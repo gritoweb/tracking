@@ -57,8 +57,12 @@ function SidebarContent({ collapsed, onNavigate }: SidebarContentProps) {
 
   return (
     <>
-      {/* Command palette trigger — reminds users of the ⌘K shortcut */}
       <div className="px-2 pt-3">
+        <WorkspaceSwitcher collapsed={collapsed} />
+      </div>
+
+      {/* Command palette trigger — reminds users of the ⌘K shortcut */}
+      <div className="px-2 pt-2">
         <Tooltip>
           <TooltipTrigger asChild>
             <button
@@ -150,11 +154,8 @@ function SidebarContent({ collapsed, onNavigate }: SidebarContentProps) {
         ))}
       </nav>
 
-      {/* Footer — workspace switcher + user info + sign out */}
+      {/* Footer — user info + sign out */}
       <div className="border-t p-3">
-        <div className="mb-2">
-          <WorkspaceSwitcher collapsed={collapsed} />
-        </div>
         {user && (
           <div
             className={cn(

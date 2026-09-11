@@ -33,7 +33,7 @@ export function WorkspaceSwitcher({ collapsed }: { collapsed?: boolean }) {
       <SelectContent>
         {orgs.map((org) => (
           <SelectItem key={org.id} value={org.id}>
-            {org.name}
+            {org.name.replace(/\s*Workspace$/i, "")}
           </SelectItem>
         ))}
       </SelectContent>

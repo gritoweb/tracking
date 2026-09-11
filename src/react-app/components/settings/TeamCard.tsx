@@ -16,19 +16,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { authClient } from "@/lib/auth-client";
+import { useAuth } from "@/hooks/useAuth";
 import { UserAvatar } from "@/components/layout/UserAvatar";
 import { X, Mail } from "lucide-react";
 import { toast } from "sonner";
 
 export function TeamCard() {
-  // Not useActiveOrganization(): session.activeOrganizationId is only ever set
-  // by an explicit set-active call, which nothing in this app makes — every
-  // org-scoped action here resolved to "no active org" until someone called it
-  // by hand. useListOrganizations() lists real memberships regardless, and
-  // since every user has exactly one workspace (auto-created on signup), the
-  // first one is always the right one.
   const { data: orgs, isPending: orgsPending } = authClient.useListOrganizations();
-  const organizationId = orgs?.[0]?.id;
+  const { session } = useAuth();
+  const organizationId =
+    orgs?.find((o) => o.id === session?.activeOrganizationId)?.id ?? orgs?.[0]?.id;
 
   const {
     data: org,
