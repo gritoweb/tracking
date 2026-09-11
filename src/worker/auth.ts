@@ -109,6 +109,27 @@ export function createAuth(env: Env, baseURL: string) {
           },
         },
       },
+      session: {
+        create: {
+          before: async (session) => {
+            const row = await env.DB
+              .prepare(`SELECT last_active_organization_id FROM "user" WHERE id = ?`)
+              .bind(session.userId)
+              .first<{ last_active_organization_id: string | null }>();
+            if (!row?.last_active_organization_id) return;
+            return { data: { ...session, activeOrganizationId: row.last_active_organization_id } };
+          },
+        },
+        update: {
+          after: async (session) => {
+            if (session.activeOrganizationId === undefined) return;
+            await env.DB
+              .prepare(`UPDATE "user" SET last_active_organization_id = ? WHERE id = ?`)
+              .bind(session.activeOrganizationId, session.userId)
+              .run();
+          },
+        },
+      },
     },
     plugins: [
       bearer(),

@@ -36,16 +36,26 @@ export async function resolveWorkspace(env: Env, request: Request): Promise<Reso
   }
 
   if (!workspaceId) {
-    // First request after signup/sign-in (or after being removed from the
-    // active workspace) — fall back to the user's first organization and
-    // persist it as active. setActiveOrganization validates membership.
     const orgs = await auth.api.listOrganizations({ headers: request.headers });
     if (orgs.length === 0) return { ok: false, status: 404 };
-    workspaceId = orgs[0].id;
+
+    const lastActive = await env.DB
+      .prepare(`SELECT last_active_organization_id FROM "user" WHERE id = ?`)
+      .bind(user.id)
+      .first<{ last_active_organization_id: string | null }>();
+    const preferred = lastActive?.last_active_organization_id;
+
+    workspaceId = orgs.find((o) => o.id === preferred)?.id ?? orgs[0].id;
     await auth.api.setActiveOrganization({
       body: { organizationId: workspaceId },
       headers: request.headers,
     });
+    if (workspaceId !== preferred) {
+      await env.DB
+        .prepare(`UPDATE "user" SET last_active_organization_id = ? WHERE id = ?`)
+        .bind(workspaceId, user.id)
+        .run();
+    }
   }
 
   return { ok: true, workspaceId, userId: user.id };

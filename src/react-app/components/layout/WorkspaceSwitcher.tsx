@@ -7,6 +7,7 @@ import {
 } from "@/components/ui/select";
 import { authClient } from "@/lib/auth-client";
 import { useAuth } from "@/hooks/useAuth";
+import { cn } from "@/lib/utils";
 
 export function WorkspaceSwitcher({ collapsed }: { collapsed?: boolean }) {
   const { data: orgs } = authClient.useListOrganizations();
@@ -25,7 +26,10 @@ export function WorkspaceSwitcher({ collapsed }: { collapsed?: boolean }) {
     <Select value={activeId} onValueChange={handleChange}>
       <SelectTrigger
         size="sm"
-        className={collapsed ? "h-8 w-8 justify-center p-0 [&>svg]:hidden" : "h-8 text-xs"}
+        className={cn(
+          "w-full rounded-md border bg-background text-sm text-muted-foreground transition-colors duration-fast ease-out-quart hover:bg-accent hover:text-foreground",
+          collapsed ? "justify-center p-2" : "gap-2 px-2.5 py-1.5"
+        )}
         aria-label="Switch workspace"
       >
         {collapsed ? "W" : <SelectValue />}
