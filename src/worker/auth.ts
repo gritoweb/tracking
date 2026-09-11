@@ -76,6 +76,13 @@ export function createAuth(env: Env, baseURL: string) {
         enabled: true,
       },
     },
+    account: {
+      // Without this, Google sign-in on an email that already has a password/OTP account fails with account_not_linked.
+      accountLinking: {
+        enabled: true,
+        trustedProviders: ["google"],
+      },
+    },
     socialProviders: {
       google: {
         clientId: env.GOOGLE_CLIENT_ID,
