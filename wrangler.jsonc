@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "timetracker-app",
+  "name": "tracking",
   "main": "./src/worker/index.ts",
   // Pinned to the installed workerd's date (1.20260708.1), not "today": a
   // compat date ahead of the local runtime makes `wrangler dev` and the e2e
