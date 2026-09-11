@@ -30,6 +30,7 @@ import {
 } from "@/hooks/useEntries";
 import { EntryForm } from "@/components/entries/EntryForm";
 import { ColorDot } from "@/components/ColorDot";
+import { UserAvatar } from "@/components/layout/UserAvatar";
 import { cn } from "@/lib/utils";
 import {
   ChevronDown,
@@ -54,6 +55,10 @@ export interface DetailedEntry {
   clientName: string | null;
   taskId: string | null;
   taskName: string | null;
+  userId: string | null;
+  userName: string | null;
+  userEmail: string | null;
+  userImage: string | null;
   start: string;
   stop: string | null;
   duration: number | null;
@@ -67,6 +72,7 @@ type ColumnKey =
   | "client"
   | "project"
   | "task"
+  | "person"
   | "date"
   | "time"
   | "amount"
@@ -85,6 +91,7 @@ const COLUMNS: ColumnDef[] = [
   { key: "client", label: "Client", defaultVisible: false, sortValue: (e) => (e.clientName ?? "").toLowerCase() },
   { key: "project", label: "Project", defaultVisible: true, sortValue: (e) => (e.projectName ?? "").toLowerCase() },
   { key: "task", label: "Task", defaultVisible: false, sortValue: (e) => (e.taskName ?? "").toLowerCase() },
+  { key: "person", label: "Person", defaultVisible: true, sortValue: (e) => (e.userName ?? e.userEmail ?? "").toLowerCase() },
   { key: "date", label: "Date", defaultVisible: true, sortValue: (e) => e.start },
   { key: "time", label: "Time", defaultVisible: true, sortValue: (e) => e.start },
   { key: "amount", label: "Amount", defaultVisible: true, align: "right", sortValue: (e) => e.amount },
@@ -413,6 +420,20 @@ function renderCell(
     case "task":
       return entry.taskName ? (
         <span className="truncate text-xs">{entry.taskName}</span>
+      ) : (
+        <span className="text-xs text-muted-foreground">—</span>
+      );
+    case "person":
+      return entry.userName || entry.userEmail ? (
+        <div className="flex items-center gap-1.5">
+          <UserAvatar
+            name={entry.userName}
+            email={entry.userEmail}
+            image={entry.userImage}
+            className="h-5 w-5 text-micro"
+          />
+          <span className="truncate text-xs">{entry.userName ?? entry.userEmail}</span>
+        </div>
       ) : (
         <span className="text-xs text-muted-foreground">—</span>
       );

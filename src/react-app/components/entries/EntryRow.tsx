@@ -33,6 +33,7 @@ import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { SavedTick } from "./SavedTick";
 import { ColorDot } from "@/components/ColorDot";
 import { ProjectBadge } from "@/components/ProjectBadge";
+import { UserAvatar } from "@/components/layout/UserAvatar";
 import type { TimeEntry } from "@shared/schemas";
 
 interface EntryRowProps {
@@ -393,6 +394,24 @@ export function EntryRow({ entry, isSelected = false, onToggleSelect }: EntryRow
               </span>
             </TooltipTrigger>
             <TooltipContent>Billable</TooltipContent>
+          </Tooltip>
+        )}
+
+        {/* Who logged it — omitted when unknown (pre-existing rows, or cron-
+            materialized entries with no single human creator). */}
+        {(entry.userName || entry.userEmail) && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="hidden shrink-0 sm:inline-flex">
+                <UserAvatar
+                  name={entry.userName}
+                  email={entry.userEmail}
+                  image={entry.userImage}
+                  className="h-5 w-5 text-micro"
+                />
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>{entry.userName ?? entry.userEmail}</TooltipContent>
           </Tooltip>
         )}
 

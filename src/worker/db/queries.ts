@@ -41,10 +41,12 @@ export const ENTRY_SELECT = `
   SELECT te.*,
     p.name  AS project_name,  p.color AS project_color,
     tk.name AS task_name,
+    u.name  AS user_name,     u.email AS user_email, u.image AS user_image,
     GROUP_CONCAT(t.name) AS tag_names
   FROM time_entries te
   LEFT JOIN projects p  ON p.id  = te.project_id AND p.workspace_id  = te.workspace_id
   LEFT JOIN tasks   tk  ON tk.id = te.task_id    AND tk.workspace_id = te.workspace_id
+  LEFT JOIN "user"  u   ON u.id  = te.user_id
   LEFT JOIN time_entry_tags tet ON tet.time_entry_id = te.id
   LEFT JOIN tags t ON t.id = tet.tag_id AND t.workspace_id = te.workspace_id
 `;
@@ -133,6 +135,9 @@ export function formatEntry(row: Record<string, unknown>) {
     id: row.id as string,
     workspaceId: row.workspace_id as string,
     userId: (row.user_id as string | null) ?? null,
+    userName: (row.user_name as string | null) ?? null,
+    userEmail: (row.user_email as string | null) ?? null,
+    userImage: (row.user_image as string | null) ?? null,
     projectId: (row.project_id as string | null) ?? null,
     projectName: (row.project_name as string | null) ?? null,
     projectColor: (row.project_color as string | null) ?? null,

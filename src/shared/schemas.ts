@@ -337,6 +337,9 @@ export const TimeEntrySchema = z.object({
   // materialized by a cron job (recurring templates, calendar auto-track)
   // rather than a person.
   userId: z.string().nullable(),
+  userName: z.string().nullable(),
+  userEmail: z.string().nullable(),
+  userImage: z.string().nullable(),
   projectId: z.string().nullable(),
   projectName: z.string().nullable(),
   projectColor: z.string().nullable(),

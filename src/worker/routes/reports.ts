@@ -399,11 +399,13 @@ export const reportsRouter = new Hono<{
         p.name as project_name, p.color as project_color, p.rate as project_rate,
         c.name as client_name,
         tk.name as task_name,
+        u.name as user_name, u.email as user_email, u.image as user_image,
         GROUP_CONCAT(t.name) as tag_names
       FROM time_entries te
       LEFT JOIN projects p ON p.id = te.project_id
       LEFT JOIN clients c ON c.id = p.client_id
       LEFT JOIN tasks tk ON tk.id = te.task_id
+      LEFT JOIN "user" u ON u.id = te.user_id
       LEFT JOIN time_entry_tags tet ON tet.time_entry_id = te.id
       LEFT JOIN tags t ON t.id = tet.tag_id
       WHERE ${where}
@@ -429,6 +431,10 @@ export const reportsRouter = new Hono<{
             clientName: r.client_name ?? null,
             taskId: r.task_id ?? null,
             taskName: r.task_name ?? null,
+            userId: r.user_id ?? null,
+            userName: r.user_name ?? null,
+            userEmail: r.user_email ?? null,
+            userImage: r.user_image ?? null,
             start: r.start,
             stop: r.stop,
             duration,
