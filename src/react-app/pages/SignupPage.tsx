@@ -52,7 +52,7 @@ export function SignupPage() {
   const [code, setCode] = useState("");
   const [linkSent, setLinkSent] = useState(false);
   const [password, setPassword] = useState("");
-  const [usePassword, setUsePassword] = useState(true);
+  const [usePassword, setUsePassword] = useState(false);
 
   // Navigate only once the shared session store has actually caught up —
   // navigating right after sign-in resolves races AuthGuard's useSession(),
@@ -308,7 +308,7 @@ export function SignupPage() {
                   setLinkSent(false);
                 }}
               >
-                {usePassword ? "Use email code instead" : "Sign up with password instead (dev)"}
+                {usePassword ? "Use email code instead" : "Sign up with password instead"}
               </Button>
               <p className="text-center text-sm text-muted-foreground">
                 Already clocking in with us?{" "}

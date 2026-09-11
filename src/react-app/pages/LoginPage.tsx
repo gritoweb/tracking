@@ -60,9 +60,8 @@ export function LoginPage() {
   const [linkSent, setLinkSent] = useState(false);
   const [pending, setPending] = useState(false);
 
-  // — Password sign-in (local dev only, ENABLE_PASSWORD_AUTH)
   const [password, setPassword] = useState("");
-  const [usePassword, setUsePassword] = useState(true);
+  const [usePassword, setUsePassword] = useState(false);
 
   // — Passkey state
   const [passkeyPending, setPasskeyPending] = useState(false);
@@ -314,7 +313,7 @@ export function LoginPage() {
                   setLinkSent(false);
                 }}
               >
-                {usePassword ? "Use email code instead" : "Sign in with password instead (dev)"}
+                {usePassword ? "Use email code instead" : "Sign in with password instead"}
               </Button>
             </form>
           </CardContent>
