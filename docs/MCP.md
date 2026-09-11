@@ -106,7 +106,7 @@ A healthy server answers with an SSE frame containing:
 ```
 
 Swap `"method":"tools/list"` (and drop `params`) to see the tools your key can
-reach — 7 on a read key, 11 on read+write.
+reach — 7 on a read key, 13 on read+write.
 
 ---
 
@@ -121,6 +121,8 @@ reach — 7 on a read key, 11 on read+write.
 | `get_project_pacing` | read | Budget spent, burn rate, projected overrun |
 | `get_running_timer` | read | What's running now, and for how long |
 | `list_drafts` | read | Proposals awaiting review, with why each was proposed |
+| `create_client` | read+write | New client; **not** idempotent — check `list_clients` first |
+| `create_project` | read+write | New project, optional client; **not** idempotent |
 | `start_timer` | read+write | Stops any running timer first, as the app does |
 | `stop_timer` | read+write | Idempotent — a second call is a no-op |
 | `log_time` | read+write | A completed entry; **not** idempotent by design |

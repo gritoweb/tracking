@@ -18,6 +18,9 @@ import { z } from "zod";
 import { buildReportWhere, durationExpr, formatEntry, ENTRY_SELECT, broadcast } from "../db/queries";
 import { loadProjectPacing } from "../lib/pacing";
 import { generateDrafts, listDrafts } from "../lib/drafts";
+import { createClient } from "../lib/clients";
+import { createProject } from "../lib/projects";
+import { CreateClientSchema, CreateProjectSchema } from "@shared/schemas";
 import type { ApiKeyScope } from "../lib/api-keys";
 
 /** Cap on rows any single tool returns, so one call can't blow the context window. */
@@ -42,7 +45,7 @@ const MUTATES = {
 // The wire identifier — stable, lowercase, and NOT for display. Clients key
 // their config off it, so it must not change with the display name.
 const SERVER_NAME = "timetracker";
-const SERVER_VERSION = "1.1.0";
+const SERVER_VERSION = "1.2.0";
 const SITE_URL = "https://timetracker.run";
 
 /**
@@ -86,7 +89,8 @@ Working with it:
 - Call \`list_projects\` before anything that takes a project id; ids are opaque and must never be guessed.
 - Use \`get_time_summary\` for "how much" and \`list_time_entries\` for "what was worked on".
 - Money comes from each project's own hourly rate. A project with no rate contributes 0 to any amount — report that as "no rate set", never as "earned nothing".
-- Drafted entries are PROPOSALS, not tracked time. They appear in no report and no total until a person reviews and confirms them in the app; \`draft_day\` creates them, it does not log time.`;
+- Drafted entries are PROPOSALS, not tracked time. They appear in no report and no total until a person reviews and confirms them in the app; \`draft_day\` creates them, it does not log time.
+- Call \`list_clients\`/\`list_projects\` before \`create_client\`/\`create_project\` to check one doesn't already exist under a slightly different name — neither tool is idempotent, so a retry makes a duplicate.`;
 
 /** MCP tool results are text; JSON is the most reliably parsed shape for one. */
 function json(value: unknown) {
@@ -468,6 +472,45 @@ export function buildMcpServer(ctx: McpContext): McpServer {
   // all — a tool a client can see but can never successfully call is worse than
   // one that was never advertised.
   if (scope !== "read_write") return server;
+
+  server.registerTool(
+    "create_client",
+    {
+      title: "Create a client",
+      description:
+        "Add a new client to the workspace. Use list_clients first to check one doesn't already exist under a slightly different name.",
+      inputSchema: CreateClientSchema.shape,
+      // Deliberately NOT idempotent: calling it twice makes two clients of the
+      // same name, matching create_project and log_time.
+      annotations: MUTATES,
+    },
+    async (data) => {
+      const client = await createClient(db, workspaceId, data);
+      return json(client);
+    }
+  );
+
+  server.registerTool(
+    "create_project",
+    {
+      title: "Create a project",
+      description:
+        "Add a new project to the workspace, optionally under a client. Use list_clients first to get a clientId rather than guessing one.",
+      inputSchema: CreateProjectSchema.shape,
+      annotations: MUTATES,
+    },
+    async (data) => {
+      if (data.clientId) {
+        const client = await db
+          .prepare(`SELECT id FROM clients WHERE id = ? AND workspace_id = ?`)
+          .bind(data.clientId, workspaceId)
+          .first();
+        if (!client) return text(`No client with id ${data.clientId} in this workspace.`);
+      }
+      const project = await createProject(db, workspaceId, data);
+      return json(project);
+    }
+  );
 
   server.registerTool(
     "start_timer",

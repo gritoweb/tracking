@@ -3,20 +3,7 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { CreateClientSchema, UpdateClientSchema } from "@shared/schemas";
 import { buildReportWhere } from "../db/queries";
-
-function formatClient(row: Record<string, unknown>) {
-  return {
-    id: row.id as string,
-    workspaceId: row.workspace_id as string,
-    name: row.name as string,
-    notes: (row.notes as string | null) ?? null,
-    email: (row.email as string | null) ?? null,
-    phone: (row.phone as string | null) ?? null,
-    address: (row.address as string | null) ?? null,
-    archived: Boolean(row.archived),
-    createdAt: row.created_at as string,
-  };
-}
+import { createClient, formatClient } from "../lib/clients";
 
 export const clientsRouter = new Hono<{
   Bindings: Env;
@@ -42,32 +29,8 @@ export const clientsRouter = new Hono<{
   .post("/", zValidator("json", CreateClientSchema), async (c) => {
     const workspaceId = c.get("workspaceId");
     const data = c.req.valid("json");
-    const id = crypto.randomUUID();
-    const now = new Date().toISOString();
-
-    await c.env.DB.prepare(
-      `INSERT INTO clients (id, workspace_id, name, notes, email, phone, address, archived, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)`
-    )
-      .bind(
-        id,
-        workspaceId,
-        data.name,
-        data.notes ?? null,
-        data.email ?? null,
-        data.phone ?? null,
-        data.address ?? null,
-        now
-      )
-      .run();
-
-    const { results } = await c.env.DB.prepare(
-      `SELECT * FROM clients WHERE id = ? AND workspace_id = ?`
-    )
-      .bind(id, workspaceId)
-      .all<Record<string, unknown>>();
-
-    return c.json(formatClient(results[0]), 201);
+    const client = await createClient(c.env.DB, workspaceId, data);
+    return c.json(client, 201);
   })
   /**
    * Per-client totals for a date window — what the Clients page shows instead
