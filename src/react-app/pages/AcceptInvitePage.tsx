@@ -22,12 +22,13 @@ export function AcceptInvitePage() {
       return;
     }
 
-    authClient.organization.acceptInvitation({ invitationId }).then(({ error: acceptError }) => {
+    authClient.organization.acceptInvitation({ invitationId }).then(async ({ error: acceptError }) => {
       if (acceptError) {
         setStatus("error");
         setError(acceptError.message ?? "This invitation is invalid or has expired.");
         return;
       }
+      await authClient.getSession({ query: { disableCookieCache: true } });
       navigate("/");
     });
   }, [isLoading, user, invitationId, navigate]);

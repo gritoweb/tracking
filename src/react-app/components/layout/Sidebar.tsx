@@ -7,6 +7,7 @@ import { useTimerStore } from "@/stores/timerStore";
 import { formatSeconds } from "@/lib/dateUtils";
 import { useAuth } from "@/hooks/useAuth";
 import { UserAvatar } from "@/components/layout/UserAvatar";
+import { WorkspaceSwitcher } from "@/components/layout/WorkspaceSwitcher";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -149,8 +150,11 @@ function SidebarContent({ collapsed, onNavigate }: SidebarContentProps) {
         ))}
       </nav>
 
-      {/* Footer — user info + sign out */}
+      {/* Footer — workspace switcher + user info + sign out */}
       <div className="border-t p-3">
+        <div className="mb-2">
+          <WorkspaceSwitcher collapsed={collapsed} />
+        </div>
         {user && (
           <div
             className={cn(
