@@ -81,6 +81,7 @@ export function createAuth(env: Env, baseURL: string) {
       accountLinking: {
         enabled: true,
         trustedProviders: ["google"],
+        requireLocalEmailVerified: false,
       },
     },
     socialProviders: {
