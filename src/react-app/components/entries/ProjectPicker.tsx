@@ -15,9 +15,16 @@ import {
   CommandGroup,
   CommandItem,
 } from "@/components/ui/command";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ColorDot } from "@/components/ColorDot";
 import { cn } from "@/lib/utils";
-import { useProjects, useCreateProject } from "@/hooks/useProjects";
+import { useProjects, useCreateProject, useClients } from "@/hooks/useProjects";
 import { useUIStore } from "@/stores/uiStore";
 import { nextProjectColor, PROJECT_COLORS } from "@/lib/colorUtils";
 
@@ -47,7 +54,9 @@ export function ProjectPicker({
 }: ProjectPickerProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [createClientId, setCreateClientId] = useState("none");
   const { data: projects = [] } = useProjects();
+  const { data: clients = [] } = useClients();
   const createProject = useCreateProject();
   const autoAssignColors = useUIStore((s) => s.autoAssignColors);
 
@@ -74,8 +83,10 @@ export function ProjectPicker({
         ? nextProjectColor(projects.map((p) => p.color))
         : PROJECT_COLORS[9],
       billable: false,
+      clientId: createClientId === "none" ? null : createClientId,
     });
     setSearch("");
+    setCreateClientId("none");
     select(project.id);
   };
 
@@ -83,7 +94,10 @@ export function ProjectPicker({
   // rather than resuming someone else's half-typed name.
   const handleOpenChange = (next: boolean) => {
     setOpen(next);
-    if (!next) setSearch("");
+    if (!next) {
+      setSearch("");
+      setCreateClientId("none");
+    }
   };
 
   return (
@@ -135,6 +149,23 @@ export function ProjectPicker({
             onValueChange={setSearch}
             className="h-9"
           />
+          {canCreate && (
+            <div className="border-b px-2 py-1.5">
+              <Select value={createClientId} onValueChange={setCreateClientId}>
+                <SelectTrigger size="sm" className="h-7 w-full text-xs">
+                  <SelectValue placeholder="No client" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No client</SelectItem>
+                  {clients.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <CommandList>
             {/* Never a bare "no results": the query the user just typed is
                 exactly the name they want, so offer to make it. */}
