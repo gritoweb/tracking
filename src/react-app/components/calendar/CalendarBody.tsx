@@ -10,7 +10,7 @@ import {
   startOfDay,
   endOfDay,
 } from "date-fns";
-import { CalendarPlus, AlertTriangle } from "lucide-react";
+import { CalendarPlus, AlertTriangle, Pencil, Copy, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { CalendarView, type CalendarViewType } from "./CalendarView";
 import { CalendarCreateDialog } from "./CalendarCreateDialog";
@@ -24,13 +24,19 @@ import { useTimerStore } from "@/stores/timerStore";
 import { useUIStore } from "@/stores/uiStore";
 import {
   buildEvents,
-  buildGapEvents,
   draftToEvent,
   externalEventToEvent,
   type CalendarEventExtendedProps,
 } from "@/lib/calendarMapping";
 import { useDraftRange } from "@/hooks/useDrafts";
 import { localDayKey, formatEntryTime } from "@/lib/dateUtils";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 
 import "@/styles/fullcalendar.css";
 
@@ -42,7 +48,6 @@ interface CalendarBodyProps {
   slotHeight: number;
   weekStartsOn: number; // 0=Sun … 6=Sat
   showWeekends: boolean;
-  showGaps: boolean;
   /**
    * False in split view, where the entry list beside this grid renders its own
    * "nothing tracked" state. Two of them side by side, in near-identical
@@ -71,7 +76,6 @@ export function CalendarBody({
   slotHeight,
   weekStartsOn,
   showWeekends,
-  showGaps,
   showEmptyState = true,
   onReviewDay,
   acceptTaskDrops = false,
@@ -168,29 +172,13 @@ export function CalendarBody({
       (g) => !draftedEventIds.has(String(g.id).replace(/^ghost:/, ""))
     );
     const draftBlocks = drafts.map(draftToEvent);
-    // Gaps only make sense on the time grid, not the month overview.
-    const allGaps =
-      showGaps && calendarView !== "dayGridMonth" ? buildGapEvents(entries, nowIso) : [];
-    // A gap that has already been drafted is the same hour asking to be filled
-    // twice — once as "Track 09:00–11:30" and once as the proposal that answers
-    // it. The proposal wins: it carries a project, a description, and a way to
-    // confirm. Left in, the two blocks also split the column and truncated each
-    // other's only label.
-    const gaps = allGaps.filter((gap) => {
-      const gapStart = new Date(gap.start as string).getTime();
-      const gapStop = new Date(gap.end as string).getTime();
-      return !drafts.some(
-        (d) =>
-          gapStart < new Date(d.stop).getTime() && gapStop > new Date(d.start).getTime()
-      );
-    });
     return {
-      events: [...gaps, ...draftBlocks, ...real, ...visibleGhosts],
+      events: [...draftBlocks, ...real, ...visibleGhosts],
       // What the "Convert N events" button offers to do — the ghosts still on
       // screen, not every unconfirmed event (a drafted one is already handled).
       ghostCount: visibleGhosts.length,
     };
-  }, [entries, runningEntry, range, nowIso, externalEvents, showGaps, calendarView, drafts]);
+  }, [entries, runningEntry, range, nowIso, externalEvents, drafts]);
 
   const convertRange = useConvertCalendarRange();
   const handleConvertAll = () =>
@@ -298,11 +286,6 @@ export function CalendarBody({
       onReviewDay?.(props.draft.localDate);
       return;
     }
-    if (props.gap && props.gapRange) {
-      setCreateRange({ start: props.gapRange.start, stop: props.gapRange.stop });
-      setCreateOpen(true);
-      return;
-    }
     if (props.ghost && props.external) {
       setCreateRange({
         start: props.external.start,
@@ -314,6 +297,46 @@ export function CalendarBody({
       return;
     }
     if (props.entry) setEditEntry(props.entry);
+  };
+
+  // Right-click menu for a real, non-running entry. Positioned at the click
+  // coordinates rather than nested in eventContent — FullCalendar renders that
+  // through its own flushSync-based portal, and a Radix menu mounted inside it
+  // fought that render pass silently (console showed "flushSync was called
+  // from inside a lifecycle method" and the menu never opened).
+  const [contextMenu, setContextMenu] = useState<{
+    entry: EditableEntry;
+    x: number;
+    y: number;
+  } | null>(null);
+
+  const handleEventContextMenu = (
+    props: CalendarEventExtendedProps,
+    x: number,
+    y: number
+  ) => {
+    if (props.entry) setContextMenu({ entry: props.entry, x, y });
+  };
+
+  const handleDuplicate = (entry: EditableEntry) => {
+    createEntry.mutate(
+      {
+        description: entry.description,
+        projectId: entry.projectId,
+        taskId: entry.taskId,
+        tags: entry.tags,
+        billable: entry.billable,
+        start: entry.start,
+        stop: entry.stop,
+      },
+      { onError: () => toast.error("Couldn't duplicate entry") }
+    );
+  };
+
+  const handleDeleteEntry = (entry: EditableEntry) => {
+    deleteEntry.mutate(entry.id, {
+      onError: () => toast.error("Couldn't delete entry"),
+    });
   };
 
   return (
@@ -395,7 +418,62 @@ export function CalendarBody({
         onExternalDrop={
           acceptTaskDrops && calendarView !== "dayGridMonth" ? handleTaskDrop : undefined
         }
+        onEventContextMenu={handleEventContextMenu}
       />
+
+      {contextMenu && (
+        <DropdownMenu
+          open
+          onOpenChange={(open) => !open && setContextMenu(null)}
+        >
+          {/* Popper needs a real anchor to measure from — this invisible 1px
+              point at the click coordinates stands in for the trigger a
+              context menu doesn't otherwise have. */}
+          <DropdownMenuTrigger asChild>
+            <span
+              className="fixed h-px w-px"
+              style={{ left: contextMenu.x, top: contextMenu.y }}
+            />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            className="w-40"
+            align="start"
+            side="bottom"
+            sideOffset={0}
+            onCloseAutoFocus={(e) => e.preventDefault()}
+          >
+            <DropdownMenuItem
+              onSelect={() => {
+                setEditEntry(contextMenu.entry);
+                setContextMenu(null);
+              }}
+            >
+              <Pencil className="h-3.5 w-3.5" />
+              Edit
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={() => {
+                handleDuplicate(contextMenu.entry);
+                setContextMenu(null);
+              }}
+            >
+              <Copy className="h-3.5 w-3.5" />
+              Duplicate
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              variant="destructive"
+              onSelect={() => {
+                handleDeleteEntry(contextMenu.entry);
+                setContextMenu(null);
+              }}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
 
       <CalendarCreateDialog
         open={createOpen}

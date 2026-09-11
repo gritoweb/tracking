@@ -49,7 +49,6 @@ interface UIStore {
   // Calendar prefs, hydrated from D1 settings but persisted locally for instant paint.
   weekStart: number; // 0=Sun … 6=Sat
   showWeekends: boolean;
-  showGaps: boolean;
   autoAssignColors: boolean;
   productivity: ProductivitySettings;
   commandOpen: boolean;
@@ -103,7 +102,6 @@ interface UIStore {
   setListRange: (key: ListRangeKey, since?: string | null, until?: string | null) => void;
   setWeekStart: (v: number) => void;
   setShowWeekends: (v: boolean) => void;
-  setShowGaps: (v: boolean) => void;
   setAutoAssignColors: (v: boolean) => void;
   setProductivity: (p: Partial<ProductivitySettings>) => void;
   setCommandOpen: (v: boolean) => void;
@@ -136,7 +134,7 @@ export const useUIStore = create<UIStore>()(
       currency: localStorage.getItem("pref_currency") ?? "USD",
       roundMode: (localStorage.getItem("pref_roundMode") as RoundMode) ?? "off",
       roundMinutes: Number(localStorage.getItem("pref_roundMinutes")) || 15,
-      timerView: "list",
+      timerView: "calendar",
       calendarView: "timeGridWeek",
       calendarSlotHeight: CALENDAR_SLOT_HEIGHT_DEFAULT,
       // "This week" — a discrete billing period, matching what the calendar and
@@ -152,7 +150,6 @@ export const useUIStore = create<UIStore>()(
       listRangeUntil: null,
       weekStart: Number(localStorage.getItem("pref_weekStart") ?? 1),
       showWeekends: localStorage.getItem("pref_showWeekends") !== "false",
-      showGaps: localStorage.getItem("pref_showGaps") !== "false",
       autoAssignColors: localStorage.getItem("pref_autoAssignColors") === "true",
       productivity: DEFAULT_PRODUCTIVITY,
       commandOpen: false,
@@ -204,10 +201,6 @@ export const useUIStore = create<UIStore>()(
       setShowWeekends: (v) => {
         set({ showWeekends: v });
         localStorage.setItem("pref_showWeekends", String(v));
-      },
-      setShowGaps: (v) => {
-        set({ showGaps: v });
-        localStorage.setItem("pref_showGaps", String(v));
       },
       setAutoAssignColors: (v) => {
         set({ autoAssignColors: v });
@@ -267,7 +260,6 @@ export const useUIStore = create<UIStore>()(
         listRangeUntil: s.listRangeUntil,
         weekStart: s.weekStart,
         showWeekends: s.showWeekends,
-        showGaps: s.showGaps,
         autoAssignColors: s.autoAssignColors,
         productivity: s.productivity,
       }),

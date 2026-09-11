@@ -71,8 +71,6 @@ interface TimerWorkspaceHeaderProps {
   onZoomOut: () => void;
   showWeekends: boolean;
   onToggleWeekends: () => void;
-  showGaps: boolean;
-  onToggleGaps: () => void;
   // List-view date scope — replaces the week nav when the list view is active.
   listRangeKey: ListRangeKey;
   listRangeSince: string | null;
@@ -109,8 +107,6 @@ export function TimerWorkspaceHeader({
   onZoomOut,
   showWeekends,
   onToggleWeekends,
-  showGaps,
-  onToggleGaps,
   listRangeKey,
   listRangeSince,
   listRangeUntil,
@@ -237,8 +233,6 @@ export function TimerWorkspaceHeader({
               onZoomOut={onZoomOut}
               showWeekends={showWeekends}
               onToggleWeekends={onToggleWeekends}
-              showGaps={showGaps}
-              onToggleGaps={onToggleGaps}
             />
           )}
 

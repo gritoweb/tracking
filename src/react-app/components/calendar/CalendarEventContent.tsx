@@ -8,34 +8,8 @@ import type { CalendarEventExtendedProps } from "@/lib/calendarMapping";
 // Custom renderer for a calendar block. Passed to FullCalendar's `eventContent`.
 // Kept intentionally compact so short (15–30 min) blocks stay legible.
 export function CalendarEventContent(arg: EventContentArg) {
-  const { entry, running, ghost, external, gap, draft } =
+  const { entry, running, ghost, external, draft } =
     arg.event.extendedProps as Partial<CalendarEventExtendedProps>;
-
-  // Untracked gap between two entries — reads as a subtle "fill me" affordance.
-  //
-  // Labelled with the duration, not the range. A calendar block already encodes
-  // its start and end in where it sits and how tall it is, so "Track 09:30 -
-  // 11:15" spent its whole width restating the geometry — and in a narrow pane
-  // (Split, or a phone) it truncated to "Track 0…", which is a label with no
-  // information left in it. The duration is the one fact the block's position
-  // doesn't already give you, and it fits at any width.
-  if (gap) {
-    const gapMs =
-      arg.event.start && arg.event.end
-        ? arg.event.end.getTime() - arg.event.start.getTime()
-        : 0;
-    return (
-      <div
-        className="tt-on-tint-muted flex h-full items-center gap-1 overflow-hidden px-1 text-left leading-tight"
-        title={`Track ${arg.timeText}`}
-      >
-        <CalendarPlus className="h-3 w-3 shrink-0" />
-        <span className="truncate text-xs font-medium">
-          {gapMs > 0 ? formatDurationShort(gapMs / 1000) : "Track"}
-        </span>
-      </div>
-    );
-  }
 
   // Draft = a proposed entry waiting for review. Reads like a real block (it
   // carries a project and a description) but with the wand marking it as
@@ -90,7 +64,7 @@ export function CalendarEventContent(arg: EventContentArg) {
   }
   const color = entry.projectColor ?? DEFAULT_PROJECT_COLOR;
 
-  return (
+  const body = (
     <div className="flex h-full flex-col gap-0.5 overflow-hidden text-left leading-tight">
       <div className="flex items-center gap-1">
         {running && (
@@ -124,4 +98,6 @@ export function CalendarEventContent(arg: EventContentArg) {
       )}
     </div>
   );
+
+  return body;
 }

@@ -3,7 +3,11 @@
  * the app's design tokens. Tokens (--border, --card, --primary, …) are swapped
  * by the `.dark` class, so these overrides adapt to dark mode automatically —
  * no separate dark block needed.
+ *
+ * `@reference` (not `@import`) so `@apply` below resolves against the app's
+ * theme/utilities without re-emitting index.css's output into this file.
  */
+@reference "../index.css";
 .tt-calendar {
   --fc-border-color: var(--border);
   --fc-page-bg-color: var(--card);
@@ -57,7 +61,10 @@
   border-radius: var(--radius-sm);
   border: none;
   border-left: 3px solid var(--fc-event-border-color, var(--primary));
-  box-shadow: none;
+  /* Toggl leaves ~3px of gutter between same-time columns (slotEventOverlap
+     divides the width evenly but doesn't itself leave a gap) — an inset
+     shadow, not a real border, so it doesn't shift FC's own width/left math. */
+  box-shadow: inset -3px 0 0 var(--fc-page-bg-color);
   padding: 0;
   overflow: hidden;
 }
@@ -120,18 +127,6 @@
   border-style: solid;
 }
 
-/* Untracked gap: barely-there dashed block that reads as fillable empty time.
-   Sits behind real blocks and brightens on hover. */
-.tt-calendar .fc-event.tt-event-gap {
-  border-style: dashed;
-  cursor: pointer;
-  box-shadow: none;
-}
-.tt-calendar .fc-event.tt-event-gap:hover {
-  background: var(--muted) !important;
-  border-style: solid;
-}
-
 /* Draft = a proposed entry awaiting review. Dashed like a ghost, but tinted
    with its proposed project's colour so a drafted week still reads as a week of
    work rather than a row of grey placeholders. Solidifies on hover — the block
@@ -153,6 +148,46 @@
 .tt-calendar .fc .fc-timegrid-now-indicator-arrow {
   border-color: var(--primary);
   background: var(--primary);
+}
+
+/* Resize handle: FullCalendar's default is an ~8px invisible strip at the
+   bottom edge, easy to miss — a near-miss lands on the event body instead
+   (a click opens the entry sheet, a drag moves it) rather than resizing.
+   Widen the actual hit area and draw a visible grip so the affordance is
+   discoverable, matching what a drag-to-resize calendar (Toggl) signals. */
+/* Two separate handles: -start (top, needs eventStartEditable) and -end
+   (bottom, needs eventDurationEditable) — both are on, so both edges resize,
+   like Google Calendar. Sharing one `bottom` offset across both had been
+   pulling the top handle down to the bottom, which is why only one dot showed. */
+.tt-calendar .fc-timegrid-event .fc-event-resizer {
+  @apply cursor-ns-resize;
+}
+.tt-calendar .fc-timegrid-event .fc-event-resizer-start {
+  @apply h-2.5 -top-[5px];
+}
+.tt-calendar .fc-timegrid-event .fc-event-resizer-end {
+  @apply h-2.5 -bottom-[5px];
+}
+.tt-calendar .fc-timegrid-event .fc-event-resizer::after {
+  /* Toggl's own grip icon (react-big-calendar's dnd addon,
+     .rbc-addons-dnd-resize-ns-icon): a double horizontal line, not a dot.
+     The bare 8px FC gives by default has no visual cue at all, so a
+     near-miss lands on the event body (click opens the entry sheet, drag
+     moves it) instead of resizing. Neutral foreground, not the brand
+     accent — this is a grid affordance, not a project color. */
+  @apply content-[''] absolute left-1/2 w-3 -translate-x-1/2 border-t-[3px] border-double border-foreground opacity-0 transition-opacity duration-fast ease-out-quart;
+}
+.tt-calendar .fc-timegrid-event .fc-event-resizer-start::after {
+  @apply top-[3px];
+}
+.tt-calendar .fc-timegrid-event .fc-event-resizer-end::after {
+  @apply bottom-[3px];
+}
+.tt-calendar .fc-timegrid-event:hover .fc-event-resizer::after {
+  @apply opacity-[0.7];
+}
+.tt-calendar .fc-timegrid-event .fc-event-resizer:hover::after {
+  @apply opacity-100;
 }
 
 /* Scrollbars stay subtle. */

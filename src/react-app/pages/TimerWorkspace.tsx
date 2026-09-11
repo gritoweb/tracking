@@ -80,8 +80,6 @@ export function TimerWorkspace() {
   const weekStart = useUIStore((s) => s.weekStart);
   const showWeekends = useUIStore((s) => s.showWeekends);
   const setShowWeekends = useUIStore((s) => s.setShowWeekends);
-  const showGaps = useUIStore((s) => s.showGaps);
-  const setShowGaps = useUIStore((s) => s.setShowGaps);
   const openQuickAdd = useUIStore((s) => s.openQuickAdd);
   const listRangeKey = useUIStore((s) => s.listRangeKey);
   const listRangeSince = useUIStore((s) => s.listRangeSince);
@@ -278,7 +276,6 @@ export function TimerWorkspace() {
       slotHeight={slotHeight}
       weekStartsOn={weekStart}
       showWeekends={showWeekends}
-      showGaps={showGaps}
       showEmptyState={view !== "split"}
       onReviewDay={openReview}
       // The rail only renders at lg and up, and only beside a grid — below that
@@ -373,8 +370,6 @@ export function TimerWorkspace() {
         onZoomOut={() => setSlotHeight(slotHeight - CALENDAR_SLOT_HEIGHT_STEP)}
         showWeekends={showWeekends}
         onToggleWeekends={() => setShowWeekends(!showWeekends)}
-        showGaps={showGaps}
-        onToggleGaps={() => setShowGaps(!showGaps)}
         listRangeKey={listRangeKey}
         listRangeSince={listRangeSince}
         listRangeUntil={listRangeUntil}

@@ -9,6 +9,7 @@ import type {
   EventClickArg,
   DatesSetArg,
   EventDropArg,
+  EventMountArg,
 } from "@fullcalendar/core";
 import type { DateClickArg, EventResizeDoneArg, DropArg } from "@fullcalendar/interaction";
 import { CalendarEventContent } from "./CalendarEventContent";
@@ -41,6 +42,15 @@ interface CalendarViewProps {
    * pointer shouldn't advertise an affordance that leads nowhere.
    */
   onExternalDrop?: (arg: DropArg) => void;
+  /**
+   * Right-click on a real, non-running entry. Fired via a native listener on
+   * the mounted element (not a component nested in `eventContent`) — FullCalendar
+   * renders that content through its own `flushSync`-based portal, and a Radix
+   * menu mounted inside it fought that render pass silently (console showed
+   * "flushSync was called from inside a lifecycle method" and the menu never
+   * opened). The menu itself lives in the parent, positioned at (x, y).
+   */
+  onEventContextMenu?: (props: CalendarEventExtendedProps, x: number, y: number) => void;
 }
 
 // Presentational FullCalendar wrapper. All persistence lives in the parent page;
@@ -63,6 +73,7 @@ export const CalendarView = forwardRef<FullCalendar, CalendarViewProps>(
       onEventClick,
       onDatesSet,
       onExternalDrop,
+      onEventContextMenu,
     },
     ref
   ) {
@@ -104,6 +115,10 @@ export const CalendarView = forwardRef<FullCalendar, CalendarViewProps>(
           firstDay={firstDay}
           weekends={weekends}
           allDaySlot={false}
+          // Default (true) staggers overlapping events, each new one covering
+          // most of the last — Toggl instead splits the column evenly so both
+          // stay fully visible side by side.
+          slotEventOverlap={false}
           nowIndicator
           slotDuration="00:30:00"
           snapDuration="00:15:00"
@@ -117,11 +132,11 @@ export const CalendarView = forwardRef<FullCalendar, CalendarViewProps>(
           editable
           eventStartEditable
           eventDurationEditable
+          eventResizableFromStart
           events={events}
           eventContent={CalendarEventContent}
           eventClassNames={(arg) => {
             const props = arg.event.extendedProps as CalendarEventExtendedProps;
-            if (props.gap) return ["tt-event-gap"];
             if (props.ghost) return ["tt-event-ghost"];
             if (props.draft) return ["tt-event-draft"];
             return props.running ? ["tt-event-running"] : [];
@@ -136,6 +151,18 @@ export const CalendarView = forwardRef<FullCalendar, CalendarViewProps>(
           datesSet={onDatesSet}
           droppable={Boolean(onExternalDrop)}
           drop={onExternalDrop}
+          eventDidMount={(info: EventMountArg) => {
+            if (!onEventContextMenu) return;
+            const props = info.event.extendedProps as CalendarEventExtendedProps;
+            if (!props.entry || props.running) return;
+            // Assigning the property (not addEventListener) needs no manual
+            // cleanup — it's overwritten on remount and discarded with the
+            // element itself when FullCalendar unmounts it.
+            info.el.oncontextmenu = (e: MouseEvent) => {
+              e.preventDefault();
+              onEventContextMenu(props, e.clientX, e.clientY);
+            };
+          }}
         />
       </div>
     );

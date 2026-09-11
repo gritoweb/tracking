@@ -60,6 +60,10 @@ export function LoginPage() {
   const [linkSent, setLinkSent] = useState(false);
   const [pending, setPending] = useState(false);
 
+  // — Password sign-in (local dev only, ENABLE_PASSWORD_AUTH)
+  const [password, setPassword] = useState("");
+  const [usePassword, setUsePassword] = useState(true);
+
   // — Passkey state
   const [passkeyPending, setPasskeyPending] = useState(false);
 
@@ -112,6 +116,22 @@ export function LoginPage() {
     setPending(false);
     if (verifyError) {
       setError(verifyError.message ?? "Invalid or expired code");
+      return;
+    }
+    // The useEffect above navigates once `user` updates.
+  };
+
+  const handlePasswordSignIn = async () => {
+    if (!email.trim() || !password.trim()) {
+      setError("Enter email and password");
+      return;
+    }
+    setError("");
+    setPending(true);
+    const { error: signInError } = await authClient.signIn.email({ email, password });
+    setPending(false);
+    if (signInError) {
+      setError(signInError.message ?? "Invalid email or password");
       return;
     }
     // The useEffect above navigates once `user` updates.
@@ -187,7 +207,8 @@ export function LoginPage() {
               noValidate
               onSubmit={(e) => {
                 e.preventDefault();
-                if (codeSent) handleVerifyCode();
+                if (usePassword) handlePasswordSignIn();
+                else if (codeSent) handleVerifyCode();
                 else handleSendCode();
               }}
             >
@@ -209,7 +230,22 @@ export function LoginPage() {
                 />
               </div>
 
-              {codeSent ? (
+              {usePassword ? (
+                <div className="space-y-1.5">
+                  <Label htmlFor="password">Password</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    autoComplete="current-password"
+                    autoFocus
+                  />
+                </div>
+              ) : null}
+
+              {codeSent && !usePassword ? (
                 <div className="space-y-1.5">
                   <Label htmlFor="otp">6-digit code</Label>
                   <Input
@@ -235,7 +271,11 @@ export function LoginPage() {
                 </p>
               )}
 
-              {codeSent ? (
+              {usePassword ? (
+                <Button type="submit" className="w-full" disabled={pending}>
+                  {pending ? "Signing in…" : "Sign in"}
+                </Button>
+              ) : codeSent ? (
                 <Button
                   type="submit"
                   className="w-full"
@@ -248,15 +288,33 @@ export function LoginPage() {
                   {pending ? "Sending…" : "Email me a code"}
                 </Button>
               )}
+
+              {!usePassword && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="w-full text-muted-foreground"
+                  disabled={pending}
+                  onClick={handleSendMagicLink}
+                >
+                  Or send me a magic link instead
+                </Button>
+              )}
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
                 className="w-full text-muted-foreground"
                 disabled={pending}
-                onClick={handleSendMagicLink}
+                onClick={() => {
+                  setUsePassword((v) => !v);
+                  setError("");
+                  setCodeSent(false);
+                  setLinkSent(false);
+                }}
               >
-                Or send me a magic link instead
+                {usePassword ? "Use email code instead" : "Sign in with password instead (dev)"}
               </Button>
             </form>
           </CardContent>

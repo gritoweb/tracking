@@ -51,6 +51,8 @@ export function SignupPage() {
   const [codeSent, setCodeSent] = useState(false);
   const [code, setCode] = useState("");
   const [linkSent, setLinkSent] = useState(false);
+  const [password, setPassword] = useState("");
+  const [usePassword, setUsePassword] = useState(true);
 
   // Navigate only once the shared session store has actually caught up —
   // navigating right after sign-in resolves races AuthGuard's useSession(),
@@ -97,6 +99,27 @@ export function SignupPage() {
     // session is brand new (the fresh-session gate on update-user passes).
     await authClient.updateUser({ name: name.trim() });
     setPending(false);
+    // The useEffect above navigates once `user` updates.
+  };
+
+  const handlePasswordSignUp = async () => {
+    setError("");
+    if (!validate()) return;
+    if (!password.trim()) {
+      setError("Enter a password");
+      return;
+    }
+    setPending(true);
+    const { error: signUpError } = await authClient.signUp.email({
+      name: name.trim(),
+      email,
+      password,
+    });
+    setPending(false);
+    if (signUpError) {
+      setError(signUpError.message ?? "Couldn't create account");
+      return;
+    }
     // The useEffect above navigates once `user` updates.
   };
 
@@ -162,7 +185,8 @@ export function SignupPage() {
             noValidate
             onSubmit={(e) => {
               e.preventDefault();
-              if (codeSent) handleVerifyCode();
+              if (usePassword) handlePasswordSignUp();
+              else if (codeSent) handleVerifyCode();
               else handleSendCode();
             }}
           >
@@ -198,7 +222,21 @@ export function SignupPage() {
                 />
               </div>
 
-              {codeSent ? (
+              {usePassword ? (
+                <div className="space-y-1.5">
+                  <Label htmlFor="password">Password</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    autoComplete="new-password"
+                  />
+                </div>
+              ) : null}
+
+              {codeSent && !usePassword ? (
                 <div className="space-y-1.5">
                   <Label htmlFor="otp">6-digit code</Label>
                   <Input
@@ -228,7 +266,11 @@ export function SignupPage() {
             </CardContent>
 
             <CardFooter className="flex flex-col gap-3 pt-2">
-              {codeSent ? (
+              {usePassword ? (
+                <Button type="submit" className="w-full" disabled={pending}>
+                  {pending ? "Creating account…" : "Create account"}
+                </Button>
+              ) : codeSent ? (
                 <Button
                   type="submit"
                   className="w-full"
@@ -241,15 +283,32 @@ export function SignupPage() {
                   {pending ? "Sending…" : "Email me a sign-up code"}
                 </Button>
               )}
+              {!usePassword && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="w-full text-muted-foreground"
+                  disabled={pending}
+                  onClick={handleSendMagicLink}
+                >
+                  Or send me a magic link instead
+                </Button>
+              )}
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
                 className="w-full text-muted-foreground"
                 disabled={pending}
-                onClick={handleSendMagicLink}
+                onClick={() => {
+                  setUsePassword((v) => !v);
+                  setError("");
+                  setCodeSent(false);
+                  setLinkSent(false);
+                }}
               >
-                Or send me a magic link instead
+                {usePassword ? "Use email code instead" : "Sign up with password instead (dev)"}
               </Button>
               <p className="text-center text-sm text-muted-foreground">
                 Already clocking in with us?{" "}

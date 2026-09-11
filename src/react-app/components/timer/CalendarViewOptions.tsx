@@ -30,8 +30,6 @@ interface CalendarViewOptionsProps {
   onZoomOut: () => void;
   showWeekends: boolean;
   onToggleWeekends: () => void;
-  showGaps: boolean;
-  onToggleGaps: () => void;
 }
 
 /**
@@ -52,8 +50,6 @@ export function CalendarViewOptions({
   onZoomOut,
   showWeekends,
   onToggleWeekends,
-  showGaps,
-  onToggleGaps,
 }: CalendarViewOptionsProps) {
   const isMonthView = calendarView === "dayGridMonth";
   const isDayView = calendarView === "timeGridDay";
@@ -123,15 +119,7 @@ export function CalendarViewOptions({
           )}
 
           {!isMonthView && (
-            <>
-              <div className="flex items-center justify-between gap-3">
-                <Label htmlFor="opt-gaps" className="text-sm font-normal">
-                  Untracked gaps
-                </Label>
-                <Switch id="opt-gaps" checked={showGaps} onCheckedChange={onToggleGaps} />
-              </div>
-
-              <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center justify-between gap-3">
                 <Label className="text-sm font-normal">Row height</Label>
                 <div className="flex items-center rounded-md border bg-muted/40 p-0.5">
                   <Button
@@ -154,7 +142,6 @@ export function CalendarViewOptions({
                   </Button>
                 </div>
               </div>
-            </>
           )}
         </div>
       </PopoverContent>
