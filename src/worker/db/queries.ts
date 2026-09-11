@@ -132,6 +132,7 @@ export function formatEntry(row: Record<string, unknown>) {
   return {
     id: row.id as string,
     workspaceId: row.workspace_id as string,
+    userId: (row.user_id as string | null) ?? null,
     projectId: (row.project_id as string | null) ?? null,
     projectName: (row.project_name as string | null) ?? null,
     projectColor: (row.project_color as string | null) ?? null,

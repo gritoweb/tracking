@@ -149,7 +149,7 @@ export interface McpContext {
 }
 
 export function buildMcpServer(ctx: McpContext): McpServer {
-  const { env, workspaceId, scope } = ctx;
+  const { env, workspaceId, userId, scope } = ctx;
   const db = env.DB;
   const server = new McpServer(SERVER_INFO, { instructions: SERVER_INSTRUCTIONS });
 
@@ -557,10 +557,10 @@ export function buildMcpServer(ctx: McpContext): McpServer {
       await db
         .prepare(
           `INSERT INTO time_entries
-             (id, workspace_id, project_id, task_id, description, start, stop, duration, billable, created_at, updated_at)
-           VALUES (?, ?, ?, NULL, ?, ?, NULL, NULL, ?, ?, ?)`
+             (id, workspace_id, user_id, project_id, task_id, description, start, stop, duration, billable, created_at, updated_at)
+           VALUES (?, ?, ?, ?, NULL, ?, ?, NULL, NULL, ?, ?, ?)`
         )
-        .bind(id, workspaceId, projectId ?? null, description, now, billable ? 1 : 0, now, now)
+        .bind(id, workspaceId, userId, projectId ?? null, description, now, billable ? 1 : 0, now, now)
         .run();
 
       await broadcast(env, workspaceId, "timer:start", { id });
@@ -648,12 +648,13 @@ export function buildMcpServer(ctx: McpContext): McpServer {
       await db
         .prepare(
           `INSERT INTO time_entries
-             (id, workspace_id, project_id, task_id, description, start, stop, duration, billable, created_at, updated_at)
-           VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?)`
+             (id, workspace_id, user_id, project_id, task_id, description, start, stop, duration, billable, created_at, updated_at)
+           VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?)`
         )
         .bind(
           crypto.randomUUID(),
           workspaceId,
+          userId,
           projectId ?? null,
           description,
           new Date(startMs).toISOString(),

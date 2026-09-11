@@ -96,9 +96,9 @@ export const draftsRouter = new Hono<{
     const now = new Date().toISOString();
     const insert = c.env.DB.prepare(
       `INSERT INTO time_entries
-         (id, workspace_id, project_id, task_id, description, start, stop, duration,
+         (id, workspace_id, user_id, project_id, task_id, description, start, stop, duration,
           billable, calendar_event_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     );
     const remove = c.env.DB.prepare(
       `DELETE FROM draft_entries WHERE id = ? AND workspace_id = ? AND user_id = ?`
@@ -113,6 +113,7 @@ export const draftsRouter = new Hono<{
         insert.bind(
           crypto.randomUUID(),
           workspaceId,
+          userId,
           (row.project_id as string | null) ?? null,
           (row.task_id as string | null) ?? null,
           (row.description as string) ?? "",

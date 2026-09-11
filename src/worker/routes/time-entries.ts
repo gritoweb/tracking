@@ -20,6 +20,7 @@ import {
   upsertTags,
   ENTRY_SELECT,
 } from "../db/queries";
+import { getMemberRole, canManageWorkspace, canEditEntry } from "../lib/permissions";
 
 /**
  * The tab that made this request, so its own broadcast can be filtered out
@@ -60,9 +61,38 @@ async function resolveBillable(
   return Boolean(row?.billable);
 }
 
+/**
+ * Which of `ids` (already scoped to this workspace) `userId` is NOT allowed to
+ * edit/delete — empty when they're all their own, unowned, or the caller is
+ * owner/admin. Checked before any write so a bulk request either fully applies
+ * or fails loud, never silently skips someone else's entries.
+ */
+async function forbiddenEntryIds(
+  db: D1Database,
+  workspaceId: string,
+  userId: string,
+  ids: string[]
+): Promise<string[]> {
+  if (!ids.length) return [];
+  const role = await getMemberRole(db, workspaceId, userId);
+  if (canManageWorkspace(role)) return [];
+
+  const placeholders = ids.map(() => "?").join(",");
+  const { results } = await db
+    .prepare(
+      `SELECT id, user_id FROM time_entries WHERE workspace_id = ? AND id IN (${placeholders})`
+    )
+    .bind(workspaceId, ...ids)
+    .all<{ id: string; user_id: string | null }>();
+
+  return results
+    .filter((r) => !canEditEntry(role, r.user_id, userId))
+    .map((r) => r.id);
+}
+
 export const timeEntriesRouter = new Hono<{
   Bindings: Env;
-  Variables: { workspaceId: string };
+  Variables: { workspaceId: string; userId: string };
 }>()
   // ─── List ─────────────────────────────────────────────────────────────────
   .get("/", async (c) => {
@@ -181,6 +211,7 @@ export const timeEntriesRouter = new Hono<{
   // ─── Create ───────────────────────────────────────────────────────────────
   .post("/", zValidator("json", CreateTimeEntrySchema), async (c) => {
     const workspaceId = c.get("workspaceId");
+    const userId = c.get("userId");
     const data = c.req.valid("json");
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
@@ -197,10 +228,10 @@ export const timeEntriesRouter = new Hono<{
 
     await c.env.DB.prepare(
       `INSERT INTO time_entries
-         (id, workspace_id, project_id, task_id, description, start, stop, duration, billable, calendar_event_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         (id, workspace_id, user_id, project_id, task_id, description, start, stop, duration, billable, calendar_event_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(
-      id, workspaceId,
+      id, workspaceId, userId,
       data.projectId ?? null,
       data.taskId ?? null,
       data.description,
@@ -235,8 +266,17 @@ export const timeEntriesRouter = new Hono<{
   // ─── Bulk update ──────────────────────────────────────────────────────────
   .patch("/bulk", zValidator("json", BulkUpdateTimeEntriesSchema), async (c) => {
     const workspaceId = c.get("workspaceId");
+    const userId = c.get("userId");
     const { ids, patch } = c.req.valid("json");
     const now = new Date().toISOString();
+
+    const forbidden = await forbiddenEntryIds(c.env.DB, workspaceId, userId, ids);
+    if (forbidden.length) {
+      return c.json(
+        { error: "Not your entry", detail: `Can't edit entries logged by someone else: ${forbidden.join(", ")}` },
+        403
+      );
+    }
 
     const fields: string[] = [];
     const values: unknown[] = [];
@@ -277,7 +317,17 @@ export const timeEntriesRouter = new Hono<{
   // ─── Bulk delete ──────────────────────────────────────────────────────────
   .delete("/bulk", zValidator("json", BulkDeleteTimeEntriesSchema), async (c) => {
     const workspaceId = c.get("workspaceId");
+    const userId = c.get("userId");
     const { ids } = c.req.valid("json");
+
+    const forbidden = await forbiddenEntryIds(c.env.DB, workspaceId, userId, ids);
+    if (forbidden.length) {
+      return c.json(
+        { error: "Not your entry", detail: `Can't delete entries logged by someone else: ${forbidden.join(", ")}` },
+        403
+      );
+    }
+
     const placeholders = ids.map(() => "?").join(",");
 
     await c.env.DB.prepare(
@@ -296,6 +346,7 @@ export const timeEntriesRouter = new Hono<{
   // ─── Update ───────────────────────────────────────────────────────────────
   .put("/:id", zValidator("json", UpdateTimeEntrySchema), async (c) => {
     const workspaceId = c.get("workspaceId");
+    const userId = c.get("userId");
     const id = c.req.param("id");
     const data = c.req.valid("json");
     const now = new Date().toISOString();
@@ -304,9 +355,14 @@ export const timeEntriesRouter = new Hono<{
     // `time_entry_tags` has no workspace_id column, so without this guard a
     // tags-only PUT would delete/rewrite another workspace's tag associations.
     const owned = await c.env.DB.prepare(
-      `SELECT start, stop FROM time_entries WHERE id = ? AND workspace_id = ?`
-    ).bind(id, workspaceId).first<{ start: string; stop: string | null }>();
+      `SELECT start, stop, user_id FROM time_entries WHERE id = ? AND workspace_id = ?`
+    ).bind(id, workspaceId).first<{ start: string; stop: string | null; user_id: string | null }>();
     if (!owned) return c.json({ error: "Not found" }, 404);
+
+    const role = await getMemberRole(c.env.DB, workspaceId, userId);
+    if (!canEditEntry(role, owned.user_id, userId)) {
+      return c.json({ error: "Not your entry" }, 403);
+    }
 
     // Validate the range the row will actually have after the patch. The schema's
     // refine can only compare fields present in the body, so a single-field patch
@@ -358,9 +414,22 @@ export const timeEntriesRouter = new Hono<{
   // ─── Delete ───────────────────────────────────────────────────────────────
   .delete("/:id", async (c) => {
     const workspaceId = c.get("workspaceId");
+    const userId = c.get("userId");
+    const id = c.req.param("id");
+
+    const owned = await c.env.DB.prepare(
+      `SELECT user_id FROM time_entries WHERE id = ? AND workspace_id = ?`
+    ).bind(id, workspaceId).first<{ user_id: string | null }>();
+    if (!owned) return c.json({ error: "Not found" }, 404);
+
+    const role = await getMemberRole(c.env.DB, workspaceId, userId);
+    if (!canEditEntry(role, owned.user_id, userId)) {
+      return c.json({ error: "Not your entry" }, 403);
+    }
+
     await c.env.DB.prepare(
       `DELETE FROM time_entries WHERE id = ? AND workspace_id = ?`
-    ).bind(c.req.param("id"), workspaceId).run();
+    ).bind(id, workspaceId).run();
     c.executionCtx.waitUntil(broadcast(c.env, workspaceId, "entries:changed", null, clientId(c)));
     return c.json({ ok: true });
   })

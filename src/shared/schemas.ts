@@ -333,6 +333,10 @@ export const UpdateRecurringEntrySchema = CreateRecurringEntrySchema.partial().e
 export const TimeEntrySchema = z.object({
   id: z.string(),
   workspaceId: z.string(),
+  // Who logged it. Null for rows from before this column existed, or
+  // materialized by a cron job (recurring templates, calendar auto-track)
+  // rather than a person.
+  userId: z.string().nullable(),
   projectId: z.string().nullable(),
   projectName: z.string().nullable(),
   projectColor: z.string().nullable(),

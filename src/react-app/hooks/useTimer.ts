@@ -109,6 +109,7 @@ export function useTimer() {
       const optimistic: TimeEntry = {
         id: `optimistic-${now}`,
         workspaceId: "default",
+        userId: null,
         description: partial.description ?? "",
         projectId: partial.projectId ?? null,
         projectName: null,
@@ -469,6 +470,7 @@ export function useTimerLifecycle(draft?: StartTimerInput) {
               taskId: null,
               taskName: null,
               workspaceId: "",
+              userId: null,
               start: new Date(saved.startedAt).toISOString(),
               stop: null,
               duration: null,
