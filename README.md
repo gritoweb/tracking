@@ -4,6 +4,10 @@ A Toggl-like time tracking app built on Cloudflare Workers, Hono, React 19, and 
 
 **Live:** https://timetracker.run
 
+## Credits
+
+This is a fork of [blakebauman/timetracker-app](https://github.com/blakebauman/timetracker-app), created and maintained by [Blake Bauman](https://github.com/blakebauman). All credit for the original design and implementation goes to them — this fork adapts it for internal use at GritoWeb.
+
 ## Features
 
 - **Time tracking** — one-click start/stop, projects, tasks, clients, tags, billable flags, and inline editing (including editing a running timer's elapsed time from the top bar). Manual entry, a weekly timesheet grid, AI quick-add from natural language, favorites for one-click starts, and recurring entry templates that materialize on schedule.

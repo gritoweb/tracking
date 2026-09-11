@@ -40,7 +40,7 @@
     {
       "binding": "DB",
       "database_name": "time-tracker",
-      "database_id": "d11526a2-6d42-4716-af42-c787aea88fd2"
+      "database_id": "ce30b90c-f188-44f6-bffb-c4e8102a6f84"
     }
   ],
   "durable_objects": {
@@ -128,7 +128,7 @@
   ],
   "routes": [
     {
-      "pattern": "timetracker.run",
+      "pattern": "tracking.gritoweb.com.br",
       "custom_domain": true
     }
   ]

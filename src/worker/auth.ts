@@ -12,7 +12,7 @@ function randomSlug(): string {
 
 export function createAuth(env: Env, baseURL: string) {
   // WebAuthn/passkey relying-party is derived from the request origin so it works
-  // unchanged in local dev (localhost) and production (timetracker.run). Frontend
+  // unchanged in local dev (localhost) and production (tracking.gritoweb.com.br). Frontend
   // and worker share an origin here, so the RP origin is just the base origin.
   const rpURL = new URL(baseURL);
 
@@ -29,7 +29,7 @@ export function createAuth(env: Env, baseURL: string) {
     secret: env.BETTER_AUTH_SECRET,
     baseURL,
     trustedOrigins: [
-      "https://timetracker.run",
+      "https://tracking.gritoweb.com.br",
       // Browser extension. The ID below is pinned via the manifest "key" for
       // local dev/testing (see extension/.keys/README.md). NOTE: the Chrome Web
       // Store assigns its OWN id on publish — after the first upload, add the
@@ -118,7 +118,7 @@ export function createAuth(env: Env, baseURL: string) {
           await sendEmail(
             env,
             data.email,
-            "You've been invited to a timetracker.run workspace",
+            "You've been invited to a tracking.gritoweb.com.br workspace",
             WorkspaceInvitationEmail({
               inviterName: data.inviter.user.name,
               workspaceName: data.organization.name,
@@ -130,12 +130,12 @@ export function createAuth(env: Env, baseURL: string) {
       admin(),
       emailOTP({
         async sendVerificationOTP({ email, otp }) {
-          await sendEmail(env, email, "Your timetracker.run verification code", VerificationOtpEmail({ otp }));
+          await sendEmail(env, email, "Your tracking.gritoweb.com.br verification code", VerificationOtpEmail({ otp }));
         },
       }),
       magicLink({
         async sendMagicLink({ email, url }) {
-          await sendEmail(env, email, "Sign in to timetracker.run", MagicLinkEmail({ url }));
+          await sendEmail(env, email, "Sign in to tracking.gritoweb.com.br", MagicLinkEmail({ url }));
         },
       }),
       passkey({

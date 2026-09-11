@@ -3,7 +3,7 @@ import { createMimeMessage } from "mimetext";
 import { render, toPlainText } from "react-email";
 import type { ReactElement } from "react";
 
-export const FROM_ADDRESS = "noreply@timetracker.run";
+export const FROM_ADDRESS = "noreply@tracking.gritoweb.com.br";
 
 /**
  * base64 of a string's UTF-8 bytes.
