@@ -61,7 +61,7 @@ export function LoginPage() {
   const [pending, setPending] = useState(false);
 
   const [password, setPassword] = useState("");
-  const [usePassword, setUsePassword] = useState(false);
+  const [usePassword, setUsePassword] = useState(true);
 
   // — Passkey state
   const [passkeyPending, setPasskeyPending] = useState(false);

@@ -52,7 +52,7 @@ export function SignupPage() {
   const [code, setCode] = useState("");
   const [linkSent, setLinkSent] = useState(false);
   const [password, setPassword] = useState("");
-  const [usePassword, setUsePassword] = useState(false);
+  const [usePassword, setUsePassword] = useState(true);
 
   // Navigate only once the shared session store has actually caught up —
   // navigating right after sign-in resolves races AuthGuard's useSession(),
