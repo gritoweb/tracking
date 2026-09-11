@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,19 +21,44 @@ import { X, Mail } from "lucide-react";
 import { toast } from "sonner";
 
 export function TeamCard() {
-  const { data: org, isPending, refetch } = authClient.useActiveOrganization();
+  // Not useActiveOrganization(): session.activeOrganizationId is only ever set
+  // by an explicit set-active call, which nothing in this app makes — every
+  // org-scoped action here resolved to "no active org" until someone called it
+  // by hand. useListOrganizations() lists real memberships regardless, and
+  // since every user has exactly one workspace (auto-created on signup), the
+  // first one is always the right one.
+  const { data: orgs, isPending: orgsPending } = authClient.useListOrganizations();
+  const organizationId = orgs?.[0]?.id;
+
+  const {
+    data: org,
+    isPending: orgDetailPending,
+    refetch,
+  } = useQuery({
+    queryKey: ["organization", organizationId],
+    queryFn: async () => {
+      const { data } = await authClient.organization.getFullOrganization({
+        query: { organizationId },
+      });
+      return data;
+    },
+    enabled: Boolean(organizationId),
+  });
+  const isPending = orgsPending || orgDetailPending;
+
   const [inviteEmail, setInviteEmail] = useState("");
   const [invitePending, setInvitePending] = useState(false);
   const [inviteError, setInviteError] = useState("");
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inviteEmail.trim()) return;
+    if (!inviteEmail.trim() || !organizationId) return;
     setInvitePending(true);
     setInviteError("");
     const { error } = await authClient.organization.inviteMember({
       email: inviteEmail.trim(),
       role: "member",
+      organizationId,
     });
     setInvitePending(false);
     if (error) {
@@ -54,7 +80,12 @@ export function TeamCard() {
   };
 
   const handleRoleChange = async (memberId: string, role: string) => {
-    const { error } = await authClient.organization.updateMemberRole({ memberId, role });
+    if (!organizationId) return;
+    const { error } = await authClient.organization.updateMemberRole({
+      memberId,
+      role,
+      organizationId,
+    });
     if (error) {
       toast.error(error.message ?? "Failed to update role");
       return;
@@ -64,7 +95,11 @@ export function TeamCard() {
   };
 
   const handleRemoveMember = async (memberId: string) => {
-    const { error } = await authClient.organization.removeMember({ memberIdOrEmail: memberId });
+    if (!organizationId) return;
+    const { error } = await authClient.organization.removeMember({
+      memberIdOrEmail: memberId,
+      organizationId,
+    });
     if (error) {
       toast.error(error.message ?? "Failed to remove member");
       return;
