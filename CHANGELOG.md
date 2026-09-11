@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-09-11 (3)
+### Added
+- **Autor visível no Timer e nos Relatórios.** Completa o item 1 da fila (a parte de dado/permissão
+  já tinha saído antes hoje): `EntryRow` (lista do Timer) ganhou um avatar com tooltip do nome, e a
+  tabela detalhada de Relatórios ganhou a coluna "Person" (togglável, igual às outras). Some quando
+  não há autor conhecido (linha antiga, ou entrada materializada por cron). Verificado: `pnpm check`
+  e `pnpm lint` limpos, deploy em produção (curl 200, Version ID `59c56177-7461-48b0-a303-613a21cb585d`).
+
 ## 2026-09-11 (2)
 ### Added
 - **`time_entries.user_id` + permissão de edição.** Causa raiz: a tabela não guardava quem lançou
