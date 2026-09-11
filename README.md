@@ -2,7 +2,7 @@
 
 A Toggl-like time tracking app built on Cloudflare Workers, Hono, React 19, and Shadcn UI. Runs entirely on Cloudflare's edge.
 
-**Live:** https://timetracker.run
+**Live:** https://tracking.gritoweb.com.br
 
 ## Credits
 
