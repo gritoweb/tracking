@@ -1,5 +1,36 @@
 # Changelog
 
+## 2026-09-14 (2)
+### Changed
+- **Invite-only access (D1).** Anyone could create an account through Google, email code, magic link
+  or password, and every new user got a personal workspace. `databaseHooks.user.create.before`
+  (`src/worker/lib/invite-only.ts`) is now the single gate for every sign-up path: an account is
+  created only for an email with a pending, unexpired invitation from a workspace owned by an
+  `ADMIN_EMAILS` address (a secret in production), or for an `ADMIN_EMAILS` address itself. A Better
+  Auth `hooks.before` refuses sign-in codes and magic links for such emails before anything is sent —
+  errors thrown inside Better Auth's send callbacks are swallowed, and the magic-link verify step can't
+  surface a hook error. Password sign-up is compiled out of production builds (password sign-in
+  stays); only an `ADMIN_EMAILS` address may create a workspace (`allowUserToCreateOrganization`),
+  closing the "create a workspace, invite anyone" bypass; accepting an invitation requires a verified email outside dev. Only the first `ADMIN_EMAILS`
+  account (and `@example.com` e2e accounts in dev builds) gets a workspace. Front: `/signup` and
+  `SignupPage` are gone; the login page honors a same-origin `?redirect=` so the invitation link
+  returns to `/accept-invite`; a signed-in user with no workspace gets `NoWorkspacePage` (pending
+  invitations, or a prompt to sign in once with an email code when the address is unverified, since
+  Better Auth lists invitations only for verified emails). `AuthGuard` reads workspaces through a
+  user-keyed TanStack query (`hooks/useWorkspaces.ts`) because Better Auth's `useListOrganizations`
+  atom never refetches when a different user signs in on the same tab. Team settings hide invite,
+  role and remove controls from plain members (the server already refuses them).
+  Verified: `pnpm build` passes and `pnpm lint` reports 0 errors on the final code (`pnpm check`,
+  including the wrangler dry-run, passed one revision earlier). New `e2e/invite-only.spec.ts`
+  (refusal on password, code and magic link with no account left behind; a non-admin workspace owner
+  gets 403 opening a workspace; the invitee joins only the inviting workspace, gets 403 opening one
+  and cannot invite; an invitation from a workspace with no admin owner creates no account; the
+  no-workspace screen holds and the invitation link lands in the app; no sign-up on the login page)
+  plus `tenant-isolation`, `admin` and `fresh-session`: 9/9. Full suite: 65 passed, 12 failed — 4 passed on re-run (load
+  flakes) and the other 8 (`entry-delete`, five `entry-inline-edit`, `integration-push-date`,
+  `tier2-features` gaps toggle) fail identically on a clean `master` worktree (2bcac5f), so they
+  predate this change. Before deploying: set the `ADMIN_EMAILS` secret.
+
 ## 2026-09-14
 ### Fixed
 - **Dependabot config + all 55 open security alerts resolved.** `.github/dependabot.yml` had
