@@ -35,7 +35,9 @@ secrets set simply doesn't appear in the Settings card.
 
 Everything downstream — ghost blocks, auto-track, the assistant's nudges, day
 drafting — goes through `lib/calendar-connections.ts` and never knows which
-provider an event came from.
+provider an event came from. Connections are personal: every read and write is
+scoped to the signed-in user, and the OAuth state cookie binds the initiating
+user as well as the workspace and provider.
 
 ## One-time Google Cloud setup (required to enable the feature)
 
@@ -137,7 +139,8 @@ with `AADSTS50194`.
 
 - **Settings → Google Calendar → Connect** runs the OAuth consent flow and stores
   an encrypted refresh token (AES-GCM, keyed by `AUTH_SECRET`) in the
-  `integrations` table as a `google_calendar` row (one per workspace).
+  `integrations` table as a `google_calendar` row owned by you (one per provider
+  per person, `integrations.user_id`; teammates never see your events).
 - On the **Calendar** view, your events for the visible week/day show as dashed
   ghost blocks. **Click a ghost** → the "Track calendar event" dialog opens
   prefilled with the title and time → pick a project → **Add entry**. The ghost is
@@ -180,4 +183,4 @@ Recurring events are expanded into individual instances (`singleEvents=true`).
 
 Tokens are encrypted at rest with AES-GCM keyed by `AUTH_SECRET`
 (`src/worker/lib/crypto.ts`) in `integrations.credentials`, one row per provider
-per workspace.
+per person (`integrations.user_id`).

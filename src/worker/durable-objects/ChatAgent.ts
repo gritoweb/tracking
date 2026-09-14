@@ -1,8 +1,8 @@
-// The assistant's chat brain: one AIChatAgent (Durable Object) per workspace. Persists
+// The assistant's chat brain: one AIChatAgent (Durable Object) per workspace member. Persists
 // the conversation + resumable streams in its own SQLite, and on each turn runs
 // a Workers AI (Llama) streamText loop with the assistant tools bound. The DO's
-// instance name IS the workspace id — the worker rewrites /agents/* routing so a
-// client can only ever reach its own workspace's agent (see worker/index.ts).
+// instance name IS "<workspaceId>:<userId>" — the worker rewrites /agents/* routing so a
+// client can only ever reach its own agent (see worker/index.ts).
 
 import { AIChatAgent, type OnChatMessageOptions } from "@cloudflare/ai-chat";
 import {
@@ -26,7 +26,7 @@ const MODEL = "@cf/meta/llama-4-scout-17b-16e-instruct";
 
 // Cost/abuse bounds (this DO is billed per Workers AI call):
 // cap a single reply's length, the size of any one inbound message fed to the
-// model, and how many turns a workspace can fire per minute.
+// model, and how many turns a person can fire per minute.
 const MAX_OUTPUT_TOKENS = 800;
 const MAX_MESSAGE_CHARS = 4000;
 const RATE_LIMIT_MAX = 15;
@@ -36,16 +36,20 @@ const RATE_LIMIT_WINDOW_MS = 60_000;
 // `Env` marks a few secrets optional, which isn't assignable to that constraint;
 // Cloudflare.Env is a structural superset our Env-typed helpers still accept.
 export class ChatAgent extends AIChatAgent<Cloudflare.Env> {
-  // Bound so a long-lived workspace agent doesn't grow unbounded in SQLite.
+  // Bound so a long-lived agent doesn't grow unbounded in SQLite.
   maxPersistedMessages = 100;
 
-  // Per-instance (== per-workspace) sliding-window rate limiter. In-memory, so it
+  // Per-instance (== per-person) sliding-window rate limiter. In-memory, so it
   // resets if the DO hibernates — enough to stop a runaway client from spamming
   // Workers AI calls, same trade-off as the REST rate-limit middleware.
   private recentTurns: number[] = [];
 
   async onChatMessage(onFinish: StreamTextOnFinishCallback<ToolSet>, options?: OnChatMessageOptions) {
-    const workspaceId = this.name;
+    const [workspaceId, userId] = this.name.split(":");
+    // The /agents gate always pins both; an instance without a person never reaches a tool.
+    if (!workspaceId || !userId) {
+      return this.textResponse("Reload the app to reconnect the Assistant.");
+    }
 
     const now = Date.now();
     this.recentTurns = this.recentTurns.filter((t) => now - t < RATE_LIMIT_WINDOW_MS);
@@ -61,8 +65,8 @@ export class ChatAgent extends AIChatAgent<Cloudflare.Env> {
     const offset = Number.isFinite(rawOffset) ? Math.max(-14 * 60, Math.min(14 * 60, rawOffset)) : 0;
 
     const [context, memories] = await Promise.all([
-      buildAssistantContext(this.env, workspaceId, offset),
-      recallMemories(this.env.DB, workspaceId),
+      buildAssistantContext(this.env, workspaceId, userId, offset),
+      recallMemories(this.env.DB, workspaceId, userId),
     ]);
     const memoryBlock = buildMemoryBlock(memories);
 
@@ -93,7 +97,7 @@ ${context}
 </data>`;
 
     const workersai = createWorkersAI({ binding: this.env.AI });
-    const tools = buildAssistantTools({ env: this.env, workspaceId, offsetMinutes: offset });
+    const tools = buildAssistantTools({ env: this.env, workspaceId, userId, offsetMinutes: offset });
 
     // Clamp any oversized message before it reaches the model, so a single huge
     // paste can't inflate the prompt (and cost/CPU) unbounded.

@@ -12,7 +12,7 @@ import {
 } from "../lib/calendar-providers";
 import {
   loadCalendarConnections,
-  fetchWorkspaceEvents,
+  fetchUserEvents,
 } from "../lib/calendar-connections";
 import { convertRange } from "../lib/calendar-autotrack";
 
@@ -22,18 +22,25 @@ function redirectUri(reqUrl: string, provider: CalendarProviderId): string {
   return `${new URL(reqUrl).origin}/api/calendar/${provider}/callback`;
 }
 
+function decodePart(part: string): string {
+  try {
+    return decodeURIComponent(part);
+  } catch {
+    return "";
+  }
+}
+
 export const calendarRouter = new Hono<{
   Bindings: Env;
-  Variables: { workspaceId: string };
+  Variables: { workspaceId: string; userId: string };
 }>()
   // ── Connection status, one row per configured provider ────────────────────
   //
-  // An array rather than a single object: a workspace can hold a work calendar
+  // An array rather than a single object: a person can hold a work calendar
   // and a personal one at once, and the Settings card renders whatever the
   // server says it supports rather than hard-coding providers.
   .get("/status", async (c) => {
-    const workspaceId = c.get("workspaceId");
-    const connections = await loadCalendarConnections(c.env, workspaceId);
+    const connections = await loadCalendarConnections(c.env, c.get("workspaceId"), c.get("userId"));
 
     return c.json(
       PROVIDER_IDS.map((id) => {
@@ -64,9 +71,14 @@ export const calendarRouter = new Hono<{
       const { enabled, provider } = c.req.valid("json");
       await c.env.DB.prepare(
         `UPDATE integrations SET auto_track = ?
-         WHERE workspace_id = ? AND type = ?`
+         WHERE workspace_id = ? AND user_id = ? AND type = ?`
       )
-        .bind(enabled ? 1 : 0, c.get("workspaceId"), CALENDAR_PROVIDERS[provider].integrationType)
+        .bind(
+          enabled ? 1 : 0,
+          c.get("workspaceId"),
+          c.get("userId"),
+          CALENDAR_PROVIDERS[provider].integrationType
+        )
         .run();
       return c.json({ ok: true, autoTrack: enabled, provider });
     }
@@ -78,7 +90,7 @@ export const calendarRouter = new Hono<{
     async (c) => {
       const { since, until } = c.req.valid("json");
       try {
-        const created = await convertRange(c.env, c.get("workspaceId"), since, until);
+        const created = await convertRange(c.env, c.get("workspaceId"), c.get("userId"), since, until);
         return c.json({ created });
       } catch {
         return c.json({ error: "Couldn't convert calendar events" }, 502);
@@ -88,19 +100,20 @@ export const calendarRouter = new Hono<{
   // ── Read-through: external events for a range, minus already-confirmed ────
   .get("/events", async (c) => {
     const workspaceId = c.get("workspaceId");
+    const userId = c.get("userId");
     const { since, until } = c.req.query();
     if (!since || !until) return c.json([]);
 
-    const events = await fetchWorkspaceEvents(c.env, workspaceId, since, until);
+    const events = await fetchUserEvents(c.env, workspaceId, userId, since, until);
     if (!events.length) return c.json([]);
 
-    // Drop events already confirmed into an entry so they don't double up.
+    // Drop events this person already confirmed into an entry so they don't double up.
     const { results } = await c.env.DB.prepare(
       `SELECT calendar_event_id FROM time_entries
-       WHERE workspace_id = ? AND calendar_event_id IS NOT NULL
+       WHERE workspace_id = ? AND user_id = ? AND calendar_event_id IS NOT NULL
          AND start >= ? AND start <= ?`
     )
-      .bind(workspaceId, since, until)
+      .bind(workspaceId, userId, since, until)
       .all<{ calendar_event_id: string }>();
     const confirmed = new Set(results.map((r) => r.calendar_event_id));
 
@@ -115,11 +128,14 @@ export const calendarRouter = new Hono<{
     if (!creds) return c.redirect("/settings?calendar=not_configured");
 
     const state = crypto.randomUUID();
-    // Bind the initiating workspace AND provider into the httpOnly state cookie:
-    // the callback must not land a connection in a different workspace if the
-    // user switches mid-flow, and must not mistake one provider's callback for
-    // the other's. The OAuth `state` param stays the raw token.
-    setCookie(c, STATE_COOKIE, `${state}.${provider}.${c.get("workspaceId")}`, {
+    // Bind the initiating workspace, person AND provider into the httpOnly state
+    // cookie: the callback must not land a connection in a different workspace or
+    // on a different account if either switches mid-flow, and must not mistake one
+    // provider's callback for the other's. The OAuth `state` param stays the raw token.
+    const cookieValue = [state, provider, c.get("workspaceId"), c.get("userId")]
+      .map(encodeURIComponent)
+      .join(".");
+    setCookie(c, STATE_COOKIE, cookieValue, {
       httpOnly: true,
       secure: new URL(c.req.url).protocol === "https:",
       sameSite: "Lax",
@@ -138,6 +154,7 @@ export const calendarRouter = new Hono<{
   // ── OAuth callback: exchange the code and store encrypted tokens ──────────
   .get("/:provider/callback", async (c) => {
     const workspaceId = c.get("workspaceId");
+    const userId = c.get("userId");
     const provider = toProviderId(c.req.param("provider"));
     if (!provider) return c.redirect("/settings?calendar=error");
 
@@ -145,16 +162,18 @@ export const calendarRouter = new Hono<{
     const expected = getCookie(c, STATE_COOKIE);
     deleteCookie(c, STATE_COOKIE, { path: "/" });
 
-    // Cookie is "<state>.<provider>.<initiating workspace>".
-    const [expectedState, expectedProvider, ...rest] = (expected ?? "").split(".");
-    const expectedWorkspace = rest.join(".");
+    // Cookie is "<state>.<provider>.<initiating workspace>.<initiating user>", each part URI-encoded.
+    const [expectedState, expectedProvider, expectedWorkspace, expectedUser] = (expected ?? "")
+      .split(".")
+      .map(decodePart);
     if (
       error ||
       !code ||
       !state ||
       state !== expectedState ||
       expectedProvider !== provider ||
-      expectedWorkspace !== workspaceId
+      expectedWorkspace !== workspaceId ||
+      expectedUser !== userId
     ) {
       return c.redirect("/settings?calendar=error");
     }
@@ -172,19 +191,20 @@ export const calendarRouter = new Hono<{
       });
       const credentials = await encryptJSON(c.env.AUTH_SECRET, tokens);
       const type = CALENDAR_PROVIDERS[provider].integrationType;
-      // One connection per provider per workspace: replace any existing one.
+      // One connection per provider per person: replace any existing one.
       await c.env.DB.prepare(
-        `DELETE FROM integrations WHERE workspace_id = ? AND type = ?`
+        `DELETE FROM integrations WHERE workspace_id = ? AND user_id = ? AND type = ?`
       )
-        .bind(workspaceId, type)
+        .bind(workspaceId, userId, type)
         .run();
       await c.env.DB.prepare(
-        `INSERT INTO integrations (id, workspace_id, type, name, base_url, credentials)
-         VALUES (?, ?, ?, ?, ?, ?)`
+        `INSERT INTO integrations (id, workspace_id, user_id, type, name, base_url, credentials)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
       )
         .bind(
           crypto.randomUUID(),
           workspaceId,
+          userId,
           type,
           tokens.accountEmail || CALENDAR_PROVIDERS[provider].label,
           provider === "google" ? "https://www.googleapis.com" : "https://graph.microsoft.com",
@@ -201,9 +221,9 @@ export const calendarRouter = new Hono<{
     const provider = toProviderId(c.req.param("provider"));
     if (!provider) return c.json({ error: "Unknown calendar provider" }, 404);
     await c.env.DB.prepare(
-      `DELETE FROM integrations WHERE workspace_id = ? AND type = ?`
+      `DELETE FROM integrations WHERE workspace_id = ? AND user_id = ? AND type = ?`
     )
-      .bind(c.get("workspaceId"), CALENDAR_PROVIDERS[provider].integrationType)
+      .bind(c.get("workspaceId"), c.get("userId"), CALENDAR_PROVIDERS[provider].integrationType)
       .run();
     return c.json({ ok: true });
   });

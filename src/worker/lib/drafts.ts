@@ -133,6 +133,7 @@ function humanDuration(seconds: number): string {
 async function findPatternCandidates(
   db: D1Database,
   workspaceId: string,
+  userId: string,
   dayStartMs: number,
   offsetMinutes: number,
   alreadyDescribed: Set<string>
@@ -144,11 +145,11 @@ async function findPatternCandidates(
     .prepare(
       `SELECT description, start, duration, project_id, task_id, billable
        FROM time_entries
-       WHERE workspace_id = ? AND stop IS NOT NULL AND start >= ? AND start < ?
+       WHERE workspace_id = ? AND user_id = ? AND stop IS NOT NULL AND start >= ? AND start < ?
          AND TRIM(description) <> ''
        ORDER BY start DESC LIMIT 1000`
     )
-    .bind(workspaceId, since, new Date(dayStartMs).toISOString())
+    .bind(workspaceId, userId, since, new Date(dayStartMs).toISOString())
     .all<Record<string, unknown>>();
 
   interface Bucket {
@@ -271,10 +272,10 @@ export async function generateDrafts(
               te.calendar_event_id, p.name AS project_name
        FROM time_entries te
        LEFT JOIN projects p ON p.id = te.project_id AND p.workspace_id = te.workspace_id
-       WHERE te.workspace_id = ? AND te.start < ? AND (te.stop IS NULL OR te.stop > ?)
+       WHERE te.workspace_id = ? AND te.user_id = ? AND te.start < ? AND (te.stop IS NULL OR te.stop > ?)
        ORDER BY te.start ASC`
     )
-      .bind(workspaceId, dayEndIso, dayStartIso)
+      .bind(workspaceId, userId, dayEndIso, dayStartIso)
       .all<Record<string, unknown>>(),
     env.DB.prepare(
       `SELECT start, stop, calendar_event_id FROM draft_entries
@@ -282,7 +283,7 @@ export async function generateDrafts(
     )
       .bind(workspaceId, userId, localDate)
       .all<{ start: string; stop: string; calendar_event_id: string | null }>(),
-    loadTodayEvents(env, workspaceId, dayStartIso, dayEndIso),
+    loadTodayEvents(env, workspaceId, userId, dayStartIso, dayEndIso),
     loadGroundingProjects(env.DB, workspaceId),
   ]);
 
@@ -386,6 +387,7 @@ export async function generateDrafts(
   const patternCandidates = await findPatternCandidates(
     env.DB,
     workspaceId,
+    userId,
     dayStartMs,
     offsetMinutes,
     alreadyDescribed

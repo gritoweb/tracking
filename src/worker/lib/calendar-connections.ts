@@ -1,4 +1,4 @@
-// Loading, refreshing and reading from a workspace's calendar connections,
+// Loading, refreshing and reading from a person's calendar connections,
 // whichever providers they are.
 //
 // Everything above this line in the stack — ghost blocks, auto-track, the
@@ -24,10 +24,11 @@ export interface CalendarConnection {
   autoTrack: boolean;
 }
 
-/** Every configured, connected calendar for a workspace. */
+/** Every configured calendar one person connected in a workspace. */
 export async function loadCalendarConnections(
   env: Env,
-  workspaceId: string
+  workspaceId: string,
+  userId: string
 ): Promise<CalendarConnection[]> {
   const types = PROVIDER_IDS.filter((id) => providerCredentials(env, id)).map(
     (id) => CALENDAR_PROVIDERS[id]
@@ -37,9 +38,9 @@ export async function loadCalendarConnections(
   const placeholders = types.map(() => "?").join(",");
   const { results } = await env.DB.prepare(
     `SELECT id, type, credentials, auto_track FROM integrations
-     WHERE workspace_id = ? AND type IN (${placeholders})`
+     WHERE workspace_id = ? AND user_id = ? AND type IN (${placeholders})`
   )
-    .bind(workspaceId, ...types.map((p) => p.integrationType))
+    .bind(workspaceId, userId, ...types.map((p) => p.integrationType))
     .all<{ id: string; type: string; credentials: string; auto_track: number }>();
 
   const out: CalendarConnection[] = [];
@@ -92,7 +93,7 @@ export async function accessTokenFor(
 }
 
 /**
- * Events across every connected calendar in [since, until].
+ * Events across every calendar this person connected, in [since, until].
  *
  * One provider failing (revoked token, Graph outage) yields that provider's
  * events as empty rather than failing the whole read — a broken work calendar
@@ -101,14 +102,15 @@ export async function accessTokenFor(
  * `onlyAutoTrack` restricts to connections the user opted into auto-tracking,
  * which is what the cron sweep wants.
  */
-export async function fetchWorkspaceEvents(
+export async function fetchUserEvents(
   env: Env,
   workspaceId: string,
+  userId: string,
   since: string,
   until: string,
   opts: { onlyAutoTrack?: boolean } = {}
 ): Promise<ExternalEvent[]> {
-  const connections = (await loadCalendarConnections(env, workspaceId)).filter(
+  const connections = (await loadCalendarConnections(env, workspaceId, userId)).filter(
     (c) => !opts.onlyAutoTrack || c.autoTrack
   );
   if (!connections.length) return [];
@@ -143,18 +145,20 @@ export async function fetchWorkspaceEvents(
   return merged.sort((a, b) => a.start.localeCompare(b.start));
 }
 
-/** Workspaces with at least one auto-track calendar, for the cron sweep. */
-export async function workspacesWithAutoTrack(env: Env): Promise<string[]> {
+/** Every person with at least one auto-track calendar, for the cron sweep. */
+export async function connectionsWithAutoTrack(
+  env: Env
+): Promise<{ workspaceId: string; userId: string }[]> {
   const configured = PROVIDER_IDS.filter((id) => providerCredentials(env, id));
   if (!configured.length) return [];
   const placeholders = configured.map(() => "?").join(",");
   const { results } = await env.DB.prepare(
-    `SELECT DISTINCT workspace_id FROM integrations
-     WHERE auto_track = 1 AND type IN (${placeholders})`
+    `SELECT DISTINCT workspace_id, user_id FROM integrations
+     WHERE auto_track = 1 AND user_id IS NOT NULL AND type IN (${placeholders})`
   )
     .bind(...configured.map((id) => CALENDAR_PROVIDERS[id].integrationType))
-    .all<{ workspace_id: string }>();
-  return results.map((r) => r.workspace_id);
+    .all<{ workspace_id: string; user_id: string }>();
+  return results.map((r) => ({ workspaceId: r.workspace_id, userId: r.user_id }));
 }
 
 export type { CalendarProviderId, CalendarTokens, ExternalEvent };

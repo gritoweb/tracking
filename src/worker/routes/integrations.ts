@@ -46,7 +46,7 @@ async function toConnection(secret: string, row: IntegrationRow): Promise<Connec
 
 export const integrationsRouter = new Hono<{
   Bindings: Env;
-  Variables: { workspaceId: string };
+  Variables: { workspaceId: string; userId: string };
 }>()
   .get("/", async (c) => {
     // Calendar sync stores its OAuth tokens as calendar integration rows
@@ -73,9 +73,9 @@ export const integrationsRouter = new Hono<{
     const credentials = await encryptJSON(c.env.AUTH_SECRET, data.credentials);
 
     await c.env.DB.prepare(
-      `INSERT INTO integrations (id, workspace_id, type, name, base_url, credentials)
-       VALUES (?, ?, ?, ?, ?, ?)`
-    ).bind(id, workspaceId, data.type, data.name, data.baseUrl, credentials).run();
+      `INSERT INTO integrations (id, workspace_id, user_id, type, name, base_url, credentials)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).bind(id, workspaceId, c.get("userId"), data.type, data.name, data.baseUrl, credentials).run();
 
     const { results } = await c.env.DB.prepare(
       `SELECT * FROM integrations WHERE id = ?`

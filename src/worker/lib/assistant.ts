@@ -5,7 +5,7 @@
 // half, grounded in the same facts (see routes/assistant.ts).
 
 import type { AssistantNudge } from "@shared/schemas";
-import { fetchWorkspaceEvents } from "./calendar-connections";
+import { fetchUserEvents } from "./calendar-connections";
 import type { ExternalEvent } from "./calendar-providers";
 import { atRiskProjects, loadProjectPacing, type ProjectPacing } from "./pacing";
 
@@ -32,7 +32,7 @@ interface TodayFacts {
   entryCount: number;
   totalSeconds: number;
   confirmedEventIds: Set<string>;
-  /** False for a workspace that has never had a single entry. */
+  /** False for a person who has never tracked a single entry here. */
   hasEverTracked: boolean;
 }
 
@@ -63,9 +63,11 @@ function formatDuration(ms: number): string {
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
+/** Today's timesheet facts for one person: nudges and chat grounding never mix in a teammate's time. */
 async function loadTodayFacts(
   db: D1Database,
   workspaceId: string,
+  userId: string,
   dayStartIso: string,
   dayEndIso: string
 ): Promise<TodayFacts> {
@@ -73,31 +75,32 @@ async function loadTodayFacts(
     db
       .prepare(
         `SELECT id, description, start FROM time_entries
-         WHERE workspace_id = ? AND stop IS NULL LIMIT 1`
+         WHERE workspace_id = ? AND user_id = ? AND stop IS NULL
+         ORDER BY start DESC LIMIT 1`
       )
-      .bind(workspaceId)
+      .bind(workspaceId, userId)
       .first<RunningEntry>(),
     db
       .prepare(
         `SELECT COUNT(*) AS n, COALESCE(SUM(duration), 0) AS total FROM time_entries
-         WHERE workspace_id = ? AND stop IS NOT NULL AND start >= ? AND start < ?`
+         WHERE workspace_id = ? AND user_id = ? AND stop IS NOT NULL AND start >= ? AND start < ?`
       )
-      .bind(workspaceId, dayStartIso, dayEndIso)
+      .bind(workspaceId, userId, dayStartIso, dayEndIso)
       .first<{ n: number; total: number }>(),
     db
       .prepare(
         `SELECT calendar_event_id FROM time_entries
-         WHERE workspace_id = ? AND calendar_event_id IS NOT NULL
+         WHERE workspace_id = ? AND user_id = ? AND calendar_event_id IS NOT NULL
            AND start >= ? AND start <= ?`
       )
-      .bind(workspaceId, dayStartIso, dayEndIso)
+      .bind(workspaceId, userId, dayStartIso, dayEndIso)
       .all<{ calendar_event_id: string }>(),
-    // Distinguishes "hasn't started today" from "brand-new workspace" — the
+    // Distinguishes "hasn't started today" from "brand-new account" — the
     // nothing-tracked nudge is a reminder for the former and a scolding for the
     // latter, whose first-run experience should be the app's own empty state.
     db
-      .prepare(`SELECT 1 AS n FROM time_entries WHERE workspace_id = ? LIMIT 1`)
-      .bind(workspaceId)
+      .prepare(`SELECT 1 AS n FROM time_entries WHERE workspace_id = ? AND user_id = ? LIMIT 1`)
+      .bind(workspaceId, userId)
       .first<{ n: number }>(),
   ]);
 
@@ -111,7 +114,7 @@ async function loadTodayFacts(
 }
 
 /**
- * Today's calendar events, across every connected calendar, via the same
+ * Today's calendar events, across every calendar this person connected, via the same
  * read-through (with token refresh persistence) as routes/calendar.ts. Returns
  * [] when nothing is connected or a provider errors — the assistant degrades to
  * timer-only nudges rather than failing.
@@ -119,11 +122,12 @@ async function loadTodayFacts(
 export async function loadTodayEvents(
   env: Env,
   workspaceId: string,
+  userId: string,
   dayStartIso: string,
   dayEndIso: string
 ): Promise<ExternalEvent[]> {
   try {
-    const events = await fetchWorkspaceEvents(env, workspaceId, dayStartIso, dayEndIso);
+    const events = await fetchUserEvents(env, workspaceId, userId, dayStartIso, dayEndIso);
     // Drop all-day blocks and zero-length artifacts — they aren't meetings.
     return events.filter((e) => {
       const len = new Date(e.stop).getTime() - new Date(e.start).getTime();
@@ -273,13 +277,14 @@ export function buildNudges(
 export async function computeNudges(
   env: Env,
   workspaceId: string,
+  userId: string,
   offsetMinutes: number
 ): Promise<AssistantNudge[]> {
   const nowMs = Date.now();
   const { dayStartIso, dayEndIso } = localDayBounds(nowMs, offsetMinutes);
   const [facts, events, pacing] = await Promise.all([
-    loadTodayFacts(env.DB, workspaceId, dayStartIso, dayEndIso),
-    loadTodayEvents(env, workspaceId, dayStartIso, dayEndIso),
+    loadTodayFacts(env.DB, workspaceId, userId, dayStartIso, dayEndIso),
+    loadTodayEvents(env, workspaceId, userId, dayStartIso, dayEndIso),
     loadProjectPacing(env.DB, workspaceId, nowMs),
   ]);
   return buildNudges(nowMs, offsetMinutes, facts, events, pacing);
@@ -292,22 +297,23 @@ export async function computeNudges(
 export async function buildAssistantContext(
   env: Env,
   workspaceId: string,
+  userId: string,
   offsetMinutes: number
 ): Promise<string> {
   const nowMs = Date.now();
   const { dayStartIso, dayEndIso, localDate } = localDayBounds(nowMs, offsetMinutes);
 
   const [facts, events, entries, projects] = await Promise.all([
-    loadTodayFacts(env.DB, workspaceId, dayStartIso, dayEndIso),
-    loadTodayEvents(env, workspaceId, dayStartIso, dayEndIso),
+    loadTodayFacts(env.DB, workspaceId, userId, dayStartIso, dayEndIso),
+    loadTodayEvents(env, workspaceId, userId, dayStartIso, dayEndIso),
     env.DB.prepare(
       `SELECT te.description, te.start, te.stop, te.duration, te.billable, p.name AS project_name
        FROM time_entries te
        LEFT JOIN projects p ON p.id = te.project_id
-       WHERE te.workspace_id = ? AND te.stop IS NOT NULL AND te.start >= ? AND te.start < ?
+       WHERE te.workspace_id = ? AND te.user_id = ? AND te.stop IS NOT NULL AND te.start >= ? AND te.start < ?
        ORDER BY te.start ASC LIMIT 40`
     )
-      .bind(workspaceId, dayStartIso, dayEndIso)
+      .bind(workspaceId, userId, dayStartIso, dayEndIso)
       .all<Record<string, unknown>>(),
     env.DB.prepare(
       `SELECT name FROM projects WHERE workspace_id = ? AND active = 1 ORDER BY name ASC LIMIT 50`

@@ -14,7 +14,9 @@ export async function broadcast(
    * change it just made. Omit for server-originated changes (cron, integrations),
    * which every client should act on.
    */
-  origin?: string | null
+  origin?: string | null,
+  /** Whose entry or timer this is: timer events reach only them, other members get entry events without the payload. */
+  ownerId?: string | null
 ): Promise<void> {
   try {
     const id = env.TIMER_ROOM.idFromName(workspaceId);
@@ -22,7 +24,7 @@ export async function broadcast(
     await stub.fetch(
       new Request("http://do/broadcast", {
         method: "POST",
-        body: JSON.stringify({ event, data, origin: origin ?? null }),
+        body: JSON.stringify({ event, data, origin: origin ?? null, ownerId: ownerId ?? null }),
         headers: { "Content-Type": "application/json" },
       })
     );

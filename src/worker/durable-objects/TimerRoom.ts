@@ -29,19 +29,27 @@ export class TimerRoom extends DurableObject<Env> {
     }
 
     if (url.pathname === "/broadcast" && request.method === "POST") {
-      const { event, data, origin } = (await request.json()) as {
+      const { event, data, origin, ownerId } = (await request.json()) as {
         event: string;
         data: unknown;
         origin?: string | null;
+        ownerId?: string | null;
       };
       // `origin` rides along so the client that caused the change can skip its
       // own echo; the room still fans out to everyone, including that client,
       // because it may care about the payload even when it ignores the refetch.
-      const msg = JSON.stringify({ event, data, origin: origin ?? null, ts: Date.now() });
+      const ts = Date.now();
+      const full = JSON.stringify({ event, data, origin: origin ?? null, ts });
+      // Teammates learn that entries changed, never what: payloads and live timers stay with their owner.
+      const redacted = JSON.stringify({ event, data: null, origin: origin ?? null, ts });
+      const ownerOnly = event === "timer:start" || event === "timer:stop";
       let sent = 0;
       for (const ws of this.ctx.getWebSockets()) {
+        const socketUserId = (ws.deserializeAttachment() as { userId?: string } | null)?.userId;
+        const isOwner = !ownerId || socketUserId === ownerId;
+        if (ownerOnly && !isOwner) continue;
         try {
-          ws.send(msg);
+          ws.send(isOwner ? full : redacted);
           sent++;
         } catch {
           // Dead socket — the runtime reaps it; nothing to clean up here.

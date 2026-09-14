@@ -36,6 +36,13 @@ export async function runRecurring(env: Env): Promise<void> {
       if (nowMinutes < timeUtc) continue; // scheduled time hasn't passed yet today
       if (row.last_materialized === todayStr) continue; // already created today
 
+      const userId = (row.user_id as string | null) ?? null;
+      // Every template has an author since migration 0037; hours are never minted for nobody.
+      if (!userId) {
+        console.warn("recurring: template has no author, skipped", { templateId: row.id });
+        continue;
+      }
+
       const startMs =
         Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0) +
         timeUtc * 60_000;
@@ -48,12 +55,13 @@ export async function runRecurring(env: Env): Promise<void> {
 
       await env.DB.prepare(
         `INSERT INTO time_entries
-           (id, workspace_id, project_id, task_id, description, start, stop, duration, billable, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+           (id, workspace_id, user_id, project_id, task_id, description, start, stop, duration, billable, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
         .bind(
           entryId,
           workspaceId,
+          userId,
           (row.project_id as string | null) ?? null,
           (row.task_id as string | null) ?? null,
           (row.description as string) ?? "",
@@ -81,7 +89,7 @@ export async function runRecurring(env: Env): Promise<void> {
         .bind(todayStr, row.id)
         .run();
 
-      await broadcast(env, workspaceId, "entries:changed", { source: "recurring" });
+      await broadcast(env, workspaceId, "entries:changed", { source: "recurring" }, null, userId);
     } catch (e) {
       // One template failing (deleted project FK, etc.) must not abort the
       // rest — but log it, or the template silently never materializes again.

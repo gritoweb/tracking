@@ -10,10 +10,13 @@ import { z } from "zod";
 import { broadcast, getEntryById } from "../db/queries";
 import { loadGroundingProjects, resolveGrounding, inferEventProjects } from "./ai";
 import { rememberFact, searchMemories } from "./assistant-memory";
+import { canWriteEntry, getMemberRole } from "./permissions";
 
 export interface AssistantToolContext {
   env: Env;
   workspaceId: string;
+  /** The person chatting: every tool reads and writes only their own time. */
+  userId: string;
   /** JS getTimezoneOffset() convention (minutes); used only for human-readable echoes. */
   offsetMinutes: number;
 }
@@ -39,13 +42,13 @@ async function resolveProject(
 }
 
 export function buildAssistantTools(ctx: AssistantToolContext): ToolSet {
-  const { env, workspaceId } = ctx;
+  const { env, workspaceId, userId } = ctx;
   const db = env.DB;
 
   return {
     startTimer: tool({
       description:
-        "Start a new running timer for the user. Automatically stops any timer that is already running (same as the app's Start button). Use when the user says they're starting or now working on something.",
+        "Start a new running timer for the user. Automatically stops the user's timer that is already running (same as the app's Start button). Use when the user says they're starting or now working on something.",
       inputSchema: z.object({
         description: z.string().max(500).describe("What the user is working on"),
         projectName: z
@@ -60,25 +63,27 @@ export function buildAssistantTools(ctx: AssistantToolContext): ToolSet {
       execute: async ({ description, projectName, billable }) => {
         const now = new Date().toISOString();
         const proj = await resolveProject(env, workspaceId, projectName);
-        // Stop whatever is running first, mirroring POST /time_entries.
+        // Stop the user's running timer first, mirroring POST /time_entries.
         await db
           .prepare(
             `UPDATE time_entries
              SET stop = ?, duration = CAST((julianday(?) - julianday(start)) * 86400 + 0.5 AS INTEGER), updated_at = ?
-             WHERE workspace_id = ? AND stop IS NULL`
+             WHERE workspace_id = ? AND user_id = ? AND stop IS NULL`
           )
-          .bind(now, now, now, workspaceId)
+          .bind(now, now, now, workspaceId, userId)
           .run();
         const id = crypto.randomUUID();
         await db
           .prepare(
             `INSERT INTO time_entries
-               (id, workspace_id, project_id, task_id, description, start, stop, duration, billable, calendar_event_id, created_at, updated_at)
-             VALUES (?, ?, ?, NULL, ?, ?, NULL, NULL, ?, NULL, ?, ?)`
+               (id, workspace_id, user_id, project_id, task_id, description, start, stop, duration, billable, calendar_event_id, created_at, updated_at)
+             VALUES (?, ?, ?, ?, NULL, ?, ?, NULL, NULL, ?, NULL, ?, ?)`
           )
           .bind(
             id,
             workspaceId,
+            userId,
+            proj.projectId,
             description,
             now,
             (billable ?? proj.billable) ? 1 : 0,
@@ -87,7 +92,7 @@ export function buildAssistantTools(ctx: AssistantToolContext): ToolSet {
           )
           .run();
         const entry = await getEntryById(db, id, workspaceId);
-        await broadcast(env, workspaceId, "timer:start", entry);
+        await broadcast(env, workspaceId, "timer:start", entry, null, userId);
         return {
           ok: true,
           startedAt: now,
@@ -100,12 +105,15 @@ export function buildAssistantTools(ctx: AssistantToolContext): ToolSet {
 
     stopTimer: tool({
       description:
-        "Stop the currently running timer. No-op (ok:false) if nothing is running.",
+        "Stop the user's running timer. No-op (ok:false) if nothing is running.",
       inputSchema: z.object({}),
       execute: async () => {
         const running = await db
-          .prepare(`SELECT id, start FROM time_entries WHERE workspace_id = ? AND stop IS NULL LIMIT 1`)
-          .bind(workspaceId)
+          .prepare(
+            `SELECT id, start FROM time_entries
+             WHERE workspace_id = ? AND user_id = ? AND stop IS NULL ORDER BY start DESC LIMIT 1`
+          )
+          .bind(workspaceId, userId)
           .first<{ id: string; start: string }>();
         if (!running) return { ok: false, reason: "No timer is running." };
         const now = new Date().toISOString();
@@ -113,12 +121,12 @@ export function buildAssistantTools(ctx: AssistantToolContext): ToolSet {
           .prepare(
             `UPDATE time_entries
              SET stop = ?, duration = CAST((julianday(?) - julianday(start)) * 86400 + 0.5 AS INTEGER), updated_at = ?
-             WHERE id = ? AND workspace_id = ? AND stop IS NULL`
+             WHERE id = ? AND workspace_id = ? AND user_id = ? AND stop IS NULL`
           )
-          .bind(now, now, now, running.id, workspaceId)
+          .bind(now, now, now, running.id, workspaceId, userId)
           .run();
         const entry = await getEntryById(db, running.id, workspaceId);
-        await broadcast(env, workspaceId, "timer:stop", entry);
+        await broadcast(env, workspaceId, "timer:stop", entry, null, userId);
         const seconds = Math.round((Date.parse(now) - Date.parse(running.start)) / 1000);
         return { ok: true, stoppedAt: now, durationHours: (seconds / 3600).toFixed(2) };
       },
@@ -149,12 +157,13 @@ export function buildAssistantTools(ctx: AssistantToolContext): ToolSet {
         await db
           .prepare(
             `INSERT INTO time_entries
-               (id, workspace_id, project_id, task_id, description, start, stop, duration, billable, calendar_event_id, created_at, updated_at)
-             VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, NULL, ?, ?)`
+               (id, workspace_id, user_id, project_id, task_id, description, start, stop, duration, billable, calendar_event_id, created_at, updated_at)
+             VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, NULL, ?, ?)`
           )
           .bind(
             id,
             workspaceId,
+            userId,
             proj.projectId,
             description,
             start,
@@ -166,7 +175,7 @@ export function buildAssistantTools(ctx: AssistantToolContext): ToolSet {
           )
           .run();
         const entry = await getEntryById(db, id, workspaceId);
-        await broadcast(env, workspaceId, "entries:changed", entry);
+        await broadcast(env, workspaceId, "entries:changed", entry, null, userId);
         return {
           ok: true,
           durationHours: (duration / 3600).toFixed(2),
@@ -202,20 +211,20 @@ export function buildAssistantTools(ctx: AssistantToolContext): ToolSet {
         await db
           .prepare(
             `INSERT INTO time_entries
-               (id, workspace_id, project_id, task_id, description, start, stop, duration, billable, calendar_event_id, created_at, updated_at)
-             VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, NULL, ?, ?)`
+               (id, workspace_id, user_id, project_id, task_id, description, start, stop, duration, billable, calendar_event_id, created_at, updated_at)
+             VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, NULL, ?, ?)`
           )
-          .bind(id, workspaceId, match?.projectId ?? null, title, start, stop, duration, match?.billable ? 1 : 0, now, now)
+          .bind(id, workspaceId, userId, match?.projectId ?? null, title, start, stop, duration, match?.billable ? 1 : 0, now, now)
           .run();
         const entry = await getEntryById(db, id, workspaceId);
-        await broadcast(env, workspaceId, "entries:changed", entry);
+        await broadcast(env, workspaceId, "entries:changed", entry, null, userId);
         return { ok: true, project: match?.projectName ?? null, durationHours: (duration / 3600).toFixed(2) };
       },
     }),
 
     getTimeSummary: tool({
       description:
-        "Summarize tracked time over a date range: total hours, billable split, and per-project breakdown. Dates are UTC ISO. Use to answer 'how much did I bill this week?'.",
+        "Summarize the user's tracked time over a date range: total hours, billable split, and per-project breakdown. Dates are UTC ISO. Use to answer 'how much did I bill this week?'.",
       inputSchema: z.object({
         since: ISO.describe("range start (inclusive)"),
         until: ISO.describe("range end (exclusive)"),
@@ -229,10 +238,10 @@ export function buildAssistantTools(ctx: AssistantToolContext): ToolSet {
                     COUNT(*) AS entries
              FROM time_entries te
              LEFT JOIN projects p ON p.id = te.project_id
-             WHERE te.workspace_id = ? AND te.stop IS NOT NULL AND te.start >= ? AND te.start < ?
+             WHERE te.workspace_id = ? AND te.user_id = ? AND te.stop IS NOT NULL AND te.start >= ? AND te.start < ?
              GROUP BY project ORDER BY seconds DESC`
           )
-          .bind(workspaceId, since, until)
+          .bind(workspaceId, userId, since, until)
           .all<{ project: string; seconds: number; billable_seconds: number; entries: number }>();
         const totalSeconds = results.reduce((s, r) => s + (r.seconds ?? 0), 0);
         const billableSeconds = results.reduce((s, r) => s + (r.billable_seconds ?? 0), 0);
@@ -266,12 +275,21 @@ export function buildAssistantTools(ctx: AssistantToolContext): ToolSet {
       // Native AI-SDK human-in-the-loop: the client must approve before execute runs.
       needsApproval: true,
       execute: async ({ id }) => {
+        const entry = await db
+          .prepare(`SELECT user_id, stop FROM time_entries WHERE id = ? AND workspace_id = ?`)
+          .bind(id, workspaceId)
+          .first<{ user_id: string | null; stop: string | null }>();
+        if (!entry) return { ok: false, reason: "No entry with that id." };
+        const role = await getMemberRole(db, workspaceId, userId);
+        if (!canWriteEntry(role, entry, userId)) {
+          return { ok: false, reason: "That entry isn't yours to delete." };
+        }
         const res = await db
           .prepare(`DELETE FROM time_entries WHERE id = ? AND workspace_id = ?`)
           .bind(id, workspaceId)
           .run();
         const deleted = (res.meta?.changes ?? 0) > 0;
-        if (deleted) await broadcast(env, workspaceId, "entries:changed", null);
+        if (deleted) await broadcast(env, workspaceId, "entries:changed", null, null, entry.user_id);
         return { ok: deleted, reason: deleted ? undefined : "No entry with that id." };
       },
     }),
@@ -288,7 +306,7 @@ export function buildAssistantTools(ctx: AssistantToolContext): ToolSet {
       // saves, so injected text can't silently plant a durable instruction.
       needsApproval: true,
       execute: async ({ key, content }) => {
-        const { key: saved } = await rememberFact(db, workspaceId, key, content);
+        const { key: saved } = await rememberFact(db, workspaceId, userId, key, content);
         return { ok: true, key: saved };
       },
     }),
@@ -297,7 +315,7 @@ export function buildAssistantTools(ctx: AssistantToolContext): ToolSet {
       description: "Search previously remembered facts about the user by keyword.",
       inputSchema: z.object({ query: z.string().max(200) }),
       execute: async ({ query }) => {
-        const memories = await searchMemories(db, workspaceId, query);
+        const memories = await searchMemories(db, workspaceId, userId, query);
         return { memories: memories.map((m) => m.content) };
       },
     }),

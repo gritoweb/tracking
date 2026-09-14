@@ -183,7 +183,7 @@ The line under the field shows what it understood before you commit it.
 
 ## Calendar sync & auto-track (Google + Outlook)
 
-Connect **Google Calendar**, **Outlook / Microsoft 365**, or both under **Settings → Calendar sync** (read-only access — the app never writes to your calendar). Connecting both is the normal case when work and personal calendars are separate; their events simply appear together. Once connected:
+Connect your own **Google Calendar**, **Outlook / Microsoft 365**, or both under **Settings → Calendar sync** (read-only access — the app never writes to your calendar). Connecting both is the normal case when work and personal calendars are separate; their events simply appear together. Your calendar is yours alone: teammates never see its events, and auto-track only creates entries on your timesheet. Once connected:
 
 - Your events appear as dashed **ghost blocks** on the Calendar view. Click one → confirm the project → it becomes a tracked entry.
 - **Auto-track** (toggle on the same Settings card): every few minutes, meetings that have *ended* are automatically turned into time entries — no clicking needed. Each event is only ever converted once.
@@ -278,7 +278,7 @@ The command palette is the fastest path to almost everything — try it first.
 
 ## Offline & sync behavior
 
-- The **running timer syncs in real time** across all your open tabs (and the extension) via a WebSocket — start, stop, discard or trim it anywhere and every other tab follows immediately.
+- The **running timer syncs in real time** across all your open tabs (and the extension) via a WebSocket — start, stop, discard or trim it anywhere and every other tab follows immediately. Timers are personal: a teammate starting or stopping theirs never touches yours.
 - **Everything derived from your entries follows too.** A stop in one tab updates Reports, and the tracked totals on Projects and Tasks, in a tab you left open on another screen — no reload, no clicking away and back.
 - If the connection drops (laptop asleep, a flaky network), the app reconnects and **re-checks the server** rather than trusting what it last heard, so a tab can't sit showing a timer that stopped somewhere else while it was away.
 - If you **go offline**, the timer keeps state locally and your changes are queued in the browser (IndexedDB), then replayed automatically when you're back online. A logged minute is never lost to a bad connection. An edit made offline stays on screen and tells you it's waiting to sync — it isn't reverted and then quietly reapplied later.
@@ -304,10 +304,10 @@ Under **Settings → Account / Security / Danger zone**:
 | Preferences | Default billable (used when an entry has no project), 12/24h time, currency, week start, show weekends | Billable: device · rest: account |
 | Productivity | Notifications, idle detection, reminders, nudge alerts, pomodoro | Device |
 | Email digests | Morning briefing, weekly summary, send hour, send one now | Account |
-| Assistant memory | Review/delete assistant memories | Workspace |
-| Recurring entries | Manage templates | Workspace |
+| Assistant memory | Review/delete assistant memories | Account |
+| Recurring entries | Manage templates | Account |
 | Team | Members, roles, invites | Workspace |
-| Calendar sync | Google connect/disconnect, auto-track | Workspace |
+| Calendar sync | Google/Outlook connect/disconnect, auto-track | Account |
 | MCP connector | Server URL, API keys (create/revoke) | Workspace |
 | Integrations | Workfront / Dynamics | Workspace |
 | Account | Profile, email verification | Account |

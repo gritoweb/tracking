@@ -1,20 +1,21 @@
 // Turning calendar events into tracked time entries — used both by the
 // user-triggered "Convert all" endpoint and the cron-driven auto-track
 // scheduler. Provider-agnostic: it asks lib/calendar-connections.ts for the
-// workspace's events and never knows which calendar they came from.
+// person's events and never knows which calendar they came from.
 
 import { broadcast } from "../db/queries";
 import { inferEventProjects, type InferredEventProject } from "./ai";
 import {
-  fetchWorkspaceEvents,
-  workspacesWithAutoTrack,
+  fetchUserEvents,
+  connectionsWithAutoTrack,
 } from "./calendar-connections";
 import type { ExternalEvent } from "./calendar-providers";
 
-/** Insert entries for events not already confirmed in [since, until]. Returns count. */
+/** Insert this person's entries for events they haven't confirmed in [since, until]. Returns count. */
 async function insertEvents(
   env: Env,
   workspaceId: string,
+  userId: string,
   since: string,
   until: string,
   events: ExternalEvent[]
@@ -22,13 +23,14 @@ async function insertEvents(
   const db = env.DB;
   if (!events.length) return 0;
 
+  // Per person: two attendees of the same meeting each track their own copy.
   const { results } = await db
     .prepare(
       `SELECT calendar_event_id FROM time_entries
-       WHERE workspace_id = ? AND calendar_event_id IS NOT NULL
+       WHERE workspace_id = ? AND user_id = ? AND calendar_event_id IS NOT NULL
          AND start >= ? AND start <= ?`
     )
-    .bind(workspaceId, since, until)
+    .bind(workspaceId, userId, since, until)
     .all<{ calendar_event_id: string }>();
   const confirmed = new Set(results.map((r) => r.calendar_event_id));
 
@@ -48,8 +50,8 @@ async function insertEvents(
   const now = new Date().toISOString();
   const stmt = db.prepare(
     `INSERT INTO time_entries
-       (id, workspace_id, project_id, task_id, description, start, stop, duration, billable, calendar_event_id, created_at, updated_at)
-     VALUES (?, ?, ?, NULL, ?, ?, ?, CAST((julianday(?) - julianday(?)) * 86400 + 0.5 AS INTEGER), ?, ?, ?, ?)`
+       (id, workspace_id, user_id, project_id, task_id, description, start, stop, duration, billable, calendar_event_id, created_at, updated_at)
+     VALUES (?, ?, ?, ?, NULL, ?, ?, ?, CAST((julianday(?) - julianday(?)) * 86400 + 0.5 AS INTEGER), ?, ?, ?, ?)`
   );
   await db.batch(
     fresh.map((e) => {
@@ -57,6 +59,7 @@ async function insertEvents(
       return stmt.bind(
         crypto.randomUUID(),
         workspaceId,
+        userId,
         match?.projectId ?? null,
         e.title,
         e.start,
@@ -74,8 +77,8 @@ async function insertEvents(
 }
 
 /**
- * Materialize calendar events in [since, until] into time entries for one
- * workspace. `onlyEnded` restricts to events that have already finished (used by
+ * Materialize one person's calendar events in [since, until] into their time
+ * entries. `onlyEnded` restricts to events that have already finished (used by
  * the scheduler so we don't create entries with a stop time in the future).
  * `onlyAutoTrack` restricts to calendars the user opted into auto-tracking —
  * the cron's business, not the "Convert all" button's.
@@ -83,11 +86,12 @@ async function insertEvents(
 export async function convertRange(
   env: Env,
   workspaceId: string,
+  userId: string,
   since: string,
   until: string,
   opts: { onlyEnded?: boolean; onlyAutoTrack?: boolean } = {}
 ): Promise<number> {
-  let events = await fetchWorkspaceEvents(env, workspaceId, since, until, {
+  let events = await fetchUserEvents(env, workspaceId, userId, since, until, {
     onlyAutoTrack: opts.onlyAutoTrack,
   });
   if (opts.onlyEnded) {
@@ -95,42 +99,45 @@ export async function convertRange(
     events = events.filter((e) => new Date(e.stop).getTime() <= nowMs);
   }
 
-  const created = await insertEvents(env, workspaceId, since, until, events);
-  if (created > 0) await broadcast(env, workspaceId, "entries:changed", { source: "calendar" });
+  const created = await insertEvents(env, workspaceId, userId, since, until, events);
+  if (created > 0) {
+    await broadcast(env, workspaceId, "entries:changed", { source: "calendar" }, null, userId);
+  }
   return created;
 }
 
 /**
- * Cron entry point: for every workspace with an auto-track calendar, materialize
+ * Cron entry point: for every person with an auto-track calendar, materialize
  * events that finished in the last hour. Dedup keeps it idempotent, so
  * overlapping runs are safe.
  */
 export async function runAutoTrack(env: Env): Promise<void> {
-  const workspaceIds = await workspacesWithAutoTrack(env);
-  if (!workspaceIds.length) return;
+  const connections = await connectionsWithAutoTrack(env);
+  if (!connections.length) return;
 
   const now = Date.now();
   const since = new Date(now - 60 * 60 * 1000).toISOString();
   const until = new Date(now + 60 * 1000).toISOString();
 
-  // Bounded concurrency: a serial sweep head-of-line-blocks every workspace
+  // Bounded concurrency: a serial sweep head-of-line-blocks every person
   // behind one slow provider response; unbounded Promise.all would breach the
   // 6-simultaneous-connection limit. Chunks of 5 keep the sweep O(n/5).
   const CONCURRENCY = 5;
-  for (let i = 0; i < workspaceIds.length; i += CONCURRENCY) {
+  for (let i = 0; i < connections.length; i += CONCURRENCY) {
     await Promise.all(
-      workspaceIds.slice(i, i + CONCURRENCY).map(async (workspaceId) => {
+      connections.slice(i, i + CONCURRENCY).map(async ({ workspaceId, userId }) => {
         try {
-          await convertRange(env, workspaceId, since, until, {
+          await convertRange(env, workspaceId, userId, since, until, {
             onlyEnded: true,
             onlyAutoTrack: true,
           });
         } catch (e) {
-          // One workspace failing (revoked token, transient provider error) must
+          // One person failing (revoked token, transient provider error) must
           // not abort the rest of the sweep — but a persistent failure means
-          // that workspace's entries silently stop materializing, so log it.
-          console.error("autotrack: workspace sweep failed", {
+          // their entries silently stop materializing, so log it.
+          console.error("autotrack: sweep failed", {
             workspaceId,
+            userId,
             error: String(e),
           });
         }

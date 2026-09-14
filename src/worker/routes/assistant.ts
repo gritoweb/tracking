@@ -18,12 +18,12 @@ const NudgesQuerySchema = z.object({
 
 export const assistantRouter = new Hono<{
   Bindings: Env;
-  Variables: { workspaceId: string };
+  Variables: { workspaceId: string; userId: string };
 }>()
   // Deterministic, cheap to poll — no AI involved.
   .get("/nudges", zValidator("query", NudgesQuerySchema), async (c) => {
     const { timezoneOffsetMinutes } = c.req.valid("query");
-    const nudges = await computeNudges(c.env, c.get("workspaceId"), timezoneOffsetMinutes);
+    const nudges = await computeNudges(c.env, c.get("workspaceId"), c.get("userId"), timezoneOffsetMinutes);
     return c.json(nudges);
   })
   // One-click "Add to timesheet" from an untracked-meeting nudge. Server-side
@@ -31,13 +31,14 @@ export const assistantRouter = new Hono<{
   // inference failure still creates the entry, just without a project.
   .post("/track-event", zValidator("json", AssistantTrackEventRequestSchema), async (c) => {
     const workspaceId = c.get("workspaceId");
+    const userId = c.get("userId");
     const { calendarEventId, title, start, stop } = c.req.valid("json");
 
-    // Idempotent: the nudge may race auto-track or a double-click.
+    // Idempotent per person: the nudge may race auto-track or a double-click, and each attendee tracks their own copy.
     const existing = await c.env.DB.prepare(
-      `SELECT id FROM time_entries WHERE workspace_id = ? AND calendar_event_id = ? LIMIT 1`
+      `SELECT id FROM time_entries WHERE workspace_id = ? AND user_id = ? AND calendar_event_id = ? LIMIT 1`
     )
-      .bind(workspaceId, calendarEventId)
+      .bind(workspaceId, userId, calendarEventId)
       .first<{ id: string }>();
     if (existing) {
       return c.json({
@@ -63,12 +64,13 @@ export const assistantRouter = new Hono<{
     );
     await c.env.DB.prepare(
       `INSERT INTO time_entries
-         (id, workspace_id, project_id, task_id, description, start, stop, duration, billable, calendar_event_id, created_at, updated_at)
-       VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?)`
+         (id, workspace_id, user_id, project_id, task_id, description, start, stop, duration, billable, calendar_event_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
       .bind(
         crypto.randomUUID(),
         workspaceId,
+        userId,
         match?.projectId ?? null,
         title,
         start,
@@ -81,7 +83,7 @@ export const assistantRouter = new Hono<{
       )
       .run();
     c.executionCtx.waitUntil(
-      broadcast(c.env, workspaceId, "entries:changed", { source: "assistant" })
+      broadcast(c.env, workspaceId, "entries:changed", { source: "assistant" }, null, userId)
     );
 
     return c.json({
@@ -93,14 +95,19 @@ export const assistantRouter = new Hono<{
   })
   // ─── Memory management (what the assistant has remembered about the user) ─────────────
   .get("/memory", async (c) => {
-    const memories = await listMemories(c.env.DB, c.get("workspaceId"));
+    const memories = await listMemories(c.env.DB, c.get("workspaceId"), c.get("userId"));
     return c.json(memories);
   })
   .delete("/memory", async (c) => {
-    await clearMemories(c.env.DB, c.get("workspaceId"));
+    await clearMemories(c.env.DB, c.get("workspaceId"), c.get("userId"));
     return c.body(null, 204);
   })
   .delete("/memory/:key", async (c) => {
-    const deleted = await deleteMemory(c.env.DB, c.get("workspaceId"), c.req.param("key"));
+    const deleted = await deleteMemory(
+      c.env.DB,
+      c.get("workspaceId"),
+      c.get("userId"),
+      c.req.param("key")
+    );
     return deleted ? c.body(null, 204) : c.json({ error: "Not found" }, 404);
   });

@@ -1,51 +1,13 @@
-import { test, expect, type Browser, type Page } from "@playwright/test";
+import { test, expect } from "@playwright/test";
 import { signUp } from "./auth";
-
-const PASSWORD = "TestPassword123!";
-
-// Outside the dev bootstrap domain (@example.com), so only a real invitation can let these in.
-function outsiderEmail(label: string) {
-  return `${label}-${Date.now()}-${Math.random().toString(36).slice(2)}@outsider.test`;
-}
-
-// Better Auth rejects requests without an Origin header, and API-context requests don't send one.
-async function originHeaders(page: Page) {
-  if (!page.url().startsWith("http")) await page.goto("/login");
-  return { origin: new URL(page.url()).origin };
-}
-
-async function newPage(browser: Browser) {
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  return { page, headers: await originHeaders(page) };
-}
-
-async function signUpWithPassword(page: Page, headers: Record<string, string>, email: string) {
-  return page.request.post("/api/auth/sign-up/email", {
-    data: { name: "Outsider", email, password: PASSWORD },
-    headers,
-  });
-}
-
-async function inviteOutsider(browser: Browser) {
-  const ownerContext = await browser.newContext();
-  const owner = await ownerContext.newPage();
-  const { email: ownerEmail } = await signUp(owner);
-  const ownerHeaders = await originHeaders(owner);
-
-  const orgs = await (await owner.request.get("/api/auth/organization/list")).json();
-  expect(orgs).toHaveLength(1);
-  const workspaceId: string = orgs[0].id;
-
-  const email = outsiderEmail("invitee");
-  const inviteRes = await owner.request.post("/api/auth/organization/invite-member", {
-    data: { email, role: "member", organizationId: workspaceId },
-    headers: ownerHeaders,
-  });
-  expect(inviteRes.ok()).toBeTruthy();
-  const invitation = await inviteRes.json();
-  return { owner, ownerEmail, ownerHeaders, workspaceId, email, invitationId: invitation.id as string };
-}
+import {
+  PASSWORD,
+  inviteOutsider,
+  newPage,
+  originHeaders,
+  outsiderEmail,
+  signUpWithPassword,
+} from "./team";
 
 test.describe("invite-only access", () => {
   test("refuses account creation without an invitation on every self-serve path", async ({ page }) => {

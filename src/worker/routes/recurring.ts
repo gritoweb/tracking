@@ -45,30 +45,33 @@ function formatRecurring(row: Record<string, unknown>) {
   };
 }
 
+// A template mints its author's hours, so each person sees and changes only their own.
 export const recurringRouter = new Hono<{
   Bindings: Env;
-  Variables: { workspaceId: string };
+  Variables: { workspaceId: string; userId: string };
 }>()
   .get("/", async (c) => {
     const { results } = await c.env.DB.prepare(
-      `${RECURRING_SELECT} WHERE r.workspace_id = ? ORDER BY r.created_at DESC`
+      `${RECURRING_SELECT} WHERE r.workspace_id = ? AND r.user_id = ? ORDER BY r.created_at DESC`
     )
-      .bind(c.get("workspaceId"))
+      .bind(c.get("workspaceId"), c.get("userId"))
       .all<Record<string, unknown>>();
     return c.json(results.map(formatRecurring));
   })
   .post("/", zValidator("json", CreateRecurringEntrySchema), async (c) => {
     const workspaceId = c.get("workspaceId");
+    const userId = c.get("userId");
     const d = c.req.valid("json");
     const id = crypto.randomUUID();
     await c.env.DB.prepare(
       `INSERT INTO recurring_entries
-         (id, workspace_id, description, project_id, task_id, tags, billable, duration_seconds, days_of_week, time_utc, active, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`
+         (id, workspace_id, user_id, description, project_id, task_id, tags, billable, duration_seconds, days_of_week, time_utc, active, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`
     )
       .bind(
         id,
         workspaceId,
+        userId,
         d.description,
         d.projectId ?? null,
         d.taskId ?? null,
@@ -81,13 +84,16 @@ export const recurringRouter = new Hono<{
       )
       .run();
 
-    const { results } = await c.env.DB.prepare(`${RECURRING_SELECT} WHERE r.id = ? AND r.workspace_id = ?`)
-      .bind(id, workspaceId)
+    const { results } = await c.env.DB.prepare(
+      `${RECURRING_SELECT} WHERE r.id = ? AND r.workspace_id = ? AND r.user_id = ?`
+    )
+      .bind(id, workspaceId, userId)
       .all<Record<string, unknown>>();
     return c.json(formatRecurring(results[0]), 201);
   })
   .put("/:id", zValidator("json", UpdateRecurringEntrySchema), async (c) => {
     const workspaceId = c.get("workspaceId");
+    const userId = c.get("userId");
     const id = c.req.param("id");
     const d = c.req.valid("json");
 
@@ -108,23 +114,25 @@ export const recurringRouter = new Hono<{
 
     if (fields.length) {
       await c.env.DB.prepare(
-        `UPDATE recurring_entries SET ${fields.join(", ")} WHERE id = ? AND workspace_id = ?`
+        `UPDATE recurring_entries SET ${fields.join(", ")} WHERE id = ? AND workspace_id = ? AND user_id = ?`
       )
-        .bind(...values, id, workspaceId)
+        .bind(...values, id, workspaceId, userId)
         .run();
     }
 
-    const { results } = await c.env.DB.prepare(`${RECURRING_SELECT} WHERE r.id = ? AND r.workspace_id = ?`)
-      .bind(id, workspaceId)
+    const { results } = await c.env.DB.prepare(
+      `${RECURRING_SELECT} WHERE r.id = ? AND r.workspace_id = ? AND r.user_id = ?`
+    )
+      .bind(id, workspaceId, userId)
       .all<Record<string, unknown>>();
     if (!results.length) return c.json({ error: "Not found" }, 404);
     return c.json(formatRecurring(results[0]));
   })
   .delete("/:id", async (c) => {
     await c.env.DB.prepare(
-      `DELETE FROM recurring_entries WHERE id = ? AND workspace_id = ?`
+      `DELETE FROM recurring_entries WHERE id = ? AND workspace_id = ? AND user_id = ?`
     )
-      .bind(c.req.param("id"), c.get("workspaceId"))
+      .bind(c.req.param("id"), c.get("workspaceId"), c.get("userId"))
       .run();
     return c.json({ ok: true });
   });

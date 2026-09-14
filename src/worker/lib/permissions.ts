@@ -34,3 +34,13 @@ export function canEditEntry(
   if (entryUserId === null) return true;
   return entryUserId === requestingUserId;
 }
+
+/** A running entry is its owner's live timer: nobody else may stop, edit or delete it, managers included. */
+export function canWriteEntry(
+  role: WorkspaceRole | null,
+  entry: { user_id: string | null; stop: string | null },
+  requestingUserId: string
+): boolean {
+  if (entry.stop === null) return entry.user_id === requestingUserId;
+  return canEditEntry(role, entry.user_id, requestingUserId);
+}

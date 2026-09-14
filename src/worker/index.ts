@@ -127,19 +127,20 @@ export type AppType = typeof app;
 /**
  * Gate the Agents SDK routes. The client connects to /agents/chat-agent/<any>;
  * we authenticate (with the same membership re-verification as /api/*), then
- * FORCE the instance name to the caller's workspace id so a client can never
- * reach another workspace's ChatAgent — the same server-side routing guarantee
- * as the timer WebSocket (routes/websocket.ts).
+ * FORCE the instance name to "<workspace id>:<user id>" so a client can never
+ * reach another person's ChatAgent — the chat, its memory and its tools are
+ * per person, with the same server-side routing guarantee as the timer
+ * WebSocket (routes/websocket.ts).
  */
 async function handleAgentRequest(request: Request, env: Env): Promise<Response> {
   const resolved = await resolveWorkspace(env, request);
   if (!resolved.ok) return new Response("Unauthorized", { status: 401 });
 
   const url = new URL(request.url);
-  // /agents/<kebab-class>/<instance>[/subpath] → pin <instance> to the workspace.
+  // /agents/<kebab-class>/<instance>[/subpath] → pin <instance> to the caller.
   const segments = url.pathname.split("/"); // ["", "agents", "chat-agent", "<instance>", ...]
   if (segments.length >= 4) {
-    segments[3] = resolved.workspaceId;
+    segments[3] = `${resolved.workspaceId}:${resolved.userId}`;
     url.pathname = segments.join("/");
   }
   const rewritten = new Request(url, request);

@@ -20,7 +20,7 @@ import {
   upsertTags,
   ENTRY_SELECT,
 } from "../db/queries";
-import { getMemberRole, canManageWorkspace, canEditEntry } from "../lib/permissions";
+import { getMemberRole, canWriteEntry } from "../lib/permissions";
 
 /**
  * The tab that made this request, so its own broadcast can be filtered out
@@ -61,12 +61,7 @@ async function resolveBillable(
   return Boolean(row?.billable);
 }
 
-/**
- * Which of `ids` (already scoped to this workspace) `userId` is NOT allowed to
- * edit/delete — empty when they're all their own, unowned, or the caller is
- * owner/admin. Checked before any write so a bulk request either fully applies
- * or fails loud, never silently skips someone else's entries.
- */
+/** Ids (already workspace-scoped) the caller may not change: someone else's entry for a member, or anyone else's running timer. */
 async function forbiddenEntryIds(
   db: D1Database,
   workspaceId: string,
@@ -75,19 +70,16 @@ async function forbiddenEntryIds(
 ): Promise<string[]> {
   if (!ids.length) return [];
   const role = await getMemberRole(db, workspaceId, userId);
-  if (canManageWorkspace(role)) return [];
 
   const placeholders = ids.map(() => "?").join(",");
   const { results } = await db
     .prepare(
-      `SELECT id, user_id FROM time_entries WHERE workspace_id = ? AND id IN (${placeholders})`
+      `SELECT id, user_id, stop FROM time_entries WHERE workspace_id = ? AND id IN (${placeholders})`
     )
     .bind(workspaceId, ...ids)
-    .all<{ id: string; user_id: string | null }>();
+    .all<{ id: string; user_id: string | null; stop: string | null }>();
 
-  return results
-    .filter((r) => !canEditEntry(role, r.user_id, userId))
-    .map((r) => r.id);
+  return results.filter((r) => !canWriteEntry(role, r, userId)).map((r) => r.id);
 }
 
 export const timeEntriesRouter = new Hono<{
@@ -99,11 +91,11 @@ export const timeEntriesRouter = new Hono<{
     const workspaceId = c.get("workspaceId");
     const { since, until, running } = c.req.query();
 
-    // ?running=true — return only the currently running entry
+    // ?running=true — return only the caller's running entry
     if (running === "true") {
       const { results } = await c.env.DB.prepare(
-        `${ENTRY_SELECT} WHERE te.workspace_id = ? AND te.stop IS NULL GROUP BY te.id LIMIT 1`
-      ).bind(workspaceId).all<Record<string, unknown>>();
+        `${ENTRY_SELECT} WHERE te.workspace_id = ? AND te.user_id = ? AND te.stop IS NULL GROUP BY te.id LIMIT 1`
+      ).bind(workspaceId, c.get("userId")).all<Record<string, unknown>>();
       return c.json(results.map(formatEntry));
     }
 
@@ -217,13 +209,13 @@ export const timeEntriesRouter = new Hono<{
     const now = new Date().toISOString();
     const billable = await resolveBillable(c.env.DB, workspaceId, data.billable, data.projectId);
 
-    // Stop any running entry
+    // Stop the caller's running timer; a teammate's keeps going.
     if (!data.stop) {
       await c.env.DB.prepare(
         `UPDATE time_entries
          SET stop = ?, duration = CAST((julianday(?) - julianday(start)) * 86400 + 0.5 AS INTEGER), updated_at = ?
-         WHERE workspace_id = ? AND stop IS NULL`
-      ).bind(data.start, data.start, now, workspaceId).run();
+         WHERE workspace_id = ? AND user_id = ? AND stop IS NULL`
+      ).bind(data.start, data.start, now, workspaceId, userId).run();
     }
 
     await c.env.DB.prepare(
@@ -250,15 +242,16 @@ export const timeEntriesRouter = new Hono<{
     }
 
     const entry = await getEntryById(c.env.DB, id, workspaceId);
-    c.executionCtx.waitUntil(broadcast(c.env, workspaceId, data.stop ? "entries:changed" : "timer:start", entry, clientId(c)));
+    c.executionCtx.waitUntil(
+      broadcast(c.env, workspaceId, data.stop ? "entries:changed" : "timer:start", entry, clientId(c), userId)
+    );
     return c.json(entry, 201);
   })
   // ─── Current running entry ─────────────────────────────────────────────
   .get("/current", async (c) => {
-    const workspaceId = c.get("workspaceId");
     const { results } = await c.env.DB.prepare(
-      `${ENTRY_SELECT} WHERE te.workspace_id = ? AND te.stop IS NULL GROUP BY te.id ORDER BY te.start DESC LIMIT 1`
-    ).bind(workspaceId).all<Record<string, unknown>>();
+      `${ENTRY_SELECT} WHERE te.workspace_id = ? AND te.user_id = ? AND te.stop IS NULL GROUP BY te.id ORDER BY te.start DESC LIMIT 1`
+    ).bind(c.get("workspaceId"), c.get("userId")).all<Record<string, unknown>>();
 
     if (!results.length) return c.json(null);
     return c.json(formatEntry(results[0]));
@@ -360,8 +353,15 @@ export const timeEntriesRouter = new Hono<{
     if (!owned) return c.json({ error: "Not found" }, 404);
 
     const role = await getMemberRole(c.env.DB, workspaceId, userId);
-    if (!canEditEntry(role, owned.user_id, userId)) {
-      return c.json({ error: "Not your entry" }, 403);
+    if (!canWriteEntry(role, owned, userId)) {
+      return c.json(
+        { error: owned.stop === null ? "Only the person tracking can change a running timer" : "Not your entry" },
+        403
+      );
+    }
+    // Clearing `stop` turns the entry back into a live timer, which only its owner may run.
+    if (data.stop === null && owned.stop !== null && owned.user_id !== userId) {
+      return c.json({ error: "Only the entry's owner can restart it" }, 403);
     }
 
     // Validate the range the row will actually have after the patch. The schema's
@@ -408,7 +408,9 @@ export const timeEntriesRouter = new Hono<{
     }
 
     const entry = await getEntryById(c.env.DB, id, workspaceId);
-    c.executionCtx.waitUntil(broadcast(c.env, workspaceId, "entries:changed", entry, clientId(c)));
+    c.executionCtx.waitUntil(
+      broadcast(c.env, workspaceId, "entries:changed", entry, clientId(c), owned.user_id)
+    );
     return c.json(entry);
   })
   // ─── Delete ───────────────────────────────────────────────────────────────
@@ -418,38 +420,53 @@ export const timeEntriesRouter = new Hono<{
     const id = c.req.param("id");
 
     const owned = await c.env.DB.prepare(
-      `SELECT user_id FROM time_entries WHERE id = ? AND workspace_id = ?`
-    ).bind(id, workspaceId).first<{ user_id: string | null }>();
+      `SELECT user_id, stop FROM time_entries WHERE id = ? AND workspace_id = ?`
+    ).bind(id, workspaceId).first<{ user_id: string | null; stop: string | null }>();
     if (!owned) return c.json({ error: "Not found" }, 404);
 
     const role = await getMemberRole(c.env.DB, workspaceId, userId);
-    if (!canEditEntry(role, owned.user_id, userId)) {
-      return c.json({ error: "Not your entry" }, 403);
+    if (!canWriteEntry(role, owned, userId)) {
+      return c.json(
+        { error: owned.stop === null ? "Only the person tracking can delete a running timer" : "Not your entry" },
+        403
+      );
     }
 
     await c.env.DB.prepare(
       `DELETE FROM time_entries WHERE id = ? AND workspace_id = ?`
     ).bind(id, workspaceId).run();
-    c.executionCtx.waitUntil(broadcast(c.env, workspaceId, "entries:changed", null, clientId(c)));
+    c.executionCtx.waitUntil(
+      broadcast(c.env, workspaceId, "entries:changed", null, clientId(c), owned.user_id)
+    );
     return c.json({ ok: true });
   })
   // ─── Stop running ─────────────────────────────────────────────────────────
   .patch("/:id/stop", async (c) => {
     const workspaceId = c.get("workspaceId");
+    const userId = c.get("userId");
     const id = c.req.param("id");
     const stop = new Date().toISOString();
+
+    const owned = await c.env.DB.prepare(
+      `SELECT user_id FROM time_entries WHERE id = ? AND workspace_id = ?`
+    ).bind(id, workspaceId).first<{ user_id: string | null }>();
+    // A stale id (the extension after a reload) keeps answering null, as it always has.
+    if (!owned) return c.json(null);
+    if (owned.user_id !== userId) {
+      return c.json({ error: "Only the person tracking can stop this timer" }, 403);
+    }
 
     const result = await c.env.DB.prepare(
       `UPDATE time_entries
        SET stop = ?, duration = CAST((julianday(?) - julianday(start)) * 86400 + 0.5 AS INTEGER), updated_at = ?
-       WHERE id = ? AND workspace_id = ? AND stop IS NULL`
-    ).bind(stop, stop, stop, id, workspaceId).run();
+       WHERE id = ? AND workspace_id = ? AND user_id = ? AND stop IS NULL`
+    ).bind(stop, stop, stop, id, workspaceId, userId).run();
 
     const entry = await getEntryById(c.env.DB, id, workspaceId);
     // Only broadcast if the entry was actually running — prevents false timer:stop
     // events when the extension tries to stop an already-stopped (stale) entry
     if (result.meta.changes > 0) {
-      c.executionCtx.waitUntil(broadcast(c.env, workspaceId, "timer:stop", entry, clientId(c)));
+      c.executionCtx.waitUntil(broadcast(c.env, workspaceId, "timer:stop", entry, clientId(c), userId));
     }
     return c.json(entry);
   });

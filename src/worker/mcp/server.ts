@@ -419,10 +419,10 @@ export function buildMcpServer(ctx: McpContext): McpServer {
           `SELECT te.id, te.description, te.start, p.name AS project_name
            FROM time_entries te
            LEFT JOIN projects p ON p.id = te.project_id AND p.workspace_id = te.workspace_id
-           WHERE te.workspace_id = ? AND te.stop IS NULL
+           WHERE te.workspace_id = ? AND te.user_id = ? AND te.stop IS NULL
            ORDER BY te.start DESC LIMIT 1`
         )
-        .bind(workspaceId)
+        .bind(workspaceId, userId)
         .first<Record<string, unknown>>();
 
       if (!row) return json({ running: false });
@@ -544,14 +544,15 @@ export function buildMcpServer(ctx: McpContext): McpServer {
         billable = Boolean(project.billable);
       }
 
+      // Stops only the key holder's running timer; a teammate's keeps going.
       await db
         .prepare(
           `UPDATE time_entries
            SET stop = ?, duration = CAST((julianday(?) - julianday(start)) * 86400 + 0.5 AS INTEGER),
                updated_at = ?
-           WHERE workspace_id = ? AND stop IS NULL`
+           WHERE workspace_id = ? AND user_id = ? AND stop IS NULL`
         )
-        .bind(now, now, now, workspaceId)
+        .bind(now, now, now, workspaceId, userId)
         .run();
 
       await db
@@ -563,7 +564,7 @@ export function buildMcpServer(ctx: McpContext): McpServer {
         .bind(id, workspaceId, userId, projectId ?? null, description, now, billable ? 1 : 0, now, now)
         .run();
 
-      await broadcast(env, workspaceId, "timer:start", { id });
+      await broadcast(env, workspaceId, "timer:start", { id }, null, userId);
       return text(`Started "${description}" at ${now}.`);
     }
   );
@@ -579,12 +580,13 @@ export function buildMcpServer(ctx: McpContext): McpServer {
     },
     async () => {
       const now = new Date().toISOString();
+      // Only the key holder's own timer: a teammate's is never "whatever is running".
       const running = await db
         .prepare(
           `SELECT id, description, start FROM time_entries
-           WHERE workspace_id = ? AND stop IS NULL ORDER BY start DESC LIMIT 1`
+           WHERE workspace_id = ? AND user_id = ? AND stop IS NULL ORDER BY start DESC LIMIT 1`
         )
-        .bind(workspaceId)
+        .bind(workspaceId, userId)
         .first<{ id: string; description: string; start: string }>();
       if (!running) return text("No timer is running.");
 
@@ -593,12 +595,12 @@ export function buildMcpServer(ctx: McpContext): McpServer {
           `UPDATE time_entries
            SET stop = ?, duration = CAST((julianday(?) - julianday(start)) * 86400 + 0.5 AS INTEGER),
                updated_at = ?
-           WHERE id = ? AND workspace_id = ?`
+           WHERE id = ? AND workspace_id = ? AND user_id = ? AND stop IS NULL`
         )
-        .bind(now, now, now, running.id, workspaceId)
+        .bind(now, now, now, running.id, workspaceId, userId)
         .run();
 
-      await broadcast(env, workspaceId, "timer:stop", { id: running.id });
+      await broadcast(env, workspaceId, "timer:stop", { id: running.id }, null, userId);
       const elapsed = Date.now() - new Date(running.start).getTime();
       return text(
         `Stopped "${running.description}" after ${Math.round(elapsed / 60_000)} minutes.`
@@ -666,7 +668,7 @@ export function buildMcpServer(ctx: McpContext): McpServer {
         )
         .run();
 
-      await broadcast(env, workspaceId, "entries:changed", null);
+      await broadcast(env, workspaceId, "entries:changed", null, null, userId);
       return text(
         `Logged ${Math.round((stopMs - startMs) / 60_000)} minutes: "${description}".`
       );
