@@ -1,5 +1,33 @@
 # Changelog
 
+## 2026-09-14 (3)
+### Fixed
+- **Per-person timers, Assistant and calendar (D2).** Starting a timer ran `UPDATE ... WHERE
+  workspace_id = ? AND stop IS NULL`, stopping every running timer in the workspace; `/current`,
+  `?running=true`, the MCP `stop_timer`/`get_running_timer`, the Assistant's tools and its nudges all
+  read "whatever is running"; and `timer:start`/`timer:stop` reached every member's socket, so a
+  teammate's timer showed up in your timer bar. Running-timer queries now filter by `user_id`
+  everywhere (REST, MCP, Assistant, nudges, day drafting). A running entry is owner-only for stop,
+  edit and delete, managers included (`canWriteEntry` in `lib/permissions.ts`), and reopening someone
+  else's entry is refused. `broadcast()` carries the entry's owner: `TimerRoom` sends timer events
+  only to that person's sockets and gives teammates `entries:changed` with a `null` payload — it used
+  to carry the entry's description and duration. The Assistant is one `ChatAgent` per person
+  (`<workspaceId>:<userId>`, pinned by the `/agents/*` gate) with per-person memory (migration `0036`)
+  and tools that read and write only the user's own time; its `startTimer` insert, which bound seven
+  values to eight placeholders and never stored the project, is fixed. Calendar connections, ghost
+  events, auto-track and recurring templates belong to whoever created them (migration `0037`;
+  existing rows go to the workspace owner), so each attendee tracks their own copy of a meeting.
+  Migration `0035` swaps the running-timer index to `(workspace_id, user_id)`.
+  Verified: `pnpm build` passes and `pnpm lint` reports 0 errors. New `e2e/timer-per-user.spec.ts`,
+  7/7: simultaneous timers; 403 on stopping, editing, deleting or bulk-editing someone else's running
+  timer, workspace owner included; MCP `stop_timer` scoped to the key holder; a teammate's timer never
+  reaches your timer bar; each attendee tracks their own copy of a meeting; recurring templates are
+  invisible to teammates; teammates' socket events carry no entry payload. Timer, realtime,
+  Assistant, MCP, drafts, calendar-provider, tenant-isolation and recurring neighbours: 39 of 40
+  passed — the failure is the `tier2-features` gaps toggle, which fails identically on a clean
+  `master`. Migrations applied to the local D1 only. Per-person calendar reads and the Assistant chat
+  need OAuth or Workers AI, so they are on the manual test list instead of e2e.
+
 ## 2026-09-14 (2)
 ### Changed
 - **Invite-only access (D1).** Anyone could create an account through Google, email code, magic link
