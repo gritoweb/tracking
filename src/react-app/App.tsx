@@ -37,9 +37,6 @@ const AdminPage = lazyWithReload(() =>
 const LoginPage = lazyWithReload(() =>
   import("@/pages/LoginPage").then((m) => ({ default: m.LoginPage }))
 );
-const SignupPage = lazyWithReload(() =>
-  import("@/pages/SignupPage").then((m) => ({ default: m.SignupPage }))
-);
 const AcceptInvitePage = lazyWithReload(() =>
   import("@/pages/AcceptInvitePage").then((m) => ({ default: m.AcceptInvitePage }))
 );
@@ -55,11 +52,6 @@ const router = createBrowserRouter([
   {
     path: "/login",
     element: withSuspense(<LoginPage />),
-    errorElement: <RouteErrorBoundary fullScreen />,
-  },
-  {
-    path: "/signup",
-    element: withSuspense(<SignupPage />),
     errorElement: <RouteErrorBoundary fullScreen />,
   },
   {

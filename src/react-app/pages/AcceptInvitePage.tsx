@@ -1,13 +1,18 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
+import { workspacesQueryKey } from "@/hooks/useWorkspaces";
 import { authClient } from "@/lib/auth-client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export function AcceptInvitePage() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { user, isLoading } = useAuth();
+  // The id, not the user object: the session refetch after accepting must not re-run the accept.
+  const userId = user?.id;
   const [status, setStatus] = useState<"pending" | "error">("pending");
   const [error, setError] = useState("");
 
@@ -16,9 +21,9 @@ export function AcceptInvitePage() {
   useEffect(() => {
     if (isLoading || !invitationId) return;
 
-    if (!user) {
-      // Invitee needs an account first — send them to sign up, then bounce back here.
-      navigate(`/signup?redirect=${encodeURIComponent(`/accept-invite?id=${invitationId}`)}`);
+    if (!userId) {
+      // Signing in creates the invited account, then the login page bounces back here.
+      navigate(`/login?redirect=${encodeURIComponent(`/accept-invite?id=${invitationId}`)}`);
       return;
     }
 
@@ -29,9 +34,12 @@ export function AcceptInvitePage() {
         return;
       }
       await authClient.getSession({ query: { disableCookieCache: true } });
+      // Accepting refreshes neither Better Auth's organization list nor the guard's workspace query.
+      authClient.$store.notify("$listOrg");
+      await queryClient.invalidateQueries({ queryKey: workspacesQueryKey });
       navigate("/");
     });
-  }, [isLoading, user, invitationId, navigate]);
+  }, [isLoading, userId, invitationId, navigate, queryClient]);
 
   if (!invitationId) {
     return (

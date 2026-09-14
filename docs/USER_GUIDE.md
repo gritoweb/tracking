@@ -29,7 +29,7 @@ Everything you can do in [timetracker.run](https://timetracker.run), organized b
 
 ## Getting started
 
-1. **Sign up** with your email — we send a one-time code or magic link, no password to invent (or use Google). A personal workspace is created for you automatically.
+1. **Get invited** — access is invite-only. Open the link in the invitation email and sign in with that same address (one-time code, magic link, or Google): your account is created and you join the inviting workspace. Without an invitation, sign-in is refused.
 2. **Add a client and a project** under **Clients** and **Projects** (a project can have a billing rate — that's what turns hours into amounts in Reports).
 3. **Start a timer** from the top bar: type a description, pick a project, hit the red start button.
 

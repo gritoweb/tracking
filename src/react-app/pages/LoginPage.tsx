@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,6 +16,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { authClient } from "@/lib/auth-client";
 import { KeyRound } from "lucide-react";
 import { BrandMark } from "@/components/brand/BrandMark";
+import { INVITE_ONLY_MESSAGE, isInviteOnlyError } from "@shared/invite-only";
 
 function GoogleIcon() {
   return (
@@ -40,19 +41,32 @@ function GoogleIcon() {
   );
 }
 
+/** Same-origin path to return to after sign-in; anything else falls back to the app root. */
+function safeRedirect(value: string | null): string {
+  if (!value || !value.startsWith("/") || value.startsWith("//") || value.startsWith("/\\")) return "/";
+  // Returning to the login page itself would strand a signed-in user on it.
+  if (value === "/login" || value.startsWith("/login?")) return "/";
+  return value;
+}
+
+function errorFromRedirect(code: string | null): string {
+  if (!code) return "";
+  if (isInviteOnlyError(code)) return INVITE_ONLY_MESSAGE;
+  if (code === "account_not_linked") {
+    return "An account with this email already exists but isn't linked to Google yet. Sign in with an email code or magic link to continue.";
+  }
+  return "Sign-in failed. Please try again.";
+}
+
 export function LoginPage() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
+  const redirect = safeRedirect(params.get("redirect"));
+  // OAuth and magic-link failures come back here, keeping the invite link's destination.
+  const errorCallbackURL = redirect === "/" ? "/login" : `/login?redirect=${encodeURIComponent(redirect)}`;
   const { user } = useAuth();
   const [email, setEmail] = useState("");
-  const [error, setError] = useState(() => {
-    const oauthError = params.get("error");
-    if (!oauthError) return "";
-    if (oauthError === "account_not_linked") {
-      return "An account with this email already exists but isn't linked to Google yet. Sign in with an email code or magic link to continue.";
-    }
-    return "Google sign-in failed. Please try again.";
-  });
+  const [error, setError] = useState(() => errorFromRedirect(params.get("error")));
 
   // — Passwordless (email code / magic link) state
   const [codeSent, setCodeSent] = useState(false);
@@ -70,8 +84,8 @@ export function LoginPage() {
   // navigating right after a sign-in call resolves races AuthGuard's
   // useSession(), which can still read the stale "logged out" cache for a tick.
   useEffect(() => {
-    if (user) navigate("/");
-  }, [user, navigate]);
+    if (user) navigate(redirect);
+  }, [user, redirect, navigate]);
 
   const handlePasskeySignIn = async () => {
     setError("");
@@ -85,7 +99,7 @@ export function LoginPage() {
   };
 
   const handleGoogleSignIn = () => {
-    authClient.signIn.social({ provider: "google", callbackURL: "/", errorCallbackURL: "/login?error=google" });
+    authClient.signIn.social({ provider: "google", callbackURL: redirect, errorCallbackURL });
   };
 
   const handleSendCode = async () => {
@@ -145,7 +159,8 @@ export function LoginPage() {
     setPending(true);
     const { error: sendError } = await authClient.signIn.magicLink({
       email,
-      callbackURL: "/",
+      callbackURL: redirect,
+      errorCallbackURL,
     });
     setPending(false);
     if (sendError) {
@@ -320,13 +335,7 @@ export function LoginPage() {
 
           <CardFooter className="flex flex-col gap-3 pt-0">
             <p className="text-center text-sm text-muted-foreground">
-              New around here and still tracking time in a spreadsheet?{" "}
-              <Link
-                to="/signup"
-                className="font-medium text-primary hover:underline"
-              >
-                Sign up
-              </Link>
+              Access is by invitation only. Ask a workspace admin to invite you.
             </p>
           </CardFooter>
         </Card>

@@ -23,7 +23,7 @@ import { toast } from "sonner";
 
 export function TeamCard() {
   const { data: orgs, isPending: orgsPending } = authClient.useListOrganizations();
-  const { session } = useAuth();
+  const { session, user } = useAuth();
   const organizationId =
     orgs?.find((o) => o.id === session?.activeOrganizationId)?.id ?? orgs?.[0]?.id;
 
@@ -42,6 +42,10 @@ export function TeamCard() {
     enabled: Boolean(organizationId),
   });
   const isPending = orgsPending || orgDetailPending;
+
+  // Mirrors the server's rule: only owner and admin may invite, change roles or remove members.
+  const myRoles = org?.members?.find((m) => m.userId === user?.id)?.role.split(",") ?? [];
+  const canManage = myRoles.includes("owner") || myRoles.includes("admin");
 
   const [inviteEmail, setInviteEmail] = useState("");
   const [invitePending, setInvitePending] = useState(false);
@@ -138,8 +142,8 @@ export function TeamCard() {
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        {member.role === "owner" ? (
-                          <Badge variant="secondary">owner</Badge>
+                        {member.role === "owner" || !canManage ? (
+                          <Badge variant="secondary">{member.role}</Badge>
                         ) : (
                           <Select
                             value={member.role}
@@ -158,7 +162,7 @@ export function TeamCard() {
                             </SelectContent>
                           </Select>
                         )}
-                        {member.role !== "owner" && (
+                        {member.role !== "owner" && canManage && (
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Button
@@ -182,7 +186,7 @@ export function TeamCard() {
               )}
             </div>
 
-            {org?.invitations?.some((i) => i.status === "pending") && (
+            {canManage && org?.invitations?.some((i) => i.status === "pending") && (
               <>
                 <Separator />
                 <div className="space-y-2">
@@ -214,25 +218,29 @@ export function TeamCard() {
               </>
             )}
 
-            <Separator />
+            {canManage && (
+              <>
+                <Separator />
 
-            <form onSubmit={handleInvite} className="space-y-2">
-              <Label htmlFor="invite-email">Invite by email</Label>
-              <div className="flex items-center gap-2">
-                <Input
-                  id="invite-email"
-                  type="email"
-                  value={inviteEmail}
-                  onChange={(e) => setInviteEmail(e.target.value)}
-                  placeholder="teammate@example.com"
-                  className="h-8 text-sm"
-                />
-                <Button type="submit" size="sm" variant="outline" disabled={invitePending}>
-                  {invitePending ? "Sending…" : "Invite"}
-                </Button>
-              </div>
-              {inviteError && <p className="text-xs text-destructive">{inviteError}</p>}
-            </form>
+                <form onSubmit={handleInvite} className="space-y-2">
+                  <Label htmlFor="invite-email">Invite by email</Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      id="invite-email"
+                      type="email"
+                      value={inviteEmail}
+                      onChange={(e) => setInviteEmail(e.target.value)}
+                      placeholder="teammate@example.com"
+                      className="h-8 text-sm"
+                    />
+                    <Button type="submit" size="sm" variant="outline" disabled={invitePending}>
+                      {invitePending ? "Sending…" : "Invite"}
+                    </Button>
+                  </div>
+                  {inviteError && <p className="text-xs text-destructive">{inviteError}</p>}
+                </form>
+              </>
+            )}
           </>
         )}
       </CardContent>

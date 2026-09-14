@@ -14,7 +14,7 @@ A full-stack time tracker (Toggl-like) running entirely on Cloudflare's edge: ti
 
 ## Brand Personality
 
-Precise, calm, unobtrusive. The product earns trust through restraint, not flourish — accurate numbers, instant feedback, and a UI that gets out of the way of the work. Soft, muted surfaces (not stark black-and-white, not AI-cream) let the meaningful color — the brand red for primary actions and running-timer state, project/tag swatches for at-a-glance scanning — carry the visual weight instead of decoration. Icon-only actions in dense toolbars (Reports, Timer header) over icon+label pairs, reserving text labels for controls that convey current state (date range, rounding mode). The one deliberate warmer exception: the auth pages (login/signup) carry a playful, human voice in copy — the app itself stays quietly professional.
+Precise, calm, unobtrusive. The product earns trust through restraint, not flourish — accurate numbers, instant feedback, and a UI that gets out of the way of the work. Soft, muted surfaces (not stark black-and-white, not AI-cream) let the meaningful color — the brand red for primary actions and running-timer state, project/tag swatches for at-a-glance scanning — carry the visual weight instead of decoration. Icon-only actions in dense toolbars (Reports, Timer header) over icon+label pairs, reserving text labels for controls that convey current state (date range, rounding mode). The one deliberate warmer exception: the login page carries a playful, human voice in copy — the app itself stays quietly professional.
 
 ## Anti-references
 

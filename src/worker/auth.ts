@@ -1,10 +1,19 @@
 import { betterAuth } from "better-auth";
+import { createAuthMiddleware } from "better-auth/api";
 import { bearer, organization, admin, emailOTP, magicLink } from "better-auth/plugins";
 import { passkey } from "@better-auth/passkey";
 import { WorkspaceInvitationEmail } from "./emails/workspace-invitation";
 import { VerificationOtpEmail } from "./emails/verification-otp";
 import { MagicLinkEmail } from "./emails/magic-link";
 import { sendEmail } from "./lib/mailer";
+import {
+  accountExists,
+  canCreateAccount,
+  inviteOnlyError,
+  isAdminEmail,
+  shouldCreateWorkspace,
+  signInEmailFromRequest,
+} from "./lib/invite-only";
 
 function randomSlug(): string {
   return crypto.randomUUID().replace(/-/g, "").slice(0, 12);
@@ -43,11 +52,10 @@ export function createAuth(env: Env, baseURL: string) {
       ...(import.meta.env.DEV ? ["http://localhost:5173", "http://localhost:8787"] : []),
     ],
     emailAndPassword: {
-      // Passwords are retired in production — sign-in is email OTP, magic link,
-      // Google, or passkey. The flag (set in .dev.vars and CI only, never as a
-      // deployed var) keeps the sign-up/sign-in endpoints alive for the e2e
-      // suite and the local dev seed login.
+      // Password sign-in is a production login method (ENABLE_PASSWORD_AUTH is a deployed var).
       enabled: env.ENABLE_PASSWORD_AUTH === "true",
+      // An unverified password sign-up could claim an invited address first; only the dev/e2e helper keeps it.
+      disableSignUp: !import.meta.env.DEV,
     },
     session: {
       // Disable better-auth's global "fresh session" gate so /list-sessions (the
@@ -90,14 +98,25 @@ export function createAuth(env: Env, baseURL: string) {
         clientSecret: env.GOOGLE_CLIENT_SECRET,
       },
     },
+    hooks: {
+      // Refuse before any email is sent: the magic-link verify step can't surface a hook error.
+      before: createAuthMiddleware(async (ctx) => {
+        const email = signInEmailFromRequest(ctx.path, ctx.body);
+        if (!email || (await accountExists(env, email))) return;
+        if (!(await canCreateAccount(env, email))) throw inviteOnlyError();
+      }),
+    },
     databaseHooks: {
       user: {
         create: {
-          // Auto-create a workspace (organization) for every new user, regardless
-          // of how they signed up (Google, OTP, or magic link). OTP signups have
-          // no name yet (it's set right after verification), so fall back to the
-          // email local-part.
+          // Every sign-up path (Google, OTP, magic link, password) creates the user here: the single invite gate.
+          before: async (user) => {
+            if (!(await canCreateAccount(env, user.email))) throw inviteOnlyError();
+            if (user.name?.trim()) return;
+            return { data: { ...user, name: user.email.split("@")[0] } };
+          },
           after: async (user) => {
+            if (!(await shouldCreateWorkspace(env, user.email))) return;
             const displayName = user.name?.trim() || user.email.split("@")[0];
             await auth.api.createOrganization({
               body: {
@@ -142,6 +161,10 @@ export function createAuth(env: Env, baseURL: string) {
             fields: { createdAt: "created_at" },
           },
         },
+        // Only an ADMIN_EMAILS account opens workspaces; the server-side bootstrap in user.create.after is exempt.
+        allowUserToCreateOrganization: (user) => isAdminEmail(env, user.email),
+        // Only a proven owner of the address may join; relaxed in dev so e2e password users can accept.
+        requireEmailVerificationOnInvitation: !import.meta.env.DEV,
         async sendInvitationEmail(data) {
           const url = `${baseURL}/accept-invite?id=${data.id}`;
           await sendEmail(
