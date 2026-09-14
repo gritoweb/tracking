@@ -218,3 +218,4 @@ extension/.keys/*
 # `git add -A` sweeps ~100 tool files into an unrelated commit — which is
 # exactly how it got into #95.
 .claude/skills/impeccable/
+
