@@ -2,8 +2,6 @@
 
 A Toggl-like time tracking app built on Cloudflare Workers, Hono, React 19, and Shadcn UI. Runs entirely on Cloudflare's edge.
 
-**Live:** https://tracking.gritoweb.com.br
-
 ## Credits
 
 This is a fork of [blakebauman/timetracker-app](https://github.com/blakebauman/timetracker-app), created and maintained by [Blake Bauman](https://github.com/blakebauman). All credit for the original design and implementation goes to them — this fork adapts it for internal use at GritoWeb.
