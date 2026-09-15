@@ -1,5 +1,29 @@
 # Changelog
 
+## 2026-09-15 (9) — production rollout
+### Changed
+- **D1, D2 and D3 are live.** `update` fast-forwarded into `master` (21 commits), migrations `0035`
+  (per-user running-timer index), `0036` (per-person assistant memory) and `0037` (authors on
+  recurring templates and calendar connections) applied to the remote D1, `pnpm check` clean, and the
+  worker deployed — Version ID `48b43c96-d425-4099-aa6d-ab484c5b7288`, `https://tracking.gritoweb.com.br/`
+  answering 200 and `/api/time_entries` 401 without a session. `ADMIN_EMAILS` is set as a secret to
+  `suporte@gritoweb.com.br`: from here only that address can create a workspace, and only an invited
+  email can create an account at all.
+- **Production now holds one workspace.** Invite-only access makes a personal workspace per signup
+  meaningless, so the five others were removed: "Luis Amaral's" (3 entries, all named `test`), the
+  ownerless legacy "My Workspace", and the empty personal workspaces of `teste-prod-verify@`,
+  `luis@` and `richard@` — the last two keep their access as **admins of the support workspace**, so
+  nobody lost anything. Deletion went table by table (13 carrying `workspace_id`, plus `member`,
+  `invitation`, the `time_entry_tags` join and the stale `activeOrganizationId` /
+  `last_active_organization_id` pointers) rather than trusting cascades.
+  Verified after the fact: 1 workspace left, intact at 3 members / 3 entries / 3 projects / 1 client,
+  and zero orphan rows across entries, projects, clients, tags, members, invitations and entry-tags.
+  Restore point if ever needed: D1 time-travel bookmark
+  `00000494-00000002-000050e7-9f28d36658336232903d2a84e49eda36` (taken immediately before the delete).
+  Two accounts now belong to no workspace (`lluispaulop@gmail.com`, `teste-prod-verify@gritoweb.com.br`):
+  they can still sign in and land on "You're not in a workspace yet"; deleting the users themselves
+  was deliberately left for a separate decision.
+
 ## 2026-09-15 (8)
 ### Fixed
 - **Blocks stopped covering the hours underneath them.** Two changes from earlier today combined
