@@ -1,5 +1,48 @@
 # Changelog
 
+## 2026-09-15
+### Added
+- **Reports by person, and a member only ever sees their own hours (D3).** Reports could group by
+  project, client, task and tag but not by the person who logged the time, and every read of tracked
+  hours covered the whole workspace — so a member saw their teammates' hours in Reports, in the Timer
+  list, in project and client totals, through the MCP tools and in the Assistant's answers. Scope is
+  now one rule, `entryScopeUserId` in `lib/permissions.ts` (null for an owner/admin, the caller's id
+  for a member), and **every** read of hours goes through it: `/reports/summary|grouped|weekly|detailed`,
+  `GET /api/time_entries` (plus `/current` and `/suggestions`), project, client and task totals,
+  `ai/summary`, the email digest, the MCP read tools and the Assistant's. Reports gained a `userIds`
+  filter and a `user` group dimension — the "Person" filter and "Group by person", offered only to an
+  owner or admin, and a member who forges `userIds` in the query still gets only their own hours,
+  because the scope is applied in `buildReportWhere` rather than in the UI. The Timer is personal for
+  everyone, admins included (list, calendar, timesheet, day totals); the team lives in Reports.
+  `GET /api/me` (new `routes/me.ts`, `hooks/useWorkspaceRole.ts`) tells the UI the caller's role, only
+  so screens can hide what the server already refuses: editing, archiving or recoloring projects and
+  clients, integrations and budgets/pacing are manager-only (`isManager` + `MANAGER_ONLY_ERROR`),
+  while creating a client or a project stays open to members. A **Hide amounts** toggle strips money
+  from the summary cards, the breakdown, the detailed table, the CSV and Excel exports and the printed
+  PDF, and is carried by saved reports so the monthly client report repeats unchanged.
+  Verified: `pnpm build` exit 0, `pnpm lint` 0 errors, new `e2e/report-per-person.spec.ts` 4/4
+  (a member's reads including a forged `userIds`; an owner grouping by person while their Timer stays
+  personal; screens hiding what a member can't do; Hide amounts keeping money out of the CSV).
+
+### Changed
+- **Every entry needs an active project, and every project an active client (D3).** Hours landing on
+  "No project" can't be billed or reported by client, which is what the monthly client report needs.
+  `CreateTimeEntrySchema.projectId` and `CreateProjectSchema.clientId` are required, updates refuse
+  `null`, and the rule is enforced on every write path — REST, MCP, the Assistant, draft confirmation,
+  calendar convert and recurring templates — through `findActiveProject` (`lib/projects.ts`) and
+  `isActiveClient` (`lib/clients.ts`), so an archived or forged id is refused too. The project picker
+  groups projects under their client everywhere it appears, creating a project inline asks for the
+  client, Start without a project opens the picker instead of tracking into nothing, and an entry row
+  reads "Project · Client" (`ENTRY_SELECT` now joins `clients`). The extension's popup lists projects
+  by client and its Start button waits for one.
+  Verified: new `e2e/project-required.spec.ts` 4/4 (REST refusing an entry without a project and a
+  project without a client; a forged or archived project blocked at draft confirmation; the MCP key of
+  a member needing a project to log; a member creating clients and projects but getting 403 on edit
+  and archive). Full suite: 81 passed, 13 failed — 8 are the pre-existing hover/menu failures that
+  fail the same way on clean `master` (`entry-delete`, 5× `entry-inline-edit`, `integration-push-date`,
+  the `tier2-features` gaps toggle) and the other 5 pass when re-run serially (flaky under six
+  parallel workers).
+
 ## 2026-09-14 (3)
 ### Fixed
 - **Per-person timers, Assistant and calendar (D2).** Starting a timer ran `UPDATE ... WHERE
