@@ -3,6 +3,7 @@ import { corsMiddleware } from "./middleware/cors";
 import { securityHeaders } from "./middleware/security-headers";
 import { rateLimit } from "./middleware/rate-limit";
 import { workspaceMiddleware, resolveWorkspace } from "./middleware/workspace";
+import { meRouter } from "./routes/me";
 import { requireFreshSession } from "./middleware/fresh-session";
 import { timeEntriesRouter } from "./routes/time-entries";
 import { projectsRouter } from "./routes/projects";
@@ -120,6 +121,7 @@ const app = new Hono<{ Bindings: Env }>()
   .route("/api/assistant", assistantRouter)
   .route("/api/admin", adminRouter)
   .route("/api/keys", apiKeysRouter)
+  .route("/api/me", meRouter)
   .route("/api/ws", websocketRouter);
 
 export type AppType = typeof app;

@@ -20,7 +20,10 @@ import {
   upsertTags,
   ENTRY_SELECT,
 } from "../db/queries";
-import { getMemberRole, canWriteEntry } from "../lib/permissions";
+import { getMemberRole, canManageWorkspace, canWriteEntry } from "../lib/permissions";
+import { findActiveProject } from "../lib/projects";
+
+const PROJECT_REQUIRED_ERROR = "Choose an active project in this workspace";
 
 /**
  * The tab that made this request, so its own broadcast can be filtered out
@@ -42,23 +45,10 @@ const clientId = (c: { req: { header: (n: string) => string | undefined } }) =>
  * report zero revenue.
  *
  * An explicit `true`/`false` from the caller always wins; this only fills the
- * gap. A project id that doesn't resolve (deleted, or another workspace's)
- * falls back to false rather than throwing — an unbillable entry is recoverable,
- * a rejected timer start is not.
+ * gap from the project, which every entry now has (D3).
  */
-async function resolveBillable(
-  db: D1Database,
-  workspaceId: string,
-  explicit: boolean | undefined,
-  projectId: string | null | undefined
-): Promise<boolean> {
-  if (explicit !== undefined) return explicit;
-  if (!projectId) return false;
-  const row = await db
-    .prepare(`SELECT billable FROM projects WHERE id = ? AND workspace_id = ?`)
-    .bind(projectId, workspaceId)
-    .first<{ billable: number }>();
-  return Boolean(row?.billable);
+function resolveBillable(explicit: boolean | undefined, projectBillable: boolean): boolean {
+  return explicit ?? projectBillable;
 }
 
 /** Ids (already workspace-scoped) the caller may not change: someone else's entry for a member, or anyone else's running timer. */
@@ -87,15 +77,17 @@ export const timeEntriesRouter = new Hono<{
   Variables: { workspaceId: string; userId: string };
 }>()
   // ─── List ─────────────────────────────────────────────────────────────────
+  // The Timer is personal for everyone, owners included (D3); the team is reviewed in Reports.
   .get("/", async (c) => {
     const workspaceId = c.get("workspaceId");
+    const userId = c.get("userId");
     const { since, until, running } = c.req.query();
 
     // ?running=true — return only the caller's running entry
     if (running === "true") {
       const { results } = await c.env.DB.prepare(
         `${ENTRY_SELECT} WHERE te.workspace_id = ? AND te.user_id = ? AND te.stop IS NULL GROUP BY te.id LIMIT 1`
-      ).bind(workspaceId, c.get("userId")).all<Record<string, unknown>>();
+      ).bind(workspaceId, userId).all<Record<string, unknown>>();
       return c.json(results.map(formatEntry));
     }
 
@@ -107,10 +99,10 @@ export const timeEntriesRouter = new Hono<{
 
     const { results } = await c.env.DB.prepare(
       `${ENTRY_SELECT}
-       WHERE te.workspace_id = ? AND te.start >= ? AND te.start < ?
+       WHERE te.workspace_id = ? AND te.user_id = ? AND te.start >= ? AND te.start < ?
        GROUP BY te.id ORDER BY te.start DESC LIMIT ${ENTRY_LIST_LIMIT}`
     )
-      .bind(workspaceId, since ?? defaultSince, until ?? defaultUntil)
+      .bind(workspaceId, userId, since ?? defaultSince, until ?? defaultUntil)
       .all<Record<string, unknown>>();
 
     return c.json(results.map(formatEntry));
@@ -119,6 +111,7 @@ export const timeEntriesRouter = new Hono<{
   // Distinct past descriptions plus the project/task/billable combo each was
   // most often logged against, so selecting one refills the whole timer bar.
   // Declared before `/:id` so the literal path isn't swallowed as an entry id.
+  // Drawn from the caller's own entries: a teammate's descriptions are their hours.
   .get("/suggestions", async (c) => {
     const workspaceId = c.get("workspaceId");
     const since = new Date(
@@ -135,7 +128,7 @@ export const timeEntriesRouter = new Hono<{
       `WITH recent AS (
          SELECT id, description, project_id, task_id, billable, start
          FROM time_entries
-         WHERE workspace_id = ?1 AND start >= ?2 AND TRIM(description) <> ''
+         WHERE workspace_id = ?1 AND user_id = ?3 AND start >= ?2 AND TRIM(description) <> ''
        ),
        combos AS (
          SELECT description, project_id, task_id, billable,
@@ -180,7 +173,7 @@ export const timeEntriesRouter = new Hono<{
        ORDER BY t.last_used DESC
        LIMIT ${SUGGESTION_LIMIT}`
     )
-      .bind(workspaceId, since)
+      .bind(workspaceId, since, c.get("userId"))
       .all<Record<string, unknown>>();
 
     return c.json(
@@ -207,7 +200,10 @@ export const timeEntriesRouter = new Hono<{
     const data = c.req.valid("json");
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
-    const billable = await resolveBillable(c.env.DB, workspaceId, data.billable, data.projectId);
+
+    const project = await findActiveProject(c.env.DB, workspaceId, data.projectId);
+    if (!project) return c.json({ error: PROJECT_REQUIRED_ERROR }, 400);
+    const billable = resolveBillable(data.billable, project.billable);
 
     // Stop the caller's running timer; a teammate's keeps going.
     if (!data.stop) {
@@ -224,7 +220,7 @@ export const timeEntriesRouter = new Hono<{
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(
       id, workspaceId, userId,
-      data.projectId ?? null,
+      project.id,
       data.taskId ?? null,
       data.description,
       data.start,
@@ -270,12 +266,15 @@ export const timeEntriesRouter = new Hono<{
         403
       );
     }
+    if (patch.projectId !== undefined && !(await findActiveProject(c.env.DB, workspaceId, patch.projectId))) {
+      return c.json({ error: PROJECT_REQUIRED_ERROR }, 400);
+    }
 
     const fields: string[] = [];
     const values: unknown[] = [];
 
     if (patch.description !== undefined) { fields.push("description = ?"); values.push(patch.description); }
-    if (patch.projectId !== undefined)   { fields.push("project_id = ?");   values.push(patch.projectId ?? null); }
+    if (patch.projectId !== undefined)   { fields.push("project_id = ?");   values.push(patch.projectId); }
     if (patch.taskId !== undefined)      { fields.push("task_id = ?");      values.push(patch.taskId ?? null); }
     if (patch.billable !== undefined)    { fields.push("billable = ?");     values.push(patch.billable ? 1 : 0); }
     fields.push("updated_at = ?");
@@ -332,8 +331,14 @@ export const timeEntriesRouter = new Hono<{
   })
   // ─── Get by ID ────────────────────────────────────────────────────────────
   .get("/:id", async (c) => {
-    const entry = await getEntryById(c.env.DB, c.req.param("id"), c.get("workspaceId"));
+    const workspaceId = c.get("workspaceId");
+    const userId = c.get("userId");
+    const entry = await getEntryById(c.env.DB, c.req.param("id"), workspaceId);
     if (!entry) return c.json({ error: "Not found" }, 404);
+    // A member opens only their own entries; owner/admin can open anyone's from Reports.
+    if (entry.userId !== userId && !canManageWorkspace(await getMemberRole(c.env.DB, workspaceId, userId))) {
+      return c.json({ error: "Not found" }, 404);
+    }
     return c.json(entry);
   })
   // ─── Update ───────────────────────────────────────────────────────────────
@@ -363,6 +368,9 @@ export const timeEntriesRouter = new Hono<{
     if (data.stop === null && owned.stop !== null && owned.user_id !== userId) {
       return c.json({ error: "Only the entry's owner can restart it" }, 403);
     }
+    if (data.projectId !== undefined && !(await findActiveProject(c.env.DB, workspaceId, data.projectId))) {
+      return c.json({ error: PROJECT_REQUIRED_ERROR }, 400);
+    }
 
     // Validate the range the row will actually have after the patch. The schema's
     // refine can only compare fields present in the body, so a single-field patch
@@ -383,7 +391,7 @@ export const timeEntriesRouter = new Hono<{
     const values: unknown[] = [];
 
     if (data.description !== undefined) { fields.push("description = ?"); values.push(data.description); }
-    if (data.projectId !== undefined)   { fields.push("project_id = ?");   values.push(data.projectId ?? null); }
+    if (data.projectId !== undefined)   { fields.push("project_id = ?");   values.push(data.projectId); }
     if (data.taskId !== undefined)      { fields.push("task_id = ?");      values.push(data.taskId ?? null); }
     if (data.start !== undefined)       { fields.push("start = ?");        values.push(data.start); }
     if (data.stop !== undefined)        { fields.push("stop = ?");         values.push(data.stop ?? null); }

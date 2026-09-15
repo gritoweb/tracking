@@ -13,6 +13,7 @@ import {
   scaleDurations,
 } from "../lib/drafts";
 import { broadcast } from "../db/queries";
+import { findActiveProject } from "../lib/projects";
 
 const clientId = (c: { req: { header: (n: string) => string | undefined } }) =>
   c.req.header("X-Client-Id") ?? null;
@@ -84,6 +85,31 @@ export const draftsRouter = new Hono<{
       .all<Record<string, unknown>>();
 
     if (!results.length) return c.json({ error: "No matching drafts" }, 404);
+    // Every entry needs an active project of this workspace (D3); a draft's may be missing, archived since, or forged.
+    const projectIds = [
+      ...new Set(results.map((r) => r.project_id as string | null).filter((p): p is string => Boolean(p))),
+    ];
+    const activeProjects = new Set(
+      projectIds.length
+        ? (
+            await c.env.DB.prepare(
+              `SELECT id FROM projects
+               WHERE workspace_id = ? AND active = 1 AND id IN (${projectIds.map(() => "?").join(",")})`
+            )
+              .bind(workspaceId, ...projectIds)
+              .all<{ id: string }>()
+          ).results.map((p) => p.id)
+        : []
+    );
+    const withoutProject = results
+      .filter((r) => !activeProjects.has(r.project_id as string))
+      .map((r) => r.id as string);
+    if (withoutProject.length) {
+      return c.json(
+        { error: "Choose an active project for every draft before confirming", draftIds: withoutProject },
+        400
+      );
+    }
 
     // Reconcile the day's total across the batch before anything is written, so
     // a rejected scale can't leave half the drafts confirmed at the old lengths.
@@ -173,6 +199,9 @@ export const draftsRouter = new Hono<{
     const nextStop = data.stop ?? owned.stop;
     if (new Date(nextStop) <= new Date(nextStart)) {
       return c.json({ error: "Stop time must be after start time" }, 400);
+    }
+    if (data.projectId && !(await findActiveProject(c.env.DB, workspaceId, data.projectId))) {
+      return c.json({ error: "Choose an active project in this workspace" }, 400);
     }
 
     const fields: string[] = [];

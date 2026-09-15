@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { signUp } from "./auth";
+import { chooseProject, createProject } from "./project-helpers";
 
 /**
  * Click-to-create on the calendar grid. This path had no coverage, which made
@@ -10,9 +11,7 @@ import { signUp } from "./auth";
  */
 test("creating an entry by clicking an empty calendar slot", async ({ page }) => {
   await signUp(page);
-  await page.request.post("/api/projects", {
-    data: { name: "Alpha", color: "#e11d48", billable: true },
-  });
+  await createProject(page, { name: "Alpha", color: "#e11d48", billable: true });
 
   await page.goto("/");
   await page.waitForLoadState("networkidle");
@@ -27,6 +26,10 @@ test("creating an entry by clicking an empty calendar slot", async ({ page }) =>
   await expect(form).toBeVisible();
 
   await form.locator("textarea").fill("Slot-created entry");
+  // Every entry needs a project (D3): Add waits for one.
+  await expect(form.getByRole("button", { name: "Add entry" })).toBeDisabled();
+  await form.getByRole("button", { name: "Select project" }).click();
+  await chooseProject(page, "Alpha");
   await form.getByRole("button", { name: "Add entry" }).click();
   await expect(form).not.toBeVisible();
 

@@ -30,7 +30,7 @@ Everything you can do in [timetracker.run](https://timetracker.run), organized b
 ## Getting started
 
 1. **Get invited** — access is invite-only. Open the link in the invitation email and sign in with that same address (one-time code, magic link, or Google): your account is created and you join the inviting workspace. Without an invitation, sign-in is refused.
-2. **Add a client and a project** under **Clients** and **Projects** (a project can have a billing rate — that's what turns hours into amounts in Reports).
+2. **Add a client and a project** under **Clients** and **Projects**. Every project belongs to a client and every entry to a project, so this comes before the first timer (a project can have a billing rate — that's what turns hours into amounts in Reports).
 3. **Start a timer** from the top bar: type a description, pick a project, hit the red start button.
 
 Sign-in is passwordless: a **6-digit email code**, a **magic link**, **Google**, or a **passkey** (add one under Settings → Security for Touch ID / security-key sign-in).
@@ -41,7 +41,9 @@ There are five ways to get time into your timesheet:
 
 - **Live timer** — type a description in the top bar, pick project/task/tags, press start. Press stop when done. The elapsed time of a *running* timer can be edited in place from the top bar if you started it late.
 
-  Whether the time is **billable** is shown by the `$` toggle in the bar, and it answers itself: picking a project adopts that project's billable setting, and with no project it falls back to **Settings → Preferences → Default billable**. Click the toggle to override either way — while a timer is running, the change applies to the running entry immediately. Billable is the only thing Reports uses to work out billable hours and invoiced amounts, so a timer that starts on a billable project now reports as billable without you having to remember.
+  Every entry needs a project. Press **Start** (or `Alt+Shift+S`, a favorite, Continue, or a nudge's start) with no project picked and the project picker opens; the timer starts the moment you choose one, and closing the picker starts nothing. The Add entry, calendar, log-time, AI Quick Add and recurring forms keep their save button disabled until a project is chosen, and a draft can't be added to the timesheet without one.
+
+  Whether the time is **billable** is shown by the `$` toggle in the bar, and it answers itself: picking a project adopts that project's billable setting, and before a project is picked the bar shows **Settings → Preferences → Default billable**. Click the toggle to override either way — while a timer is running, the change applies to the running entry immediately. Billable is the only thing Reports uses to work out billable hours and invoiced amounts, so a timer that starts on a billable project now reports as billable without you having to remember.
 - **Manual entry** — **Add Entry** on the Timer page for time you've already spent; pick start/end or a duration.
 - **AI Quick Add** — describe the entry in plain language ("45 min standup for Acme this morning, billable") and the app parses it into a real entry, matched against your actual projects and tasks. It warns you when it isn't sure about a match.
 - **Timesheet grid** — the Timesheet view is a weekly grid: one row per project/task combination, type hours directly into day cells.
@@ -99,6 +101,8 @@ The last card asks **"How much time should we report?"** — set the day's real 
 
 ## Budgets & pacing
 
+Budgets are team numbers, so everything in this section — the budget bar, the pacing verdict, the Assistant's budget warnings, the briefing's budget lines and the MCP pacing tool — is shown to workspace **owners and admins** only.
+
 Give a project a **time target** (Projects → edit → estimated hours) and optionally an end date, and the Projects page starts telling you where it's heading, not just where it is:
 
 - the share of the budget used
@@ -134,7 +138,8 @@ The key is shown **once** and can't be recovered; if you lose it, revoke it and 
 ## Organizing work: clients, projects, tasks, tags
 
 - **Clients** hold contact details and notes; each client's detail page shows its projects and recent activity.
-- **Projects** belong to a client (optionally), carry a **color**, a **billable** flag, an optional **billing rate**, and an optional budget. The Projects page can be searched (by project *or* client name), sorted by name, client, tracked time or rate, and scoped to a period — the same four options Clients uses (this month / last month / this year / all time). Projects opens on **all time** and Clients on **this month**, because they answer different questions; both say which window they are showing, and the tracked figure on each row follows it. The budget bar underneath does **not** — a budget is cumulative, so `11h / 40h` is always all-time and says so when the page is scoped to anything else. Rate × billable hours = the amounts you see in Reports. The billable flag is the default for new time on that project — the timer bar adopts it when you pick the project, and any entry created without an explicit flag (the browser extension, AI Quick Add, the API) inherits it too.
+- **Who changes what:** anyone in the workspace can add a client or a project — from its page, or straight from the project picker, which asks for the client. Editing, archiving and recoloring clients and projects, and setting a project's rate, budget, dates or integration link, is for **owners and admins**. The project picker groups projects under their client, and entry rows read *Project · Client*.
+- **Projects** belong to a client (required — every project has one), carry a **color**, a **billable** flag, an optional **billing rate**, and an optional budget. The Projects page can be searched (by project *or* client name), sorted by name, client, tracked time or rate, and scoped to a period — the same four options Clients uses (this month / last month / this year / all time). Projects opens on **all time** and Clients on **this month**, because they answer different questions; both say which window they are showing, and the tracked figure on each row follows it. The budget bar underneath does **not** — a budget is cumulative, so `11h / 40h` is always all-time and says so when the page is scoped to anything else. Rate × billable hours = the amounts you see in Reports. The billable flag is the default for new time on that project — the timer bar adopts it when you pick the project, and any entry created without an explicit flag (the browser extension, AI Quick Add, the API) inherits it too.
 - **Tasks** belong to projects, and are the plan side of the timer. A task carries a **due date**, a **priority** (Urgent / High / Normal / None), an optional **estimate**, free-text **notes**, up to one level of **subtasks**, and an optional **repeat**. See "Planning with tasks" below.
 - **Tags** are freeform labels; new tags automatically get a distinct color (editable later, along with renames, on the fly from any tag picker).
 
@@ -218,7 +223,7 @@ Dismissals stick per-device. Turn nudge alerts on/off under Settings → Product
 
 The Reports page has three tabs:
 
-- **Summary** — totals (tracked, billable, amount, entries, avg/day), a daily bar chart, a cumulative chart, and a breakdown you can group and sub-group by **project / client / task / tag** (e.g. client → project).
+- **Summary** — totals (tracked, billable, amount, entries, avg/day), a daily bar chart, a cumulative chart, and a breakdown you can group and sub-group by **project / client / task / tag** — and, for owners and admins, **person** (e.g. client → project, or person → project).
 - **Weekly** — hours per day nested under ISO weeks.
 - **Detailed** — every entry as a row with project, client, task, tags, duration, and amount.
 
@@ -226,6 +231,8 @@ Everything respects the **date range picker** and filters. Other tools on this p
 
 - **Rounding** — round durations off / nearest / up / down to a chosen number of minutes. This preference is saved to your account.
 - **Export** — CSV, Excel (.xlsx), or print/PDF via the browser's print dialog.
+- **Hide amounts** — a switch in the toolbar for a report that goes to a client: it takes money out of the summary tiles, the breakdown, the detailed table, the CSV/Excel export and the printout, and a saved report remembers it.
+- **Whose hours** — a member's Reports cover only their own time, whatever filters are sent (the same goes for their Timer, project and client totals, task totals, AI summary, briefing and MCP key). Owners and admins see the whole workspace here and can narrow it with the **Person** filter under Filters.
 - **Saved reports** — save the current configuration (range, filters, grouping, rounding) under a name and reload it in one click.
 - **AI summary** — draft a client-ready narrative summary of the selected period in a chosen style, from your real entries. Edit before you send it anywhere.
 - A full **all-entries CSV export** lives under Settings → Data export.
@@ -246,12 +253,12 @@ All under **Settings → Productivity**, all device-local, all off by default:
 Under **Settings → Team** you can invite people to your workspace by email. Invitees get an email link; accepting it (after signing up, if needed) joins them to your workspace.
 
 - **Roles:** owner (fixed), admin, member — changeable per member from the same card.
-- Everyone in a workspace shares its clients, projects, tasks, tags, and entries.
+- Everyone in a workspace shares its clients, projects, tasks and tags. **Entries are personal:** each person's Timer shows only their own, a member sees only their own hours everywhere, and owners and admins review the team in Reports. Nobody stops or edits someone else's running timer.
 - Pending invites can be cancelled; members can be removed.
 
 ## Browser extension
 
-A Chrome (MV3) extension mirrors the timer in your toolbar:
+A Chrome (MV3) extension mirrors the timer in your toolbar (starting a timer there asks for a project, listed under its client, just like the app):
 
 - **Badge** shows the running timer's elapsed time at a glance.
 - **Popup** — sign in, see the running entry, start/stop.
@@ -301,7 +308,7 @@ Under **Settings → Account / Security / Danger zone**:
 | Appearance | Theme (light/dark/system), auto-assign colors + AI recolor | Theme: device · colors: account |
 | Keyboard shortcuts | Reference card | — |
 | Data export | All-entries CSV | — |
-| Preferences | Default billable (used when an entry has no project), 12/24h time, currency, week start, show weekends | Billable: device · rest: account |
+| Preferences | Default billable (shown before a project is picked), 12/24h time, currency, week start, show weekends | Billable: device · rest: account |
 | Productivity | Notifications, idle detection, reminders, nudge alerts, pomodoro | Device |
 | Email digests | Morning briefing, weekly summary, send hour, send one now | Account |
 | Assistant memory | Review/delete assistant memories | Account |

@@ -1,16 +1,22 @@
 import type { CreateProject } from "@shared/schemas";
 import { DISTINCT_COLORS, spreadColor } from "./colors";
 
-export const PROJECT_SELECT = `
+/** Project rows with their tracked time; `scoped` adds one `te.user_id = ?` binding (in the join, before the WHERE's) for a member. */
+export function projectSelect(scoped: boolean): string {
+  return `
   SELECT p.*, c.name AS client_name,
     COALESCE(SUM(te.duration), 0) AS tracked_seconds,
     COALESCE(SUM(te.duration), 0) AS budget_seconds
   FROM projects p
   LEFT JOIN clients c ON c.id = p.client_id AND c.workspace_id = p.workspace_id
-  LEFT JOIN time_entries te ON te.project_id = p.id AND te.workspace_id = p.workspace_id AND te.stop IS NOT NULL
+  LEFT JOIN time_entries te ON te.project_id = p.id AND te.workspace_id = p.workspace_id AND te.stop IS NOT NULL${scoped ? " AND te.user_id = ?" : ""}
 `;
+}
 
-export function formatProject(row: Record<string, unknown>) {
+export const PROJECT_SELECT = projectSelect(false);
+
+/** `hideBudget` is for a member: budgets are team numbers they don't see (D3). */
+export function formatProject(row: Record<string, unknown>, opts: { hideBudget?: boolean } = {}) {
   return {
     id: row.id as string,
     workspaceId: row.workspace_id as string,
@@ -23,17 +29,37 @@ export function formatProject(row: Record<string, unknown>) {
     active: Boolean(row.active),
     startDate: (row.start_date as string | null) ?? null,
     endDate: (row.end_date as string | null) ?? null,
-    estimatedHours: (row.estimated_hours as number | null) ?? null,
+    estimatedHours: opts.hideBudget ? null : ((row.estimated_hours as number | null) ?? null),
     integrationId: (row.integration_id as string | null) ?? null,
     externalProjectId: (row.external_project_id as string | null) ?? null,
     externalTaskId: (row.external_task_id as string | null) ?? null,
     trackedSeconds: (row.tracked_seconds as number) ?? 0,
-    budgetSeconds: (row.budget_seconds as number) ?? (row.tracked_seconds as number) ?? 0,
+    budgetSeconds: opts.hideBudget
+      ? 0
+      : ((row.budget_seconds as number) ?? (row.tracked_seconds as number) ?? 0),
     createdAt: row.created_at as string,
   };
 }
 
-/** Shared by the REST route and the MCP `create_project` tool. */
+/** A plain member creates a project by name, colour, client and billable flag; rates, budgets and integrations stay with managers. */
+export function memberProjectInput(data: CreateProject): CreateProject {
+  return { name: data.name, color: data.color, clientId: data.clientId, billable: data.billable };
+}
+
+/** The project, if it is active in this workspace — the only kind an entry, template or meeting may be logged against. */
+export async function findActiveProject(
+  db: D1Database,
+  workspaceId: string,
+  projectId: string
+): Promise<{ id: string; name: string; billable: boolean } | null> {
+  const row = await db
+    .prepare(`SELECT id, name, billable FROM projects WHERE id = ? AND workspace_id = ? AND active = 1`)
+    .bind(projectId, workspaceId)
+    .first<{ id: string; name: string; billable: number }>();
+  return row ? { id: row.id, name: row.name, billable: Boolean(row.billable) } : null;
+}
+
+/** Shared by the REST route and the MCP `create_project` tool; callers check the client first. */
 export async function createProject(db: D1Database, workspaceId: string, data: CreateProject) {
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
@@ -60,7 +86,7 @@ export async function createProject(db: D1Database, workspaceId: string, data: C
     .bind(
       id,
       workspaceId,
-      data.clientId ?? null,
+      data.clientId,
       data.name,
       color,
       data.billable ? 1 : 0,

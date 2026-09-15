@@ -1,15 +1,19 @@
 import { test, expect } from "@playwright/test";
 import { signUp } from "./auth";
+import { chooseProject, createProject } from "./project-helpers";
 
 test.describe("running timer sync", () => {
   test.beforeEach(async ({ page }) => {
     await signUp(page);
+    await createProject(page);
+    await page.reload();
   });
 
   test("restores the running entry into the timer bar after reload", async ({ page }) => {
     const input = page.getByPlaceholder("What are you working on?");
     await input.fill("Persisted running task");
     await page.getByRole("button", { name: "Start" }).click();
+    await chooseProject(page);
     await expect(page.getByRole("button", { name: "Stop" })).toBeVisible();
 
     // Reload — the running entry is restored from IndexedDB and the render-time
@@ -33,6 +37,7 @@ test.describe("running timer sync", () => {
     const input = page.getByPlaceholder("What are you working on?");
     await input.fill("Initial text");
     await page.getByRole("button", { name: "Start" }).click();
+    await chooseProject(page);
     await expect(page.getByRole("button", { name: "Stop" })).toBeVisible();
 
     // Reload so the running entry is restored with a stable id (past the

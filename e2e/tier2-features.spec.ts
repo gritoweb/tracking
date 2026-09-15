@@ -1,13 +1,16 @@
 import { test, expect } from "@playwright/test";
 import { signUp } from "./auth";
+import { chooseProject, createProject } from "./project-helpers";
 
 
 test("tag colors: recolor an existing tag in the entry dialog", async ({ page }) => {
   await signUp(page);
+  const project = await createProject(page);
   // Seed an entry carrying the tag so it exists server-side (recolorable).
   await page.request.post("/api/time_entries", {
     data: {
       description: "seed",
+      projectId: project.id,
       start: new Date(Date.now() - 3600_000).toISOString(),
       stop: new Date().toISOString(),
       tags: ["design"],
@@ -29,6 +32,7 @@ test("tag colors: recolor an existing tag in the entry dialog", async ({ page })
 
 test("recurring entries: create a template in settings", async ({ page }) => {
   await signUp(page);
+  await createProject(page);
   await page.goto("/settings?tab=tracking");
 
   await expect(page.getByText("Recurring entries")).toBeVisible();
@@ -38,6 +42,10 @@ test("recurring entries: create a template in settings", async ({ page }) => {
   const dialog = page.getByRole("dialog", { name: "New recurring entry" });
   await dialog.getByLabel("Description").fill("Daily standup");
   await dialog.getByLabel("Duration (minutes)").fill("15");
+  // Every template needs a project (D3).
+  await expect(dialog.getByRole("button", { name: "Create" })).toBeDisabled();
+  await dialog.getByRole("button", { name: "Select project" }).click();
+  await chooseProject(page);
   await dialog.getByRole("button", { name: "Create" }).click();
 
   await expect(page.getByText("Daily standup")).toBeVisible();
@@ -53,9 +61,12 @@ test("calendar: gaps toggle present on the time grid", async ({ page }) => {
 
 test("timer stop: day total stays put (optimistic), entry lands with duration", async ({ page }) => {
   await signUp(page);
+  await createProject(page);
+  await page.reload();
 
   await page.getByPlaceholder("What are you working on?").fill("Focus block");
   await page.getByRole("button", { name: "Start" }).click();
+  await chooseProject(page);
   await expect(page.getByRole("button", { name: "Stop" })).toBeVisible();
   await page.waitForTimeout(2000); // accrue a couple seconds
 

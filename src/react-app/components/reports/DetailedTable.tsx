@@ -45,6 +45,7 @@ import {
   Inbox,
 } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
+import { toast } from "sonner";
 
 export interface DetailedEntry {
   id: string;
@@ -113,9 +114,11 @@ function loadVisible(): Record<ColumnKey, boolean> {
 
 interface DetailedTableProps {
   entries: DetailedEntry[];
+  /** The report's "Hide amounts": wins over the column toggle so a client report can't carry money by accident. */
+  hideAmounts?: boolean;
 }
 
-export function DetailedTable({ entries }: DetailedTableProps) {
+export function DetailedTable({ entries, hideAmounts = false }: DetailedTableProps) {
   const timeFormat = useUIStore((s) => s.timeFormat);
   const currency = useUIStore((s) => s.currency);
   const [visible, setVisible] = useState<Record<ColumnKey, boolean>>(loadVisible);
@@ -146,7 +149,8 @@ export function DetailedTable({ entries }: DetailedTableProps) {
         : { key, dir: key === "date" || key === "amount" || key === "duration" ? "desc" : "asc" }
     );
 
-  const cols = COLUMNS.filter((c) => visible[c.key]);
+  const menuColumns = COLUMNS.filter((c) => !(hideAmounts && c.key === "amount"));
+  const cols = menuColumns.filter((c) => visible[c.key]);
 
   const sorted = useMemo(() => {
     const col = COLUMNS.find((c) => c.key === sort.key)!;
@@ -172,7 +176,12 @@ export function DetailedTable({ entries }: DetailedTableProps) {
   const toggleAll = () =>
     setSelected(allSelected ? new Set() : new Set(sorted.map((e) => e.id)));
 
-  const duplicate = (e: DetailedEntry) =>
+  const duplicate = (e: DetailedEntry) => {
+    // Every entry needs a project (D3); an older entry without one has to get one first.
+    if (!e.projectId) {
+      toast.error("Give this entry a project before duplicating it");
+      return;
+    }
     createEntry.mutate({
       description: e.description,
       projectId: e.projectId,
@@ -182,6 +191,7 @@ export function DetailedTable({ entries }: DetailedTableProps) {
       billable: e.billable,
       tags: e.tags,
     });
+  };
 
   const bulkBillable = (billable: boolean) =>
     bulkUpdate.mutate(
@@ -235,7 +245,7 @@ export function DetailedTable({ entries }: DetailedTableProps) {
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              {COLUMNS.map((c) => (
+              {menuColumns.map((c) => (
                 <DropdownMenuCheckboxItem
                   key={c.key}
                   checked={visible[c.key]}

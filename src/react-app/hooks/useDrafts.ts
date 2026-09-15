@@ -145,6 +145,7 @@ export function useConfirmDrafts(localDate: string) {
         `${confirmed} ${confirmed === 1 ? "entry" : "entries"} added to your timesheet`
       );
     },
-    onError: () => toast.error("Couldn't confirm the drafts"),
+    onError: (error) =>
+      toast.error(error instanceof Error && error.message ? error.message : "Couldn't confirm the drafts"),
   });
 }

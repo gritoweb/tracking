@@ -14,6 +14,11 @@ interface ExportEntry {
   tags: string[];
 }
 
+export interface ExportOptions {
+  /** False drops the Amount column, for a report that goes to a client. */
+  includeAmount?: boolean;
+}
+
 const EXPORT_HEADERS = [
   "Date",
   "Start",
@@ -27,6 +32,12 @@ const EXPORT_HEADERS = [
   "Amount",
   "Tags",
 ];
+
+const AMOUNT_COLUMN = EXPORT_HEADERS.indexOf("Amount");
+
+function withoutAmount<T>(cells: T[], options: ExportOptions): T[] {
+  return options.includeAmount === false ? cells.filter((_, i) => i !== AMOUNT_COLUMN) : cells;
+}
 
 // Row cells shared by CSV and XLSX (Amount kept numeric for spreadsheets).
 function exportRow(e: ExportEntry): (string | number)[] {
@@ -47,20 +58,31 @@ function exportRow(e: ExportEntry): (string | number)[] {
   ];
 }
 
-export function exportToCSV(entries: ExportEntry[], filename = "time-entries"): void {
+export function exportToCSV(
+  entries: ExportEntry[],
+  filename = "time-entries",
+  options: ExportOptions = {}
+): void {
   const csvCell = (v: string | number) =>
     typeof v === "number" ? String(v) : `"${v.replace(/"/g, '""')}"`;
   const lines = [
-    EXPORT_HEADERS.join(","),
-    ...entries.map((e) => exportRow(e).map(csvCell).join(",")),
+    withoutAmount(EXPORT_HEADERS, options).join(","),
+    ...entries.map((e) => withoutAmount(exportRow(e), options).map(csvCell).join(",")),
   ];
   download(`${filename}.csv`, new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" }));
 }
 
 // Real .xlsx (OOXML) via the dependency-free writer — opens in Excel/Sheets
 // without the format-mismatch warning the old HTML-table .xls trick produced.
-export function exportToExcel(entries: ExportEntry[], filename = "time-entries"): void {
-  const rows = [EXPORT_HEADERS, ...entries.map(exportRow)];
+export function exportToExcel(
+  entries: ExportEntry[],
+  filename = "time-entries",
+  options: ExportOptions = {}
+): void {
+  const rows = [
+    withoutAmount(EXPORT_HEADERS, options),
+    ...entries.map((e) => withoutAmount(exportRow(e), options)),
+  ];
   const bytes = buildXlsx("Time entries", rows);
   download(
     `${filename}.xlsx`,

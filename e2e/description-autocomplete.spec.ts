@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { signUp } from "./auth";
+import { createProject } from "./project-helpers";
 
 /**
  * The timer bar's description suggestions.
@@ -15,11 +16,13 @@ test.describe("description autocomplete", () => {
   test.beforeEach(async ({ page }) => {
     await signUp(page);
     const origin = new URL(page.url()).origin;
+    const project = await createProject(page);
     for (const d of ["Homepage hero rebuild", "Client feedback pass", "Sprint planning"]) {
       await page.request.post("/api/time_entries", {
         headers: { origin },
         data: {
           description: d,
+          projectId: project.id,
           start: new Date(Date.now() - 7200_000).toISOString(),
           stop: new Date(Date.now() - 3600_000).toISOString(),
         },

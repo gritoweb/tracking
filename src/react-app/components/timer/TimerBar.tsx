@@ -49,6 +49,21 @@ export function TimerBar() {
   const { data: projects = [] } = useProjects();
   const descRef = useRef<HTMLInputElement>(null);
 
+  // A start without a project (the button, Alt+Shift+S, a favourite, a nudge) waits here until one is picked (D3).
+  const pendingStart = useUIStore((s) => s.pendingStart);
+  const setPendingStart = useUIStore((s) => s.setPendingStart);
+  const [projectPickerOpen, setProjectPickerOpen] = useState(false);
+  const [seenPendingStart, setSeenPendingStart] = useState(pendingStart);
+  if (seenPendingStart !== pendingStart) {
+    setSeenPendingStart(pendingStart);
+    if (pendingStart && !runningEntry) {
+      if (pendingStart.description !== undefined) setDescription(pendingStart.description);
+      if (pendingStart.tags) setTags(pendingStart.tags);
+      if (pendingStart.billable !== undefined) setBillable(pendingStart.billable);
+      setProjectPickerOpen(true);
+    }
+  }
+
   const isRunning = Boolean(runningEntry);
 
   // Sync the editable fields from the running entry whenever it changes
@@ -165,7 +180,7 @@ export function TimerBar() {
         id: runningEntry.id,
         data: {
           description: s.description,
-          projectId: s.projectId,
+          ...(s.projectId ? { projectId: s.projectId } : {}),
           taskId: s.taskId,
           tags: s.tags,
           billable: s.billable,
@@ -284,6 +299,12 @@ export function TimerBar() {
           unreadable slivers when they genuinely don't fit. */}
       <ProjectPicker
         value={projectId}
+        open={projectPickerOpen}
+        holdOpen={Boolean(pendingStart)}
+        onOpenChange={(open) => {
+          setProjectPickerOpen(open);
+          if (!open) setPendingStart(null);
+        }}
         onChange={(id) => {
           setProjectId(id);
           setTaskId(null);
@@ -303,6 +324,15 @@ export function TimerBar() {
               id: runningEntry.id,
               data: { projectId: id, taskId: null, billable: next },
             });
+          } else if (pendingStart) {
+            startTimer({
+              description: pendingStart.description ?? description,
+              tags: pendingStart.tags ?? tags,
+              billable: pendingStart.billable ?? next,
+              projectId: id,
+              taskId: null,
+            });
+            setPendingStart(null);
           }
         }}
         compact

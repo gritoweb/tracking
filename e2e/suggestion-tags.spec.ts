@@ -1,14 +1,12 @@
 import { test, expect, type Page } from "@playwright/test";
 import { signUp } from "./auth";
+import { createProject } from "./project-helpers";
 
 // Seed a project + two completed entries sharing a description but with
 // different tags (older vs newer), so the suggestion should carry the NEWER
 // entry's tags.
 async function seed(page: Page) {
-  const proj = await page.request.post("/api/projects", {
-    data: { name: "Alpha", color: "#e11d48" },
-  });
-  const { id: projectId } = (await proj.json()) as { id: string };
+  const { id: projectId } = await createProject(page, { name: "Alpha", color: "#e11d48" });
   const now = Date.now();
   const iso = (msAgo: number) => new Date(now - msAgo).toISOString();
   // Older entry: tag that must NOT carry over.
@@ -63,8 +61,13 @@ test("timer bar: suggestion carries newest tags as removable chips", async ({ pa
   await expect(page.getByRole("button", { name: "Stop" })).toBeVisible();
   await page.getByRole("button", { name: "Remove tag meeting" }).click();
   await expect(page.getByRole("button", { name: "Remove tag meeting" })).toBeHidden();
+  // Stop flips the bar optimistically, so wait for the server before reading the entry back.
+  const stopResponse = page.waitForResponse(
+    (r) => r.url().includes("/stop") && r.request().method() === "PATCH"
+  );
   await page.getByRole("button", { name: "Stop" }).click();
   await expect(page.getByRole("button", { name: "Start" })).toBeVisible();
+  expect((await stopResponse).ok()).toBeTruthy();
 
   // The stopped entry keeps the remaining tag only.
   const res = await page.request.get("/api/time_entries");

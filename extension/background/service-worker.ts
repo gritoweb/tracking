@@ -315,21 +315,34 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           sendResponse({ ok: false, error: "Not signed in" });
           break;
         }
+        // Every entry needs a project (D3); the server refuses one without it.
+        if (typeof msg.projectId !== "string" || !msg.projectId) {
+          sendResponse({ ok: false, error: "Choose a project first" });
+          break;
+        }
         const base = resolveBase(apiUrl);
         try {
+          // Billable is left out so the server applies the project's own default.
           const res = await authedFetch(base, "/api/time_entries", authToken, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               description: msg.description ?? "",
-              projectId: msg.projectId ?? null,
+              projectId: msg.projectId,
               start: new Date().toISOString(),
-              billable: false,
               tags: [],
             }),
           });
-          if (!res || !res.ok) {
-            sendResponse({ ok: false, error: res ? "Failed to start timer" : "Session expired" });
+          if (!res) {
+            sendResponse({ ok: false, error: "Session expired" });
+            break;
+          }
+          if (!res.ok) {
+            const body = (await res.json().catch(() => null)) as { error?: unknown } | null;
+            sendResponse({
+              ok: false,
+              error: typeof body?.error === "string" ? body.error : "Failed to start timer",
+            });
             break;
           }
           const entry = (await res.json()) as {
@@ -350,6 +363,39 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           // Update badge immediately — don't wait for the next alarm tick
           await paintBadge(started);
           sendResponse({ ok: true, entry });
+        } catch (err) {
+          sendResponse({ ok: false, error: String(err) });
+        }
+        break;
+      }
+
+      case "LIST_PROJECTS": {
+        const { apiUrl, authToken } = (await chrome.storage.local.get([
+          "apiUrl",
+          "authToken",
+        ])) as { apiUrl?: string; authToken?: string };
+        if (!authToken) {
+          sendResponse({ ok: false, error: "Not signed in" });
+          break;
+        }
+        try {
+          const res = await authedFetch(resolveBase(apiUrl), "/api/projects", authToken);
+          if (!res || !res.ok) {
+            sendResponse({ ok: false, error: res ? "Failed to load projects" : "Session expired" });
+            break;
+          }
+          const projects = (await res.json()) as Array<{
+            id: string;
+            name: string;
+            clientName: string | null;
+            active: boolean;
+          }>;
+          sendResponse({
+            ok: true,
+            projects: projects
+              .filter((p) => p.active)
+              .map(({ id, name, clientName }) => ({ id, name, clientName })),
+          });
         } catch (err) {
           sendResponse({ ok: false, error: String(err) });
         }

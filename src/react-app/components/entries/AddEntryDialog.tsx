@@ -29,11 +29,11 @@ export function AddEntryDialog({
   };
 
   const handleSave = () => {
-    const { start, stop } = draft.draft;
-    if (!start || !stop || !draft.hasValidRange) return;
+    const { start, stop, projectId } = draft.draft;
+    if (!start || !stop || !projectId || !draft.hasValidRange) return;
     const startedAt = new Date(start);
     createEntry.mutate(
-      { ...draft.draft, start, stop },
+      { ...draft.draft, projectId, start, stop },
       {
         onSuccess: () => {
           // An entry dated outside the period on screen would otherwise just not

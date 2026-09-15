@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { signUp } from "./auth";
+import { chooseProject, createProject } from "./project-helpers";
 
 // A fixed timezone west of UTC: the local date and the UTC date differ for
 // everything tracked after 18:00, which is what the day-key bucketing has to
@@ -14,6 +15,8 @@ test.describe("day boundaries in the Timer list", () => {
     // "Today" range from.
     await page.clock.install({ time: new Date("2026-08-14T05:40:00.000Z") });
     await signUp(page);
+    await createProject(page);
+    await page.reload();
 
     await page.getByRole("tab", { name: "List" }).click();
     await page.getByRole("button", { name: "Date range" }).click();
@@ -26,6 +29,7 @@ test.describe("day boundaries in the Timer list", () => {
     const input = page.getByPlaceholder("What are you working on?");
     await input.fill("After midnight task");
     await page.getByRole("button", { name: "Start timer" }).click();
+    await chooseProject(page);
     await expect(page.getByRole("button", { name: "Stop timer" })).toBeVisible();
     await expect(list.getByText("After midnight task")).toBeVisible();
 
@@ -48,11 +52,13 @@ test.describe("day boundaries in the Timer list", () => {
     await page.clock.install({ time: new Date("2026-08-14T02:30:00.000Z") });
     await signUp(page);
     const origin = new URL(page.url()).origin;
+    const project = await createProject(page);
 
     const res = await page.request.post("/api/time_entries", {
       // 20:00–20:15 local, both stamped on Aug 14 in UTC.
       data: {
         description: "Evening task",
+        projectId: project.id,
         start: "2026-08-14T02:00:00.000Z",
         stop: "2026-08-14T02:15:00.000Z",
         billable: false,

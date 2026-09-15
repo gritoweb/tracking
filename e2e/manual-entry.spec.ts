@@ -1,16 +1,20 @@
 import { test, expect } from "@playwright/test";
 import { signUp } from "./auth";
 import { fillTimeRange, pickDate } from "./entry-helpers";
+import { chooseProject, createProject } from "./project-helpers";
 
 test.describe("manual one-off time entry", () => {
   test.beforeEach(async ({ page }) => {
     await signUp(page);
+    await createProject(page);
+    await page.reload();
   });
 
   test("adds an entry with a start and stop time", async ({ page }) => {
     await page.getByRole("button", { name: "Add entry" }).click();
 
-    const dialog = page.getByRole("dialog");
+    // Named: the project picker's popover is a dialog too.
+    const dialog = page.getByRole("dialog", { name: "New entry" });
     await expect(dialog.getByRole("heading", { name: "New entry" })).toBeVisible();
 
     await dialog.locator("textarea").fill("Manual test entry");
@@ -19,6 +23,10 @@ test.describe("manual one-off time entry", () => {
 
     await expect(dialog.getByLabel("Duration")).toHaveValue("01:30:00");
     const saveButton = dialog.getByRole("button", { name: "Add entry" });
+    // Every entry needs a project (D3): save waits for one.
+    await expect(saveButton).toBeDisabled();
+    await dialog.getByRole("button", { name: "Select project" }).click();
+    await chooseProject(page);
     await expect(saveButton).toBeEnabled();
     await saveButton.click();
 
@@ -40,6 +48,7 @@ test.describe("manual one-off time entry", () => {
     // Start the timer via the running-timer bar on the Timer page.
     await page.getByPlaceholder("What are you working on?").fill("Running task");
     await page.getByRole("button", { name: "Start" }).click();
+    await chooseProject(page);
     await expect(page.getByRole("button", { name: "Stop" })).toBeVisible();
 
     await page.getByRole("button", { name: "Add entry" }).click();
@@ -54,6 +63,8 @@ test.describe("manual one-off time entry", () => {
       new Date(Date.now() - 86_400_000)
     );
     await fillTimeRange(dialog, "09:00", "10:00");
+    await dialog.getByRole("button", { name: "Select project" }).click();
+    await chooseProject(page);
     await dialog.getByRole("button", { name: "Add entry" }).click();
     await expect(dialog).not.toBeVisible();
 

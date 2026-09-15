@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Check, ChevronDown, FolderOpen, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -30,7 +30,8 @@ import { nextProjectColor, PROJECT_COLORS } from "@/lib/colorUtils";
 
 interface ProjectPickerProps {
   value: string | null;
-  onChange: (projectId: string | null) => void;
+  /** Always a project: every entry needs one, so the picker offers no "No project" (D3). */
+  onChange: (projectId: string) => void;
   compact?: boolean;
   className?: string;
   /**
@@ -40,6 +41,11 @@ interface ProjectPickerProps {
    * control and broke the column's left edge.
    */
   field?: boolean;
+  /** Controlled open state, for a caller that opens the picker itself (the timer bar's Start). */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  /** Stay open when focus is pulled away — a closing menu hands focus back to its own trigger. */
+  holdOpen?: boolean;
   /** Custom trigger element (single child, receives the popover ref). */
   children?: React.ReactNode;
 }
@@ -51,10 +57,15 @@ export function ProjectPicker({
   className,
   children,
   field = false,
+  open: controlledOpen,
+  onOpenChange,
+  holdOpen = false,
 }: ProjectPickerProps) {
-  const [open, setOpen] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const open = controlledOpen ?? uncontrolledOpen;
   const [search, setSearch] = useState("");
-  const [createClientId, setCreateClientId] = useState("none");
+  const [createClientId, setCreateClientId] = useState("");
   const { data: projects = [] } = useProjects();
   const { data: clients = [] } = useClients();
   const createProject = useCreateProject();
@@ -62,46 +73,56 @@ export function ProjectPicker({
 
   const selected = projects.find((p) => p.id === value);
 
-  const select = (projectId: string | null) => {
+  // Projects under their client, clients alphabetical; an older project with no client comes last.
+  const groups = useMemo(() => {
+    const byClient = new Map<string, typeof projects>();
+    for (const project of projects) {
+      const client = project.clientName ?? "";
+      byClient.set(client, [...(byClient.get(client) ?? []), project]);
+    }
+    return [...byClient.entries()].sort(([a], [b]) =>
+      a === "" ? 1 : b === "" ? -1 : a.localeCompare(b)
+    );
+  }, [projects]);
+
+  // Reset the query when the popover closes so the next open starts clean
+  // rather than resuming someone else's half-typed name.
+  const setOpen = (next: boolean) => {
+    if (controlledOpen === undefined) setUncontrolledOpen(next);
+    onOpenChange?.(next);
+    if (!next) {
+      setSearch("");
+      setCreateClientId("");
+    }
+  };
+
+  const select = (projectId: string) => {
     onChange(projectId);
     setOpen(false);
   };
 
   // Creating from here is the whole reason a first-run workspace isn't a dead
-  // end: opening this picker with no projects used to offer "No project" and
-  // nothing else, with per-client billing — the product's entire point — behind
-  // a door with no handle. A name is the only required field; colour follows the
-  // same auto-assign rule as the full form.
+  // end. A name and a client are the required fields; colour follows the same
+  // auto-assign rule as the full form.
   const typed = search.trim();
   const exists = projects.some((p) => p.name.toLowerCase() === typed.toLowerCase());
   const canCreate = typed.length > 0 && !exists && !createProject.isPending;
 
   const handleCreate = async () => {
+    if (!createClientId) return;
     const project = await createProject.mutateAsync({
       name: typed,
       color: autoAssignColors
         ? nextProjectColor(projects.map((p) => p.color))
         : PROJECT_COLORS[9],
       billable: false,
-      clientId: createClientId === "none" ? null : createClientId,
+      clientId: createClientId,
     });
-    setSearch("");
-    setCreateClientId("none");
     select(project.id);
   };
 
-  // Reset the query when the popover closes so the next open starts clean
-  // rather than resuming someone else's half-typed name.
-  const handleOpenChange = (next: boolean) => {
-    setOpen(next);
-    if (!next) {
-      setSearch("");
-      setCreateClientId("none");
-    }
-  };
-
   return (
-    <Popover open={open} onOpenChange={handleOpenChange}>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         {children ?? (
         <Button
@@ -132,16 +153,25 @@ export function ProjectPicker({
           ) : (
             <>
               <FolderOpen className="h-3.5 w-3.5" />
-              {!compact && <span>No project</span>}
+              {!compact && <span>Choose project</span>}
             </>
           )}
           <ChevronDown className="h-3 w-3 opacity-50" />
         </Button>
         )}
       </PopoverTrigger>
-      <PopoverContent className="w-56 p-0" align="start">
+      <PopoverContent
+        className="w-64 p-0"
+        align="start"
+        onFocusOutside={(e) => {
+          if (!holdOpen) return;
+          e.preventDefault();
+          requestAnimationFrame(() => inputRef.current?.focus());
+        }}
+      >
         <Command shouldFilter>
           <CommandInput
+            ref={inputRef}
             placeholder={
               projects.length === 0 ? "Name your first project…" : "Search or create…"
             }
@@ -151,19 +181,28 @@ export function ProjectPicker({
           />
           {canCreate && (
             <div className="border-b px-2 py-1.5">
-              <Select value={createClientId} onValueChange={setCreateClientId}>
-                <SelectTrigger size="sm" className="h-7 w-full text-xs">
-                  <SelectValue placeholder="No client" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No client</SelectItem>
-                  {clients.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {clients.length ? (
+                <Select value={createClientId} onValueChange={setCreateClientId}>
+                  <SelectTrigger
+                    size="sm"
+                    className="h-7 w-full text-xs"
+                    aria-label="Client for the new project"
+                  >
+                    <SelectValue placeholder="Choose a client" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {clients.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <p className="text-xs leading-normal text-muted-foreground">
+                  Add a client under Clients first — every project needs one.
+                </p>
+              )}
             </div>
           )}
           <CommandList>
@@ -174,6 +213,7 @@ export function ProjectPicker({
                 <CreateProjectItem
                   name={typed}
                   pending={createProject.isPending}
+                  disabled={!createClientId}
                   onCreate={handleCreate}
                   standalone
                 />
@@ -181,31 +221,24 @@ export function ProjectPicker({
                 <span className="text-sm text-muted-foreground">No projects found</span>
               )}
             </CommandEmpty>
-            <CommandGroup>
-              <CommandItem
-                value="no-project"
-                keywords={["no project"]}
-                onSelect={() => select(null)}
-              >
-                <FolderOpen className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="text-muted-foreground">No project</span>
-                {!value && <Check className="ml-auto h-3.5 w-3.5" />}
-              </CommandItem>
-              {projects.map((project) => (
-                <CommandItem
-                  key={project.id}
-                  value={project.id}
-                  keywords={[project.name]}
-                  onSelect={() => select(project.id)}
-                >
-                  <ColorDot color={project.color} />
-                  <span className="truncate">{project.name}</span>
-                  {value === project.id && (
-                    <Check className="ml-auto h-3.5 w-3.5 shrink-0" />
-                  )}
-                </CommandItem>
-              ))}
-            </CommandGroup>
+            {groups.map(([client, clientProjects]) => (
+              <CommandGroup key={client || "__no_client__"} heading={client || "No client"}>
+                {clientProjects.map((project) => (
+                  <CommandItem
+                    key={project.id}
+                    value={project.id}
+                    keywords={[project.name, client]}
+                    onSelect={() => select(project.id)}
+                  >
+                    <ColorDot color={project.color} />
+                    <span className="truncate">{project.name}</span>
+                    {value === project.id && (
+                      <Check className="ml-auto h-3.5 w-3.5 shrink-0" />
+                    )}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            ))}
 
             {/* Also offered alongside partial matches — typing "Acme" when
                 "Acme Retainer" exists shouldn't force a trip to /projects. */}
@@ -214,6 +247,7 @@ export function ProjectPicker({
                 <CreateProjectItem
                   name={typed}
                   pending={createProject.isPending}
+                  disabled={!createClientId}
                   onCreate={handleCreate}
                 />
               </CommandGroup>
@@ -222,8 +256,8 @@ export function ProjectPicker({
             {/* First run: the list has nothing to search, so say what to do. */}
             {projects.length === 0 && !typed && (
               <p className="border-t px-3 py-2.5 text-xs leading-normal text-muted-foreground">
-                Type a name to create your first project. Attaching time to a
-                project is what makes it billable.
+                Type a name to create your first project. Every project belongs to a
+                client, and every entry needs a project.
               </p>
             )}
           </CommandList>
@@ -237,11 +271,14 @@ export function ProjectPicker({
 function CreateProjectItem({
   name,
   pending,
+  disabled,
   onCreate,
   standalone = false,
 }: {
   name: string;
   pending: boolean;
+  /** Until a client is chosen for the new project. */
+  disabled: boolean;
   onCreate: () => void;
   /** Rendered outside a CommandGroup (inside CommandEmpty), which cmdk does
       not treat as selectable — so it needs to be a real button. */
@@ -265,7 +302,7 @@ function CreateProjectItem({
       <button
         type="button"
         onClick={onCreate}
-        disabled={pending}
+        disabled={pending || disabled}
         className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm transition-colors duration-fast ease-out-quart hover:bg-accent focus-visible:bg-accent focus-visible:outline-none disabled:opacity-50"
       >
         {content}
@@ -278,7 +315,7 @@ function CreateProjectItem({
       value={`__create__${name}`}
       keywords={[name]}
       onSelect={onCreate}
-      disabled={pending}
+      disabled={pending || disabled}
     >
       {content}
     </CommandItem>
@@ -298,10 +335,7 @@ export function AssignProjectChip({
   ariaLabel?: string;
 }) {
   return (
-    <ProjectPicker
-      value={null}
-      onChange={(projectId) => projectId && onAssign(projectId)}
-    >
+    <ProjectPicker value={null} onChange={onAssign}>
       <button
         type="button"
         aria-label={ariaLabel}

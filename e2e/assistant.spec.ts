@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { signUp } from "./auth";
+import { createProject } from "./project-helpers";
 
 // The Assistant: deterministic nudges from timer/timesheet state, the
 // global launcher in the timer bar, and the right-side panel. Calendar-driven
@@ -7,6 +8,7 @@ import { signUp } from "./auth";
 // long_timer nudge covers the full nudge pipeline end to end.
 test("assistant surfaces a long-running-timer nudge and dismisses it", async ({ page }) => {
   await signUp(page);
+  const project = await createProject(page);
 
   // Leave the app before seeding: the open page would otherwise consume the
   // nudge the moment its query refetches (toast + persisted seen-marker),
@@ -16,7 +18,7 @@ test("assistant surfaces a long-running-timer nudge and dismisses it", async ({ 
   // Seed a running timer started 5h ago — past the 4h long_timer threshold.
   const start = new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString();
   const created = await page.request.post("/api/time_entries", {
-    data: { description: "Deep focus block", start },
+    data: { description: "Deep focus block", projectId: project.id, start },
   });
   expect(created.ok()).toBeTruthy();
 
@@ -77,8 +79,8 @@ test("assistant surfaces a long-running-timer nudge and dismisses it", async ({ 
   await expect(page.getByPlaceholder("Ask the assistant…")).toBeFocused();
 });
 
-// AI project inference is best-effort and unavailable in CI — this exercises
-// the fallback path: the entry must still materialize, just uncategorized.
+// Every entry needs a project (D3): a meeting nothing can place is refused and
+// stays a ghost block; with a project it materializes exactly once.
 test("track-event materializes a meeting idempotently", async ({ page }) => {
   await signUp(page);
 
@@ -86,12 +88,21 @@ test("track-event materializes a meeting idempotently", async ({ page }) => {
   const stop = new Date(Date.now() - 60 * 60 * 1000).toISOString();
   const body = { calendarEventId: "evt-e2e-track", title: "Design sync", start, stop };
 
-  const first = await page.request.post("/api/assistant/track-event", { data: body });
+  // No projects in the workspace, so inference has nothing to match against.
+  const refused = await page.request.post("/api/assistant/track-event", { data: body });
+  expect(refused.status()).toBe(422);
+
+  const project = await createProject(page);
+  const first = await page.request.post("/api/assistant/track-event", {
+    data: { ...body, projectId: project.id },
+  });
   expect(first.ok()).toBeTruthy();
   expect((await first.json()).created).toBe(true);
 
   // Same event again (double-click / auto-track race) must not duplicate.
-  const second = await page.request.post("/api/assistant/track-event", { data: body });
+  const second = await page.request.post("/api/assistant/track-event", {
+    data: { ...body, projectId: project.id },
+  });
   expect((await second.json()).created).toBe(false);
 
   await page.reload();

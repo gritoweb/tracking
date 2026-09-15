@@ -48,7 +48,10 @@ export function useTrackNudgeEvent() {
         data.projectName ? `Added to timesheet · ${data.projectName}` : "Added to timesheet"
       );
     },
-    onError: () => toast.error("Couldn't add that meeting — try again."),
+    onError: (error) =>
+      toast.error(
+        error instanceof Error && error.message ? error.message : "Couldn't add that meeting — try again."
+      ),
   });
 }
 

@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { signUp } from "./auth";
+import { createProject } from "./project-helpers";
 
 // Regression coverage for the Phase 1 cross-tenant (IDOR) hardening: a caller in
 // workspace B must never be able to read or mutate a resource owned by workspace
@@ -28,9 +29,11 @@ test.describe("cross-tenant isolation (IDOR)", () => {
     expect(await clientLeak.text()).not.toContain("secret@victim.test");
 
     // ── A creates a time entry with a private tag ───────────────────────────
+    const projectA = await createProject(pageA);
     const entryRes = await pageA.request.post("/api/time_entries", {
       data: {
         description: "Billable work",
+        projectId: projectA.id,
         start: "2026-05-01T09:00:00.000Z",
         stop: "2026-05-01T10:00:00.000Z",
         billable: true,

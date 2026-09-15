@@ -42,11 +42,13 @@ export async function broadcast(
 export const ENTRY_SELECT = `
   SELECT te.*,
     p.name  AS project_name,  p.color AS project_color,
+    cl.name AS client_name,
     tk.name AS task_name,
     u.name  AS user_name,     u.email AS user_email, u.image AS user_image,
     GROUP_CONCAT(t.name) AS tag_names
   FROM time_entries te
   LEFT JOIN projects p  ON p.id  = te.project_id AND p.workspace_id  = te.workspace_id
+  LEFT JOIN clients cl  ON cl.id = p.client_id   AND cl.workspace_id = te.workspace_id
   LEFT JOIN tasks   tk  ON tk.id = te.task_id    AND tk.workspace_id = te.workspace_id
   LEFT JOIN "user"  u   ON u.id  = te.user_id
   LEFT JOIN time_entry_tags tet ON tet.time_entry_id = te.id
@@ -67,6 +69,9 @@ export function buildReportWhere(opts: {
   tagIds?: string[];
   billable?: "billable" | "nonbillable";
   search?: string;
+  userIds?: string[];
+  /** Set for a plain member: pins the query to their own hours and ignores `userIds`. */
+  scopeUserId?: string | null;
 }): { where: string; bindings: unknown[] } {
   const where = [
     `te.workspace_id = ?`,
@@ -76,6 +81,14 @@ export function buildReportWhere(opts: {
   ];
   const bindings: unknown[] = [opts.workspaceId, opts.since, opts.until];
   const ph = (a: string[]) => a.map(() => "?").join(",");
+
+  if (opts.scopeUserId) {
+    where.push(`te.user_id = ?`);
+    bindings.push(opts.scopeUserId);
+  } else if (opts.userIds?.length) {
+    where.push(`te.user_id IN (${ph(opts.userIds)})`);
+    bindings.push(...opts.userIds);
+  }
 
   if (opts.projectIds?.length) {
     where.push(`te.project_id IN (${ph(opts.projectIds)})`);
@@ -143,6 +156,7 @@ export function formatEntry(row: Record<string, unknown>) {
     projectId: (row.project_id as string | null) ?? null,
     projectName: (row.project_name as string | null) ?? null,
     projectColor: (row.project_color as string | null) ?? null,
+    clientName: (row.client_name as string | null) ?? null,
     taskId: (row.task_id as string | null) ?? null,
     taskName: (row.task_name as string | null) ?? null,
     description: (row.description as string) ?? "",

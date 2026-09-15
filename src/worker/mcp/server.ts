@@ -17,9 +17,10 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { buildReportWhere, durationExpr, formatEntry, ENTRY_SELECT, broadcast } from "../db/queries";
 import { loadProjectPacing } from "../lib/pacing";
+import { entryScopeUserId, getMemberRole } from "../lib/permissions";
 import { generateDrafts, listDrafts } from "../lib/drafts";
-import { createClient } from "../lib/clients";
-import { createProject } from "../lib/projects";
+import { createClient, isActiveClient } from "../lib/clients";
+import { createProject, findActiveProject, memberProjectInput } from "../lib/projects";
 import { CreateClientSchema, CreateProjectSchema } from "@shared/schemas";
 import type { ApiKeyScope } from "../lib/api-keys";
 
@@ -152,6 +153,10 @@ export function buildMcpServer(ctx: McpContext): McpServer {
   const { env, workspaceId, userId, scope } = ctx;
   const db = env.DB;
   const server = new McpServer(SERVER_INFO, { instructions: SERVER_INSTRUCTIONS });
+  // Owner/admin keys read the whole workspace; a member's key reads only their own hours (D3).
+  let scopePromise: Promise<string | null> | null = null;
+  const scopeUserId = () =>
+    (scopePromise ??= getMemberRole(db, workspaceId, userId).then((role) => entryScopeUserId(role, userId)));
 
   // ─── Read ─────────────────────────────────────────────────────────────────
 
@@ -174,11 +179,13 @@ export function buildMcpServer(ctx: McpContext): McpServer {
            LEFT JOIN clients c ON c.id = p.client_id AND c.workspace_id = p.workspace_id
            LEFT JOIN time_entries te
              ON te.project_id = p.id AND te.workspace_id = p.workspace_id AND te.stop IS NOT NULL
-           WHERE p.workspace_id = ? AND p.active = 1
+             AND (?1 IS NULL OR te.user_id = ?1)
+           WHERE p.workspace_id = ?2 AND p.active = 1
            GROUP BY p.id ORDER BY p.name ASC`
         )
-        .bind(workspaceId)
+        .bind(await scopeUserId(), workspaceId)
         .all<Record<string, unknown>>();
+      const manager = (await scopeUserId()) === null;
 
       return json(
         results.map((r) => ({
@@ -187,7 +194,7 @@ export function buildMcpServer(ctx: McpContext): McpServer {
           client: r.client_name ?? null,
           billable: Boolean(r.billable),
           hourlyRate: r.rate ?? null,
-          budgetHours: r.estimated_hours ?? null,
+          budgetHours: manager ? (r.estimated_hours ?? null) : null,
           trackedHours: hours((r.tracked as number) ?? 0),
           startDate: r.start_date ?? null,
           endDate: r.end_date ?? null,
@@ -249,6 +256,7 @@ export function buildMcpServer(ctx: McpContext): McpServer {
         workspaceId,
         since: sinceIso,
         until: untilIso,
+        scopeUserId: await scopeUserId(),
       });
       const dur = durationExpr();
       const amount = `SUM((CASE WHEN te.billable = 1 THEN ${dur} ELSE 0 END) * COALESCE(p.rate, 0) / 3600.0)`;
@@ -344,6 +352,11 @@ export function buildMcpServer(ctx: McpContext): McpServer {
       const { sinceIso, untilIso } = rangeToIso(since, until, timezoneOffsetMinutes);
       const clauses = [`te.workspace_id = ?`, `te.start >= ?`, `te.start < ?`];
       const bindings: unknown[] = [workspaceId, sinceIso, untilIso];
+      const scope = await scopeUserId();
+      if (scope) {
+        clauses.push(`te.user_id = ?`);
+        bindings.push(scope);
+      }
       if (search?.trim()) {
         clauses.push(`te.description LIKE ? ESCAPE '\\'`);
         bindings.push(`%${search.trim().replace(/[%_\\]/g, "\\$&")}%`);
@@ -385,6 +398,9 @@ export function buildMcpServer(ctx: McpContext): McpServer {
       annotations: READ_ONLY,
     },
     async () => {
+      if ((await scopeUserId()) !== null) {
+        return text("Project budgets are visible to workspace owners and admins only.");
+      }
       const pacing = await loadProjectPacing(db, workspaceId);
       return json(
         pacing.map((p) => ({
@@ -495,19 +511,16 @@ export function buildMcpServer(ctx: McpContext): McpServer {
     {
       title: "Create a project",
       description:
-        "Add a new project to the workspace, optionally under a client. Use list_clients first to get a clientId rather than guessing one.",
+        "Add a new project to the workspace under a client — every project needs one. Use list_clients first to get a clientId rather than guessing one.",
       inputSchema: CreateProjectSchema.shape,
       annotations: MUTATES,
     },
     async (data) => {
-      if (data.clientId) {
-        const client = await db
-          .prepare(`SELECT id FROM clients WHERE id = ? AND workspace_id = ?`)
-          .bind(data.clientId, workspaceId)
-          .first();
-        if (!client) return text(`No client with id ${data.clientId} in this workspace.`);
+      if (!(await isActiveClient(db, workspaceId, data.clientId))) {
+        return text(`No active client with id ${data.clientId} in this workspace. Use list_clients.`);
       }
-      const project = await createProject(db, workspaceId, data);
+      const manager = (await scopeUserId()) === null;
+      const project = await createProject(db, workspaceId, manager ? data : memberProjectInput(data));
       return json(project);
     }
   );
@@ -520,10 +533,7 @@ export function buildMcpServer(ctx: McpContext): McpServer {
         "Start tracking time now. Stops any timer already running, exactly as the app's own timer bar does. Pass a project id from list_projects when the work belongs to one.",
       inputSchema: {
         description: z.string().max(2000).describe("What is being worked on"),
-        projectId: z
-          .string()
-          .optional()
-          .describe("A project id from list_projects; omit if the work has no project"),
+        projectId: z.string().describe("A project id from list_projects — every entry needs one"),
       },
       annotations: MUTATES,
     },
@@ -534,15 +544,9 @@ export function buildMcpServer(ctx: McpContext): McpServer {
       // Billable follows the project's default, matching resolveBillable on the
       // REST path — a timer started from a chat window must not land
       // non-billable when the same work started in the app wouldn't.
-      let billable = false;
-      if (projectId) {
-        const project = await db
-          .prepare(`SELECT billable FROM projects WHERE id = ? AND workspace_id = ?`)
-          .bind(projectId, workspaceId)
-          .first<{ billable: number }>();
-        if (!project) return text(`No project with id ${projectId} in this workspace.`);
-        billable = Boolean(project.billable);
-      }
+      const project = await findActiveProject(db, workspaceId, projectId);
+      if (!project) return text(`No active project with id ${projectId} in this workspace. Use list_projects.`);
+      const billable = project.billable;
 
       // Stops only the key holder's running timer; a teammate's keeps going.
       await db
@@ -561,7 +565,7 @@ export function buildMcpServer(ctx: McpContext): McpServer {
              (id, workspace_id, user_id, project_id, task_id, description, start, stop, duration, billable, created_at, updated_at)
            VALUES (?, ?, ?, ?, NULL, ?, ?, NULL, NULL, ?, ?, ?)`
         )
-        .bind(id, workspaceId, userId, projectId ?? null, description, now, billable ? 1 : 0, now, now)
+        .bind(id, workspaceId, userId, project.id, description, now, billable ? 1 : 0, now, now)
         .run();
 
       await broadcast(env, workspaceId, "timer:start", { id }, null, userId);
@@ -618,7 +622,7 @@ export function buildMcpServer(ctx: McpContext): McpServer {
         description: z.string().max(2000).describe("What the work was"),
         start: z.string().describe("ISO 8601 start instant, e.g. 2026-08-24T14:00:00Z"),
         stop: z.string().describe("ISO 8601 stop instant, after start"),
-        projectId: z.string().optional().describe("A project id from list_projects"),
+        projectId: z.string().describe("A project id from list_projects — every entry needs one"),
         billable: z
           .boolean()
           .optional()
@@ -636,15 +640,9 @@ export function buildMcpServer(ctx: McpContext): McpServer {
       }
       if (stopMs <= startMs) return text("stop must be after start.");
 
-      let resolvedBillable = billable ?? false;
-      if (projectId) {
-        const project = await db
-          .prepare(`SELECT billable FROM projects WHERE id = ? AND workspace_id = ?`)
-          .bind(projectId, workspaceId)
-          .first<{ billable: number }>();
-        if (!project) return text(`No project with id ${projectId} in this workspace.`);
-        if (billable === undefined) resolvedBillable = Boolean(project.billable);
-      }
+      const project = await findActiveProject(db, workspaceId, projectId);
+      if (!project) return text(`No active project with id ${projectId} in this workspace. Use list_projects.`);
+      const resolvedBillable = billable ?? project.billable;
 
       const now = new Date().toISOString();
       await db
@@ -657,7 +655,7 @@ export function buildMcpServer(ctx: McpContext): McpServer {
           crypto.randomUUID(),
           workspaceId,
           userId,
-          projectId ?? null,
+          project.id,
           description,
           new Date(startMs).toISOString(),
           new Date(stopMs).toISOString(),

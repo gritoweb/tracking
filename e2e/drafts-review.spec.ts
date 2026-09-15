@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { signUp } from "./auth";
+import { createProject } from "./project-helpers";
 
 /**
  * Local 'YYYY-MM-DD' for today, and UTC instants for a local clock time on it.
@@ -22,6 +23,8 @@ test("drafts: an uncovered gap becomes a proposal, reviewed and confirmed", asyn
 }) => {
   await signUp(page);
   const origin = new URL(page.url()).origin;
+  // Seeded entries carry a project, so the gap drafted between them inherits it (D3).
+  const project = await createProject(page);
 
   // Two entries with a 90-minute hole between them. Both must be in the past —
   // nothing that hasn't happened yet is ever drafted.
@@ -37,6 +40,7 @@ test("drafts: an uncovered gap becomes a proposal, reviewed and confirmed", asyn
       headers: { origin },
       data: {
         description: `seed ${startHour}`,
+        projectId: project.id,
         start: atLocalHour(Math.floor(startHour), (startHour % 1) * 60),
         stop: atLocalHour(Math.floor(stopHour), (stopHour % 1) * 60),
       },
@@ -85,6 +89,8 @@ test("drafts: an uncovered gap becomes a proposal, reviewed and confirmed", asyn
 test("drafts: proposals never count as tracked time until confirmed", async ({ page }) => {
   await signUp(page);
   const origin = new URL(page.url()).origin;
+  // Seeded entries carry a project, so the gap drafted between them inherits it (D3).
+  const project = await createProject(page);
 
   const now = new Date();
   const base = Math.min(now.getHours() - 4, 9);
@@ -98,6 +104,7 @@ test("drafts: proposals never count as tracked time until confirmed", async ({ p
       headers: { origin },
       data: {
         description: `seed ${startHour}`,
+        projectId: project.id,
         start: atLocalHour(Math.floor(startHour), (startHour % 1) * 60),
         stop: atLocalHour(Math.floor(stopHour), (stopHour % 1) * 60),
       },
@@ -129,6 +136,8 @@ test("drafts: proposals never count as tracked time until confirmed", async ({ p
 test("drafts: two proposals never claim the same time", async ({ page }) => {
   await signUp(page);
   const origin = new URL(page.url()).origin;
+  // Seeded entries carry a project, so the gap drafted between them inherits it (D3).
+  const project = await createProject(page);
 
   const now = new Date();
   const base = Math.min(now.getHours() - 4, 9);
@@ -145,7 +154,12 @@ test("drafts: two proposals never claim the same time", async ({ page }) => {
     const stop = new Date(d.getTime() + 30 * 60_000);
     await page.request.post("/api/time_entries", {
       headers: { origin },
-      data: { description: "weekly planning", start: d.toISOString(), stop: stop.toISOString() },
+      data: {
+        description: "weekly planning",
+        projectId: project.id,
+        start: d.toISOString(),
+        stop: stop.toISOString(),
+      },
     });
   }
 
@@ -157,6 +171,7 @@ test("drafts: two proposals never claim the same time", async ({ page }) => {
       headers: { origin },
       data: {
         description: `seed ${startHour}`,
+        projectId: project.id,
         start: atLocalHour(Math.floor(startHour), (startHour % 1) * 60),
         stop: atLocalHour(Math.floor(stopHour), (stopHour % 1) * 60),
       },

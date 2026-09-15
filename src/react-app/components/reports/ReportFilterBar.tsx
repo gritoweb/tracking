@@ -18,6 +18,7 @@ import {
 import { MultiSelect, type MultiSelectOption } from "./MultiSelect";
 import { useAllClients, useAllProjects, useTags } from "@/hooks/useProjects";
 import { useAllTasks } from "@/hooks/useTasks";
+import { useWorkspaceMembers } from "@/hooks/useWorkspaceRole";
 
 export type BillableFilter = "all" | "billable" | "nonbillable";
 
@@ -26,6 +27,8 @@ export interface ReportFilters {
   projectIds: string[];
   taskIds: string[];
   tagIds: string[];
+  /** Owner/admin only; the server ignores it for a member and keeps their own hours (D3). */
+  userIds: string[];
   billable: BillableFilter;
   search: string;
 }
@@ -35,6 +38,7 @@ export const EMPTY_FILTERS: ReportFilters = {
   projectIds: [],
   taskIds: [],
   tagIds: [],
+  userIds: [],
   billable: "all",
   search: "",
 };
@@ -42,13 +46,16 @@ export const EMPTY_FILTERS: ReportFilters = {
 interface ReportFilterBarProps {
   filters: ReportFilters;
   onChange: (filters: ReportFilters) => void;
+  /** Shows the Person filter — workspace owners and admins only. */
+  canFilterPeople?: boolean;
 }
 
-export function ReportFilterBar({ filters, onChange }: ReportFilterBarProps) {
+export function ReportFilterBar({ filters, onChange, canFilterPeople = false }: ReportFilterBarProps) {
   const { data: clients = [] } = useAllClients();
   const { data: projects = [] } = useAllProjects();
   const { data: tasks = [] } = useAllTasks();
   const { data: tags = [] } = useTags();
+  const { data: members = [] } = useWorkspaceMembers(canFilterPeople);
 
   // Cascading: projects narrow to the selected clients; tasks narrow to the
   // selected projects. When nothing upstream is selected, show everything.
@@ -70,6 +77,10 @@ export function ReportFilterBar({ filters, onChange }: ReportFilterBarProps) {
     [tasks, filters.projectIds]
   );
 
+  const personOptions: MultiSelectOption[] = members.map((m) => ({
+    value: m.userId,
+    label: m.name,
+  }));
   const clientOptions: MultiSelectOption[] = clients.map((c) => ({
     value: c.id,
     label: c.name,
@@ -106,7 +117,8 @@ export function ReportFilterBar({ filters, onChange }: ReportFilterBarProps) {
   };
 
   const hasAny = Boolean(
-    filters.clientIds.length ||
+    filters.userIds.length ||
+      filters.clientIds.length ||
       filters.projectIds.length ||
       filters.taskIds.length ||
       filters.tagIds.length ||
@@ -119,6 +131,7 @@ export function ReportFilterBar({ filters, onChange }: ReportFilterBarProps) {
   // before trusting the total. Search sits outside the popover and outside this
   // count, because it stays visible in its own field.
   const activeCount =
+    (filters.userIds.length ? 1 : 0) +
     (filters.clientIds.length ? 1 : 0) +
     (filters.projectIds.length ? 1 : 0) +
     (filters.taskIds.length ? 1 : 0) +
@@ -160,6 +173,18 @@ export function ReportFilterBar({ filters, onChange }: ReportFilterBarProps) {
           </Button>
         </PopoverTrigger>
         <PopoverContent align="start" className="w-72 space-y-3 p-3">
+          {canFilterPeople && (
+            <div className="space-y-1.5">
+              <Label className="text-xs">Person</Label>
+              <MultiSelect
+                label="Person"
+                options={personOptions}
+                value={filters.userIds}
+                onChange={(userIds) => onChange({ ...filters, userIds })}
+                className="w-full"
+              />
+            </div>
+          )}
           <div className="space-y-1.5">
             <Label className="text-xs">Client</Label>
             <MultiSelect

@@ -44,3 +44,14 @@ export function canWriteEntry(
   if (entry.stop === null) return entry.user_id === requestingUserId;
   return canEditEntry(role, entry.user_id, requestingUserId);
 }
+
+/** Whose hours a read may cover: null (whole workspace) for owner/admin, the caller's own id for a member. */
+export function entryScopeUserId(role: WorkspaceRole | null, userId: string): string | null {
+  return canManageWorkspace(role) ? null : userId;
+}
+
+export async function isManager(db: D1Database, workspaceId: string, userId: string): Promise<boolean> {
+  return canManageWorkspace(await getMemberRole(db, workspaceId, userId));
+}
+
+export const MANAGER_ONLY_ERROR = "Only workspace owners and admins can do this";

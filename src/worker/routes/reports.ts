@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { ReportQuerySchema, GroupedReportQuerySchema } from "@shared/schemas";
 import { buildReportWhere, durationExpr } from "../db/queries";
+import { entryScopeUserId, getMemberRole } from "../lib/permissions";
 
 type RoundMode = "off" | "nearest" | "up" | "down";
 
@@ -19,6 +20,7 @@ interface ReportQuery {
   clientIds?: string[];
   taskIds?: string[];
   tagIds?: string[];
+  userIds?: string[];
   billable?: "billable" | "nonbillable";
   search?: string;
   roundMode?: RoundMode;
@@ -26,7 +28,7 @@ interface ReportQuery {
 }
 
 // Pull the shared filter args out of a validated query.
-function filterArgs(q: ReportQuery, workspaceId: string) {
+function filterArgs(q: ReportQuery, workspaceId: string, scopeUserId: string | null) {
   return {
     workspaceId,
     since: q.since,
@@ -35,9 +37,20 @@ function filterArgs(q: ReportQuery, workspaceId: string) {
     clientIds: q.clientIds,
     taskIds: q.taskIds,
     tagIds: q.tagIds,
+    userIds: q.userIds,
     billable: q.billable,
     search: q.search,
+    scopeUserId,
   };
+}
+
+/** Enforced here, never by the UI: a member's reports cover only their own hours, whatever `userIds` says. */
+async function reportScope(c: {
+  env: Env;
+  get: (key: "workspaceId" | "userId") => string;
+}): Promise<string | null> {
+  const userId = c.get("userId");
+  return entryScopeUserId(await getMemberRole(c.env.DB, c.get("workspaceId"), userId), userId);
 }
 
 // Aggregation expressions parameterised by the (optionally rounded) duration.
@@ -55,22 +68,28 @@ function exprs(q: { roundMode?: RoundMode; roundMinutes?: number }) {
 // Grouped-summary dimension → SQL column + display-name + color expressions.
 const DIM: Record<
   string,
-  { col: string; name: string; color: string; needs?: "clients" | "tasks" | "tags" }
+  { col: string; name: string; color: string; needs?: "clients" | "tasks" | "tags" | "users" }
 > = {
   project: { col: "te.project_id", name: "COALESCE(p.name, 'No project')", color: "p.color" },
   client: { col: "p.client_id", name: "COALESCE(cl.name, 'No client')", color: "NULL", needs: "clients" },
   task: { col: "te.task_id", name: "COALESCE(tk.name, 'No task')", color: "NULL", needs: "tasks" },
   tag: { col: "t.id", name: "COALESCE(t.name, 'No tag')", color: "NULL", needs: "tags" },
+  user: {
+    col: "te.user_id",
+    name: "COALESCE(NULLIF(u.name, ''), u.email, 'No author')",
+    color: "NULL",
+    needs: "users",
+  },
 };
 
 export const reportsRouter = new Hono<{
   Bindings: Env;
-  Variables: { workspaceId: string };
+  Variables: { workspaceId: string; userId: string };
 }>()
   .get("/summary", zValidator("query", ReportQuerySchema), async (c) => {
     const workspaceId = c.get("workspaceId");
     const q = c.req.valid("query");
-    const { where, bindings } = buildReportWhere(filterArgs(q, workspaceId));
+    const { where, bindings } = buildReportWhere(filterArgs(q, workspaceId, await reportScope(c)));
     const e = exprs(q);
 
     // All six aggregations share the same WHERE/bindings — one db.batch() round
@@ -222,7 +241,7 @@ export const reportsRouter = new Hono<{
     async (c) => {
       const workspaceId = c.get("workspaceId");
       const q = c.req.valid("query");
-      const { where, bindings } = buildReportWhere(filterArgs(q, workspaceId));
+      const { where, bindings } = buildReportWhere(filterArgs(q, workspaceId, await reportScope(c)));
       const e = exprs(q);
 
       const g = DIM[q.group];
@@ -239,6 +258,8 @@ export const reportsRouter = new Hono<{
         joins.push("LEFT JOIN time_entry_tags tet ON tet.time_entry_id = te.id");
         joins.push("LEFT JOIN tags t ON t.id = tet.tag_id");
       }
+      if (needs.has("users"))
+        joins.push(`LEFT JOIN "user" u ON u.id = te.user_id`);
 
       const cols = [
         `${g.col} as g_id`,
@@ -347,7 +368,7 @@ export const reportsRouter = new Hono<{
     async (c) => {
       const workspaceId = c.get("workspaceId");
       const q = c.req.valid("query");
-      const { where, bindings } = buildReportWhere(filterArgs(q, workspaceId));
+      const { where, bindings } = buildReportWhere(filterArgs(q, workspaceId, await reportScope(c)));
       const e = exprs(q);
 
       const { results } = await c.env.DB.prepare(
@@ -389,7 +410,7 @@ export const reportsRouter = new Hono<{
     async (c) => {
       const workspaceId = c.get("workspaceId");
       const q = c.req.valid("query");
-      const { where, bindings } = buildReportWhere(filterArgs(q, workspaceId));
+      const { where, bindings } = buildReportWhere(filterArgs(q, workspaceId, await reportScope(c)));
       const dur = durationExpr(q.roundMode, q.roundMinutes);
 
       const { results } = await c.env.DB.prepare(

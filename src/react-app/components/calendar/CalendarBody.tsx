@@ -319,10 +319,16 @@ export function CalendarBody({
   };
 
   const handleDuplicate = (entry: EditableEntry) => {
+    // Every entry needs a project (D3); an older entry without one has to get one first.
+    if (!entry.projectId) {
+      toast.error("Give this entry a project before duplicating it");
+      return;
+    }
+    const projectId = entry.projectId;
     createEntry.mutate(
       {
         description: entry.description,
-        projectId: entry.projectId,
+        projectId,
         taskId: entry.taskId,
         tags: entry.tags,
         billable: entry.billable,

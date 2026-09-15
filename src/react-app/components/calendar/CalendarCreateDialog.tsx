@@ -47,10 +47,10 @@ export function CalendarCreateDialog({
   }
 
   const handleSave = () => {
-    const { start, stop } = draft.draft;
-    if (!start || !stop || !draft.hasValidRange) return;
+    const { start, stop, projectId } = draft.draft;
+    if (!start || !stop || !projectId || !draft.hasValidRange) return;
     createEntry.mutate(
-      { ...draft.draft, start, stop, calendarEventId },
+      { ...draft.draft, projectId, start, stop, calendarEventId },
       { onSuccess: onClose }
     );
   };

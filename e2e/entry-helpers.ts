@@ -1,4 +1,5 @@
 import { expect, type Page, type Locator } from "@playwright/test";
+import { E2E_PROJECT } from "./project-helpers";
 
 // The Add-entry dialog's Start/Stop fields are TimeOfDayInputs (free-text,
 // committed on blur/Enter), not native <input type="time"> — fill then press
@@ -12,18 +13,26 @@ export async function fillTimeRange(dialog: Locator, start: string, stop: string
   await stopInput.press("Enter");
 }
 
-/** Seed a completed entry for today through the Add-entry dialog. */
+/** Seed a completed entry for today through the Add-entry dialog; the project must already be loaded in the page. */
 export async function addManualEntry(
   page: Page,
-  { description, start, stop }: { description: string; start: string; stop: string }
+  {
+    description,
+    start,
+    stop,
+    project = E2E_PROJECT,
+  }: { description: string; start: string; stop: string; project?: string }
 ) {
   await page.getByRole("button", { name: "Add entry" }).click();
-  const dialog = page.getByRole("dialog");
+  // Named: the project picker's popover is a dialog too.
+  const dialog = page.getByRole("dialog", { name: "New entry" });
   await dialog.locator("textarea").fill(description);
   await fillTimeRange(dialog, start, stop);
   // The Duration field reflects the committed range (the old standalone
   // "Duration: 1h 30m" line was removed once every form gained the field).
   await expect(dialog.getByLabel("Duration")).not.toHaveValue("00:00:00");
+  await dialog.getByRole("button", { name: "Select project" }).click();
+  await page.getByRole("option", { name: project }).click();
   await dialog.getByRole("button", { name: "Add entry" }).click();
   await dialog.waitFor({ state: "hidden" });
 }

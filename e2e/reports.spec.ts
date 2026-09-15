@@ -1,10 +1,13 @@
 import { test, expect } from "@playwright/test";
 import { signUp } from "./auth";
 import { addManualEntry } from "./entry-helpers";
+import { createProject } from "./project-helpers";
 
 test.describe("reports charts", () => {
   test.beforeEach(async ({ page }) => {
     await signUp(page);
+    await createProject(page);
+    await page.reload();
   });
 
   test("renders summary + weekly charts with a tracked entry", async ({ page }) => {

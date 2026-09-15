@@ -25,6 +25,10 @@ const ISO = z
   .string()
   .refine((s) => !Number.isNaN(Date.parse(s)), "must be an ISO 8601 timestamp");
 
+// Every entry needs a project (D3); the model is told to ask rather than log without one.
+const NEEDS_PROJECT =
+  "Every entry needs a project. Ask the user which project (listProjects has the names), then try again.";
+
 /** Resolve a free-text project name to a real id via the grounded matcher. */
 async function resolveProject(
   env: Env,
@@ -48,13 +52,13 @@ export function buildAssistantTools(ctx: AssistantToolContext): ToolSet {
   return {
     startTimer: tool({
       description:
-        "Start a new running timer for the user. Automatically stops the user's timer that is already running (same as the app's Start button). Use when the user says they're starting or now working on something.",
+        "Start a new running timer for the user. Automatically stops the user's timer that is already running (same as the app's Start button). Use when the user says they're starting or now working on something. Needs a project.",
       inputSchema: z.object({
         description: z.string().max(500).describe("What the user is working on"),
         projectName: z
           .string()
           .nullish()
-          .describe("Exact name of a known project to bill it to, or omit"),
+          .describe("Exact name of a known project to bill it to — required; ask the user if unsure"),
         billable: z
           .boolean()
           .nullish()
@@ -63,6 +67,7 @@ export function buildAssistantTools(ctx: AssistantToolContext): ToolSet {
       execute: async ({ description, projectName, billable }) => {
         const now = new Date().toISOString();
         const proj = await resolveProject(env, workspaceId, projectName);
+        if (!proj.projectId) return { ok: false, reason: proj.warning ?? NEEDS_PROJECT };
         // Stop the user's running timer first, mirroring POST /time_entries.
         await db
           .prepare(
@@ -98,7 +103,6 @@ export function buildAssistantTools(ctx: AssistantToolContext): ToolSet {
           startedAt: now,
           project: proj.projectName,
           billable: (billable ?? proj.billable) ? true : false,
-          note: proj.warning,
         };
       },
     }),
@@ -134,12 +138,12 @@ export function buildAssistantTools(ctx: AssistantToolContext): ToolSet {
 
     logTimeEntry: tool({
       description:
-        "Log a COMPLETED past time entry (both start and stop known). Use for retroactively recording work, e.g. 'I worked on Acme from 2 to 4pm'. Do not use to start a live timer.",
+        "Log a COMPLETED past time entry (both start and stop known). Use for retroactively recording work, e.g. 'I worked on Acme from 2 to 4pm'. Do not use to start a live timer. Needs a project.",
       inputSchema: z.object({
         description: z.string().max(500),
         start: ISO.describe("UTC ISO 8601 start"),
         stop: ISO.describe("UTC ISO 8601 stop; must be after start"),
-        projectName: z.string().nullish(),
+        projectName: z.string().nullish().describe("Exact name of a known project — required"),
         billable: z.boolean().nullish(),
       }),
       // Creates a billable record — require the user to confirm before it writes,
@@ -151,6 +155,7 @@ export function buildAssistantTools(ctx: AssistantToolContext): ToolSet {
           return { ok: false, reason: "Stop must be after start." };
         }
         const proj = await resolveProject(env, workspaceId, projectName);
+        if (!proj.projectId) return { ok: false, reason: proj.warning ?? NEEDS_PROJECT };
         const now = new Date().toISOString();
         const id = crypto.randomUUID();
         const duration = Math.round((Date.parse(stop) - Date.parse(start)) / 1000);
@@ -180,31 +185,43 @@ export function buildAssistantTools(ctx: AssistantToolContext): ToolSet {
           ok: true,
           durationHours: (duration / 3600).toFixed(2),
           project: proj.projectName,
-          note: proj.warning,
         };
       },
     }),
 
     trackMeeting: tool({
       description:
-        "Add a calendar meeting to the timesheet as a completed entry, categorized by AI project inference. Use for an untracked meeting the user asks to log.",
+        "Add a calendar meeting to the timesheet as a completed entry. Pass projectName when the user named one; otherwise the project is inferred from the title, and a meeting that matches no project is not logged.",
       inputSchema: z.object({
         title: z.string().max(500),
         start: ISO,
         stop: ISO,
+        projectName: z.string().nullish().describe("Exact project name, if the user gave one"),
       }),
       // Creates a billable record — confirm before writing (see logTimeEntry).
       needsApproval: true,
-      execute: async ({ title, start, stop }) => {
+      execute: async ({ title, start, stop, projectName }) => {
         if (Date.parse(stop) <= Date.parse(start)) {
           return { ok: false, reason: "Stop must be after start." };
         }
-        let match = null;
-        try {
-          match = (await inferEventProjects(db, env.AI, workspaceId, [title])).get(title.trim()) ?? null;
-        } catch {
-          // best-effort
+        let project: { projectId: string | null; projectName: string | null; billable: boolean } = {
+          projectId: null,
+          projectName: null,
+          billable: false,
+        };
+        if (projectName) {
+          project = await resolveProject(env, workspaceId, projectName);
+        } else {
+          try {
+            const match = (await inferEventProjects(db, env.AI, workspaceId, [title])).get(title.trim());
+            if (match?.projectId) {
+              project = { projectId: match.projectId, projectName: match.projectName, billable: match.billable };
+            }
+          } catch {
+            // best-effort
+          }
         }
+        if (!project.projectId) return { ok: false, reason: NEEDS_PROJECT };
         const now = new Date().toISOString();
         const id = crypto.randomUUID();
         const duration = Math.round((Date.parse(stop) - Date.parse(start)) / 1000);
@@ -214,11 +231,11 @@ export function buildAssistantTools(ctx: AssistantToolContext): ToolSet {
                (id, workspace_id, user_id, project_id, task_id, description, start, stop, duration, billable, calendar_event_id, created_at, updated_at)
              VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, NULL, ?, ?)`
           )
-          .bind(id, workspaceId, userId, match?.projectId ?? null, title, start, stop, duration, match?.billable ? 1 : 0, now, now)
+          .bind(id, workspaceId, userId, project.projectId, title, start, stop, duration, project.billable ? 1 : 0, now, now)
           .run();
         const entry = await getEntryById(db, id, workspaceId);
         await broadcast(env, workspaceId, "entries:changed", entry, null, userId);
-        return { ok: true, project: match?.projectName ?? null, durationHours: (duration / 3600).toFixed(2) };
+        return { ok: true, project: project.projectName, durationHours: (duration / 3600).toFixed(2) };
       },
     }),
 

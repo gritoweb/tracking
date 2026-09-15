@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { signUp } from "./auth";
+import { createProject } from "./project-helpers";
 
 // The entry list has a per-row Continue, but the Timer workspace has five views
 // and three of them (calendar, timesheet, planner) put no entry row on screen —
@@ -7,12 +8,7 @@ import { signUp } from "./auth";
 test("the idle bar can continue the last thing tracked", async ({ page }) => {
   await signUp(page);
   const origin = new URL(page.url()).origin;
-  const project = await (
-    await page.request.post("/api/projects", {
-      data: { name: "Retainer", color: "#e11d48", billable: true },
-      headers: { origin },
-    })
-  ).json();
+  const project = await createProject(page, { name: "Retainer", color: "#e11d48", billable: true });
 
   await page.goto("/");
   const bar = page.locator('header[aria-label="Timer controls"]');

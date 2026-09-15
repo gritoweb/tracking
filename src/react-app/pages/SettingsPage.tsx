@@ -22,6 +22,7 @@ import { exportToCSV } from "@/lib/exportUtils";
 import { useUIStore } from "@/stores/uiStore";
 import { useUpdateSettings } from "@/hooks/useSettings";
 import { useRecolorProjects } from "@/hooks/useProjects";
+import { useWorkspaceRole } from "@/hooks/useWorkspaceRole";
 import { CURRENCIES } from "@/lib/currency";
 import { IntegrationsCard } from "@/components/integrations/IntegrationsCard";
 import { CalendarSyncCard } from "@/components/settings/CalendarSyncCard";
@@ -61,6 +62,8 @@ export function SettingsPage() {
   const setAutoAssignColorsStore = useUIStore((s) => s.setAutoAssignColors);
   const updateSettings = useUpdateSettings();
   const recolorProjects = useRecolorProjects();
+  // Recoloring every project is a workspace change: owners/admins only (D3).
+  const { canManage } = useWorkspaceRole();
 
   // ── Handlers ────────────────────────────────────────────────────────────────
 
@@ -161,11 +164,12 @@ export function SettingsPage() {
                 Auto-assign colors
               </Label>
               <p className="mt-1 text-xs leading-normal text-muted-foreground">
-                Give new projects a distinct color automatically. "Apply to existing"
-                uses AI to color your current projects distinctly.
+                Give new projects a distinct color automatically.
+                {canManage && ' "Apply to existing" uses AI to color your current projects distinctly.'}
               </p>
             </div>
             <div className="flex items-center gap-2">
+              {canManage && (
               <Button
                 variant="outline"
                 size="sm"
@@ -186,6 +190,7 @@ export function SettingsPage() {
                   "Apply to existing"
                 )}
               </Button>
+              )}
               <Switch
                 id="pref-autocolor"
                 checked={autoAssignColors}

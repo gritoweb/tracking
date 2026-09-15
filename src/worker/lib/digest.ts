@@ -10,6 +10,7 @@
 import { sendEmail } from "./mailer";
 import { DailyBriefEmail, type BriefBudgetLine, type BriefProjectLine } from "../emails/daily-brief";
 import { atRiskProjects, loadProjectPacing } from "./pacing";
+import { isManager } from "./permissions";
 import { runBriefNarrative } from "./ai";
 
 const APP_URL = "https://timetracker.run";
@@ -135,9 +136,9 @@ export async function buildDigest(
               COALESCE(SUM(duration), 0) AS total,
               COALESCE(SUM(CASE WHEN billable = 1 THEN duration ELSE 0 END), 0) AS billable
        FROM time_entries
-       WHERE workspace_id = ? AND stop IS NOT NULL AND start >= ? AND start < ?`
+       WHERE workspace_id = ? AND user_id = ? AND stop IS NOT NULL AND start >= ? AND start < ?`
     )
-      .bind(user.workspaceId, sinceIso, untilIso)
+      .bind(user.workspaceId, user.id, sinceIso, untilIso)
       .first<{ n: number; total: number; billable: number }>(),
     env.DB.prepare(
       `SELECT COALESCE(p.name, 'No project') AS name,
@@ -145,12 +146,12 @@ export async function buildDigest(
               SUM(te.duration) AS seconds
        FROM time_entries te
        LEFT JOIN projects p ON p.id = te.project_id AND p.workspace_id = te.workspace_id
-       WHERE te.workspace_id = ? AND te.stop IS NOT NULL AND te.start >= ? AND te.start < ?
+       WHERE te.workspace_id = ? AND te.user_id = ? AND te.stop IS NOT NULL AND te.start >= ? AND te.start < ?
        GROUP BY te.project_id
        ORDER BY seconds DESC
        LIMIT ${MAX_PROJECT_LINES}`
     )
-      .bind(user.workspaceId, sinceIso, untilIso)
+      .bind(user.workspaceId, user.id, sinceIso, untilIso)
       .all<{ name: string; color: string; seconds: number }>(),
     // Fed to the narrative writer. Capped well below the summariser's own limit
     // — a week of entries is plenty of material for one paragraph.
@@ -158,10 +159,10 @@ export async function buildDigest(
       `SELECT te.description, te.start, te.duration, te.billable, p.name AS project_name
        FROM time_entries te
        LEFT JOIN projects p ON p.id = te.project_id AND p.workspace_id = te.workspace_id
-       WHERE te.workspace_id = ? AND te.stop IS NOT NULL AND te.start >= ? AND te.start < ?
+       WHERE te.workspace_id = ? AND te.user_id = ? AND te.stop IS NOT NULL AND te.start >= ? AND te.start < ?
        ORDER BY te.start ASC LIMIT 120`
     )
-      .bind(user.workspaceId, sinceIso, untilIso)
+      .bind(user.workspaceId, user.id, sinceIso, untilIso)
       .all<Record<string, unknown>>(),
     env.DB.prepare(
       `SELECT COUNT(*) AS n FROM draft_entries
@@ -169,7 +170,10 @@ export async function buildDigest(
     )
       .bind(user.workspaceId, user.id, startLocalDate, endLocalDate)
       .first<{ n: number }>(),
-    loadProjectPacing(env.DB, user.workspaceId),
+    // The digest is personal; budget warnings are team numbers, so only owners and admins get them (D3).
+    isManager(env.DB, user.workspaceId, user.id).then((manager) =>
+      manager ? loadProjectPacing(env.DB, user.workspaceId) : []
+    ),
   ]);
 
   const totalSeconds = totalsRow?.total ?? 0;

@@ -33,6 +33,8 @@ interface SummaryCardsProps {
   entryCount: number;
   avgSeconds: number;
   visible: Record<MetricKey, boolean>;
+  /** Drops the money tile, for a report that goes to a client. */
+  hideAmount?: boolean;
 }
 
 interface Tile {
@@ -92,6 +94,7 @@ export function SummaryCards({
   entryCount,
   avgSeconds,
   visible,
+  hideAmount = false,
 }: SummaryCardsProps) {
   const currency = useUIStore((s) => s.currency);
 
@@ -147,7 +150,7 @@ export function SummaryCards({
     },
   ];
 
-  const shown = tiles.filter((t) => visible[t.key]);
+  const shown = tiles.filter((t) => visible[t.key] && !(hideAmount && t.key === "amount"));
 
   // One framed strip divided by 1px gaps (bg-border shows through).
   //

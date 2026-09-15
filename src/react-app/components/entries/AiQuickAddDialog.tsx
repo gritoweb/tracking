@@ -93,6 +93,7 @@ export function AiQuickAddDialog({ open, onClose }: AiQuickAddDialogProps) {
   };
 
   const handleConfirm = () => {
+    if (!projectId) return;
     createEntry.mutate(
       {
         description,
@@ -191,6 +192,9 @@ export function AiQuickAddDialog({ open, onClose }: AiQuickAddDialogProps) {
                   AI guess: "{result.projectName}" (not matched — pick one above)
                 </p>
               )}
+              {!projectId && !(result.projectName && !result.projectMatched) && (
+                <p className="text-xs text-muted-foreground">Every entry needs a project.</p>
+              )}
             </div>
 
             {projectId && (
@@ -225,7 +229,7 @@ export function AiQuickAddDialog({ open, onClose }: AiQuickAddDialogProps) {
               <Button type="button" variant="ghost" onClick={() => setResult(null)}>
                 Back
               </Button>
-              <Button type="button" onClick={handleConfirm} disabled={createEntry.isPending}>
+              <Button type="button" onClick={handleConfirm} disabled={createEntry.isPending || !projectId}>
                 {createEntry.isPending ? "Saving…" : "Confirm & save"}
               </Button>
             </DialogFooter>

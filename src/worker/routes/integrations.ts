@@ -13,6 +13,12 @@ import { localDateInZone } from "../lib/local-date";
 import { broadcast } from "../db/queries";
 import { getAdapter, IntegrationError, type Connection } from "../integrations";
 import { safeIntegrationOrigin } from "../integrations/url-guard";
+import {
+  canManageWorkspace,
+  canWriteEntry,
+  getMemberRole,
+  MANAGER_ONLY_ERROR,
+} from "../lib/permissions";
 
 function formatIntegration(row: Record<string, unknown>) {
   return {
@@ -44,6 +50,14 @@ async function toConnection(secret: string, row: IntegrationRow): Promise<Connec
   };
 }
 
+/** Workfront/Dynamics credentials are workspace configuration: only owner/admin create, change, test or remove them. */
+async function isManagerRequest(c: {
+  env: Env;
+  get: (key: "workspaceId" | "userId") => string;
+}): Promise<boolean> {
+  return canManageWorkspace(await getMemberRole(c.env.DB, c.get("workspaceId"), c.get("userId")));
+}
+
 export const integrationsRouter = new Hono<{
   Bindings: Env;
   Variables: { workspaceId: string; userId: string };
@@ -59,6 +73,7 @@ export const integrationsRouter = new Hono<{
     return c.json(results.map(formatIntegration));
   })
   .post("/", zValidator("json", CreateIntegrationSchema), async (c) => {
+    if (!(await isManagerRequest(c))) return c.json({ error: MANAGER_ONLY_ERROR }, 403);
     const workspaceId = c.get("workspaceId");
     const data = c.req.valid("json");
 
@@ -83,6 +98,7 @@ export const integrationsRouter = new Hono<{
     return c.json(formatIntegration(results[0]), 201);
   })
   .put("/:id", zValidator("json", UpdateIntegrationSchema), async (c) => {
+    if (!(await isManagerRequest(c))) return c.json({ error: MANAGER_ONLY_ERROR }, 403);
     const workspaceId = c.get("workspaceId");
     const id = c.req.param("id");
     const data = c.req.valid("json");
@@ -118,12 +134,15 @@ export const integrationsRouter = new Hono<{
     return c.json(formatIntegration(results[0]));
   })
   .delete("/:id", async (c) => {
+    if (!(await isManagerRequest(c))) return c.json({ error: MANAGER_ONLY_ERROR }, 403);
     await c.env.DB.prepare(
-      `DELETE FROM integrations WHERE id = ? AND workspace_id = ?`
+      `DELETE FROM integrations WHERE id = ? AND workspace_id = ?
+         AND type NOT IN ('google_calendar', 'microsoft_calendar')`
     ).bind(c.req.param("id"), c.get("workspaceId")).run();
     return c.json({ ok: true });
   })
   .post("/:id/test", async (c) => {
+    if (!(await isManagerRequest(c))) return c.json({ error: MANAGER_ONLY_ERROR }, 403);
     const row = await c.env.DB.prepare(
       `SELECT * FROM integrations WHERE id = ? AND workspace_id = ?`
     ).bind(c.req.param("id"), c.get("workspaceId")).first<IntegrationRow>();
@@ -140,7 +159,10 @@ export const integrationsRouter = new Hono<{
   })
   .post("/push", zValidator("json", PushTimeEntriesSchema), async (c) => {
     const workspaceId = c.get("workspaceId");
+    const userId = c.get("userId");
     const { entryIds, comment, timezone } = c.req.valid("json");
+    // Pushing writes the entry's sync status, so it follows the same rule as editing it.
+    const role = await getMemberRole(c.env.DB, workspaceId, userId);
 
     // Decrypt each integration at most once per request.
     const connCache = new Map<string, Connection>();
@@ -149,7 +171,7 @@ export const integrationsRouter = new Hono<{
 
     for (const entryId of entryIds) {
       const row = await c.env.DB.prepare(
-        `SELECT te.id, te.description, te.start, te.stop, te.duration,
+        `SELECT te.id, te.user_id, te.description, te.start, te.stop, te.duration,
                 p.id AS p_id, p.name AS p_name, p.integration_id,
                 p.external_project_id, p.external_task_id,
                 i.id AS i_id, i.type AS i_type, i.name AS i_name,
@@ -162,6 +184,14 @@ export const integrationsRouter = new Hono<{
 
       if (!row) {
         results.push({ id: entryId, ok: false, error: "Entry not found" });
+        continue;
+      }
+      const entryOwner = {
+        user_id: (row.user_id as string | null) ?? null,
+        stop: (row.stop as string | null) ?? null,
+      };
+      if (!canWriteEntry(role, entryOwner, userId)) {
+        results.push({ id: entryId, ok: false, error: "Not your entry" });
         continue;
       }
       if (!row.p_id) {

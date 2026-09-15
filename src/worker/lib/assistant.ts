@@ -8,6 +8,7 @@ import type { AssistantNudge } from "@shared/schemas";
 import { fetchUserEvents } from "./calendar-connections";
 import type { ExternalEvent } from "./calendar-providers";
 import { atRiskProjects, loadProjectPacing, type ProjectPacing } from "./pacing";
+import { isManager } from "./permissions";
 
 // How far ahead a meeting can be and still get a "starts soon" nudge.
 const SOON_WINDOW_MS = 15 * 60 * 1000;
@@ -285,7 +286,10 @@ export async function computeNudges(
   const [facts, events, pacing] = await Promise.all([
     loadTodayFacts(env.DB, workspaceId, userId, dayStartIso, dayEndIso),
     loadTodayEvents(env, workspaceId, userId, dayStartIso, dayEndIso),
-    loadProjectPacing(env.DB, workspaceId, nowMs),
+    // Budget warnings are built from the whole team's hours, so only owners and admins get them (D3).
+    isManager(env.DB, workspaceId, userId).then((manager) =>
+      manager ? loadProjectPacing(env.DB, workspaceId, nowMs) : []
+    ),
   ]);
   return buildNudges(nowMs, offsetMinutes, facts, events, pacing);
 }

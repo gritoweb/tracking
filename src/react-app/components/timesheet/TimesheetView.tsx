@@ -158,7 +158,7 @@ export function TimesheetView({ weekStart }: TimesheetViewProps) {
         const payload = toCreatePayload(entry);
         deleteEntry.mutate(entry.id);
         toast.success("Entry cleared", {
-          action: { label: "Undo", onClick: () => createEntry.mutate(payload) },
+          action: payload ? { label: "Undo", onClick: () => createEntry.mutate(payload) } : undefined,
         });
       } else {
         const start = new Date(entry.start);
@@ -170,12 +170,18 @@ export function TimesheetView({ weekStart }: TimesheetViewProps) {
 
     // No entry yet → create one starting at the default hour on that day.
     if (seconds > 0) {
+      // Every entry needs a project (D3); a row without one can't take new time.
+      if (!row.projectId) {
+        toast.error("Pick a project for this row before logging time on it");
+        return;
+      }
+      const projectId = row.projectId;
       const day = days[dayIndex];
       const start = new Date(day.getFullYear(), day.getMonth(), day.getDate(), DEFAULT_START_HOUR, 0, 0);
       const stop = new Date(start.getTime() + seconds * 1000);
       createEntry.mutate({
         description: "",
-        projectId: row.projectId,
+        projectId,
         taskId: row.taskId,
         start: start.toISOString(),
         stop: stop.toISOString(),
@@ -193,7 +199,7 @@ export function TimesheetView({ weekStart }: TimesheetViewProps) {
         since: prevStart.toISOString(),
         until: weekStart.toISOString(),
       })) as TimeEntry[];
-      const completed = prev.filter((e) => e.stop && e.duration && e.duration > 0);
+      const completed = prev.filter((e) => e.stop && e.duration && e.duration > 0 && e.projectId);
       if (completed.length === 0) {
         toast.info("No entries to copy from last week");
         return;

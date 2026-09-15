@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { signUp } from "./auth";
+import { createProject } from "./project-helpers";
 
 // The timer bar used to switch to `md:flex-nowrap` while every control except
 // the description input was `shrink-0`. Between 768px and ~1000px the row
@@ -42,11 +43,11 @@ test("every timer bar control stays on screen at every width", async ({ page }) 
   const origin = new URL(page.url()).origin;
   // A deliberately long project + task name: the overflow only showed up once
   // the chips were wide enough to matter.
-  const created = await page.request.post("/api/projects", {
-    data: { name: "Kearney ERP Migration Phase 2", color: "#e11d48", billable: true },
-    headers: { origin },
+  const project = await createProject(page, {
+    name: "Kearney ERP Migration Phase 2",
+    color: "#e11d48",
+    billable: true,
   });
-  const project = await created.json();
   await page.request.post("/api/tasks", {
     data: { name: "Stakeholder workshops", projectId: project.id },
     headers: { origin },

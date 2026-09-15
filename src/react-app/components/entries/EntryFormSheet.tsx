@@ -69,7 +69,8 @@ export function EntryFormSheet({
   // all, so Save stayed enabled while the form showed "Stop time must be after
   // start time" right below it and the only real feedback was the server's 400.
   const rangeError = requireRange ? !draft.hasValidRange : draft.rangeInverted;
-  const canSubmit = !rangeError;
+  // Every entry needs a project (D3).
+  const canSubmit = !rangeError && Boolean(d.projectId);
 
   return (
     <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
@@ -110,6 +111,9 @@ export function EntryFormSheet({
               value={d.projectId}
               onChange={(id) => patch({ projectId: id, taskId: null })}
             />
+            {!d.projectId && (
+              <p className="text-xs text-muted-foreground">Every entry needs a project.</p>
+            )}
           </div>
 
           {d.projectId && (

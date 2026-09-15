@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { workspaceWithMember } from "./team";
+import { createProject } from "./project-helpers";
 
 const MCP_HEADERS = {
   "Content-Type": "application/json",
@@ -16,9 +17,9 @@ function parseRpc(text: string): Record<string, unknown> {
   return JSON.parse(line);
 }
 
-async function startTimer(page: Page, description: string) {
+async function startTimer(page: Page, description: string, projectId: string) {
   const res = await page.request.post("/api/time_entries", {
-    data: { description, start: new Date().toISOString() },
+    data: { description, projectId, start: new Date().toISOString() },
   });
   expect(res.status()).toBe(201);
   return (await res.json()) as { id: string };
@@ -30,13 +31,20 @@ async function currentTimer(page: Page): Promise<Current> {
   return (await (await page.request.get("/api/time_entries/current")).json()) as Current;
 }
 
+/** The shared workspace plus one project in it, which every entry needs (D3). */
+async function teamWithProject(browser: import("@playwright/test").Browser) {
+  const team = await workspaceWithMember(browser);
+  const project = await createProject(team.owner);
+  return { ...team, projectId: project.id };
+}
+
 test.describe("per-user timers", () => {
   test("two members run timers at the same time and each sees only their own", async ({
     browser,
   }) => {
-    const { owner, member } = await workspaceWithMember(browser);
-    const ownerEntry = await startTimer(owner, "Owner focus");
-    const memberEntry = await startTimer(member, "Member focus");
+    const { owner, member, projectId } = await teamWithProject(browser);
+    const ownerEntry = await startTimer(owner, "Owner focus", projectId);
+    const memberEntry = await startTimer(member, "Member focus", projectId);
 
     const ownerCurrent = await currentTimer(owner);
     expect(ownerCurrent?.id).toBe(ownerEntry.id);
@@ -50,9 +58,9 @@ test.describe("per-user timers", () => {
   test("nobody stops, edits or deletes another person's running timer, the workspace owner included", async ({
     browser,
   }) => {
-    const { owner, member } = await workspaceWithMember(browser);
-    const ownerEntry = await startTimer(owner, "Owner timer");
-    const memberEntry = await startTimer(member, "Member timer");
+    const { owner, member, projectId } = await teamWithProject(browser);
+    const ownerEntry = await startTimer(owner, "Owner timer", projectId);
+    const memberEntry = await startTimer(member, "Member timer", projectId);
 
     expect((await member.request.patch(`/api/time_entries/${ownerEntry.id}/stop`)).status()).toBe(403);
     expect((await owner.request.patch(`/api/time_entries/${memberEntry.id}/stop`)).status()).toBe(403);
@@ -84,9 +92,9 @@ test.describe("per-user timers", () => {
   });
 
   test("the MCP stop_timer stops only the key holder's timer", async ({ browser }) => {
-    const { owner, member, memberHeaders } = await workspaceWithMember(browser);
-    const ownerEntry = await startTimer(owner, "Owner keeps going");
-    await startTimer(member, "Member via MCP");
+    const { owner, member, memberHeaders, projectId } = await teamWithProject(browser);
+    const ownerEntry = await startTimer(owner, "Owner keeps going", projectId);
+    await startTimer(member, "Member via MCP", projectId);
 
     const created = await member.request.post("/api/keys", {
       headers: memberHeaders,
@@ -125,27 +133,28 @@ test.describe("per-user timers", () => {
   });
 
   test("a teammate's timer never shows up on your screen", async ({ browser }) => {
-    const { owner, member } = await workspaceWithMember(browser);
+    const { owner, member, projectId } = await teamWithProject(browser);
     const stopButton = owner.getByRole("button", { name: "Stop timer", exact: true });
     await expect(owner.getByRole("button", { name: "Start timer", exact: true })).toBeVisible();
 
-    await startTimer(member, "Member elsewhere");
+    await startTimer(member, "Member elsewhere", projectId);
     // The socket delivered teammates' timers within a second before; give it that long and more.
     await owner.waitForTimeout(2000);
     await expect(stopButton).toHaveCount(0);
 
     // Proves the socket is alive: the owner's own timer does arrive.
-    await startTimer(owner, "Owner here");
+    await startTimer(owner, "Owner here", projectId);
     await expect(stopButton).toBeVisible();
   });
 
   test("each attendee tracks their own copy of the same meeting", async ({ browser }) => {
-    const { owner, member } = await workspaceWithMember(browser);
+    const { owner, member, projectId } = await teamWithProject(browser);
     const body = {
       calendarEventId: `shared-meeting-${Date.now()}`,
       title: "Weekly sync",
       start: new Date(Date.now() - 2 * 3_600_000).toISOString(),
       stop: new Date(Date.now() - 3_600_000).toISOString(),
+      projectId,
     };
 
     const ownerTrack = await (await owner.request.post("/api/assistant/track-event", { data: body })).json();
@@ -158,9 +167,15 @@ test.describe("per-user timers", () => {
   });
 
   test("a recurring template belongs to its author alone", async ({ browser }) => {
-    const { owner, member } = await workspaceWithMember(browser);
+    const { owner, member, projectId } = await teamWithProject(browser);
     const created = await owner.request.post("/api/recurring", {
-      data: { description: "Standup", durationSeconds: 900, daysOfWeek: [1, 2, 3, 4, 5], timeUtcMinutes: 720 },
+      data: {
+        description: "Standup",
+        projectId,
+        durationSeconds: 900,
+        daysOfWeek: [1, 2, 3, 4, 5],
+        timeUtcMinutes: 720,
+      },
     });
     expect(created.status()).toBe(201);
     const template = (await created.json()) as { id: string };
@@ -181,7 +196,7 @@ test.describe("per-user timers", () => {
   });
 
   test("teammates learn that entries changed, never what changed", async ({ browser }) => {
-    const { owner, member } = await workspaceWithMember(browser);
+    const { owner, member, projectId } = await teamWithProject(browser);
     type SocketEvent = { event: string; data: unknown };
 
     // A raw observer socket on the owner's session, opened the same way as websocket-close.spec.ts.
@@ -201,6 +216,7 @@ test.describe("per-user timers", () => {
     const created = await member.request.post("/api/time_entries", {
       data: {
         description: "Confidential member work",
+        projectId,
         start: new Date(Date.now() - 3_600_000).toISOString(),
         stop: new Date(Date.now() - 1_800_000).toISOString(),
       },

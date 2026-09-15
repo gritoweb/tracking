@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { signUp } from "./auth";
+import { createProject } from "./project-helpers";
 
 /**
  * Tasks as the plan side of the timer: due dates, priority, subtasks and
@@ -16,12 +17,7 @@ function localDate(offset = 0) {
 async function seed(page: import("@playwright/test").Page) {
   await signUp(page);
   const origin = new URL(page.url()).origin;
-  const project = await (
-    await page.request.post("/api/projects", {
-      data: { name: "ERP Migration", color: "#e11d48" },
-      headers: { origin },
-    })
-  ).json();
+  const project = await createProject(page, { name: "ERP Migration", color: "#e11d48" });
   return { project, origin };
 }
 

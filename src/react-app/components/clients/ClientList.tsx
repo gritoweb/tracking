@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ClientForm } from "./ClientForm";
 import { useAllClients, useDeleteClient, useUpdateClient } from "@/hooks/useProjects";
+import { useWorkspaceRole } from "@/hooks/useWorkspaceRole";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import type { Client, ClientStats } from "@shared/schemas";
@@ -118,6 +119,8 @@ export function ClientList() {
   const { byClient, isLoading: statsLoading } = useClientStats(since, until);
   const currency = useUIStore((s) => s.currency);
   const deleteClient = useDeleteClient();
+  // Editing and archiving a client is for owners/admins; the server refuses a member (D3).
+  const { canManage } = useWorkspaceRole();
   const updateClient = useUpdateClient();
   const navigate = useNavigate();
   const [showCreate, setShowCreate] = useState(false);
@@ -230,6 +233,7 @@ export function ClientList() {
               <ChevronRight className="h-4 w-4" />
             </span>
 
+            {canManage && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon-sm" aria-label="Client actions">
@@ -253,6 +257,7 @@ export function ClientList() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            )}
           </div>
         ))}
 

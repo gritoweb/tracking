@@ -151,8 +151,10 @@ export function DraftReviewDialog({ open, localDate, onClose }: DraftReviewDialo
   const draftTarget = Math.max(drafts.length * 60, targetDayTotal - confirmedSeconds);
   const willScale = drafts.length > 0 && Math.abs(draftTarget - draftSeconds) > 30;
 
+  // Every entry needs a project (D3): confirming waits until each proposal has one.
+  const missingProject = drafts.some((d) => !d.projectId);
   const handleConfirm = () => {
-    if (!drafts.length) return;
+    if (!drafts.length || missingProject) return;
     confirmDrafts.mutate(
       {
         ids: drafts.map((d) => d.id),
@@ -233,7 +235,7 @@ export function DraftReviewDialog({ open, localDate, onClose }: DraftReviewDialo
                   <Button
                     size="sm"
                     onClick={handleConfirm}
-                    disabled={confirmDrafts.isPending}
+                    disabled={confirmDrafts.isPending || missingProject}
                     className="gap-1.5"
                   >
                     {confirmDrafts.isPending ? (

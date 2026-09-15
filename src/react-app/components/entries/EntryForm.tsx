@@ -35,9 +35,10 @@ export function EntryForm({ entry, open, onClose }: EntryFormProps) {
   const updateEntry = useUpdateEntry();
 
   const handleSave = () => {
-    const { start, stop, ...rest } = draft.draft;
+    const { start, stop, projectId, ...rest } = draft.draft;
+    if (!projectId) return;
     updateEntry.mutate(
-      { id: entry.id, data: { ...rest, start: start ?? entry.start, stop: stop ?? undefined } },
+      { id: entry.id, data: { ...rest, projectId, start: start ?? entry.start, stop: stop ?? undefined } },
       { onSuccess: onClose }
     );
   };

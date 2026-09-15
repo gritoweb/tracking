@@ -105,10 +105,8 @@ export function FavoritesMenu({ current }: FavoritesMenuProps) {
           <DropdownMenuItem
             key={f.id}
             className="group flex items-center gap-2"
-            onSelect={(e) => {
-              e.preventDefault();
-              start(f);
-            }}
+            // Closes the menu: a favorite without a project opens the timer bar's picker, which an open modal menu would trap.
+            onSelect={() => start(f)}
           >
             <Play className="h-3 w-3 shrink-0 text-muted-foreground" />
             {f.projectId && <ColorDot color={f.projectColor} />}

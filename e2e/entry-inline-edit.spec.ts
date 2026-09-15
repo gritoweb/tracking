@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { signUp } from "./auth";
 import { addManualEntry } from "./entry-helpers";
+import { createProject } from "./project-helpers";
 
 /**
  * The entry list's inline edits — description, duration, project, time range.
@@ -14,6 +15,8 @@ import { addManualEntry } from "./entry-helpers";
 test.describe("entry list inline editing", () => {
   test.beforeEach(async ({ page }) => {
     await signUp(page);
+    await createProject(page);
+    await page.reload();
   });
 
   test("renaming in place keeps the same row and acknowledges the save", async ({ page }) => {
@@ -46,21 +49,20 @@ test.describe("entry list inline editing", () => {
     ).toContainText("1h 30m");
   });
 
-  test("the editor opened from the stop toast closes on save instead of reopening", async ({
+  test("the editor opened through the UI store closes on save instead of reopening", async ({
     page,
   }) => {
-    // The toast path is the one that broke: it opens the editor through the UI
+    // The store path is the one that broke: the editor opens through the UI
     // store, and the store key was only cleared by a callback on the row — which
     // the save itself unmounted. The store stayed set, so the row that remounted
     // immediately reopened the sheet the user had just dismissed by saving.
-    await page.getByPlaceholder("What are you working on?").fill("Toast edit");
-    await page.getByRole("button", { name: "Start" }).click();
-    await page.getByRole("button", { name: "Stop" }).click();
-
-    // Scoped to the toast: the row's own AssignProjectChip carries the same
-    // accessible name and would open the project picker instead.
-    const toast = page.locator("[data-sonner-toast]").filter({ hasText: "no project" });
-    await toast.getByRole("button", { name: "Assign project" }).click();
+    // The "no project" stop toast used to be the way in; every entry has a
+    // project now (D3), so the row menu's Edit, which uses the same store, is.
+    await addManualEntry(page, { description: "Toast edit", start: "09:00", stop: "10:00" });
+    const row = page.locator("div.group", { hasText: "Toast edit" }).first();
+    await row.hover();
+    await row.getByRole("button", { name: "Entry actions" }).click();
+    await page.getByRole("menuitem", { name: "Edit" }).click();
     const sheet = page.getByRole("dialog");
     await expect(sheet).toBeVisible();
 

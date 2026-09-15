@@ -3,6 +3,7 @@
 // (UTC date) keeps it idempotent across the 5-minute cron cycles.
 
 import { broadcast, upsertTags } from "../db/queries";
+import { findActiveProject } from "./projects";
 
 export async function runRecurring(env: Env): Promise<void> {
   const now = new Date();
@@ -37,9 +38,18 @@ export async function runRecurring(env: Env): Promise<void> {
       if (row.last_materialized === todayStr) continue; // already created today
 
       const userId = (row.user_id as string | null) ?? null;
-      // Every template has an author since migration 0037; hours are never minted for nobody.
-      if (!userId) {
-        console.warn("recurring: template has no author, skipped", { templateId: row.id });
+      const project = row.project_id
+        ? await findActiveProject(env.DB, row.workspace_id as string, row.project_id as string)
+        : null;
+      // Hours need an author (0037) and an active project (D3); a template missing either is skipped and warned once a day.
+      if (!userId || !project) {
+        console.warn("recurring: template skipped", {
+          templateId: row.id,
+          missing: !userId ? "author" : "active project",
+        });
+        await env.DB.prepare(`UPDATE recurring_entries SET last_materialized = ? WHERE id = ?`)
+          .bind(todayStr, row.id)
+          .run();
         continue;
       }
 
@@ -62,7 +72,7 @@ export async function runRecurring(env: Env): Promise<void> {
           entryId,
           workspaceId,
           userId,
-          (row.project_id as string | null) ?? null,
+          project.id,
           (row.task_id as string | null) ?? null,
           (row.description as string) ?? "",
           startIso,

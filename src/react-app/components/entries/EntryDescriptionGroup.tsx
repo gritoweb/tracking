@@ -75,7 +75,7 @@ export function EntryDescriptionGroup({
   // and the timesheet's clear-a-cell all offer one. The app's convention for
   // destructive actions is undo rather than a confirm dialog — match it.
   const handleDeleteAll = () => {
-    const payloads = group.entries.map(toCreatePayload);
+    const payloads = group.entries.flatMap((e) => toCreatePayload(e) ?? []);
     bulkDelete.mutate(group.entries.map((e) => e.id));
     toast.success(`${group.entries.length} entries deleted`, {
       action: {

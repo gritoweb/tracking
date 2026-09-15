@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { entryScopeUserId, getMemberRole } from "../lib/permissions";
 import { zValidator } from "@hono/zod-validator";
 import { CreateTaskSchema, UpdateTaskSchema } from "@shared/schemas";
 import { nextOccurrence, normalizeRecurRule } from "@shared/task-recurrence";
@@ -38,11 +39,13 @@ function formatTask(row: Row) {
  * a GROUP BY, so the row survives adding more per-task aggregates without
  * every one of them needing a grouping key.
  */
-const TASK_SELECT = `
+// A member's tracked time counts only their own hours (D3): `scoped` adds one `te.user_id = ?` binding before the WHERE's.
+function taskSelect(scoped: boolean): string {
+  return `
   SELECT tk.*,
     p.name AS project_name, p.color AS project_color,
     (SELECT COALESCE(SUM(te.duration), 0) FROM time_entries te
-       WHERE te.workspace_id = tk.workspace_id AND te.stop IS NOT NULL
+       WHERE te.workspace_id = tk.workspace_id AND te.stop IS NOT NULL${scoped ? " AND te.user_id = ?" : ""}
          AND (te.task_id = tk.id
               OR te.task_id IN (SELECT c.id FROM tasks c WHERE c.parent_id = tk.id))
     ) AS tracked_seconds,
@@ -51,11 +54,17 @@ const TASK_SELECT = `
   FROM tasks tk
   LEFT JOIN projects p ON p.id = tk.project_id AND p.workspace_id = tk.workspace_id
 `;
+}
 
-async function readTask(db: D1Database, id: string, workspaceId: string) {
+async function taskScope(c: { env: Env; get: (key: "workspaceId" | "userId") => string }) {
+  const userId = c.get("userId");
+  return entryScopeUserId(await getMemberRole(c.env.DB, c.get("workspaceId"), userId), userId);
+}
+
+async function readTask(db: D1Database, id: string, workspaceId: string, scopeUserId: string | null) {
   const { results } = await db
-    .prepare(`${TASK_SELECT} WHERE tk.id = ? AND tk.workspace_id = ?`)
-    .bind(id, workspaceId)
+    .prepare(`${taskSelect(scopeUserId !== null)} WHERE tk.id = ? AND tk.workspace_id = ?`)
+    .bind(...(scopeUserId ? [scopeUserId] : []), id, workspaceId)
     .all<Row>();
   return results.length ? results[0] : null;
 }
@@ -92,7 +101,7 @@ async function nextSortOrder(db: D1Database, workspaceId: string, projectId: str
 
 export const tasksRouter = new Hono<{
   Bindings: Env;
-  Variables: { workspaceId: string };
+  Variables: { workspaceId: string; userId: string };
 }>()
   // ─── List tasks ───────────────────────────────────────────────────────────
   .get("/", async (c) => {
@@ -107,9 +116,10 @@ export const tasksRouter = new Hono<{
 
     // Ordered so a client that renders the list as-is still gets a sane order:
     // the manual sequence first, then name as the stable tiebreak.
+    const scopeUserId = await taskScope(c);
     const { results } = await c.env.DB.prepare(
-      `${TASK_SELECT} ${where} ORDER BY tk.sort_order ASC, tk.name ASC`
-    ).bind(...bindings).all<Row>();
+      `${taskSelect(scopeUserId !== null)} ${where} ORDER BY tk.sort_order ASC, tk.name ASC`
+    ).bind(...(scopeUserId ? [scopeUserId] : []), ...bindings).all<Row>();
 
     return c.json(results.map(formatTask));
   })
@@ -157,7 +167,7 @@ export const tasksRouter = new Hono<{
       now
     ).run();
 
-    const row = await readTask(c.env.DB, id, workspaceId);
+    const row = await readTask(c.env.DB, id, workspaceId, await taskScope(c));
     return c.json(formatTask(row!), 201);
   })
   // ─── Update ───────────────────────────────────────────────────────────────
@@ -300,7 +310,7 @@ export const tasksRouter = new Hono<{
       }
     }
 
-    const row = await readTask(c.env.DB, id, workspaceId);
+    const row = await readTask(c.env.DB, id, workspaceId, await taskScope(c));
     if (!row) return c.json({ error: "Not found" }, 404);
     return c.json(formatTask(row));
   })

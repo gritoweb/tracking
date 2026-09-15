@@ -24,6 +24,7 @@ import {
   useProjects,
 } from "@/hooks/useProjects";
 import { useIntegrations } from "@/hooks/useIntegrations";
+import { useWorkspaceRole } from "@/hooks/useWorkspaceRole";
 import { useUIStore } from "@/stores/uiStore";
 import { PROJECT_COLORS, PROJECT_COLOR_NAMES, nextProjectColor } from "@/lib/colorUtils";
 import { cn } from "@/lib/utils";
@@ -48,7 +49,9 @@ export function ProjectForm({ project, open, onClose }: ProjectFormProps) {
         ? nextProjectColor(existingProjects.map((p) => p.color))
         : PROJECT_COLORS[9])
   );
-  const [clientId, setClientId] = useState<string>(project?.clientId ?? "none");
+  const [clientId, setClientId] = useState<string>(project?.clientId ?? "");
+  // Rates, budgets, dates and integrations are set by owners/admins; the server ignores them from a member (D3).
+  const { canManage } = useWorkspaceRole();
   const [billable, setBillable] = useState(project?.billable ?? false);
   const [rate, setRate] = useState<string>(project?.rate?.toString() ?? "");
   const [startDate, setStartDate] = useState(project?.startDate ?? "");
@@ -85,7 +88,7 @@ export function ProjectForm({ project, open, onClose }: ProjectFormProps) {
     const data = {
       name,
       color,
-      clientId: clientId === "none" ? null : clientId,
+      clientId,
       billable,
       rate: rate ? parseFloat(rate) : null,
       startDate: startDate || null,
@@ -158,18 +161,23 @@ export function ProjectForm({ project, open, onClose }: ProjectFormProps) {
             <Label htmlFor="project-client">Client</Label>
             <Select value={clientId} onValueChange={setClientId}>
               <SelectTrigger id="project-client">
-                <SelectValue placeholder="No client" />
+                <SelectValue placeholder="Choose a client" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">No client</SelectItem>
                 {clients.map((c) => (
                   <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            {clients.length === 0 && (
+              <p className="text-xs text-muted-foreground">
+                Add a client under Clients first — every project needs one.
+              </p>
+            )}
           </div>
 
           {/* Date range */}
+          {canManage && (
           <div className="flex gap-3">
             <div className="flex-1 space-y-1.5">
               <Label>Start date</Label>
@@ -188,6 +196,7 @@ export function ProjectForm({ project, open, onClose }: ProjectFormProps) {
               />
             </div>
           </div>
+          )}
 
           {/* Billable + rate + estimated hours */}
           <div className="space-y-3">
@@ -196,7 +205,7 @@ export function ProjectForm({ project, open, onClose }: ProjectFormProps) {
                 <Switch id="billable" checked={billable} onCheckedChange={setBillable} />
                 <Label htmlFor="billable">Billable</Label>
               </div>
-              {billable && (
+              {billable && canManage && (
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-muted-foreground">Rate</span>
                   <Input
@@ -213,6 +222,7 @@ export function ProjectForm({ project, open, onClose }: ProjectFormProps) {
               )}
             </div>
 
+            {canManage && (
             <div className="flex items-center gap-3">
               <Label className="shrink-0 text-sm text-muted-foreground">Estimated hours</Label>
               <Input
@@ -225,10 +235,11 @@ export function ProjectForm({ project, open, onClose }: ProjectFormProps) {
                 step={0.5}
               />
             </div>
+            )}
           </div>
 
           {/* Integration */}
-          {integrations.length > 0 && (
+          {canManage && integrations.length > 0 && (
             <div className="space-y-3 border-t pt-4">
               <div className="space-y-1.5">
                 <Label htmlFor="project-integration">Integration</Label>
@@ -298,7 +309,7 @@ export function ProjectForm({ project, open, onClose }: ProjectFormProps) {
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button
             onClick={handleSave}
-            disabled={!name.trim() || isPending || integrationMissingRequiredId}
+            disabled={!name.trim() || !clientId || isPending || integrationMissingRequiredId}
           >
             {project ? "Save changes" : "Create project"}
           </Button>

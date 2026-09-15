@@ -37,15 +37,21 @@ async function insertEvents(
   const fresh = events.filter((e) => !confirmed.has(e.calendarEventId));
   if (!fresh.length) return 0;
 
-  // Best-effort project match from the event title, so meetings land on the
-  // right engagement with its billable default. Unmatched → no project, 0.
+  // Project match from the event title, so meetings land on the right
+  // engagement with its billable default.
   let inferred = new Map<string, InferredEventProject>();
   try {
     inferred = await inferEventProjects(db, env.AI, workspaceId, fresh.map((e) => e.title));
   } catch (e) {
-    // AI unavailable — entries still materialize, just uncategorized.
     console.warn("autotrack: project inference unavailable", { workspaceId, error: String(e) });
   }
+
+  // Every entry needs a project (D3): a meeting the inference can't place stays a ghost block for the person to track.
+  const placeable = fresh.flatMap((e) => {
+    const match = inferred.get(e.title.trim());
+    return match?.projectId ? [{ event: e, match }] : [];
+  });
+  if (!placeable.length) return 0;
 
   const now = new Date().toISOString();
   const stmt = db.prepare(
@@ -54,26 +60,25 @@ async function insertEvents(
      VALUES (?, ?, ?, ?, NULL, ?, ?, ?, CAST((julianday(?) - julianday(?)) * 86400 + 0.5 AS INTEGER), ?, ?, ?, ?)`
   );
   await db.batch(
-    fresh.map((e) => {
-      const match = inferred.get(e.title.trim());
-      return stmt.bind(
+    placeable.map(({ event: e, match }) =>
+      stmt.bind(
         crypto.randomUUID(),
         workspaceId,
         userId,
-        match?.projectId ?? null,
+        match.projectId,
         e.title,
         e.start,
         e.stop,
         e.stop,
         e.start,
-        match ? (match.billable ? 1 : 0) : 0,
+        match.billable ? 1 : 0,
         e.calendarEventId,
         now,
         now
-      );
-    })
+      )
+    )
   );
-  return fresh.length;
+  return placeable.length;
 }
 
 /**

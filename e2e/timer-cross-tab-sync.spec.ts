@@ -1,5 +1,13 @@
 import { test, expect, type Page } from "@playwright/test";
 import { signUp } from "./auth";
+import { chooseProject, createProject } from "./project-helpers";
+
+/** A fresh workspace with a project already loaded in the page, since Start asks for one. */
+async function signUpWithProject(page: Page) {
+  await signUp(page);
+  await createProject(page);
+  await page.reload();
+}
 
 // Timer state is shared across a workspace's open tabs over the TimerRoom
 // socket. The transport always worked; what didn't was the *receiving* side —
@@ -21,12 +29,13 @@ async function openSecondTab(page: Page) {
 async function startTimer(page: Page, description: string) {
   await page.getByPlaceholder("What are you working on?").fill(description);
   await page.getByRole("button", { name: "Start timer", exact: true }).click();
+  await chooseProject(page);
   await expect(page.getByRole("button", { name: "Stop timer", exact: true })).toBeVisible();
 }
 
 test.describe("cross-tab timer sync", () => {
   test("start and stop propagate to another tab", async ({ page }) => {
-    await signUp(page);
+    await signUpWithProject(page);
     const tabB = await openSecondTab(page);
 
     await startTimer(page, "Cross-tab entry");
@@ -46,7 +55,7 @@ test.describe("cross-tab timer sync", () => {
   // which the handler used to ignore outright, so tab B kept ticking an entry
   // that no longer existed until someone reloaded it.
   test("discarding in one tab stops the timer in the other", async ({ page }) => {
-    await signUp(page);
+    await signUpWithProject(page);
     const tabB = await openSecondTab(page);
 
     await startTimer(page, "Entry to discard");
@@ -63,7 +72,7 @@ test.describe("cross-tab timer sync", () => {
   // mutations also invalidated `reports`. So a stop in one tab never reached a
   // Reports view open in another — it sat on its old totals.
   test("stopping in one tab refreshes Reports in the other", async ({ page }) => {
-    await signUp(page);
+    await signUpWithProject(page);
     const tabB = await openSecondTab(page);
 
     await tabB.goto("/reports");
@@ -94,7 +103,7 @@ test.describe("cross-tab timer sync", () => {
   test("a stop applied via the update route clears the other tab's timer", async ({
     page,
   }) => {
-    await signUp(page);
+    await signUpWithProject(page);
     const tabB = await openSecondTab(page);
 
     await startTimer(page, "Entry closed by update");

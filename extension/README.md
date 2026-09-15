@@ -2,7 +2,8 @@
 
 A Manifest V3 Chrome extension that mirrors the [Time Tracker](https://timetracker.run)
 web app: start/stop and view your running timer from the toolbar, with a live
-badge, and pre-fill descriptions from issue/PR pages.
+badge, and pre-fill descriptions from issue/PR pages. Starting a timer needs a
+project, picked from the workspace's active projects grouped by client.
 
 ## Layout
 

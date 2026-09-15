@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { signUp } from "./auth";
+import { createProject } from "./project-helpers";
 
 /**
  * A progress bar's track must never be its fill colour.
@@ -21,12 +22,7 @@ for (const scheme of ["light", "dark"] as const) {
   test(`an untracked estimate does not render as a full bar (${scheme})`, async ({ page }) => {
     await signUp(page);
     const origin = new URL(page.url()).origin;
-    const project = await (
-      await page.request.post("/api/projects", {
-        data: { name: "Meridian Rollout", color: "#dd322e" },
-        headers: { origin },
-      })
-    ).json();
+    const project = await createProject(page, { name: "Meridian Rollout", color: "#dd322e" });
     await page.request.post("/api/tasks", {
       data: {
         name: "Not started",

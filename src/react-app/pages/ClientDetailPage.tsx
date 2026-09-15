@@ -30,6 +30,7 @@ import {
 import { ClientForm } from "@/components/clients/ClientForm";
 import { TaskList } from "@/components/projects/TaskList";
 import { useClient, useAllProjects } from "@/hooks/useProjects";
+import { useWorkspaceRole } from "@/hooks/useWorkspaceRole";
 import { formatDurationShort } from "@/lib/dateUtils";
 import { cn } from "@/lib/utils";
 
@@ -39,6 +40,8 @@ export function ClientDetailPage() {
   const { data: client, isLoading, isError } = useClient(id);
   const { data: allProjects = [] } = useAllProjects();
   const [showEdit, setShowEdit] = useState(false);
+  // Editing a client is for owners/admins; the server refuses a member (D3).
+  const { canManage } = useWorkspaceRole();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   // Same period vocabulary and the same aggregation as the Clients list, so
   // the drill-down continues the sentence the row started instead of
@@ -143,10 +146,12 @@ export function ClientDetailPage() {
             </p>
           )}
         </div>
-        <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setShowEdit(true)}>
-          <Edit2 className="h-3.5 w-3.5" />
-          Edit
-        </Button>
+        {canManage && (
+          <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setShowEdit(true)}>
+            <Edit2 className="h-3.5 w-3.5" />
+            Edit
+          </Button>
+        )}
       </div>
 
       {/* The same four figures the list row shows, in the framed strip the

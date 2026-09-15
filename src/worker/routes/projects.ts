@@ -4,7 +4,9 @@ import { CreateProjectSchema, UpdateProjectSchema } from "@shared/schemas";
 import { DISTINCT_COLORS, spreadColor } from "../lib/colors";
 import { runProjectColorAssignment } from "../lib/ai";
 import { loadProjectPacing } from "../lib/pacing";
-import { PROJECT_SELECT, createProject, formatProject } from "../lib/projects";
+import { isActiveClient } from "../lib/clients";
+import { canManageWorkspace, getMemberRole, MANAGER_ONLY_ERROR } from "../lib/permissions";
+import { projectSelect, createProject, formatProject, memberProjectInput } from "../lib/projects";
 
 /*
  * Projects reported an unqualified all-time total while Clients defaulted to
@@ -17,23 +19,30 @@ import { PROJECT_SELECT, createProject, formatProject } from "../lib/projects";
  *   budget_seconds  — always all time, because a budget is cumulative. Scoping
  *                     it to "this month" would make `11h / 40h` a sentence with
  *                     two different subjects.
+ *
+ * A member's totals cover only their own hours, and budgets are blanked (D3).
  */
-const PROJECT_SELECT_RANGED = `
+function projectSelectRanged(scoped: boolean): string {
+  return `
   SELECT p.*, c.name AS client_name,
     COALESCE(SUM(CASE WHEN te.start >= ? AND te.start <= ? THEN te.duration ELSE 0 END), 0) AS tracked_seconds,
     COALESCE(SUM(te.duration), 0) AS budget_seconds
   FROM projects p
   LEFT JOIN clients c ON c.id = p.client_id AND c.workspace_id = p.workspace_id
-  LEFT JOIN time_entries te ON te.project_id = p.id AND te.workspace_id = p.workspace_id AND te.stop IS NOT NULL
+  LEFT JOIN time_entries te ON te.project_id = p.id AND te.workspace_id = p.workspace_id AND te.stop IS NOT NULL${scoped ? " AND te.user_id = ?" : ""}
 `;
+}
 
 export const projectsRouter = new Hono<{
   Bindings: Env;
-  Variables: { workspaceId: string };
+  Variables: { workspaceId: string; userId: string };
 }>()
   .get("/", async (c) => {
     const workspaceId = c.get("workspaceId");
+    const userId = c.get("userId");
     const { includeArchived, since, until } = c.req.query();
+    const manager = canManageWorkspace(await getMemberRole(c.env.DB, workspaceId, userId));
+    const scope = manager ? [] : [userId];
 
     // Both or neither: half a range is not a range, and silently treating a
     // lone `since` as "onwards" would make the page's stated window a lie.
@@ -42,17 +51,21 @@ export const projectsRouter = new Hono<{
        GROUP BY p.id ORDER BY p.name ASC`;
 
     const stmt = ranged
-      ? c.env.DB.prepare(`${PROJECT_SELECT_RANGED} ${tail}`).bind(since, until, workspaceId)
-      : c.env.DB.prepare(`${PROJECT_SELECT} ${tail}`).bind(workspaceId);
+      ? c.env.DB.prepare(`${projectSelectRanged(!manager)} ${tail}`).bind(since, until, ...scope, workspaceId)
+      : c.env.DB.prepare(`${projectSelect(!manager)} ${tail}`).bind(...scope, workspaceId);
 
     const { results } = await stmt.all<Record<string, unknown>>();
 
-    return c.json(results.map(formatProject));
+    return c.json(results.map((row) => formatProject(row, { hideBudget: !manager })));
   })
   .post("/", zValidator("json", CreateProjectSchema), async (c) => {
     const workspaceId = c.get("workspaceId");
     const data = c.req.valid("json");
-    const project = await createProject(c.env.DB, workspaceId, data);
+    if (!(await isActiveClient(c.env.DB, workspaceId, data.clientId))) {
+      return c.json({ error: "Choose an active client in this workspace" }, 400);
+    }
+    const manager = canManageWorkspace(await getMemberRole(c.env.DB, workspaceId, c.get("userId")));
+    const project = await createProject(c.env.DB, workspaceId, manager ? data : memberProjectInput(data));
     return c.json(project, 201);
   })
   // Auto-assign colors: ask Workers AI to give each project a distinct, sensibly
@@ -60,6 +73,9 @@ export const projectsRouter = new Hono<{
   // deterministic warm/cool spread so a poor/absent AI response never regresses.
   .post("/recolor", async (c) => {
     const workspaceId = c.get("workspaceId");
+    if (!canManageWorkspace(await getMemberRole(c.env.DB, workspaceId, c.get("userId")))) {
+      return c.json({ error: MANAGER_ONLY_ERROR }, 403);
+    }
     const { results } = await c.env.DB.prepare(
       `SELECT id, name FROM projects WHERE workspace_id = ? ORDER BY name ASC`
     ).bind(workspaceId).all<{ id: string; name: string }>();
@@ -110,29 +126,44 @@ export const projectsRouter = new Hono<{
   // Budget pacing for every active project: share of budget spent, burn rate
   // over the trailing window, and where that rate lands the project by its end
   // date. Declared before "/:id" so the literal path isn't read as a project id.
+  // A member gets an empty list: pacing is built from the whole team's hours.
   .get("/pacing", async (c) => {
-    const pacing = await loadProjectPacing(c.env.DB, c.get("workspaceId"));
+    const workspaceId = c.get("workspaceId");
+    if (!canManageWorkspace(await getMemberRole(c.env.DB, workspaceId, c.get("userId")))) {
+      return c.json([]);
+    }
+    const pacing = await loadProjectPacing(c.env.DB, workspaceId);
     return c.json(pacing);
   })
   .get("/:id", async (c) => {
+    const workspaceId = c.get("workspaceId");
+    const userId = c.get("userId");
+    const manager = canManageWorkspace(await getMemberRole(c.env.DB, workspaceId, userId));
     const { results } = await c.env.DB.prepare(
-      `${PROJECT_SELECT} WHERE p.id = ? AND p.workspace_id = ? GROUP BY p.id`
-    ).bind(c.req.param("id"), c.get("workspaceId")).all<Record<string, unknown>>();
+      `${projectSelect(!manager)} WHERE p.id = ? AND p.workspace_id = ? GROUP BY p.id`
+    ).bind(...(manager ? [] : [userId]), c.req.param("id"), workspaceId).all<Record<string, unknown>>();
 
     if (!results.length) return c.json({ error: "Not found" }, 404);
-    return c.json(formatProject(results[0]));
+    return c.json(formatProject(results[0], { hideBudget: !manager }));
   })
   .put("/:id", zValidator("json", UpdateProjectSchema), async (c) => {
     const workspaceId = c.get("workspaceId");
     const id = c.req.param("id");
     const data = c.req.valid("json");
 
+    if (!canManageWorkspace(await getMemberRole(c.env.DB, workspaceId, c.get("userId")))) {
+      return c.json({ error: MANAGER_ONLY_ERROR }, 403);
+    }
+    if (data.clientId !== undefined && !(await isActiveClient(c.env.DB, workspaceId, data.clientId))) {
+      return c.json({ error: "Choose an active client in this workspace" }, 400);
+    }
+
     const fields: string[] = [];
     const values: unknown[] = [];
 
     if (data.name !== undefined)           { fields.push("name = ?");           values.push(data.name); }
     if (data.color !== undefined)          { fields.push("color = ?");          values.push(data.color); }
-    if (data.clientId !== undefined)       { fields.push("client_id = ?");      values.push(data.clientId ?? null); }
+    if (data.clientId !== undefined)       { fields.push("client_id = ?");      values.push(data.clientId); }
     if (data.billable !== undefined)       { fields.push("billable = ?");       values.push(data.billable ? 1 : 0); }
     if (data.rate !== undefined)           { fields.push("rate = ?");           values.push(data.rate ?? null); }
     if (data.active !== undefined)         { fields.push("active = ?");         values.push(data.active ? 1 : 0); }
@@ -150,15 +181,19 @@ export const projectsRouter = new Hono<{
     }
 
     const { results } = await c.env.DB.prepare(
-      `${PROJECT_SELECT} WHERE p.id = ? AND p.workspace_id = ? GROUP BY p.id`
+      `${projectSelect(false)} WHERE p.id = ? AND p.workspace_id = ? GROUP BY p.id`
     ).bind(id, workspaceId).all<Record<string, unknown>>();
 
     if (!results.length) return c.json({ error: "Not found" }, 404);
     return c.json(formatProject(results[0]));
   })
   .delete("/:id", async (c) => {
+    const workspaceId = c.get("workspaceId");
+    if (!canManageWorkspace(await getMemberRole(c.env.DB, workspaceId, c.get("userId")))) {
+      return c.json({ error: MANAGER_ONLY_ERROR }, 403);
+    }
     await c.env.DB.prepare(
       `UPDATE projects SET active = 0 WHERE id = ? AND workspace_id = ?`
-    ).bind(c.req.param("id"), c.get("workspaceId")).run();
+    ).bind(c.req.param("id"), workspaceId).run();
     return c.json({ ok: true });
   });

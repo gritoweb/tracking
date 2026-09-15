@@ -1,11 +1,14 @@
 import { test, expect } from "@playwright/test";
 import { signUp } from "./auth";
+import { chooseProject, createProject } from "./project-helpers";
 
 // Regression coverage for the Toggl-inspired feature ports: favorites,
 // calendar month view, and the productivity settings.
 
 test("favorites: save current draft and start from it", async ({ page }) => {
   await signUp(page);
+  await createProject(page);
+  await page.reload();
 
   await page.getByPlaceholder("What are you working on?").fill("Design review");
   await page.getByRole("button", { name: "Favorites" }).click();
@@ -14,8 +17,9 @@ test("favorites: save current draft and start from it", async ({ page }) => {
   // The menu stays open on save; the new favorite appears as a startable item.
   await expect(page.getByRole("menuitem", { name: /Design review/ })).toBeVisible();
 
-  // Clicking it starts a timer.
+  // The favorite has no project, so starting it asks for one first (D3).
   await page.getByRole("menuitem", { name: /Design review/ }).click();
+  await chooseProject(page);
   await expect(page.getByRole("button", { name: "Stop" })).toBeVisible();
 });
 

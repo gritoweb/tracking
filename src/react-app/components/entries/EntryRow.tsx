@@ -201,10 +201,9 @@ export function EntryRow({ entry, isSelected = false, onToggleSelect }: EntryRow
       pendingDelete.current = null;
       deleteEntry.mutate(entry.id);
       toast.success("Entry deleted", {
-        action: {
-          label: "Undo",
-          onClick: () => createEntry.mutate(payload),
-        },
+        action: payload
+          ? { label: "Undo", onClick: () => createEntry.mutate(payload) }
+          : undefined,
       });
     };
     setTimeout(() => pendingDelete.current?.(), reducedMotion ? 0 : EXIT_MS);
@@ -313,7 +312,10 @@ export function EntryRow({ entry, isSelected = false, onToggleSelect }: EntryRow
               </TimeRangePopover>
             </span>
             {entry.projectName ? (
-              <ProjectBadge name={entry.projectName} color={entry.projectColor} />
+              <ProjectBadge
+                name={entry.clientName ? `${entry.projectName} · ${entry.clientName}` : entry.projectName}
+                color={entry.projectColor}
+              />
             ) : (
               <span className="relative">
                 <SavedTick saved={savedProject.saved} className="-right-3" />

@@ -1,10 +1,13 @@
 import { test, expect } from "@playwright/test";
 import { signUp } from "./auth";
 import { addManualEntry } from "./entry-helpers";
+import { createProject } from "./project-helpers";
 
 test.describe("entry delete", () => {
   test.beforeEach(async ({ page }) => {
     await signUp(page);
+    await createProject(page);
+    await page.reload();
   });
 
   test("deletes an entry via its row menu (with exit animation)", async ({ page }) => {

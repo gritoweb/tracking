@@ -4,6 +4,7 @@ import {
   CreateRecurringEntrySchema,
   UpdateRecurringEntrySchema,
 } from "@shared/schemas";
+import { findActiveProject } from "../lib/projects";
 
 const RECURRING_SELECT = `
   SELECT r.*, p.name AS project_name, p.color AS project_color, t.name AS task_name
@@ -11,6 +12,8 @@ const RECURRING_SELECT = `
   LEFT JOIN projects p ON p.id = r.project_id AND p.workspace_id = r.workspace_id
   LEFT JOIN tasks t ON t.id = r.task_id AND t.workspace_id = r.workspace_id
 `;
+
+const PROJECT_REQUIRED_ERROR = "Choose an active project in this workspace";
 
 function formatRecurring(row: Record<string, unknown>) {
   let tags: string[] = [];
@@ -62,6 +65,9 @@ export const recurringRouter = new Hono<{
     const workspaceId = c.get("workspaceId");
     const userId = c.get("userId");
     const d = c.req.valid("json");
+    if (!(await findActiveProject(c.env.DB, workspaceId, d.projectId))) {
+      return c.json({ error: PROJECT_REQUIRED_ERROR }, 400);
+    }
     const id = crypto.randomUUID();
     await c.env.DB.prepare(
       `INSERT INTO recurring_entries
@@ -73,7 +79,7 @@ export const recurringRouter = new Hono<{
         workspaceId,
         userId,
         d.description,
-        d.projectId ?? null,
+        d.projectId,
         d.taskId ?? null,
         JSON.stringify(d.tags),
         d.billable ? 1 : 0,
@@ -96,11 +102,14 @@ export const recurringRouter = new Hono<{
     const userId = c.get("userId");
     const id = c.req.param("id");
     const d = c.req.valid("json");
+    if (d.projectId !== undefined && !(await findActiveProject(c.env.DB, workspaceId, d.projectId))) {
+      return c.json({ error: PROJECT_REQUIRED_ERROR }, 400);
+    }
 
     const fields: string[] = [];
     const values: unknown[] = [];
     if (d.description !== undefined) { fields.push("description = ?"); values.push(d.description); }
-    if (d.projectId !== undefined) { fields.push("project_id = ?"); values.push(d.projectId ?? null); }
+    if (d.projectId !== undefined) { fields.push("project_id = ?"); values.push(d.projectId); }
     if (d.taskId !== undefined) { fields.push("task_id = ?"); values.push(d.taskId ?? null); }
     if (d.tags !== undefined) { fields.push("tags = ?"); values.push(JSON.stringify(d.tags)); }
     if (d.billable !== undefined) { fields.push("billable = ?"); values.push(d.billable ? 1 : 0); }

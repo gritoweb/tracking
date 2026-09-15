@@ -1,13 +1,15 @@
 import { test, expect } from "@playwright/test";
 import { signUp } from "./auth";
+import { createClient, createProject } from "./project-helpers";
 
 
 test("auto-assign colors: toggle + recolor existing projects", async ({ page }) => {
   await signUp(page);
 
   // Seed several projects that all share the default color.
+  const client = await createClient(page);
   for (const name of ["Alpha", "Beta", "Gamma", "Delta"]) {
-    await page.request.post("/api/projects", { data: { name, color: "#0ea5e9" } });
+    await createProject(page, { name, color: "#0ea5e9", clientId: client.id });
   }
 
   await page.goto("/settings");

@@ -173,7 +173,15 @@ function reportQuery(params: Record<string, string | undefined>): string {
   ).toString();
 }
 
+export interface WorkspaceMe {
+  userId: string;
+  workspaceId: string;
+  role: "owner" | "admin" | "member" | null;
+  canManage: boolean;
+}
+
 export const api = {
+  me: () => request<WorkspaceMe>("/me"),
   // ─── Time entries ──────────────────────────────────────────────────────────
   timeEntries: {
     list: (params: { since?: string; until?: string }) => {

@@ -11,6 +11,8 @@ export interface ReportConfig {
   rounding: Rounding;
   group: GroupDimension;
   subGroup: SubGroupDimension;
+  /** Keeps a client-facing report free of money when it's reopened next month. */
+  hideAmounts?: boolean;
 }
 
 export interface SavedReport {

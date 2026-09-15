@@ -4,10 +4,16 @@ import { z } from "zod";
 import { CreateClientSchema, UpdateClientSchema } from "@shared/schemas";
 import { buildReportWhere } from "../db/queries";
 import { createClient, formatClient } from "../lib/clients";
+import {
+  canManageWorkspace,
+  entryScopeUserId,
+  getMemberRole,
+  MANAGER_ONLY_ERROR,
+} from "../lib/permissions";
 
 export const clientsRouter = new Hono<{
   Bindings: Env;
-  Variables: { workspaceId: string };
+  Variables: { workspaceId: string; userId: string };
 }>()
   .get("/", async (c) => {
     const workspaceId = c.get("workspaceId");
@@ -45,14 +51,18 @@ export const clientsRouter = new Hono<{
    * Rounding is deliberately NOT applied: rounding is a reporting preference
    * that belongs to an invoice you are about to send, and silently applying it
    * to a browsing surface would make this page disagree with the entry list.
+   *
+   * A member's totals cover only their own hours, exactly like their reports (D3).
    */
   .get(
     "/stats",
     zValidator("query", z.object({ since: z.string(), until: z.string() })),
     async (c) => {
       const workspaceId = c.get("workspaceId");
+      const userId = c.get("userId");
       const { since, until } = c.req.valid("query");
-      const { where, bindings } = buildReportWhere({ workspaceId, since, until });
+      const scopeUserId = entryScopeUserId(await getMemberRole(c.env.DB, workspaceId, userId), userId);
+      const { where, bindings } = buildReportWhere({ workspaceId, since, until, scopeUserId });
 
       const { results } = await c.env.DB.prepare(
         `
@@ -100,6 +110,10 @@ export const clientsRouter = new Hono<{
     const id = c.req.param("id");
     const data = c.req.valid("json");
 
+    if (!canManageWorkspace(await getMemberRole(c.env.DB, workspaceId, c.get("userId")))) {
+      return c.json({ error: MANAGER_ONLY_ERROR }, 403);
+    }
+
     const fields: string[] = [];
     const values: unknown[] = [];
 
@@ -128,10 +142,14 @@ export const clientsRouter = new Hono<{
     return c.json(formatClient(results[0]));
   })
   .delete("/:id", async (c) => {
+    const workspaceId = c.get("workspaceId");
+    if (!canManageWorkspace(await getMemberRole(c.env.DB, workspaceId, c.get("userId")))) {
+      return c.json({ error: MANAGER_ONLY_ERROR }, 403);
+    }
     await c.env.DB.prepare(
       `UPDATE clients SET archived = 1 WHERE id = ? AND workspace_id = ?`
     )
-      .bind(c.req.param("id"), c.get("workspaceId"))
+      .bind(c.req.param("id"), workspaceId)
       .run();
     return c.json({ ok: true });
   });

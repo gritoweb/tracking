@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { entryScopeUserId, getMemberRole } from "../lib/permissions";
 import { zValidator } from "@hono/zod-validator";
 import {
   AiQuickEntryRequestSchema,
@@ -17,7 +18,7 @@ import {
 
 export const aiRouter = new Hono<{
   Bindings: Env;
-  Variables: { workspaceId: string };
+  Variables: { workspaceId: string; userId: string };
 }>()
   .post("/quick-entry", zValidator("json", AiQuickEntryRequestSchema), async (c) => {
     const workspaceId = c.get("workspaceId");
@@ -70,6 +71,13 @@ export const aiRouter = new Hono<{
 
     let whereClause = `te.workspace_id = ? AND te.start >= ? AND te.start < ? AND te.stop IS NOT NULL`;
     const bindings: unknown[] = [workspaceId, since, until];
+    // A member's summary covers only their own hours, like their reports (D3).
+    const userId = c.get("userId");
+    const scopeUserId = entryScopeUserId(await getMemberRole(c.env.DB, workspaceId, userId), userId);
+    if (scopeUserId) {
+      whereClause += ` AND te.user_id = ?`;
+      bindings.push(scopeUserId);
+    }
     if (projectId) {
       whereClause += ` AND te.project_id = ?`;
       bindings.push(projectId);

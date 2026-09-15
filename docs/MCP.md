@@ -116,16 +116,16 @@ reach — 7 on a read key, 13 on read+write.
 |---|---|---|
 | `list_projects` | read | Ids, client, billable default, rate, budget, tracked total |
 | `list_clients` | read | With project counts |
-| `get_time_summary` | read | Totals over a range, grouped by project/client/task/tag |
-| `list_time_entries` | read | Individual entries, optional description search |
-| `get_project_pacing` | read | Budget spent, burn rate, projected overrun |
+| `get_time_summary` | read | Totals over a range, grouped by project/client/task/tag; a member's key counts only their own time |
+| `list_time_entries` | read | Individual entries, optional description search; a member's key lists only their own |
+| `get_project_pacing` | read | Budget spent, burn rate, projected overrun; owners and admins only |
 | `get_running_timer` | read | What's running now, and for how long |
 | `list_drafts` | read | Proposals awaiting review, with why each was proposed |
 | `create_client` | read+write | New client; **not** idempotent — check `list_clients` first |
-| `create_project` | read+write | New project, optional client; **not** idempotent |
-| `start_timer` | read+write | Stops any running timer first, as the app does |
+| `create_project` | read+write | New project under a client (required); a member's rate and budget are dropped; **not** idempotent |
+| `start_timer` | read+write | Needs a `projectId`; stops your own running timer first, as the app does |
 | `stop_timer` | read+write | Idempotent — a second call is a no-op |
-| `log_time` | read+write | A completed entry; **not** idempotent by design |
+| `log_time` | read+write | A completed entry; needs a `projectId`; **not** idempotent by design |
 | `draft_day` | read+write | Proposes a day's missing entries; idempotent |
 
 Each tool declares `readOnlyHint` / `destructiveHint` / `idempotentHint` /

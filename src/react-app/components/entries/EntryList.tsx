@@ -68,7 +68,7 @@ export function EntryList({ since, until, onAddEntry }: EntryListProps) {
     const ids = [...selectedIds];
     const payloads = entries
       .filter((e) => selectedIds.has(e.id))
-      .map(toCreatePayload);
+      .flatMap((e) => toCreatePayload(e) ?? []);
     bulkDelete.mutate(ids, { onSuccess: clearSelection });
     toast.success(`${ids.length} ${ids.length === 1 ? "entry" : "entries"} deleted`, {
       action: {

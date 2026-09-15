@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { signUp } from "./auth";
 import { addManualEntry } from "./entry-helpers";
+import { createProject } from "./project-helpers";
 
 // Workfront and Dynamics file an entry against a calendar day, and the server
 // stores only UTC instants — so the push has to carry the zone the day was
@@ -23,6 +24,7 @@ test("pushing entries carries the browser's timezone so the work date is local",
   });
   expect(integration.status()).toBe(201);
 
+  await createProject(page);
   await page.goto("/");
   await addManualEntry(page, {
     description: "Evening push",

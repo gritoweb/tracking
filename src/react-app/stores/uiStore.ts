@@ -54,6 +54,8 @@ interface UIStore {
   commandOpen: boolean;
   shortcutsOpen: boolean;
   discardConfirmOpen: boolean;
+  // Set when a start lacks a project: the timer bar opens its picker and starts once one is chosen.
+  pendingStart: PendingStart | null;
   // AI Quick Add dialog — global so it can be opened from the Timer header and
   // the Assistant panel (which is mounted app-wide). Transient, never persisted.
   quickAddOpen: boolean;
@@ -109,6 +111,7 @@ interface UIStore {
   setShortcutsOpen: (v: boolean) => void;
   openShortcuts: () => void;
   setDiscardConfirmOpen: (v: boolean) => void;
+  setPendingStart: (v: PendingStart | null) => void;
   setQuickAddOpen: (v: boolean) => void;
   openQuickAdd: () => void;
   flashEntry: (id: string) => void;
@@ -124,6 +127,15 @@ export const CALENDAR_SLOT_HEIGHT_MIN = 20;
 export const CALENDAR_SLOT_HEIGHT_MAX = 68;
 export const CALENDAR_SLOT_HEIGHT_STEP = 8;
 export const CALENDAR_SLOT_HEIGHT_DEFAULT = 44;
+
+/** A timer start requested before a project was chosen (D3). */
+export type PendingStart = {
+  description?: string;
+  projectId?: string | null;
+  taskId?: string | null;
+  billable?: boolean;
+  tags?: string[];
+};
 
 export const useUIStore = create<UIStore>()(
   persist(
@@ -155,6 +167,7 @@ export const useUIStore = create<UIStore>()(
       commandOpen: false,
       shortcutsOpen: false,
       discardConfirmOpen: false,
+      pendingStart: null,
       quickAddOpen: false,
       highlightedEntryId: null,
       pinnedEntryId: null,
@@ -213,6 +226,7 @@ export const useUIStore = create<UIStore>()(
       setShortcutsOpen: (v) => set({ shortcutsOpen: v }),
       openShortcuts: () => set({ shortcutsOpen: true }),
       setDiscardConfirmOpen: (v) => set({ discardConfirmOpen: v }),
+      setPendingStart: (v) => set({ pendingStart: v }),
       setQuickAddOpen: (v) => set({ quickAddOpen: v }),
       openQuickAdd: () => set({ quickAddOpen: true }),
       clearPinnedEntry: () => set({ pinnedEntryId: null }),

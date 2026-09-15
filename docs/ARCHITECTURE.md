@@ -35,7 +35,8 @@ Cron (*/5 min) ─────────── scheduled()   → auto-track + 
 | `/api/clients`, `/api/tags`, `/api/favorites`, `/api/recurring` | one file each | plain CRUD (tags: rename/recolor/delete only — created implicitly via entries) |
 | `/api/tasks` | `routes/tasks.ts` | CRUD plus the planning model: due date, priority, fractional `sort_order`, one level of subtasks, and recurrence. Three rules live here, not in the client: a subtask may never be a parent (one level, enforced on create and on re-parent); `tracked_seconds` **rolls subtasks up into the parent**, so a container task isn't reported as zero; and completing a repeating task **spawns the next occurrence inline**, measured from the `completedOn` local date the client sends — the worker runs in UTC and must not derive a due date from its own clock. Recurrence carries forward to the new occurrence and is cleared from the completed one, so reopening and re-ticking can't mint a second copy. |
 | `/api/drafts` | `drafts.ts` | drafted entries awaiting review: `GET ?date=` / `?since&until` (local dates), `POST /generate`, `PATCH /:id`, `POST /confirm` (with optional total reconciliation), `DELETE /:id`, `DELETE ?date=` |
-| `/api/reports` | `reports.ts` | `summary`, `grouped` (group→subGroup), `weekly`, `detailed`; rounding applied in SQL |
+| `/api/reports` | `reports.ts` | `summary`, `grouped` (group→subGroup, incl. `user`), `weekly`, `detailed`; rounding applied in SQL; a member is pinned to their own `user_id` |
+| `/api/me` | `me.ts` | the caller's role in the active workspace and `canManage`, only so the UI can hide what the server refuses |
 | `/api/saved-reports` | `saved-reports.ts` | per-user saved report configs |
 | `/api/planner` | `planner.ts` | per-user planned allocations (project+task per day): `GET ?since&until`, `PUT /` cell upsert (0 deletes), `POST /bulk` (CSV import / copy-week) |
 | `/api/settings` | `settings.ts` | per-user prefs stored on the Better Auth `user` row, incl. digest preferences; `POST /digest/send` mails one immediately |
@@ -50,6 +51,14 @@ Cron (*/5 min) ─────────── scheduled()   → auto-track + 
 `/mcp` is **not** a Hono route: like `/agents/*` it is intercepted in `index.ts` before the app, authenticated by API key rather than session, and handed to `agents/mcp`'s `createMcpHandler`. See MCP below.
 
 `db/queries.ts` holds the shared SQL helpers — `ENTRY_SELECT` is the canonical time-entry JOIN; `broadcast()` fans WebSocket events out through the DO; `upsertTags()` implicitly creates tags with deterministic colors.
+
+## Who sees what (`lib/permissions.ts`)
+
+- **Entries are personal; reads of hours are scoped by role.** `entryScopeUserId(role, userId)` is `null` for owner/admin and the caller's id for a member, and every read of tracked time goes through it: `buildReportWhere` (its `scopeUserId` wins over any `userIds` filter), `clients/stats`, project totals (`projectSelect(scoped)`), `tasks.tracked_seconds`, `ai/summary`, the digest and the MCP read tools. The Timer list and suggestions are the caller's own for everyone; `GET /time_entries/:id` 404s for a member on someone else's entry.
+- **Budgets are owner/admin only:** `estimatedHours`/`budgetSeconds` are blanked for a member, `GET /projects/pacing` returns `[]`, and `budget_risk` nudges, digest pacing and MCP `get_project_pacing` are skipped or refused.
+- **Every entry has an active project; every project an active client.** The shared schemas require `projectId`/`clientId`, and `findActiveProject`/`isActiveClient` reject archived or foreign ids on REST, MCP, recurring templates and `track-event`. Auto-track leaves meetings inference can't place as ghost blocks, the recurring cron skips a template without a project, and drafts can't be confirmed without one.
+- **Members create, managers change.** Anyone creates a client or a project (`memberProjectInput` drops a member's rate, budget, dates and integration link); editing, archiving and recoloring projects and clients, and integrations CRUD/test, answer 403 `MANAGER_ONLY_ERROR`. `integrations/push` checks `canWriteEntry` per entry.
+- The UI mirrors these rules through `GET /api/me` (`hooks/useWorkspaceRole.ts`, `canManage` stays false until known), but a hidden control is never the protection.
 
 ## Auth (Better Auth, `src/worker/auth.ts`)
 
@@ -107,7 +116,7 @@ Deliberately AI-free — pacing goes in front of a client, so it must be reprodu
 
 `/mcp` speaks Streamable HTTP via `agents/mcp`'s `createMcpHandler` — stateless, no Durable Object. A fresh `McpServer` is built per request, bound to the workspace resolved from the API key.
 
-- **Eleven tools**, each a thin wrapper over the helpers the REST API already uses (report builder, pacing, draft pipeline), so a chat answer and a Reports page answer come from one implementation.
+- **Eleven tools**, each a thin wrapper over the helpers the REST API already uses (report builder, pacing, draft pipeline), so a chat answer and a Reports page answer come from one implementation. A key acts as the person who created it: a member's key reads only their own hours and no budgets, and `start_timer`/`log_time`/`create_project` require an active project/client.
 - **No tool takes a workspace id** — it is fixed at construction, so nothing a model can invent reaches a tenant boundary.
 - **Write tools are registered only for a `read_write` key.** A read key isn't shown them at all; a tool a client can see but can never call is worse than one never advertised.
 - **Auth is a workspace API key** (`tt_live_…`), not a session bearer: only the SHA-256 is stored, the plaintext is shown once and is unrecoverable, and membership is re-verified against `member` on every call (a key outlives the session that minted it).

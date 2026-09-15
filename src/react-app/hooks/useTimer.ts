@@ -117,6 +117,7 @@ export function useTimer() {
         projectId: partial.projectId ?? null,
         projectName: null,
         projectColor: null,
+        clientName: null,
         taskId: partial.taskId ?? null,
         taskName: null,
         start: new Date(now).toISOString(),
@@ -355,7 +356,14 @@ export function useTimer() {
   });
 
   const startTimer = useCallback(
-    (partial: StartTimerInput = {}) => startMutation.mutate(partial),
+    (partial: StartTimerInput = {}) => {
+      // Every entry needs a project (D3): the timer bar asks for one and starts once it's picked.
+      if (!partial.projectId) {
+        useUIStore.getState().setPendingStart(partial);
+        return;
+      }
+      startMutation.mutate(partial);
+    },
     [startMutation]
   );
 
@@ -470,6 +478,7 @@ export function useTimerLifecycle(draft?: StartTimerInput) {
               projectId: saved.projectId,
               projectColor: saved.projectColor,
               projectName: null,
+              clientName: null,
               taskId: null,
               taskName: null,
               workspaceId: "",

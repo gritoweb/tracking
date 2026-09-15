@@ -53,6 +53,7 @@ function queryParams(
     projectIds: join(filters?.projectIds),
     taskIds: join(filters?.taskIds),
     tagIds: join(filters?.tagIds),
+    userIds: join(filters?.userIds),
     billable:
       filters?.billable && filters.billable !== "all" ? filters.billable : undefined,
     search: filters?.search?.trim() || undefined,
@@ -118,7 +119,7 @@ export function useReportWeekly(
   });
 }
 
-export type GroupDimension = "project" | "client" | "task" | "tag";
+export type GroupDimension = "project" | "client" | "task" | "tag" | "user";
 export type SubGroupDimension = "none" | GroupDimension;
 
 export interface GroupRow {

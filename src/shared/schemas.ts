@@ -127,7 +127,8 @@ export const CreateProjectSchema = z.object({
   // seed — came out the same sky blue, so a three-project breakdown donut
   // rendered three identical slices.
   color: z.string().regex(/^#[0-9a-f]{6}$/i).optional(),
-  clientId: z.string().nullable().optional(),
+  // Every project belongs to a client (D3).
+  clientId: z.string().min(1, "Choose a client"),
   billable: z.boolean().default(false),
   rate: z.number().nullable().optional(),
   startDate: z.string().nullable().optional(),
@@ -315,7 +316,7 @@ export const RecurringEntrySchema = z.object({
 
 export const CreateRecurringEntrySchema = z.object({
   description: z.string().max(2000).default(""),
-  projectId: z.string().nullable().optional(),
+  projectId: z.string().min(1, "Choose a project"),
   taskId: z.string().nullable().optional(),
   tags: z.array(z.string().max(100)).max(50).default([]),
   billable: z.boolean().default(false),
@@ -343,6 +344,7 @@ export const TimeEntrySchema = z.object({
   projectId: z.string().nullable(),
   projectName: z.string().nullable(),
   projectColor: z.string().nullable(),
+  clientName: z.string().nullable(),
   taskId: z.string().nullable(),
   taskName: z.string().nullable(),
   description: z.string(),
@@ -388,7 +390,8 @@ export const EntrySuggestionSchema = z.object({
 export const CreateTimeEntrySchema = z
   .object({
     description: z.string().max(2000).default(""),
-    projectId: z.string().nullable().optional(),
+    // Every entry belongs to a project (D3): hours without one can't be billed or reported.
+    projectId: z.string().min(1, "Choose a project"),
     taskId: z.string().nullable().optional(),
     start: z.string(),
     stop: z.string().nullable().optional(),
@@ -410,7 +413,7 @@ export const CreateTimeEntrySchema = z
 export const UpdateTimeEntrySchema = z
   .object({
     description: z.string().max(2000).optional(),
-    projectId: z.string().nullable().optional(),
+    projectId: z.string().min(1, "Choose a project").optional(),
     taskId: z.string().nullable().optional(),
     start: z.string().optional(),
     stop: z.string().nullable().optional(),
@@ -425,7 +428,7 @@ export const UpdateTimeEntrySchema = z
 export const BulkUpdateTimeEntriesSchema = z.object({
   ids: z.array(z.string()).min(1),
   patch: z.object({
-    projectId: z.string().nullable().optional(),
+    projectId: z.string().min(1, "Choose a project").optional(),
     taskId: z.string().nullable().optional(),
     billable: z.boolean().optional(),
     tags: z.array(z.string()).optional(),
@@ -525,6 +528,8 @@ export const ReportQuerySchema = z.object({
   clientIds: csvIds,
   taskIds: csvIds,
   tagIds: csvIds,
+  // Owners/admins filter by person; for a member the server ignores it and keeps only their own hours.
+  userIds: csvIds,
   // billable = only billable entries, nonbillable = only non-billable
   billable: z.enum(["billable", "nonbillable"]).optional(),
   // free-text search over the entry description
@@ -535,13 +540,14 @@ export const ReportQuerySchema = z.object({
 });
 
 // Group/sub-group dimensions for the grouped summary tree.
-export const GroupDimensionSchema = z.enum(["project", "client", "task", "tag"]);
+export const GroupDimensionSchema = z.enum(["project", "client", "task", "tag", "user"]);
 export const SubGroupDimensionSchema = z.enum([
   "none",
   "project",
   "client",
   "task",
   "tag",
+  "user",
 ]);
 
 export const GroupedReportQuerySchema = ReportQuerySchema.extend({
@@ -810,6 +816,8 @@ export const AssistantTrackEventRequestSchema = z
     title: z.string().max(500),
     start: z.string(),
     stop: z.string(),
+    // Optional override; without it the server infers the project and refuses a meeting it can't place.
+    projectId: z.string().min(1).optional(),
   })
   .refine((d) => new Date(d.stop) > new Date(d.start), {
     message: "Stop time must be after start time",

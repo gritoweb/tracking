@@ -25,6 +25,7 @@ import {
   useUpdateProject,
   useProjectPacing,
 } from "@/hooks/useProjects";
+import { useWorkspaceRole } from "@/hooks/useWorkspaceRole";
 import { pacingLabel, pacingToneClass } from "@/lib/pacing";
 import { Target } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -68,6 +69,8 @@ export function ProjectList() {
   const currency = useUIStore((s) => s.currency);
   const deleteProject = useDeleteProject();
   const updateProject = useUpdateProject();
+  // Editing, archiving and budgets are for owners/admins; the server refuses a member (D3).
+  const { canManage } = useWorkspaceRole();
   const [editProject, setEditProject] = useState<Project | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
@@ -99,7 +102,7 @@ export function ProjectList() {
    */
   const anyBudgeted = projects.some((p) => p.estimatedHours);
   const anyTracked = projects.some((p) => (p.trackedSeconds ?? 0) > 0);
-  const showBudgetHint = !isLoading && !anyBudgeted && anyTracked;
+  const showBudgetHint = canManage && !isLoading && !anyBudgeted && anyTracked;
 
   const q = query.trim().toLowerCase();
   const visible = projects
@@ -339,6 +342,7 @@ export function ProjectList() {
                     <TooltipContent>{isExpanded ? "Hide tasks" : "Show tasks"}</TooltipContent>
                   </Tooltip>
 
+                  {canManage && (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="icon-sm" aria-label="Project actions">
@@ -362,6 +366,7 @@ export function ProjectList() {
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
+                  )}
                 </div>
 
                 {/* Tasks section */}

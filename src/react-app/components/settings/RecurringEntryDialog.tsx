@@ -56,10 +56,11 @@ export function RecurringEntryDialog({ open, onClose, editing }: RecurringEntryD
   const toggleDay = (d: number) =>
     setDays((cur) => (cur.includes(d) ? cur.filter((x) => x !== d) : [...cur, d]));
 
-  const valid = days.length > 0 && durationMin >= 1;
+  // Every template needs a project (D3).
+  const valid = days.length > 0 && durationMin >= 1 && Boolean(projectId);
 
   const submit = () => {
-    if (!valid) return;
+    if (!valid || !projectId) return;
     const { daysOfWeek, timeUtcMinutes } = localScheduleToUtc(days, hhmmToMinutes(time));
     const payload = {
       description,
@@ -107,6 +108,9 @@ export function RecurringEntryDialog({ open, onClose, editing }: RecurringEntryD
             />
             <TaskPicker projectId={projectId} value={taskId} onChange={setTaskId} />
             <TagPicker value={tags} onChange={setTags} />
+            {!projectId && (
+              <p className="w-full text-xs text-muted-foreground">Every recurring entry needs a project.</p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">

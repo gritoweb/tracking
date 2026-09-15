@@ -8,6 +8,7 @@ import {
 import { computeNudges } from "../lib/assistant";
 import { inferEventProjects } from "../lib/ai";
 import { listMemories, deleteMemory, clearMemories } from "../lib/assistant-memory";
+import { findActiveProject } from "../lib/projects";
 import { broadcast } from "../db/queries";
 
 // Clamp to sane UTC offsets so a bad client can't shift day-bound queries
@@ -27,12 +28,12 @@ export const assistantRouter = new Hono<{
     return c.json(nudges);
   })
   // One-click "Add to timesheet" from an untracked-meeting nudge. Server-side
-  // so the entry can be pre-categorized via grounded AI project inference —
-  // inference failure still creates the entry, just without a project.
+  // so the entry can be pre-categorized via grounded AI project inference.
+  // Every entry needs a project (D3): a meeting it can't place is refused and stays a ghost block.
   .post("/track-event", zValidator("json", AssistantTrackEventRequestSchema), async (c) => {
     const workspaceId = c.get("workspaceId");
     const userId = c.get("userId");
-    const { calendarEventId, title, start, stop } = c.req.valid("json");
+    const { calendarEventId, title, start, stop, projectId } = c.req.valid("json");
 
     // Idempotent per person: the nudge may race auto-track or a double-click, and each attendee tracks their own copy.
     const existing = await c.env.DB.prepare(
@@ -49,13 +50,24 @@ export const assistantRouter = new Hono<{
       } satisfies AssistantTrackEventResult);
     }
 
-    let match = null;
-    try {
-      match =
-        (await inferEventProjects(c.env.DB, c.env.AI, workspaceId, [title])).get(title.trim()) ??
-        null;
-    } catch {
-      // Best-effort only.
+    let project: { id: string; name: string; billable: boolean } | null = null;
+    if (projectId) {
+      project = await findActiveProject(c.env.DB, workspaceId, projectId);
+    } else {
+      try {
+        const match = (await inferEventProjects(c.env.DB, c.env.AI, workspaceId, [title])).get(title.trim());
+        if (match?.projectId) {
+          project = { id: match.projectId, name: match.projectName, billable: match.billable };
+        }
+      } catch {
+        // Best-effort only.
+      }
+    }
+    if (!project) {
+      return c.json(
+        { error: "No project matches this meeting. Track it from the calendar and pick one." },
+        422
+      );
     }
 
     const now = new Date().toISOString();
@@ -71,12 +83,12 @@ export const assistantRouter = new Hono<{
         crypto.randomUUID(),
         workspaceId,
         userId,
-        match?.projectId ?? null,
+        project.id,
         title,
         start,
         stop,
         duration,
-        match?.billable ? 1 : 0,
+        project.billable ? 1 : 0,
         calendarEventId,
         now,
         now
@@ -88,9 +100,9 @@ export const assistantRouter = new Hono<{
 
     return c.json({
       created: true,
-      projectId: match?.projectId ?? null,
-      projectName: match?.projectName ?? null,
-      billable: Boolean(match?.billable),
+      projectId: project.id,
+      projectName: project.name,
+      billable: project.billable,
     } satisfies AssistantTrackEventResult);
   })
   // ─── Memory management (what the assistant has remembered about the user) ─────────────

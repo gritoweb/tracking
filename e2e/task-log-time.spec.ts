@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { signUp } from "./auth";
+import { createProject } from "./project-helpers";
 
 /**
  * Converting a task into a time entry. The form is the confirmation step —
@@ -8,9 +9,7 @@ import { signUp } from "./auth";
  */
 async function seed(page: import("@playwright/test").Page) {
   await signUp(page);
-  const p = await (await page.request.post("/api/projects", {
-    data: { name: "ERP Migration", color: "#e11d48" },
-  })).json();
+  const p = await createProject(page, { name: "ERP Migration", color: "#e11d48" });
   await page.request.post("/api/tasks", {
     data: { name: "Cutover plan", projectId: p.id, estimatedSeconds: 7200 },
   });

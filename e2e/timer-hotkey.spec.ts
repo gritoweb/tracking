@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { signUp } from "./auth";
+import { createProject } from "./project-helpers";
 
 // Alt+Shift+S is advertised in the Start button's own tooltip, but it used to be
 // two different actions from one label:
@@ -14,10 +15,7 @@ test("Alt+Shift+S starts the staged draft, from inside the description field", a
 }) => {
   await signUp(page);
   const origin = new URL(page.url()).origin;
-  await page.request.post("/api/projects", {
-    data: { name: "Retainer", color: "#e11d48", billable: true },
-    headers: { origin },
-  });
+  await createProject(page, { name: "Retainer", color: "#e11d48", billable: true });
 
   await page.goto("/");
   await page.waitForSelector('header[aria-label="Timer controls"]');

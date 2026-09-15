@@ -23,6 +23,24 @@ const c = {
   brandDisabled: "var(--brand-disabled)",
 };
 
+interface ExtProject {
+  id: string;
+  name: string;
+  clientName: string | null;
+}
+
+/** Projects under their client, clients alphabetical; a project without a client comes last. */
+function groupByClient(projects: ExtProject[]): [string, ExtProject[]][] {
+  const groups = new Map<string, ExtProject[]>();
+  for (const project of projects) {
+    const client = project.clientName ?? "";
+    groups.set(client, [...(groups.get(client) ?? []), project]);
+  }
+  return [...groups.entries()].sort(([a], [b]) =>
+    a === "" ? 1 : b === "" ? -1 : a.localeCompare(b)
+  );
+}
+
 function formatElapsed(ms: number): string {
   const s = Math.floor(ms / 1000);
   const h = Math.floor(s / 3600);
@@ -47,6 +65,9 @@ export function Popup() {
   const [codeSent, setCodeSent] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [loginLoading, setLoginLoading] = useState(false);
+  const [projects, setProjects] = useState<ExtProject[]>([]);
+  const [projectId, setProjectId] = useState("");
+  const [startError, setStartError] = useState<string | null>(null);
 
   // Load state on mount. GET_STATE gives us the stored apiUrl + timer state (and
   // nudges the service worker to refresh timer state from the server). We then
@@ -91,6 +112,14 @@ export function Popup() {
     chrome.storage.onChanged.addListener(handler);
     return () => chrome.storage.onChanged.removeListener(handler);
   }, []);
+
+  // The Start needs a project (D3), so the list loads as soon as someone is signed in.
+  useEffect(() => {
+    if (!user) return;
+    chrome.runtime.sendMessage({ type: "LIST_PROJECTS" }, (res) => {
+      if (res?.ok) setProjects(res.projects);
+    });
+  }, [user]);
 
   // Tick
   useEffect(() => {
@@ -163,11 +192,18 @@ export function Popup() {
     setDescription("");
     setElapsed(0);
     setShowSettings(false);
+    setProjects([]);
+    setProjectId("");
   };
 
   const handleStart = () => {
+    if (!projectId) {
+      setStartError("Choose a project first");
+      return;
+    }
     setLoading(true);
-    chrome.runtime.sendMessage({ type: "START_TIMER", description }, (res) => {
+    setStartError(null);
+    chrome.runtime.sendMessage({ type: "START_TIMER", description, projectId }, (res) => {
       setLoading(false);
       if (res?.ok) {
         setTimerState({
@@ -175,8 +211,10 @@ export function Popup() {
           entryId: res.entry.id,
           startedAt: new Date(res.entry.start).getTime(),
           description,
-          projectId: null,
+          projectId,
         });
+      } else {
+        setStartError(res?.error ?? "Failed to start timer");
       }
     });
   };
@@ -415,10 +453,41 @@ export function Popup() {
               placeholder="What are you working on?"
               style={{ ...inputStyle, borderRadius: 6, padding: "8px 10px", marginBottom: 8 }}
             />
-            <button onClick={handleStart} disabled={loading} style={{
-              ...btnPrimary(loading),
-              background: loading ? "#94a3b8" : c.brand,
-            }}>
+            <select
+              value={projectId}
+              onChange={(e) => {
+                setProjectId(e.target.value);
+                setStartError(null);
+              }}
+              aria-label="Project"
+              style={{ ...inputStyle, borderRadius: 6, padding: "7px 8px", marginBottom: 8 }}
+            >
+              <option value="" disabled>
+                Choose project
+              </option>
+              {groupByClient(projects).map(([client, clientProjects]) => (
+                <optgroup key={client || "__no_client__"} label={client || "No client"}>
+                  {clientProjects.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+            {projects.length === 0 && (
+              <p style={{ fontSize: 12, color: c.fgMuted, margin: "0 0 8px" }}>
+                No projects yet — create one in Time Tracker first.
+              </p>
+            )}
+            {startError && (
+              <p style={{ fontSize: 12, color: c.brand, margin: "0 0 8px" }}>{startError}</p>
+            )}
+            <button
+              onClick={handleStart}
+              disabled={loading || !projectId}
+              style={btnPrimary(loading || !projectId)}
+            >
               {loading ? "Starting..." : "▶ Start"}
             </button>
           </div>

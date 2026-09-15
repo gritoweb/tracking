@@ -14,6 +14,15 @@ export function formatClient(row: Record<string, unknown>) {
   };
 }
 
+/** Whether `clientId` is an active (not archived) client of this workspace — the only kind a project may belong to. */
+export async function isActiveClient(db: D1Database, workspaceId: string, clientId: string): Promise<boolean> {
+  const row = await db
+    .prepare(`SELECT 1 FROM clients WHERE id = ? AND workspace_id = ? AND archived = 0`)
+    .bind(clientId, workspaceId)
+    .first();
+  return row !== null;
+}
+
 /** Shared by the REST route and the MCP `create_client` tool. */
 export async function createClient(db: D1Database, workspaceId: string, data: CreateClient) {
   const id = crypto.randomUUID();
