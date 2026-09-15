@@ -31,3 +31,9 @@ export async function createProject(
 export async function chooseProject(page: Page, name = E2E_PROJECT) {
   await page.getByRole("option", { name }).click();
 }
+
+/** Picks the bar's project up front: Start needs one and the picker never opens itself. */
+export async function pickProjectInBar(page: Page, name = E2E_PROJECT) {
+  await page.getByRole("button", { name: "Select project" }).first().click();
+  await chooseProject(page, name);
+}

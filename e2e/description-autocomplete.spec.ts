@@ -5,12 +5,12 @@ import { createProject } from "./project-helpers";
 /**
  * The timer bar's description suggestions.
  *
- * The click case is the one that regressed: the field is a Popover *Anchor*,
- * not a *Trigger*, so Radix's dismissable layer counted the very focus that
- * opened the list as an outside interaction and dismissed it — a ~230ms flash,
- * after which the field still held focus, so clicking again did nothing.
- * Asserting it is STILL open after a beat is the whole point; a plain
- * toBeVisible() passes during the flash.
+ * Typing opens the list; focus alone does not — the entry dialogs autofocus
+ * this field, and a dropdown that greets you covers the form you came to fill.
+ * Once open it must STAY open: the field is a Popover *Anchor*, not a
+ * *Trigger*, so Radix's dismissable layer used to count the very interaction
+ * that opened the list as an outside one and dismissed it after ~230ms. A
+ * plain toBeVisible() passes during that flash, so the wait below is the point.
  */
 test.describe("description autocomplete", () => {
   test.beforeEach(async ({ page }) => {
@@ -31,9 +31,15 @@ test.describe("description autocomplete", () => {
     await page.reload();
   });
 
-  test("clicking the field opens the list and keeps it open", async ({ page }) => {
+  test("focus alone leaves it shut; typing opens it and keeps it open", async ({ page }) => {
+    const input = page.getByPlaceholder("What are you working on?");
     const list = page.locator("#description-suggestions");
-    await page.getByPlaceholder("What are you working on?").click();
+
+    await input.click();
+    await page.waitForTimeout(400);
+    await expect(list).toBeHidden();
+
+    await input.pressSequentially("ho");
     await expect(list).toBeVisible();
     // Long enough to outlast the exit animation the flash was hiding behind.
     await page.waitForTimeout(700);
@@ -44,7 +50,7 @@ test.describe("description autocomplete", () => {
     const input = page.getByPlaceholder("What are you working on?");
     const list = page.locator("#description-suggestions");
 
-    await input.click();
+    await input.pressSequentially("ho");
     await expect(list).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(list).toBeHidden();
@@ -62,7 +68,7 @@ test.describe("description autocomplete", () => {
     // Focus genuinely leaving still dismisses — that path is the field's own
     // onBlur, which is why the Radix focus-outside check was safe to suppress.
     await input.fill("");
-    await input.click();
+    await input.pressSequentially("ho");
     await expect(list).toBeVisible();
     await page.getByRole("link", { name: "Projects" }).first().focus();
     await expect(list).toBeHidden();

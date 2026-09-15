@@ -36,12 +36,11 @@ export function spreadColor(index: number): string {
   return DISTINCT_COLORS[((index % DISTINCT_COLORS.length) + DISTINCT_COLORS.length) % DISTINCT_COLORS.length];
 }
 
-// Deterministic color for a tag name so the same name always gets the same
-// swatch (until the user overrides it). Simple string hash → palette index.
-export function colorForTagName(name: string): string {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = (hash * 31 + name.charCodeAt(i)) | 0;
-  }
-  return TAG_COLORS[Math.abs(hash) % TAG_COLORS.length];
+/** Palette colour for a new tag: first one this workspace isn't using, else random. */
+export function pickUnusedColor(used: Iterable<string>): string {
+  const taken = new Set(used);
+  return (
+    TAG_COLORS.find((c) => !taken.has(c)) ??
+    TAG_COLORS[Math.floor(Math.random() * TAG_COLORS.length)]
+  );
 }

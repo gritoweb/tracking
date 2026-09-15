@@ -34,7 +34,10 @@ export function TimerBar() {
   const setConfirmDiscard = useUIStore((s) => s.setDiscardConfirmOpen);
 
   const [description, setDescription] = useState("");
-  const [projectId, setProjectId] = useState<string | null>(null);
+  // Opens on the last project used: a bar that forgets it asks for one on every start.
+  const [projectId, setProjectId] = useState<string | null>(
+    () => useUIStore.getState().lastProjectId
+  );
   const [taskId, setTaskId] = useState<string | null>(null);
   // Tags carried over from a picked suggestion (or synced from the running
   // entry). The bar has no tag *picker* — chips are removable but only ever
@@ -60,7 +63,6 @@ export function TimerBar() {
       if (pendingStart.description !== undefined) setDescription(pendingStart.description);
       if (pendingStart.tags) setTags(pendingStart.tags);
       if (pendingStart.billable !== undefined) setBillable(pendingStart.billable);
-      setProjectPickerOpen(true);
     }
   }
 
@@ -91,7 +93,7 @@ export function TimerBar() {
     setSyncedTaskId(runningEntry?.taskId ?? null);
     setSyncedTagsKey(tagsKey);
     setDescription(runningEntry?.description ?? "");
-    setProjectId(runningEntry?.projectId ?? null);
+    setProjectId(runningEntry?.projectId ?? useUIStore.getState().lastProjectId);
     setTaskId(runningEntry?.taskId ?? null);
     setTags(runningEntry?.tags ?? []);
     // On stop (runningEntry → null) the bar resets to the user's preference,
@@ -307,6 +309,7 @@ export function TimerBar() {
         }}
         onChange={(id) => {
           setProjectId(id);
+          useUIStore.getState().setLastProjectId(id);
           setTaskId(null);
           // Picking a project answers "is this invoiceable?" for the user —
           // that's what the project's own billable flag is for. An explicit
@@ -421,7 +424,12 @@ export function TimerBar() {
         )}
 
         {/* Combined elapsed + Start/Stop capsule */}
-        <TimerControl isRunning={isRunning} onStart={handleStart} onStop={handleStop} />
+        <TimerControl
+          isRunning={isRunning}
+          onStart={handleStart}
+          onStop={handleStop}
+          startDisabled={!projectId}
+        />
 
         <AssistantButton />
       </div>

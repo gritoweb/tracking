@@ -166,6 +166,8 @@ export function DescriptionAutocomplete({
     id,
     value,
     autoFocus,
+    // Typing opens the list, focus does not: the entry dialogs autofocus this
+    // field, and a dropdown that greets you covers the form you came to fill.
     onChange: (
       e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
     ) => {
@@ -173,7 +175,6 @@ export function DescriptionAutocomplete({
       setOpen(true);
       setActive(-1);
     },
-    onFocus: () => setOpen(true),
     onBlur: (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       // Ignore blur caused by clicking a row — the row's mousedown handler
       // commits it; closing here first would cancel the click.

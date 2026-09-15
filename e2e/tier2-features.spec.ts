@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { signUp } from "./auth";
-import { chooseProject, createProject } from "./project-helpers";
+import { chooseProject, createProject, pickProjectInBar } from "./project-helpers";
 
 
 test("tag colors: recolor an existing tag in the entry dialog", async ({ page }) => {
@@ -65,8 +65,8 @@ test("timer stop: day total stays put (optimistic), entry lands with duration", 
   await page.reload();
 
   await page.getByPlaceholder("What are you working on?").fill("Focus block");
+  await pickProjectInBar(page);
   await page.getByRole("button", { name: "Start" }).click();
-  await chooseProject(page);
   await expect(page.getByRole("button", { name: "Stop" })).toBeVisible();
   await page.waitForTimeout(2000); // accrue a couple seconds
 
@@ -75,4 +75,26 @@ test("timer stop: day total stays put (optimistic), entry lands with duration", 
   // duration — the day total should not collapse to 0 during the refetch.
   await expect(page.getByRole("button", { name: "Start" })).toBeVisible();
   await expect(page.getByText("Focus block").first()).toBeVisible();
+});
+
+test("new tags walk the palette instead of landing on the same colour", async ({ page }) => {
+  await signUp(page);
+  const project = await createProject(page);
+
+  for (const [i, tag] of ["alpha", "beta", "gamma", "delta"].entries()) {
+    const res = await page.request.post("/api/time_entries", {
+      data: {
+        description: `Tagged ${i}`,
+        projectId: project.id,
+        start: new Date(Date.now() - (i + 2) * 3600_000).toISOString(),
+        stop: new Date(Date.now() - (i + 1) * 3600_000).toISOString(),
+        tags: [tag],
+      },
+    });
+    expect(res.status()).toBe(201);
+  }
+
+  const tags = (await (await page.request.get("/api/tags")).json()) as { color: string }[];
+  expect(tags).toHaveLength(4);
+  expect(new Set(tags.map((t) => t.color)).size).toBe(4);
 });

@@ -1,4 +1,4 @@
-import { colorForTagName } from "../lib/colors";
+import { pickUnusedColor } from "../lib/colors";
 
 // Helper to broadcast events via Durable Object
 export async function broadcast(
@@ -197,6 +197,19 @@ export async function upsertTags(
 ): Promise<void> {
   if (!tagNames.length) return;
 
+  // Colours already in play, so a new tag lands on a free one — hashing the name
+  // clustered short words into the same few blues.
+  const { results: inUse } = await db
+    .prepare(`SELECT DISTINCT color FROM tags WHERE workspace_id = ?`)
+    .bind(workspaceId)
+    .all<{ color: string | null }>();
+  const taken = new Set(inUse.map((r) => r.color).filter((c): c is string => Boolean(c)));
+  const nextColor = () => {
+    const color = pickUnusedColor(taken);
+    taken.add(color);
+    return color;
+  };
+
   // Single atomic batch (1 D1 round trip) instead of 3 serial queries per tag:
   // create any missing tags, then link the entry to all of them by name.
   const insertTag = db.prepare(
@@ -205,7 +218,7 @@ export async function upsertTags(
   const placeholders = tagNames.map(() => "?").join(",");
   await db.batch([
     ...tagNames.map((name) =>
-      insertTag.bind(crypto.randomUUID(), workspaceId, name, colorForTagName(name))
+      insertTag.bind(crypto.randomUUID(), workspaceId, name, nextColor())
     ),
     db
       .prepare(

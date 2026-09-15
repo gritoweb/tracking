@@ -56,6 +56,8 @@ interface UIStore {
   discardConfirmOpen: boolean;
   // Set when a start lacks a project: the timer bar opens its picker and starts once one is chosen.
   pendingStart: PendingStart | null;
+  /** The last project a timer started on, so the bar opens on it instead of asking again. */
+  lastProjectId: string | null;
   // AI Quick Add dialog — global so it can be opened from the Timer header and
   // the Assistant panel (which is mounted app-wide). Transient, never persisted.
   quickAddOpen: boolean;
@@ -112,6 +114,7 @@ interface UIStore {
   openShortcuts: () => void;
   setDiscardConfirmOpen: (v: boolean) => void;
   setPendingStart: (v: PendingStart | null) => void;
+  setLastProjectId: (v: string | null) => void;
   setQuickAddOpen: (v: boolean) => void;
   openQuickAdd: () => void;
   flashEntry: (id: string) => void;
@@ -168,6 +171,7 @@ export const useUIStore = create<UIStore>()(
       shortcutsOpen: false,
       discardConfirmOpen: false,
       pendingStart: null,
+      lastProjectId: null,
       quickAddOpen: false,
       highlightedEntryId: null,
       pinnedEntryId: null,
@@ -227,6 +231,7 @@ export const useUIStore = create<UIStore>()(
       openShortcuts: () => set({ shortcutsOpen: true }),
       setDiscardConfirmOpen: (v) => set({ discardConfirmOpen: v }),
       setPendingStart: (v) => set({ pendingStart: v }),
+      setLastProjectId: (v) => set({ lastProjectId: v }),
       setQuickAddOpen: (v) => set({ quickAddOpen: v }),
       openQuickAdd: () => set({ quickAddOpen: true }),
       clearPinnedEntry: () => set({ pinnedEntryId: null }),
@@ -275,6 +280,7 @@ export const useUIStore = create<UIStore>()(
         weekStart: s.weekStart,
         showWeekends: s.showWeekends,
         autoAssignColors: s.autoAssignColors,
+        lastProjectId: s.lastProjectId,
         productivity: s.productivity,
       }),
     }

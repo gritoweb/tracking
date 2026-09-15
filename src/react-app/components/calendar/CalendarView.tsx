@@ -1,4 +1,4 @@
-import { forwardRef } from "react";
+import { forwardRef, useCallback, useRef } from "react";
 import FullCalendar from "@fullcalendar/react";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import dayGridPlugin from "@fullcalendar/daygrid";
@@ -91,8 +91,30 @@ export const CalendarView = forwardRef<FullCalendar, CalendarViewProps>(
       ? ({ hour: "numeric", minute: "2-digit", hour12: true, meridiem: true } as const)
       : ({ hour: "2-digit", minute: "2-digit", hour12: false, meridiem: false } as const);
 
+    // FullCalendar renders the drag/resize preview at full column width, straight
+    // over the blocks beside it. These pin it to the share the dragged block holds.
+    const hostRef = useRef<HTMLDivElement>(null);
+
+    const pinMirror = useCallback((el: HTMLElement) => {
+      const harness = el.closest(".fc-timegrid-event-harness");
+      const column = el.closest(".fc-timegrid-col-events");
+      const host = hostRef.current;
+      if (!harness || !column || !host) return;
+      const block = harness.getBoundingClientRect();
+      const col = column.getBoundingClientRect();
+      if (!col.width) return;
+      host.style.setProperty("--tt-mirror-left", `${((block.left - col.left) / col.width) * 100}%`);
+      host.style.setProperty("--tt-mirror-right", `${((col.right - block.right) / col.width) * 100}%`);
+    }, []);
+
+    const releaseMirror = useCallback(() => {
+      hostRef.current?.style.removeProperty("--tt-mirror-left");
+      hostRef.current?.style.removeProperty("--tt-mirror-right");
+    }, []);
+
     return (
       <div
+        ref={hostRef}
         className="tt-calendar min-h-0 flex-1"
         style={{ ["--fc-slot-height" as string]: `${slotHeight}px` }}
       >
@@ -147,6 +169,10 @@ export const CalendarView = forwardRef<FullCalendar, CalendarViewProps>(
           dateClick={(arg: DateClickArg) => onDateClick(arg.date.toISOString())}
           eventDrop={onEventDrop}
           eventResize={onEventResize}
+          eventDragStart={(info) => pinMirror(info.el)}
+          eventDragStop={releaseMirror}
+          eventResizeStart={(info) => pinMirror(info.el)}
+          eventResizeStop={releaseMirror}
           eventClick={onEventClick}
           datesSet={onDatesSet}
           droppable={Boolean(onExternalDrop)}

@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { signUp } from "./auth";
 import { fillTimeRange, pickDate } from "./entry-helpers";
-import { chooseProject, createProject } from "./project-helpers";
+import { chooseProject, createProject, pickProjectInBar } from "./project-helpers";
 
 test.describe("manual one-off time entry", () => {
   test.beforeEach(async ({ page }) => {
@@ -47,8 +47,8 @@ test.describe("manual one-off time entry", () => {
   test("does not affect a currently running timer", async ({ page }) => {
     // Start the timer via the running-timer bar on the Timer page.
     await page.getByPlaceholder("What are you working on?").fill("Running task");
+    await pickProjectInBar(page);
     await page.getByRole("button", { name: "Start" }).click();
-    await chooseProject(page);
     await expect(page.getByRole("button", { name: "Stop" })).toBeVisible();
 
     await page.getByRole("button", { name: "Add entry" }).click();

@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { useTimerStore } from "@/stores/timerStore";
 import { useUIStore } from "@/stores/uiStore";
 import { invalidateEntryDerived } from "@/hooks/useEntries";
+import { useProjects } from "@/hooks/useProjects";
 import { api } from "@/lib/api";
 import { formatSeconds, formatDurationShort } from "@/lib/dateUtils";
 import { saveTimerState, clearTimerState, loadTimerState } from "@/lib/idb";
@@ -46,6 +47,8 @@ export interface StartTimerInput {
 export function useTimer() {
   const { runningEntry, setRunningEntry, clearTimer } = useTimerStore();
   const queryClient = useQueryClient();
+  // Only to check the remembered project still exists before starting on it.
+  const { data: projects = [] } = useProjects();
 
   // Optimistically drop the just-started entry into the cached time-entries
   // ranges that actually contain it, so it appears in the list immediately
@@ -357,14 +360,20 @@ export function useTimer() {
 
   const startTimer = useCallback(
     (partial: StartTimerInput = {}) => {
-      // Every entry needs a project (D3): the timer bar asks for one and starts once it's picked.
-      if (!partial.projectId) {
-        useUIStore.getState().setPendingStart(partial);
+      // Every entry needs a project (D3). Reuse the last one rather than interrupting
+      // with a picker on every start; only a first-ever start has nothing to fall back on.
+      const { lastProjectId, setPendingStart } = useUIStore.getState();
+      const remembered = projects.some((p) => p.id === lastProjectId) ? lastProjectId : null;
+      const projectId = partial.projectId ?? remembered;
+      if (!projectId) {
+        setPendingStart(partial);
+        toast.error("Choose a project to start");
         return;
       }
-      startMutation.mutate(partial);
+      useUIStore.getState().setLastProjectId(projectId);
+      startMutation.mutate({ ...partial, projectId });
     },
-    [startMutation]
+    [startMutation, projects]
   );
 
   const stopTimer = useCallback(() => {

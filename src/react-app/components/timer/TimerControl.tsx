@@ -12,6 +12,8 @@ import { cn } from "@/lib/utils";
 interface TimerControlProps {
   isRunning: boolean;
   onStart: () => void;
+  /** No project chosen yet: every entry needs one, and the picker is one click away. */
+  startDisabled?: boolean;
   onStop: () => void;
 }
 
@@ -37,7 +39,7 @@ interface TimerControlProps {
  * click fires, before the create/stop request round-trips, so there's no
  * loading state to show; a failed request reverts itself and toasts.
  */
-export function TimerControl({ isRunning, onStart, onStop }: TimerControlProps) {
+export function TimerControl({ isRunning, onStart, onStop, startDisabled = false }: TimerControlProps) {
   const { elapsed } = useTimerStore();
   const { editElapsed } = useTimer();
 
@@ -138,6 +140,8 @@ export function TimerControl({ isRunning, onStart, onStop }: TimerControlProps) 
               // matching every other 40px button in the app.
               size="icon-lg"
               onClick={isRunning ? onStop : onStart}
+              disabled={!isRunning && startDisabled}
+              title={!isRunning && startDisabled ? "Choose a project to start" : undefined}
               className="tt-touch relative cursor-pointer rounded-full"
               aria-label={isRunning ? "Stop timer" : "Start timer"}
             >

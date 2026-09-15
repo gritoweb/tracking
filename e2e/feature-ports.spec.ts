@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { signUp } from "./auth";
-import { chooseProject, createProject } from "./project-helpers";
+import { createProject, pickProjectInBar } from "./project-helpers";
 
 // Regression coverage for the Toggl-inspired feature ports: favorites,
 // calendar month view, and the productivity settings.
@@ -17,10 +17,16 @@ test("favorites: save current draft and start from it", async ({ page }) => {
   // The menu stays open on save; the new favorite appears as a startable item.
   await expect(page.getByRole("menuitem", { name: /Design review/ })).toBeVisible();
 
-  // The favorite has no project, so starting it asks for one first (D3).
+  // The favorite carries no project and nothing has been picked yet, so starting
+  // it says so instead of opening a picker over the menu.
   await page.getByRole("menuitem", { name: /Design review/ }).click();
-  await chooseProject(page);
-  await expect(page.getByRole("button", { name: "Stop" })).toBeVisible();
+  await expect(page.getByText("Choose a project to start")).toBeVisible();
+
+  // The start waits for a project instead of being dropped: picking one in the
+  // bar runs it. The open menu aria-hides the rest of the page, so close it first.
+  await page.keyboard.press("Escape");
+  await pickProjectInBar(page);
+  await expect(page.getByRole("button", { name: "Stop timer" })).toBeVisible();
 });
 
 test("calendar: month view renders", async ({ page }) => {

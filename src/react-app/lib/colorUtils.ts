@@ -61,6 +61,11 @@ export function nextProjectColor(usedColors: string[]): string {
   );
 }
 
+/** A palette colour at random — for when the user turned distinct auto-assign off. */
+export function randomProjectColor(): string {
+  return DISTINCT_COLORS[Math.floor(Math.random() * DISTINCT_COLORS.length)];
+}
+
 export function getContrastColor(hex: string): string {
   const r = parseInt(hex.slice(1, 3), 16);
   const g = parseInt(hex.slice(3, 5), 16);

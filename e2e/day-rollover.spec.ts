@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { signUp } from "./auth";
-import { chooseProject, createProject } from "./project-helpers";
+import { createProject, pickProjectInBar } from "./project-helpers";
 
 // A fixed timezone west of UTC: the local date and the UTC date differ for
 // everything tracked after 18:00, which is what the day-key bucketing has to
@@ -28,8 +28,8 @@ test.describe("day boundaries in the Timer list", () => {
     const list = page.getByRole("tabpanel");
     const input = page.getByPlaceholder("What are you working on?");
     await input.fill("After midnight task");
+    await pickProjectInBar(page);
     await page.getByRole("button", { name: "Start timer" }).click();
-    await chooseProject(page);
     await expect(page.getByRole("button", { name: "Stop timer" })).toBeVisible();
     await expect(list.getByText("After midnight task")).toBeVisible();
 

@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { test, expect, type Browser, type Page } from "@playwright/test";
 import { signUp } from "./auth";
 import { workspaceWithMember } from "./team";
-import { createProject } from "./project-helpers";
+import { E2E_PROJECT, createProject } from "./project-helpers";
 
 // A member's hours are theirs alone; owners and admins see the team and can split it by person (D3).
 // Most reads below are forged requests a member's screen never makes: the server is the boundary.
@@ -152,4 +152,40 @@ test("Hide amounts keeps money out of the CSV export", async ({ page }) => {
   const hidden = await exportCsv();
   expect(hidden.split("\n")[0]).not.toContain("Amount");
   expect(hidden).toContain("Client-facing work");
+});
+
+test("demoting yourself takes the manager-only controls off the screen at once", async ({
+  browser,
+}) => {
+  const { owner, ownerHeaders, member, workspaceId } = await workspaceWithMember(browser);
+  await createProject(owner);
+
+  // The member has to be an admin first — an owner can't demote themselves.
+  const org = await (
+    await owner.request.get(
+      `/api/auth/organization/get-full-organization?organizationId=${workspaceId}`
+    )
+  ).json();
+  const memberRow = (org.members as { id: string; role: string }[]).find((m) => m.role === "member");
+  const promoted = await owner.request.post("/api/auth/organization/update-member-role", {
+    data: { memberId: memberRow!.id, role: "admin", organizationId: workspaceId },
+    headers: ownerHeaders,
+  });
+  expect(promoted.ok(), await promoted.text()).toBeTruthy();
+
+  await member.goto("/projects");
+  const rowActions = member.getByRole("button", { name: "Project actions" });
+  await expect(rowActions.first()).toBeVisible();
+
+  // Demote self under Settings → Workspace, then walk back without reloading.
+  await member.goto("/settings");
+  await member.getByRole("tab", { name: /workspace/i }).click();
+  await member.getByRole("combobox", { name: /^Role for / }).click();
+  await member.getByRole("option", { name: "member" }).click();
+  await expect(member.getByText("Role updated")).toBeVisible();
+
+  await member.getByRole("link", { name: "Projects" }).click();
+  // Wait for the row itself, or "no actions" would pass while the list is still loading.
+  await expect(member.getByText(E2E_PROJECT).first()).toBeVisible();
+  await expect(rowActions).toHaveCount(0);
 });

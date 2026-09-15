@@ -56,6 +56,20 @@
   border-color: var(--border);
 }
 
+/* FullCalendar's own gutter is 2px left and 2.5% right, so a day column leaves a
+   growing empty strip on the right. The left gap is a real margin, the right one
+   is the inset gutter each block draws (below), which makes both read as 3px. */
+.tt-calendar .fc .fc-timegrid-col-events {
+  margin-inline: 3px 0;
+}
+
+/* The drag preview is rendered full-width over its neighbours; CalendarView pins
+   it to the dragged block's own share of the column through these vars. */
+.tt-calendar .fc-timegrid-event-harness:has(.fc-event-mirror) {
+  left: var(--tt-mirror-left, 0) !important;
+  right: var(--tt-mirror-right, 0) !important;
+}
+
 /* Events: rounded, no heavy default chrome; our renderer supplies the content. */
 .tt-calendar .fc .fc-timegrid-event {
   border-radius: var(--radius-sm);

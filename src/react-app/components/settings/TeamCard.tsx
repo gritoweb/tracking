@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +22,7 @@ import { X, Mail } from "lucide-react";
 import { toast } from "sonner";
 
 export function TeamCard() {
+  const queryClient = useQueryClient();
   const { data: orgs, isPending: orgsPending } = authClient.useListOrganizations();
   const { session, user } = useAuth();
   const organizationId =
@@ -92,6 +93,10 @@ export function TeamCard() {
       return;
     }
     toast.success("Role updated");
+    // Demoting yourself has to reach the cached role too, or manager-only controls
+    // stay on screen until a reload.
+    await queryClient.invalidateQueries({ queryKey: ["me"] });
+    await queryClient.invalidateQueries({ queryKey: ["workspace-members"] });
     refetch();
   };
 
@@ -106,6 +111,7 @@ export function TeamCard() {
       return;
     }
     toast.success("Member removed");
+    await queryClient.invalidateQueries({ queryKey: ["workspace-members"] });
     refetch();
   };
 

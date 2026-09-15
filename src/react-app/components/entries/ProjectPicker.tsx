@@ -34,7 +34,7 @@ import {
   useCreateClient,
 } from "@/hooks/useProjects";
 import { useUIStore } from "@/stores/uiStore";
-import { nextProjectColor, PROJECT_COLORS } from "@/lib/colorUtils";
+import { nextProjectColor, randomProjectColor } from "@/lib/colorUtils";
 
 interface ProjectPickerProps {
   value: string | null;
@@ -157,7 +157,7 @@ export function ProjectPicker({
       name,
       color: autoAssignColors
         ? nextProjectColor(projects.map((p) => p.color))
-        : PROJECT_COLORS[9],
+        : randomProjectColor(),
       billable: false,
       clientId,
     });
