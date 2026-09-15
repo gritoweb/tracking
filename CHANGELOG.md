@@ -1,5 +1,29 @@
 # Changelog
 
+## 2026-09-15 (3)
+### Fixed
+- **The project-with-a-client rule reached three paths that were still deciding on their own.**
+  The audit of every way time can be written found the rule enforced at the REST entry routes, the
+  recurring routes and the MCP `log_time`/`start_timer`, and missing in three places that query
+  projects themselves: `loadGroundingProjects` (`lib/ai.ts`) listed every active project with no
+  regard for its client, which is the list the Assistant matches a spoken project name against, the
+  one AI Quick Add resolves through, the one day-drafting proposes from, and the one calendar
+  auto-track infers meetings into — so a pre-client project could still take time through any of
+  them; and `POST /drafts/confirm` re-checked `active = 1` in its own batch query without the client.
+  Both now require `client_id IS NOT NULL`, so the rule holds at the timer bar, the API, the MCP, the
+  Assistant, Quick Add, drafts, recurring templates and the calendar alike. Deleting a client was
+  checked too and is safe: the route archives rather than deletes, so the schema's
+  `ON DELETE SET NULL` never fires and no project loses its client behind the app's back.
+- **The MCP asks instead of assuming.** Its refusals named `list_projects` but left the model free to
+  pick a project or invent a client to satisfy the call. The server instructions now say to ask the
+  person and wait, the refusal texts repeat it at the point of failure (so a model that skipped the
+  instructions still can't choose quietly), `start_timer`'s description no longer reads as if the
+  project were optional, and `list_projects` marks a pre-client project with `needsClient: true`
+  rather than leaving a model to discover it by being refused.
+  Verified: `pnpm build` exit 0, `pnpm lint` 0 errors, 20/20 across `project-required`, `assistant`,
+  `drafts-review`, `calendar-create`, `calendar-providers`, `mcp` and `description-autocomplete`,
+  including a new test that asserts the refusal text sends the model back to the person.
+
 ## 2026-09-15 (2)
 ### Changed
 - **The client is created where the hours are logged, and no project takes time without one.**
