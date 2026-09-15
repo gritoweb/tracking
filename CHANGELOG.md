@@ -20,9 +20,14 @@
   and zero orphan rows across entries, projects, clients, tags, members, invitations and entry-tags.
   Restore point if ever needed: D1 time-travel bookmark
   `00000494-00000002-000050e7-9f28d36658336232903d2a84e49eda36` (taken immediately before the delete).
-  Two accounts now belong to no workspace (`lluispaulop@gmail.com`, `teste-prod-verify@gritoweb.com.br`):
-  they can still sign in and land on "You're not in a workspace yet"; deleting the users themselves
-  was deliberately left for a separate decision.
+  The two accounts left without a workspace (`lluispaulop@gmail.com`,
+  `teste-prod-verify@gritoweb.com.br`) were deleted too, row by row across the Better Auth tables
+  (`account`, `session`, `passkey`, `twoFactor`, `verification`) and every table keyed by a user
+  (`member`, `api_keys`, `assistant_memory`, `draft_entries`, `project_allocations`, `saved_reports`,
+  `invitation.inviterId`). Production now holds exactly three accounts — `suporte@`, `luis@` and
+  `richard@`, all verified, all in the one workspace — with zero orphan accounts, sessions, members
+  or author references. Bookmark before that deletion:
+  `00000496-00000000-000050e7-40c60120222f61aa719b55bb1a0d4715`.
 
 ## 2026-09-15 (8)
 ### Fixed
