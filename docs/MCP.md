@@ -114,15 +114,15 @@ reach — 7 on a read key, 13 on read+write.
 
 | Tool | Scope | Notes |
 |---|---|---|
-| `list_projects` | read | Ids, client, billable default, rate, budget, tracked total |
+| `list_projects` | read | Ids, client, billable default, rate, budget, tracked total; `needsClient` marks one that can't take time yet |
 | `list_clients` | read | With project counts |
 | `get_time_summary` | read | Totals over a range, grouped by project/client/task/tag; a member's key counts only their own time |
 | `list_time_entries` | read | Individual entries, optional description search; a member's key lists only their own |
 | `get_project_pacing` | read | Budget spent, burn rate, projected overrun; owners and admins only |
 | `get_running_timer` | read | What's running now, and for how long |
 | `list_drafts` | read | Proposals awaiting review, with why each was proposed |
-| `create_client` | read+write | New client; **not** idempotent — check `list_clients` first |
-| `create_project` | read+write | New project under a client (required); a member's rate and budget are dropped; **not** idempotent |
+| `create_client` | read+write | New client, only when the person asked for it; **not** idempotent — check `list_clients` first |
+| `create_project` | read+write | New project under an active client (required, never invented); a member's rate and budget are dropped; **not** idempotent |
 | `start_timer` | read+write | Needs a `projectId`; stops your own running timer first, as the app does |
 | `stop_timer` | read+write | Idempotent — a second call is a no-op |
 | `log_time` | read+write | A completed entry; needs a `projectId`; **not** idempotent by design |
@@ -147,6 +147,13 @@ context. They cover the things a tool schema can't say:
   This is advisory: if a "yesterday" answer looks shifted by a few hours, this is
   the first thing to suspect.
 - Look project ids up with `list_projects` rather than guessing them.
+- **Ask, don't assume.** Every entry needs a project and every project a client.
+  When the person didn't say which, the model is told to ask and wait — never to
+  pick one, and never to create a project or client to get past a refusal. The
+  refusals say so too, so a model that ignores the instructions still can't
+  quietly choose for someone.
+- A project listed with `needsClient: true` predates that rule and takes no time
+  until a person links its client in the app (the project picker offers it).
 - `get_time_summary` for "how much", `list_time_entries` for "what".
 - A project with no rate contributes 0 to any amount — that's "no rate set",
   never "earned nothing".

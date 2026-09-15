@@ -88,6 +88,8 @@ const SERVER_INSTRUCTIONS = `TimeTracker holds one workspace's tracked time: ent
 Working with it:
 - Date ranges are the USER'S local calendar days. Pass \`timezoneOffsetMinutes\` (JS getTimezoneOffset sign: west of UTC is positive) on any tool that takes one, or the range silently means UTC days.
 - Call \`list_projects\` before anything that takes a project id; ids are opaque and must never be guessed.
+- Every entry needs a project, and every project a client. When the person didn't say which, ASK them and wait — never pick a project or client for them, and never create one to get past a refusal.
+- A project listed with \`needsClient: true\` cannot take time until someone links its client in the app; offer that instead of logging elsewhere.
 - Use \`get_time_summary\` for "how much" and \`list_time_entries\` for "what was worked on".
 - Money comes from each project's own hourly rate. A project with no rate contributes 0 to any amount — report that as "no rate set", never as "earned nothing".
 - Drafted entries are PROPOSALS, not tracked time. They appear in no report and no total until a person reviews and confirms them in the app; \`draft_day\` creates them, it does not log time.
@@ -165,7 +167,7 @@ export function buildMcpServer(ctx: McpContext): McpServer {
     {
       title: "List projects",
       description:
-        "Every active project in the workspace with its client, billable default, hourly rate, time budget and total tracked time. Call this first when a question names a project or client.",
+        "Every active project in the workspace with its client, billable default, hourly rate, time budget and total tracked time. Call this first when a question names a project or client. `needsClient: true` marks a project that cannot take time until a person links its client in the app.",
       inputSchema: {},
       annotations: READ_ONLY,
     },
@@ -192,6 +194,7 @@ export function buildMcpServer(ctx: McpContext): McpServer {
           id: r.id,
           name: r.name,
           client: r.client_name ?? null,
+          needsClient: r.client_name == null,
           billable: Boolean(r.billable),
           hourlyRate: r.rate ?? null,
           budgetHours: manager ? (r.estimated_hours ?? null) : null,
@@ -494,7 +497,7 @@ export function buildMcpServer(ctx: McpContext): McpServer {
     {
       title: "Create a client",
       description:
-        "Add a new client to the workspace. Use list_clients first to check one doesn't already exist under a slightly different name.",
+        "Add a new client to the workspace. Only when the person asked for this client by name — never invent one to satisfy another call. Use list_clients first to check it doesn't already exist under a slightly different name.",
       inputSchema: CreateClientSchema.shape,
       // Deliberately NOT idempotent: calling it twice makes two clients of the
       // same name, matching create_project and log_time.
@@ -511,13 +514,13 @@ export function buildMcpServer(ctx: McpContext): McpServer {
     {
       title: "Create a project",
       description:
-        "Add a new project to the workspace under a client — every project needs one. Use list_clients first to get a clientId rather than guessing one.",
+        "Add a new project to the workspace under a client — every project needs one. Only when the person asked for this project. Use list_clients for the clientId and ask them which client when they didn't name one; never guess it or invent a client.",
       inputSchema: CreateProjectSchema.shape,
       annotations: MUTATES,
     },
     async (data) => {
       if (!(await isActiveClient(db, workspaceId, data.clientId))) {
-        return text(`No active client with id ${data.clientId} in this workspace. Use list_clients.`);
+        return text(`No active client with id ${data.clientId} in this workspace. Call list_clients and ask the person which client this project belongs to.`);
       }
       const manager = (await scopeUserId()) === null;
       const project = await createProject(db, workspaceId, manager ? data : memberProjectInput(data));
@@ -530,10 +533,10 @@ export function buildMcpServer(ctx: McpContext): McpServer {
     {
       title: "Start a timer",
       description:
-        "Start tracking time now. Stops any timer already running, exactly as the app's own timer bar does. Pass a project id from list_projects when the work belongs to one.",
+        "Start tracking time now. Stops any timer already running, exactly as the app's own timer bar does. Needs a project id from list_projects; ask the person which project when they didn't name one.",
       inputSchema: {
         description: z.string().max(2000).describe("What is being worked on"),
-        projectId: z.string().describe("A project id from list_projects — every entry needs one"),
+        projectId: z.string().describe("A project id from list_projects — every entry needs one; ask the person rather than choosing for them"),
       },
       annotations: MUTATES,
     },
@@ -545,7 +548,7 @@ export function buildMcpServer(ctx: McpContext): McpServer {
       // REST path — a timer started from a chat window must not land
       // non-billable when the same work started in the app wouldn't.
       const project = await findActiveProject(db, workspaceId, projectId);
-      if (!project) return text(`No active project with id ${projectId} in this workspace, or it has no client yet. Use list_projects.`);
+      if (!project) return text(`No active project with id ${projectId} in this workspace, or it has no client yet. Call list_projects and ask the person which project to use — don't choose one for them.`);
       const billable = project.billable;
 
       // Stops only the key holder's running timer; a teammate's keeps going.
@@ -622,7 +625,7 @@ export function buildMcpServer(ctx: McpContext): McpServer {
         description: z.string().max(2000).describe("What the work was"),
         start: z.string().describe("ISO 8601 start instant, e.g. 2026-08-24T14:00:00Z"),
         stop: z.string().describe("ISO 8601 stop instant, after start"),
-        projectId: z.string().describe("A project id from list_projects — every entry needs one"),
+        projectId: z.string().describe("A project id from list_projects — every entry needs one; ask the person rather than choosing for them"),
         billable: z
           .boolean()
           .optional()
@@ -641,7 +644,7 @@ export function buildMcpServer(ctx: McpContext): McpServer {
       if (stopMs <= startMs) return text("stop must be after start.");
 
       const project = await findActiveProject(db, workspaceId, projectId);
-      if (!project) return text(`No active project with id ${projectId} in this workspace, or it has no client yet. Use list_projects.`);
+      if (!project) return text(`No active project with id ${projectId} in this workspace, or it has no client yet. Call list_projects and ask the person which project to use — don't choose one for them.`);
       const resolvedBillable = billable ?? project.billable;
 
       const now = new Date().toISOString();

@@ -197,6 +197,7 @@ Do not invent work that isn't listed, do not moralise, do not give advice, and d
 
 /** Active projects (+tasks) shaped for AI grounding. Shared by the AI routes,
  *  calendar materialization, and the assistant's track-event action. */
+// Only projects that can take time: the Assistant, Quick Add and calendar matching all ground on this.
 export async function loadGroundingProjects(
   db: D1Database,
   workspaceId: string
@@ -207,7 +208,7 @@ export async function loadGroundingProjects(
               tk.id AS task_id, tk.name AS task_name
        FROM projects p
        LEFT JOIN tasks tk ON tk.project_id = p.id AND tk.active = 1
-       WHERE p.workspace_id = ? AND p.active = 1
+       WHERE p.workspace_id = ? AND p.active = 1 AND p.client_id IS NOT NULL
        ORDER BY p.name ASC`
     )
     .bind(workspaceId)

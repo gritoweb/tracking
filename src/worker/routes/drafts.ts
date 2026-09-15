@@ -94,7 +94,8 @@ export const draftsRouter = new Hono<{
         ? (
             await c.env.DB.prepare(
               `SELECT id FROM projects
-               WHERE workspace_id = ? AND active = 1 AND id IN (${projectIds.map(() => "?").join(",")})`
+               WHERE workspace_id = ? AND active = 1 AND client_id IS NOT NULL
+                 AND id IN (${projectIds.map(() => "?").join(",")})`
             )
               .bind(workspaceId, ...projectIds)
               .all<{ id: string }>()

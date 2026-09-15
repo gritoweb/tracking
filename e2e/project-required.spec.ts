@@ -292,3 +292,34 @@ test("the picker creates the project and its client together, without leaving th
   }[];
   expect(projects.map((p) => [p.name, p.clientName])).toEqual([["Picker Project", "Picker Client"]]);
 });
+
+test("MCP: a refusal sends the model back to the person instead of letting it pick", async ({
+  page,
+}) => {
+  await signUp(page);
+  const origin = new URL(page.url()).origin;
+  const project = await createProject(page);
+  const call = await mcpTools(page, { origin });
+
+  const forged = await call("log_time", {
+    description: "Forged project",
+    start: START,
+    stop: STOP,
+    projectId: "forged-project-id",
+  });
+  expect(forged).toContain("ask the person which project");
+
+  const noClient = await call("create_project", {
+    name: "Invented client",
+    clientId: "forged-client-id",
+    billable: false,
+  });
+  expect(noClient).toContain("ask the person which client");
+
+  // The list says which projects can take time, so nothing has to be inferred.
+  const listed = JSON.parse(await call("list_projects", {})) as {
+    id: string;
+    needsClient: boolean;
+  }[];
+  expect(listed.find((p) => p.id === project.id)?.needsClient).toBe(false);
+});
