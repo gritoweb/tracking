@@ -137,11 +137,10 @@ export const CalendarView = forwardRef<FullCalendar, CalendarViewProps>(
           firstDay={firstDay}
           weekends={weekends}
           allDaySlot={false}
-          // Stagger overlapping events (the Google Calendar look) rather than
-          // splitting the column: a block that shares an hour with another kept
-          // half the width for its whole length, leaving it lopsided in the
-          // stretch where it ran alone.
-          slotEventOverlap
+          // Split the column between blocks that share an hour instead of
+          // stacking them: the stagger draws a later block full width over the
+          // one still running, hiding the hours underneath it.
+          slotEventOverlap={false}
           nowIndicator
           slotDuration="00:30:00"
           snapDuration="00:15:00"
