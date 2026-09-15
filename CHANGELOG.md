@@ -1,5 +1,29 @@
 # Changelog
 
+## 2026-09-15 (7)
+### Removed
+- **The description field no longer suggests anything.** Typing dropped a list of past descriptions
+  over the form, and picking one rewrote project, task, billable and tags in one go — more than the
+  field was asked to do. Both the timer bar and the entry form are now a plain input and textarea.
+  `GET /api/time_entries/suggestions` **stays**: the timer bar's **Continue** button reads it to
+  offer the last thing tracked, which is the deliberate way to repeat an entry. Gone with it:
+  `DescriptionAutocomplete`, its ranking helper, and the specs that drove the dropdown (the tag
+  colour tests moved to `e2e/tag-colors.spec.ts`).
+
+### Changed
+- **Overlapping calendar blocks stack instead of splitting the column.** With
+  `slotEventOverlap: false`, one shared minute cost a block half the column *for its whole length* —
+  an entry running 08:00–10:15 sat at half width even in the hour it ran alone, which reads as
+  lopsided. FullCalendar's stagger is back on: measured in a 134px column, the 08:00–10:15 block now
+  spans the full 130px and the entries overlapping it sit offset on top, exactly as Google Calendar
+  draws them.
+- **The range you drag to create reads white.** It wears FullCalendar's own solid blue, on which the
+  app's near-black event ink was barely legible in light mode; the mirror is tagged `tt-event-select`
+  in `eventClassNames` and its text is white in both themes.
+  Verified: `pnpm build` exit 0, `pnpm lint` 0 errors, 14 passing across the tag, resume, manual
+  entry, calendar, hotkey, favourites and day-rollover specs — the 5 failures are the pre-existing
+  `entry-inline-edit` ones.
+
 ## 2026-09-15 (6)
 ### Fixed
 - **A tag now shows its own colour the moment you add it, like a project does.** The asymmetry had a
