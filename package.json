@@ -106,6 +106,7 @@
 		"cf-typegen": "wrangler types",
 		"check": "tsc -b && vite build && wrangler deploy --dry-run",
 		"deploy": "pnpm build && wrangler deploy",
+		"versions:upload": "pnpm build && wrangler versions upload",
 		"dev": "vite",
 		"email:dev": "email dev --dir src/worker/emails --port 3333",
 		"lint": "eslint .",
