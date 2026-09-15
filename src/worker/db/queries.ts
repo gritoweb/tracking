@@ -1,5 +1,13 @@
 import { nextUnusedColor } from "@shared/colors";
 
+/**
+ * The tab that made this request, so its own broadcast can be filtered out
+ * client-side (see `broadcast`'s `origin`). Absent for the extension and any
+ * non-browser caller, which simply means they get the normal fan-out.
+ */
+export const requestOrigin = (c: { req: { header: (n: string) => string | undefined } }) =>
+  c.req.header("X-Client-Id") ?? null;
+
 // Helper to broadcast events via Durable Object
 export async function broadcast(
   env: Env,

@@ -8,7 +8,7 @@ import {
   nextOccurrence,
   todayLocalDate,
 } from "@shared/task-recurrence";
-import type { Task, CreateTask, UpdateTask } from "@shared/schemas";
+import type { Task, CreateTask, TaskStatus, UpdateTask } from "@shared/schemas";
 
 // The API hides inactive (done) tasks unless asked, so every list here opts in:
 // the Tasks page offers an All/Active/Done filter and a "Done" group, and without
@@ -90,6 +90,58 @@ export function useUpdateTask() {
         queryClient.setQueryData(key, data);
       }
       toast.error("Failed to update task");
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["tasks"] }),
+  });
+}
+
+/**
+ * Commit a board drop.
+ *
+ * Takes the whole target status, not just its id, because the optimistic patch
+ * has to repaint the card completely on the frame it was released — column,
+ * colour, and the strike-through that follows a drop on a completed column. With
+ * only an id the card would sit correct-but-uncoloured until the refetch landed,
+ * which reads as the drag having half-failed.
+ */
+export function useMoveTask() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, status, boardOrder }: { id: string; status: TaskStatus; boardOrder: number }) =>
+      api.tasks.move(id, {
+        statusId: status.id,
+        boardOrder,
+        completedOn: todayLocalDate(),
+      }) as Promise<Task>,
+    onMutate: async ({ id, status, boardOrder }) => {
+      await queryClient.cancelQueries({ queryKey: ["tasks"] });
+      const snapshot = queryClient.getQueriesData<Task[]>({ queryKey: ["tasks"] });
+      const done = status.category === "completed";
+      const patch = (t: Task): Task => ({
+        ...t,
+        statusId: status.id,
+        statusName: status.name,
+        statusColor: status.color,
+        statusCategory: status.category,
+        active: !done,
+        completedAt: done ? (t.completedAt ?? new Date().toISOString()) : null,
+      });
+      queryClient.setQueriesData<Task[]>({ queryKey: ["tasks"] }, (old) =>
+        old?.map((t) => {
+          if (t.id === id) return { ...patch(t), boardOrder };
+          // The server carries a parent's children across with it; mirror that
+          // here or the subtask rows contradict the card for a beat.
+          if (t.parentId === id) return patch(t);
+          return t;
+        })
+      );
+      return { snapshot };
+    },
+    onError: (_err, _vars, context) => {
+      for (const [key, data] of context?.snapshot ?? []) {
+        queryClient.setQueryData(key, data);
+      }
+      toast.error("Failed to move task");
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ["tasks"] }),
   });

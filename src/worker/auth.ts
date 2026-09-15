@@ -16,6 +16,7 @@ import {
   shouldCreateWorkspace,
   signInEmailFromRequest,
 } from "./lib/invite-only";
+import { ensureStatuses } from "./lib/task-statuses";
 
 function randomSlug(): string {
   return crypto.randomUUID().replace(/-/g, "").slice(0, 12);
@@ -165,6 +166,14 @@ export function createAuth(env: Env, baseURL: string) {
         },
         // Only an ADMIN_EMAILS account opens workspaces; the server-side bootstrap in user.create.after is exempt.
         allowUserToCreateOrganization: (user) => isAdminEmail(env, user.email),
+        organizationHooks: {
+          // A workspace is born with the five default task statuses. `ensureStatuses`
+          // repairs a workspace that somehow missed this, so the board never renders
+          // a page with no columns.
+          afterCreateOrganization: async ({ organization }) => {
+            await ensureStatuses(env.DB, organization.id);
+          },
+        },
         // Only a proven owner of the address may join; relaxed in dev so e2e password users can accept.
         requireEmailVerificationOnInvitation: !import.meta.env.DEV,
         async sendInvitationEmail(data) {

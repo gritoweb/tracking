@@ -10,6 +10,7 @@ import { projectsRouter } from "./routes/projects";
 import { clientsRouter } from "./routes/clients";
 import { tagsRouter } from "./routes/tags";
 import { tasksRouter } from "./routes/tasks";
+import { taskStatusesRouter } from "./routes/task-statuses";
 import { favoritesRouter } from "./routes/favorites";
 import { recurringRouter } from "./routes/recurring";
 import { draftsRouter } from "./routes/drafts";
@@ -108,6 +109,7 @@ const app = new Hono<{ Bindings: Env }>()
   .route("/api/clients", clientsRouter)
   .route("/api/tags", tagsRouter)
   .route("/api/tasks", tasksRouter)
+  .route("/api/task-statuses", taskStatusesRouter)
   .route("/api/favorites", favoritesRouter)
   .route("/api/recurring", recurringRouter)
   .route("/api/drafts", draftsRouter)

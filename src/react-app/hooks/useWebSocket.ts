@@ -227,6 +227,16 @@ export function useWebSocket() {
           invalidateEntries();
           break;
         }
+        case "tasks:changed": {
+          // Always a bare signal, never the row. A task's `trackedSeconds` is
+          // scoped to the reader's role (a member sees only their own hours), so
+          // fanning the payload out would hand a member a teammate's total.
+          if (!isOwnEcho) {
+            queryClient.invalidateQueries({ queryKey: ["tasks"] });
+            queryClient.invalidateQueries({ queryKey: ["task-statuses"] });
+          }
+          break;
+        }
       }
     }
 

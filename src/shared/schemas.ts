@@ -177,6 +177,51 @@ export const ProjectPacingSchema = z.object({
   status: PacingStatusSchema,
 });
 
+// ─── Task status ─────────────────────────────────────────────────────────────
+
+/**
+ * The only part of a status that is behaviour rather than vocabulary.
+ *
+ * `completed` is what drives `active`/`completed_at` on the task row; the other
+ * two exist so a board can tell "not picked up" from "being worked on" without
+ * the server caring which is which. A workspace renames the columns freely —
+ * the category is what every reader downstream keys off.
+ */
+export const TaskStatusCategorySchema = z.enum(["not_started", "active", "completed"]);
+
+export const TaskStatusSchema = z.object({
+  id: z.string(),
+  workspaceId: z.string(),
+  name: z.string(),
+  color: z.string(),
+  category: TaskStatusCategorySchema,
+  /** Fractional index, like a task's: moving a column rewrites one row. */
+  sortOrder: z.number(),
+  archived: z.boolean(),
+  /** Where a new task lands. Exactly one per workspace. */
+  isDefault: z.boolean(),
+});
+
+export const CreateTaskStatusSchema = z.object({
+  name: z.string().min(1).max(64),
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Expected a #rrggbb color"),
+  category: TaskStatusCategorySchema,
+});
+
+export const UpdateTaskStatusSchema = z.object({
+  name: z.string().min(1).max(64).optional(),
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Expected a #rrggbb color").optional(),
+  category: TaskStatusCategorySchema.optional(),
+  sortOrder: z.number().optional(),
+  /** Setting this clears it from whichever status held it — never two defaults. */
+  isDefault: z.boolean().optional(),
+});
+
+/** Archiving a status that still holds tasks has to say where they go. */
+export const ArchiveTaskStatusSchema = z.object({
+  moveTo: z.string().optional(),
+});
+
 // ─── Task ─────────────────────────────────────────────────────────────────────
 
 // A local calendar date. A due date is a *day*, not an instant — see
@@ -205,13 +250,20 @@ export const TaskSchema = z.object({
   name: z.string(),
   /** The task's own notes. Not the time entry's description — see the migration. */
   description: z.string().nullable(),
+  /** Mirror of the status category — `false` exactly when the status is `completed`. */
   active: z.boolean(),
+  statusId: z.string().nullable(),
+  statusName: z.string().nullable(),
+  statusColor: z.string().nullable(),
+  statusCategory: TaskStatusCategorySchema.nullable(),
   estimatedSeconds: z.number().nullable(),
   /** Own tracked time **plus** every subtask's — see TASK_SELECT. */
   trackedSeconds: z.number(),
   dueDate: LocalDateSchema.nullable(),
   priority: TaskPrioritySchema,
   sortOrder: z.number(),
+  /** Position inside its board column — deliberately not `sortOrder`, see migration 0038. */
+  boardOrder: z.number(),
   /** Non-null on a subtask. One level only: a subtask can never be a parent. */
   parentId: z.string().nullable(),
   completedAt: z.string().nullable(),
@@ -230,6 +282,8 @@ export const CreateTaskSchema = z.object({
   priority: TaskPrioritySchema.optional(),
   parentId: z.string().nullable().optional(),
   recurRule: RecurRuleSchema.nullable().optional(),
+  /** Omitted means the workspace's default status. */
+  statusId: z.string().optional(),
 });
 
 export const UpdateTaskSchema = z.object({
@@ -248,6 +302,19 @@ export const UpdateTaskSchema = z.object({
    * ticks a recurring task done, and it is what the next occurrence is measured
    * from — the worker runs in UTC and must never guess this.
    */
+  completedOn: LocalDateSchema.optional(),
+  /**
+   * Moving between columns. Passing this also rewrites `active`/`completed_at`
+   * from the target's category, so `statusId` and `active` can never disagree.
+   */
+  statusId: z.string().optional(),
+});
+
+/** What a drag on the board sends: the column it landed in and where in it. */
+export const MoveTaskSchema = z.object({
+  statusId: z.string(),
+  boardOrder: z.number(),
+  /** The dropping client's local date, for the recurrence spawn — see UpdateTaskSchema. */
   completedOn: LocalDateSchema.optional(),
 });
 
@@ -860,6 +927,11 @@ export type UpdateClient = z.infer<typeof UpdateClientSchema>;
 export type ClientStats = z.infer<typeof ClientStatsSchema>;
 export type CreateTask = z.infer<typeof CreateTaskSchema>;
 export type UpdateTask = z.infer<typeof UpdateTaskSchema>;
+export type MoveTask = z.infer<typeof MoveTaskSchema>;
+export type TaskStatus = z.infer<typeof TaskStatusSchema>;
+export type TaskStatusCategory = z.infer<typeof TaskStatusCategorySchema>;
+export type CreateTaskStatus = z.infer<typeof CreateTaskStatusSchema>;
+export type UpdateTaskStatus = z.infer<typeof UpdateTaskStatusSchema>;
 export type ApiKeyScope = z.infer<typeof ApiKeyScopeSchema>;
 export type ApiKey = z.infer<typeof ApiKeySchema>;
 export type CreateApiKey = z.infer<typeof CreateApiKeySchema>;

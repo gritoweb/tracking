@@ -17,20 +17,13 @@ import {
   broadcast,
   formatEntry,
   getEntryById,
+  requestOrigin,
   upsertTags,
   ENTRY_SELECT,
 } from "../db/queries";
 import { getMemberRole, canManageWorkspace, canWriteEntry, entryScopeUserId } from "../lib/permissions";
 import { findActiveProject, PROJECT_REQUIRED_ERROR } from "../lib/projects";
 
-
-/**
- * The tab that made this request, so its own broadcast can be filtered out
- * client-side (see `broadcast`'s `origin`). Absent for the extension and any
- * non-browser caller, which simply means they get the normal fan-out.
- */
-const clientId = (c: { req: { header: (n: string) => string | undefined } }) =>
-  c.req.header("X-Client-Id") ?? null;
 
 /**
  * Decide an entry's billable flag when the caller didn't state one.
@@ -243,7 +236,7 @@ export const timeEntriesRouter = new Hono<{
 
     const entry = await getEntryById(c.env.DB, id, workspaceId);
     c.executionCtx.waitUntil(
-      broadcast(c.env, workspaceId, data.stop ? "entries:changed" : "timer:start", entry, clientId(c), userId)
+      broadcast(c.env, workspaceId, data.stop ? "entries:changed" : "timer:start", entry, requestOrigin(c), userId)
     );
     return c.json(entry, 201);
   })
@@ -307,7 +300,7 @@ export const timeEntriesRouter = new Hono<{
       }
     }
 
-    c.executionCtx.waitUntil(broadcast(c.env, workspaceId, "entries:changed", null, clientId(c)));
+    c.executionCtx.waitUntil(broadcast(c.env, workspaceId, "entries:changed", null, requestOrigin(c)));
     return c.json({ ok: true, updated: ids.length });
   })
   // ─── Bulk delete ──────────────────────────────────────────────────────────
@@ -330,7 +323,7 @@ export const timeEntriesRouter = new Hono<{
       `DELETE FROM time_entries WHERE workspace_id = ? AND id IN (${placeholders})`
     ).bind(workspaceId, ...ids).run();
 
-    c.executionCtx.waitUntil(broadcast(c.env, workspaceId, "entries:changed", null, clientId(c)));
+    c.executionCtx.waitUntil(broadcast(c.env, workspaceId, "entries:changed", null, requestOrigin(c)));
     return c.json({ ok: true, deleted: ids.length });
   })
   // ─── Get by ID ────────────────────────────────────────────────────────────
@@ -421,7 +414,7 @@ export const timeEntriesRouter = new Hono<{
 
     const entry = await getEntryById(c.env.DB, id, workspaceId);
     c.executionCtx.waitUntil(
-      broadcast(c.env, workspaceId, "entries:changed", entry, clientId(c), owned.user_id)
+      broadcast(c.env, workspaceId, "entries:changed", entry, requestOrigin(c), owned.user_id)
     );
     return c.json(entry);
   })
@@ -448,7 +441,7 @@ export const timeEntriesRouter = new Hono<{
       `DELETE FROM time_entries WHERE id = ? AND workspace_id = ?`
     ).bind(id, workspaceId).run();
     c.executionCtx.waitUntil(
-      broadcast(c.env, workspaceId, "entries:changed", null, clientId(c), owned.user_id)
+      broadcast(c.env, workspaceId, "entries:changed", null, requestOrigin(c), owned.user_id)
     );
     return c.json({ ok: true });
   })
@@ -478,7 +471,7 @@ export const timeEntriesRouter = new Hono<{
     // Only broadcast if the entry was actually running — prevents false timer:stop
     // events when the extension tries to stop an already-stopped (stale) entry
     if (result.meta.changes > 0) {
-      c.executionCtx.waitUntil(broadcast(c.env, workspaceId, "timer:stop", entry, clientId(c), userId));
+      c.executionCtx.waitUntil(broadcast(c.env, workspaceId, "timer:stop", entry, requestOrigin(c), userId));
     }
     return c.json(entry);
   });

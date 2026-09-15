@@ -249,8 +249,26 @@ export const api = {
       request<unknown>("/tasks", { method: "POST", body: JSON.stringify(body) }),
     update: (id: string, body: Record<string, unknown>) =>
       request<unknown>(`/tasks/${id}`, { method: "PUT", body: JSON.stringify(body) }),
+    /** A board drop: the column and the position inside it, in one write. */
+    move: (id: string, body: Record<string, unknown>) =>
+      request<unknown>(`/tasks/${id}/move`, { method: "PATCH", body: JSON.stringify(body) }),
     delete: (id: string) =>
       request<unknown>(`/tasks/${id}`, { method: "DELETE" }),
+  },
+
+  // ─── Task statuses (the board's columns) ──────────────────────────────────
+  taskStatuses: {
+    list: () => request<unknown[]>("/task-statuses"),
+    create: (body: Record<string, unknown>) =>
+      request<unknown>("/task-statuses", { method: "POST", body: JSON.stringify(body) }),
+    update: (id: string, body: Record<string, unknown>) =>
+      request<unknown>(`/task-statuses/${id}`, { method: "PUT", body: JSON.stringify(body) }),
+    /** Archive, never delete. `moveTo` is required when the status still holds tasks. */
+    archive: (id: string, body: { moveTo?: string }) =>
+      request<{ ok: boolean; moved: number }>(`/task-statuses/${id}/archive`, {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
   },
 
   // ─── Clients ──────────────────────────────────────────────────────────────
