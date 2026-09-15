@@ -1,5 +1,5 @@
 -- Neutralized: this migration previously seeded a demo account
--- (blake.bauman@gmail.com) with a hardcoded, publicly-known password. Because
+-- (a demo address) with a hardcoded, publicly-known password. Because
 -- `wrangler d1 migrations apply --remote` runs every migration, that account
 -- would be recreated in PRODUCTION on any fresh/restored database — a backdoor.
 --

@@ -105,7 +105,7 @@
 		"generate-icons": "node scripts/generate-icons.mjs",
 		"cf-typegen": "wrangler types",
 		"check": "tsc -b && vite build && wrangler deploy --dry-run",
-		"deploy": "wrangler deploy",
+		"deploy": "pnpm build && wrangler deploy",
 		"dev": "vite",
 		"email:dev": "email dev --dir src/worker/emails --port 3333",
 		"lint": "eslint .",

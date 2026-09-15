@@ -27,7 +27,7 @@ if (!/^http:\/\/localhost:\d+$/.test(BASE)) {
   process.exit(1);
 }
 
-const DEMO = { email: "blake.bauman@gmail.com", password: "TestPassApps2026" };
+const DEMO = { email: "demo@example.com", password: "DemoPassword2026" };
 const OFFSET_HEADER = { "Content-Type": "application/json", Origin: BASE };
 let cookie = "";
 

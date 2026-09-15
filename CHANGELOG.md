@@ -1,33 +1,43 @@
 # Changelog
 
+## 2026-09-15 (10)
+### Fixed
+- **Deploying now builds first.** Workers Builds runs a bare `wrangler deploy` with no build step,
+  and the client bundle is produced by `vite build` (the `@cloudflare/vite-plugin` writes both
+  `dist/client` and the generated `dist/tracking/wrangler.json` the deploy redirects to) — so the
+  pipeline failed with *the directory specified by the "assets.directory" field does not exist*. The
+  repo's own `deploy` script is now `pnpm build && wrangler deploy`, so it can never publish a stale
+  or missing bundle. The hosted pipeline still needs its command pointed at that script (or a build
+  command added) in the Workers Builds settings — a dashboard field, not something the repo can set.
+  Verified: with `dist/` and `.wrangler/deploy/` deleted, `pnpm build` then `wrangler deploy --dry-run`
+  completes.
+
+### Changed
+- **Repository scrubbed of personal and operational data, for going public.** Deploy Version IDs and
+  the D1 restore bookmarks came out of this file; the dev seed's demo login, which carried a real
+  person's address and name from the upstream project, is now `demo@example.com` / `DemoPassword2026`
+  with a freshly generated Better Auth scrypt hash — verified by applying the seed to a local D1 and
+  signing in through the API (200 with the new password, 401 with a wrong one).
+
 ## 2026-09-15 (9) — production rollout
 ### Changed
-- **D1, D2 and D3 are live.** `update` fast-forwarded into `master` (21 commits), migrations `0035`
-  (per-user running-timer index), `0036` (per-person assistant memory) and `0037` (authors on
-  recurring templates and calendar connections) applied to the remote D1, `pnpm check` clean, and the
-  worker deployed — Version ID `48b43c96-d425-4099-aa6d-ab484c5b7288`, `https://tracking.gritoweb.com.br/`
-  answering 200 and `/api/time_entries` 401 without a session. `ADMIN_EMAILS` is set as a secret to
-  `suporte@gritoweb.com.br`: from here only that address can create a workspace, and only an invited
-  email can create an account at all.
-- **Production now holds one workspace.** Invite-only access makes a personal workspace per signup
-  meaningless, so the five others were removed: "Luis Amaral's" (3 entries, all named `test`), the
-  ownerless legacy "My Workspace", and the empty personal workspaces of `teste-prod-verify@`,
-  `luis@` and `richard@` — the last two keep their access as **admins of the support workspace**, so
-  nobody lost anything. Deletion went table by table (13 carrying `workspace_id`, plus `member`,
-  `invitation`, the `time_entry_tags` join and the stale `activeOrganizationId` /
-  `last_active_organization_id` pointers) rather than trusting cascades.
-  Verified after the fact: 1 workspace left, intact at 3 members / 3 entries / 3 projects / 1 client,
-  and zero orphan rows across entries, projects, clients, tags, members, invitations and entry-tags.
-  Restore point if ever needed: D1 time-travel bookmark
-  `00000494-00000002-000050e7-9f28d36658336232903d2a84e49eda36` (taken immediately before the delete).
-  The two accounts left without a workspace (`lluispaulop@gmail.com`,
-  `teste-prod-verify@gritoweb.com.br`) were deleted too, row by row across the Better Auth tables
-  (`account`, `session`, `passkey`, `twoFactor`, `verification`) and every table keyed by a user
-  (`member`, `api_keys`, `assistant_memory`, `draft_entries`, `project_allocations`, `saved_reports`,
-  `invitation.inviterId`). Production now holds exactly three accounts — `suporte@`, `luis@` and
-  `richard@`, all verified, all in the one workspace — with zero orphan accounts, sessions, members
-  or author references. Bookmark before that deletion:
-  `00000496-00000000-000050e7-40c60120222f61aa719b55bb1a0d4715`.
+- **D1, D2 and D3 are live.** The working branch fast-forwarded into `master` (21 commits),
+  migrations `0035` (per-user running-timer index), `0036` (per-person assistant memory) and `0037`
+  (authors on recurring templates and calendar connections) applied to the remote D1, `pnpm check`
+  clean, worker deployed, and the site smoke-checked (`200` on the app, `401` on the API without a
+  session). `ADMIN_EMAILS` is set as a secret: from here only an address on that list can create a
+  workspace, and only an invited email can create an account at all.
+- **Production was trimmed to a single workspace.** Invite-only access makes the personal workspace
+  that every signup used to get meaningless, so the leftovers from the open-signup period were
+  removed — one carrying three throwaway entries, one ownerless legacy row, and three empty personal
+  workspaces whose owners keep their access as members of the remaining workspace. Deletion went
+  table by table (the thirteen carrying `workspace_id`, plus `member`, `invitation`, the
+  `time_entry_tags` join and the stale `activeOrganizationId` / `last_active_organization_id`
+  pointers) rather than trusting cascades, and the accounts left without any workspace were deleted
+  the same way across the Better Auth tables. Verified afterwards: one workspace, intact, and zero
+  orphan rows across entries, projects, clients, tags, members, invitations, accounts and sessions.
+  A D1 time-travel bookmark was taken immediately before each deletion; it and the account-level
+  detail live in the team's private notes, not here.
 
 ## 2026-09-15 (8)
 ### Fixed
@@ -323,7 +333,7 @@
   já tinha saído antes hoje): `EntryRow` (lista do Timer) ganhou um avatar com tooltip do nome, e a
   tabela detalhada de Relatórios ganhou a coluna "Person" (togglável, igual às outras). Some quando
   não há autor conhecido (linha antiga, ou entrada materializada por cron). Verificado: `pnpm check`
-  e `pnpm lint` limpos, deploy em produção (curl 200, Version ID `59c56177-7461-48b0-a303-613a21cb585d`).
+  e `pnpm lint` limpos, deploy em produção (curl 200).
 
 ## 2026-09-11 (2)
 ### Added
@@ -337,7 +347,7 @@
   nos endpoints `/bulk`. Todo caminho de criação agora grava `user_id`: criação manual (REST), MCP
   `log_time`/`start_timer`, e confirmação de draft. Migration `0034_time_entry_owner.sql` aplicada no
   D1 remoto antes do deploy. Verificado: `pnpm check` (typecheck+build+dry-run) e `pnpm lint` limpos,
-  deploy em produção (curl 200, Version ID `e9b4cb53-9f44-4a62-8a65-6e7b1d3f1bf9`).
+  deploy em produção (curl 200).
   **Ainda falta:** mostrar o autor na UI (Timer + Relatórios) e filtrar por pessoa — isso é só o
   backend/permissão, a parte visual segue nos itens 1 e 2 da fila do `falta.md`.
 
@@ -352,4 +362,4 @@
   e `src/worker/lib/projects.ts`, reaproveitada pela rota REST e pela ferramenta MCP — mantém a
   garantia do projeto de que "um tool nunca discorda da REST API" porque os dois chamam o mesmo helper.
   Verificado: `pnpm check` (typecheck + build + `wrangler deploy --dry-run`, exit 0) e deploy real em
-  produção (`curl` 200 em `tracking.gritoweb.com.br`, Version ID `e83fecf5-cd68-4678-8d59-aa0519e73e73`).
+  produção (`curl` 200 em `tracking.gritoweb.com.br`).
