@@ -1,5 +1,31 @@
 # Changelog
 
+## 2026-09-15 (6)
+### Fixed
+- **A tag now shows its own colour the moment you add it, like a project does.** The asymmetry had a
+  cause: the project picker *creates* the project (the server answers with its colour), while a tag
+  only came into existence when the entry was saved — so the chip in the form had no row to read and
+  fell back to the untinted swatch, and the colour only appeared once the list refetched. `POST
+  /api/tags` creates the tag as it is added (idempotent on the name), so the chip carries the real
+  colour straight away and recolouring works without saving anything first.
+- **The swatch inside the recolour button had collapsed to nothing.** Wrapping the dot in a button
+  took it out of the badge's flex row, and an inline `span` ignores Tailwind's width and height — so
+  the chip rendered with the colour set and no dot to show it. The wrapper is `inline-flex`.
+
+### Changed
+- **One palette and one colouring rule for the whole app.** The swatch list, the distinct ordering and
+  "pick the colour this workspace isn't using" existed twice — `worker/lib/colors.ts` and
+  `react-app/lib/colorUtils.ts` — which is exactly how a picker's preview and the row the server
+  writes drift apart. Both now import `src/shared/colors.ts` (`SWATCH_COLORS`, `DISTINCT_COLORS`,
+  `nextUnusedColor`, `randomColor`, `spreadColor`); the worker copy is deleted and the client file
+  keeps only what is genuinely client-side (contrast and rgba helpers). Tag chips render through the
+  same `ColorDot` component the projects use.
+  Verified: `pnpm build` exit 0, `pnpm lint` 0 errors, 4/4 in `suggestion-tags` (including a new test
+  that the chip's swatch is a real colour *before* the entry is saved) and 18 passing across the
+  colour, entry and project specs — the 6 failures are the pre-existing `entry-inline-edit` and
+  `tier2-features` gaps ones. Measured in the browser: three tags added in a row come out red, blue
+  and green at 10×10px.
+
 ## 2026-09-15 (5)
 ### Fixed
 - **A tag stayed grey until the page was reloaded.** Tags are minted server-side when an entry that
