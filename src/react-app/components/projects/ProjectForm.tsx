@@ -21,8 +21,16 @@ import {
   useCreateProject,
   useUpdateProject,
   useClients,
+  useCreateClient,
   useProjects,
 } from "@/hooks/useProjects";
+import { ClientField } from "@/components/projects/ClientField";
+import {
+  NO_CLIENT,
+  hasClient,
+  resolveClientId,
+  type ClientChoice,
+} from "@/lib/clientChoice";
 import { useIntegrations } from "@/hooks/useIntegrations";
 import { useWorkspaceRole } from "@/hooks/useWorkspaceRole";
 import { useUIStore } from "@/stores/uiStore";
@@ -49,7 +57,9 @@ export function ProjectForm({ project, open, onClose }: ProjectFormProps) {
         ? nextProjectColor(existingProjects.map((p) => p.color))
         : PROJECT_COLORS[9])
   );
-  const [clientId, setClientId] = useState<string>(project?.clientId ?? "");
+  const [client, setClient] = useState<ClientChoice>(
+    project?.clientId ? { clientId: project.clientId, newName: "" } : NO_CLIENT
+  );
   // Rates, budgets, dates and integrations are set by owners/admins; the server ignores them from a member (D3).
   const { canManage } = useWorkspaceRole();
   const [billable, setBillable] = useState(project?.billable ?? false);
@@ -73,8 +83,9 @@ export function ProjectForm({ project, open, onClose }: ProjectFormProps) {
   const selectedIntegration = integrations.find((i) => i.id === integrationId);
   const createProject = useCreateProject();
   const updateProject = useUpdateProject();
+  const createClient = useCreateClient();
 
-  const isPending = createProject.isPending || updateProject.isPending;
+  const isPending = createProject.isPending || updateProject.isPending || createClient.isPending;
 
   // Dynamics always requires a project ID; Workfront requires a project or task ID.
   const integrationMissingRequiredId =
@@ -84,7 +95,8 @@ export function ProjectForm({ project, open, onClose }: ProjectFormProps) {
         ? !externalProjectId.trim() && !externalTaskId.trim()
         : false;
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    const clientId = await resolveClientId(client, clients, createClient.mutateAsync);
     const data = {
       name,
       color,
@@ -159,21 +171,12 @@ export function ProjectForm({ project, open, onClose }: ProjectFormProps) {
           {/* Client */}
           <div className="space-y-1.5">
             <Label htmlFor="project-client">Client</Label>
-            <Select value={clientId} onValueChange={setClientId}>
-              <SelectTrigger id="project-client">
-                <SelectValue placeholder="Choose a client" />
-              </SelectTrigger>
-              <SelectContent>
-                {clients.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {clients.length === 0 && (
-              <p className="text-xs text-muted-foreground">
-                Add a client under Clients first — every project needs one.
-              </p>
-            )}
+            <ClientField
+              id="project-client"
+              value={client}
+              onChange={setClient}
+              clients={clients}
+            />
           </div>
 
           {/* Date range */}
@@ -309,7 +312,7 @@ export function ProjectForm({ project, open, onClose }: ProjectFormProps) {
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button
             onClick={handleSave}
-            disabled={!name.trim() || !clientId || isPending || integrationMissingRequiredId}
+            disabled={!name.trim() || !hasClient(client) || isPending || integrationMissingRequiredId}
           >
             {project ? "Save changes" : "Create project"}
           </Button>

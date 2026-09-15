@@ -216,6 +216,7 @@ test("a member creates clients and projects, and only owners and admins change t
 
   const memberClient = await member.request.post("/api/clients", { data: { name: "Member client" } });
   expect(memberClient.ok()).toBeTruthy();
+  const memberClientId = ((await memberClient.json()) as { id: string }).id;
   const memberProject = await member.request.post("/api/projects", {
     data: {
       name: "Member project",
@@ -236,6 +237,8 @@ test("a member creates clients and projects, and only owners and admins change t
 
   const refused = [
     await member.request.put(`/api/projects/${project.id}`, { data: { name: "Renamed" } }),
+    // A blank client may be filled by anyone; moving one that is already set may not.
+    await member.request.put(`/api/projects/${project.id}`, { data: { clientId: memberClientId } }),
     await member.request.delete(`/api/projects/${project.id}`),
     await member.request.post("/api/projects/recolor"),
     await member.request.put(`/api/clients/${project.clientId}`, { data: { name: "Renamed" } }),
@@ -249,7 +252,7 @@ test("a member creates clients and projects, and only owners and admins change t
       },
     }),
   ];
-  expect(refused.map((r) => r.status())).toEqual([403, 403, 403, 403, 403, 403]);
+  expect(refused.map((r) => r.status())).toEqual([403, 403, 403, 403, 403, 403, 403]);
 
   const ownerProjects = (await (await owner.request.get("/api/projects")).json()) as {
     id: string;
@@ -265,4 +268,27 @@ test("a member creates clients and projects, and only owners and admins change t
     headers: await originHeaders(owner),
   });
   expect(renamed.ok()).toBeTruthy();
+});
+
+test("the picker creates the project and its client together, without leaving the entry", async ({
+  page,
+}) => {
+  await signUp(page);
+  await page.goto("/");
+
+  await page.getByRole("button", { name: "Select project" }).first().click();
+  await page.getByPlaceholder("Name your first project…").fill("Picker Project");
+  await page.getByRole("option", { name: /Create Picker Project/ }).click();
+
+  await expect(page.getByLabel("Project name")).toHaveValue("Picker Project");
+  await page.getByLabel("New client name").fill("Picker Client");
+  await page.getByRole("button", { name: "Create project" }).click();
+
+  await expect(page.getByRole("button", { name: "Project: Picker Project" }).first()).toBeVisible();
+
+  const projects = (await (await page.request.get("/api/projects")).json()) as {
+    name: string;
+    clientName: string | null;
+  }[];
+  expect(projects.map((p) => [p.name, p.clientName])).toEqual([["Picker Project", "Picker Client"]]);
 });

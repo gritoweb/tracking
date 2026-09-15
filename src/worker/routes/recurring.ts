@@ -4,7 +4,7 @@ import {
   CreateRecurringEntrySchema,
   UpdateRecurringEntrySchema,
 } from "@shared/schemas";
-import { findActiveProject } from "../lib/projects";
+import { findActiveProject, PROJECT_REQUIRED_ERROR } from "../lib/projects";
 
 const RECURRING_SELECT = `
   SELECT r.*, p.name AS project_name, p.color AS project_color, t.name AS task_name
@@ -13,7 +13,6 @@ const RECURRING_SELECT = `
   LEFT JOIN tasks t ON t.id = r.task_id AND t.workspace_id = r.workspace_id
 `;
 
-const PROJECT_REQUIRED_ERROR = "Choose an active project in this workspace";
 
 function formatRecurring(row: Record<string, unknown>) {
   let tags: string[] = [];

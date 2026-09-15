@@ -21,9 +21,8 @@ import {
   ENTRY_SELECT,
 } from "../db/queries";
 import { getMemberRole, canManageWorkspace, canWriteEntry } from "../lib/permissions";
-import { findActiveProject } from "../lib/projects";
+import { findActiveProject, PROJECT_REQUIRED_ERROR } from "../lib/projects";
 
-const PROJECT_REQUIRED_ERROR = "Choose an active project in this workspace";
 
 /**
  * The tab that made this request, so its own broadcast can be filtered out

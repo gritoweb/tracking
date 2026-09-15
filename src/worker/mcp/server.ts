@@ -545,7 +545,7 @@ export function buildMcpServer(ctx: McpContext): McpServer {
       // REST path — a timer started from a chat window must not land
       // non-billable when the same work started in the app wouldn't.
       const project = await findActiveProject(db, workspaceId, projectId);
-      if (!project) return text(`No active project with id ${projectId} in this workspace. Use list_projects.`);
+      if (!project) return text(`No active project with id ${projectId} in this workspace, or it has no client yet. Use list_projects.`);
       const billable = project.billable;
 
       // Stops only the key holder's running timer; a teammate's keeps going.
@@ -641,7 +641,7 @@ export function buildMcpServer(ctx: McpContext): McpServer {
       if (stopMs <= startMs) return text("stop must be after start.");
 
       const project = await findActiveProject(db, workspaceId, projectId);
-      if (!project) return text(`No active project with id ${projectId} in this workspace. Use list_projects.`);
+      if (!project) return text(`No active project with id ${projectId} in this workspace, or it has no client yet. Use list_projects.`);
       const resolvedBillable = billable ?? project.billable;
 
       const now = new Date().toISOString();

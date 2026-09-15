@@ -46,17 +46,33 @@ export function memberProjectInput(data: CreateProject): CreateProject {
   return { name: data.name, color: data.color, clientId: data.clientId, billable: data.billable };
 }
 
-/** The project, if it is active in this workspace — the only kind an entry, template or meeting may be logged against. */
+/** Active project with a client — the only kind an entry, template or meeting may be logged against. */
 export async function findActiveProject(
   db: D1Database,
   workspaceId: string,
   projectId: string
 ): Promise<{ id: string; name: string; billable: boolean } | null> {
   const row = await db
-    .prepare(`SELECT id, name, billable FROM projects WHERE id = ? AND workspace_id = ? AND active = 1`)
+    .prepare(
+      `SELECT id, name, billable FROM projects
+       WHERE id = ? AND workspace_id = ? AND active = 1 AND client_id IS NOT NULL`
+    )
     .bind(projectId, workspaceId)
     .first<{ id: string; name: string; billable: number }>();
   return row ? { id: row.id, name: row.name, billable: Boolean(row.billable) } : null;
+}
+
+/** Whether the project exists here with its client still blank — the one gap a member is allowed to fill. */
+export async function projectMissingClient(
+  db: D1Database,
+  workspaceId: string,
+  projectId: string
+): Promise<boolean> {
+  const row = await db
+    .prepare(`SELECT 1 FROM projects WHERE id = ? AND workspace_id = ? AND client_id IS NULL`)
+    .bind(projectId, workspaceId)
+    .first();
+  return Boolean(row);
 }
 
 /** Shared by the REST route and the MCP `create_project` tool; callers check the client first. */
@@ -108,3 +124,7 @@ export async function createProject(db: D1Database, workspaceId: string, data: C
 
   return formatProject(row!);
 }
+
+/** One refusal text, so the rule reads the same on every write path. */
+export const PROJECT_REQUIRED_ERROR =
+  "Choose an active project that belongs to a client";

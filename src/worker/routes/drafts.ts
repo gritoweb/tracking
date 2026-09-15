@@ -13,7 +13,7 @@ import {
   scaleDurations,
 } from "../lib/drafts";
 import { broadcast } from "../db/queries";
-import { findActiveProject } from "../lib/projects";
+import { findActiveProject, PROJECT_REQUIRED_ERROR } from "../lib/projects";
 
 const clientId = (c: { req: { header: (n: string) => string | undefined } }) =>
   c.req.header("X-Client-Id") ?? null;
@@ -201,7 +201,7 @@ export const draftsRouter = new Hono<{
       return c.json({ error: "Stop time must be after start time" }, 400);
     }
     if (data.projectId && !(await findActiveProject(c.env.DB, workspaceId, data.projectId))) {
-      return c.json({ error: "Choose an active project in this workspace" }, 400);
+      return c.json({ error: PROJECT_REQUIRED_ERROR }, 400);
     }
 
     const fields: string[] = [];

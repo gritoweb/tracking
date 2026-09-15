@@ -1,6 +1,8 @@
 import { useMemo, useRef, useState } from "react";
 import { Check, ChevronDown, FolderOpen, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import {
   Popover,
@@ -15,16 +17,22 @@ import {
   CommandGroup,
   CommandItem,
 } from "@/components/ui/command";
+import { ClientField } from "@/components/projects/ClientField";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  NO_CLIENT,
+  hasClient,
+  resolveClientId,
+  type ClientChoice,
+} from "@/lib/clientChoice";
 import { ColorDot } from "@/components/ColorDot";
 import { cn } from "@/lib/utils";
-import { useProjects, useCreateProject, useClients } from "@/hooks/useProjects";
+import {
+  useProjects,
+  useCreateProject,
+  useUpdateProject,
+  useClients,
+  useCreateClient,
+} from "@/hooks/useProjects";
 import { useUIStore } from "@/stores/uiStore";
 import { nextProjectColor, PROJECT_COLORS } from "@/lib/colorUtils";
 
@@ -65,10 +73,16 @@ export function ProjectPicker({
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
   const open = controlledOpen ?? uncontrolledOpen;
   const [search, setSearch] = useState("");
-  const [createClientId, setCreateClientId] = useState("");
+  const [client, setClient] = useState<ClientChoice>(NO_CLIENT);
   const { data: projects = [] } = useProjects();
   const { data: clients = [] } = useClients();
   const createProject = useCreateProject();
+  const createClient = useCreateClient();
+  const updateProject = useUpdateProject();
+  // An older project with no client can't take time: it is linked here before it can be picked.
+  const [linking, setLinking] = useState<(typeof projects)[number] | null>(null);
+  // The name being created, which turns the popover into a two-field panel.
+  const [creatingName, setCreatingName] = useState<string | null>(null);
   const autoAssignColors = useUIStore((s) => s.autoAssignColors);
 
   const selected = projects.find((p) => p.id === value);
@@ -92,13 +106,35 @@ export function ProjectPicker({
     onOpenChange?.(next);
     if (!next) {
       setSearch("");
-      setCreateClientId("");
+      setClient(NO_CLIENT);
+      setLinking(null);
+      setCreatingName(null);
     }
   };
 
   const select = (projectId: string) => {
     onChange(projectId);
     setOpen(false);
+  };
+
+  // Picking a client-less project links it first; the entry would be refused otherwise.
+  const pick = (project: (typeof projects)[number]) => {
+    if (!project.clientId) {
+      setClient(NO_CLIENT);
+      setLinking(project);
+      return;
+    }
+    select(project.id);
+  };
+
+  const panelPending =
+    updateProject.isPending || createProject.isPending || createClient.isPending;
+
+  const handleLink = async () => {
+    if (!linking || !hasClient(client)) return;
+    const clientId = await resolveClientId(client, clients, createClient.mutateAsync);
+    await updateProject.mutateAsync({ id: linking.id, data: { clientId } });
+    select(linking.id);
   };
 
   // Creating from here is the whole reason a first-run workspace isn't a dead
@@ -108,15 +144,22 @@ export function ProjectPicker({
   const exists = projects.some((p) => p.name.toLowerCase() === typed.toLowerCase());
   const canCreate = typed.length > 0 && !exists && !createProject.isPending;
 
+  const openCreate = (name: string) => {
+    setClient(NO_CLIENT);
+    setCreatingName(name);
+  };
+
   const handleCreate = async () => {
-    if (!createClientId) return;
+    const name = creatingName?.trim();
+    if (!name || !hasClient(client)) return;
+    const clientId = await resolveClientId(client, clients, createClient.mutateAsync);
     const project = await createProject.mutateAsync({
-      name: typed,
+      name,
       color: autoAssignColors
         ? nextProjectColor(projects.map((p) => p.color))
         : PROJECT_COLORS[9],
       billable: false,
-      clientId: createClientId,
+      clientId,
     });
     select(project.id);
   };
@@ -161,7 +204,7 @@ export function ProjectPicker({
         )}
       </PopoverTrigger>
       <PopoverContent
-        className="w-64 p-0"
+        className="w-72 p-0"
         align="start"
         onFocusOutside={(e) => {
           if (!holdOpen) return;
@@ -169,6 +212,69 @@ export function ProjectPicker({
           requestAnimationFrame(() => inputRef.current?.focus());
         }}
       >
+        {linking || creatingName !== null ? (
+          <div className="space-y-3 p-3">
+            <p className="-mx-3 border-b px-3 pb-2 text-sm font-medium">
+              {linking ? "Link a client" : "New project"}
+            </p>
+            {linking ? (
+              <p className="text-xs leading-normal text-muted-foreground">
+                <span className="font-medium text-foreground">{linking.name}</span> has no
+                client yet, and time is tracked against a project that has one.
+              </p>
+            ) : (
+              <div className="space-y-1.5">
+                <Label htmlFor="picker-project-name">Project name</Label>
+                <Input
+                  id="picker-project-name"
+                  value={creatingName ?? ""}
+                  autoFocus
+                  onChange={(e) => setCreatingName(e.target.value)}
+                  // cmdk owns arrows and Enter while its Command is mounted.
+                  onKeyDown={(e) => e.stopPropagation()}
+                />
+              </div>
+            )}
+            <div className="space-y-1.5">
+              <Label htmlFor="picker-project-client">Client</Label>
+              <ClientField
+                id="picker-project-client"
+                value={client}
+                onChange={setClient}
+                clients={clients}
+                autoFocus={Boolean(linking)}
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="flex-1"
+                onClick={() => (linking ? setLinking(null) : setCreatingName(null))}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                className="flex-1"
+                disabled={
+                  !hasClient(client) || panelPending || (!linking && !creatingName?.trim())
+                }
+                onClick={linking ? handleLink : handleCreate}
+              >
+                {panelPending ? (
+                  <Spinner size="sm" />
+                ) : linking ? (
+                  "Link and use"
+                ) : (
+                  "Create project"
+                )}
+              </Button>
+            </div>
+          </div>
+        ) : (
         <Command shouldFilter>
           <CommandInput
             ref={inputRef}
@@ -179,60 +285,36 @@ export function ProjectPicker({
             onValueChange={setSearch}
             className="h-9"
           />
-          {canCreate && (
-            <div className="border-b px-2 py-1.5">
-              {clients.length ? (
-                <Select value={createClientId} onValueChange={setCreateClientId}>
-                  <SelectTrigger
-                    size="sm"
-                    className="h-7 w-full text-xs"
-                    aria-label="Client for the new project"
-                  >
-                    <SelectValue placeholder="Choose a client" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {clients.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <p className="text-xs leading-normal text-muted-foreground">
-                  Add a client under Clients first — every project needs one.
-                </p>
-              )}
-            </div>
-          )}
           <CommandList>
             {/* Never a bare "no results": the query the user just typed is
                 exactly the name they want, so offer to make it. */}
             <CommandEmpty className="px-2 py-2">
               {canCreate ? (
-                <CreateProjectItem
-                  name={typed}
-                  pending={createProject.isPending}
-                  disabled={!createClientId}
-                  onCreate={handleCreate}
-                  standalone
-                />
+                <CreateProjectItem name={typed} onCreate={() => openCreate(typed)} standalone />
               ) : (
                 <span className="text-sm text-muted-foreground">No projects found</span>
               )}
             </CommandEmpty>
-            {groups.map(([client, clientProjects]) => (
-              <CommandGroup key={client || "__no_client__"} heading={client || "No client"}>
+            {groups.map(([clientName, clientProjects]) => (
+              <CommandGroup
+                key={clientName || "__no_client__"}
+                heading={clientName || "No client yet"}
+              >
                 {clientProjects.map((project) => (
                   <CommandItem
                     key={project.id}
                     value={project.id}
-                    keywords={[project.name, client]}
-                    onSelect={() => select(project.id)}
+                    keywords={[project.name, clientName]}
+                    onSelect={() => pick(project)}
                   >
                     <ColorDot color={project.color} />
                     <span className="truncate">{project.name}</span>
-                    {value === project.id && (
+                    {!project.clientId && (
+                      <span className="ml-auto shrink-0 text-xs text-muted-foreground">
+                        Needs a client
+                      </span>
+                    )}
+                    {value === project.id && project.clientId && (
                       <Check className="ml-auto h-3.5 w-3.5 shrink-0" />
                     )}
                   </CommandItem>
@@ -244,12 +326,7 @@ export function ProjectPicker({
                 "Acme Retainer" exists shouldn't force a trip to /projects. */}
             {canCreate && (
               <CommandGroup className="border-t">
-                <CreateProjectItem
-                  name={typed}
-                  pending={createProject.isPending}
-                  disabled={!createClientId}
-                  onCreate={handleCreate}
-                />
+                <CreateProjectItem name={typed} onCreate={() => openCreate(typed)} />
               </CommandGroup>
             )}
 
@@ -262,23 +339,19 @@ export function ProjectPicker({
             )}
           </CommandList>
         </Command>
+        )}
       </PopoverContent>
     </Popover>
   );
 }
 
-/** "Create <name>" row, shared by the empty and partial-match cases. */
+/** "Create <name>" row — opens the panel where the name and its client are confirmed. */
 function CreateProjectItem({
   name,
-  pending,
-  disabled,
   onCreate,
   standalone = false,
 }: {
   name: string;
-  pending: boolean;
-  /** Until a client is chosen for the new project. */
-  disabled: boolean;
   onCreate: () => void;
   /** Rendered outside a CommandGroup (inside CommandEmpty), which cmdk does
       not treat as selectable — so it needs to be a real button. */
@@ -286,13 +359,9 @@ function CreateProjectItem({
 }) {
   const content = (
     <>
-      {pending ? (
-        <Spinner size="sm" />
-      ) : (
-        <Plus className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-      )}
+      <Plus className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
       <span className="truncate">
-        Create <span className="font-medium">{name}</span>
+        Create <span className="font-medium">{name}</span>…
       </span>
     </>
   );
@@ -302,8 +371,7 @@ function CreateProjectItem({
       <button
         type="button"
         onClick={onCreate}
-        disabled={pending || disabled}
-        className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm transition-colors duration-fast ease-out-quart hover:bg-accent focus-visible:bg-accent focus-visible:outline-none disabled:opacity-50"
+        className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm transition-colors duration-fast ease-out-quart hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
       >
         {content}
       </button>
@@ -311,12 +379,7 @@ function CreateProjectItem({
   }
 
   return (
-    <CommandItem
-      value={`__create__${name}`}
-      keywords={[name]}
-      onSelect={onCreate}
-      disabled={pending || disabled}
-    >
+    <CommandItem value={`__create__${name}`} keywords={[name]} onSelect={onCreate}>
       {content}
     </CommandItem>
   );

@@ -6,7 +6,7 @@ import { runProjectColorAssignment } from "../lib/ai";
 import { loadProjectPacing } from "../lib/pacing";
 import { isActiveClient } from "../lib/clients";
 import { canManageWorkspace, getMemberRole, MANAGER_ONLY_ERROR } from "../lib/permissions";
-import { projectSelect, createProject, formatProject, memberProjectInput } from "../lib/projects";
+import { projectSelect, createProject, formatProject, memberProjectInput, projectMissingClient } from "../lib/projects";
 
 /*
  * Projects reported an unqualified all-time total while Clients defaulted to
@@ -152,7 +152,12 @@ export const projectsRouter = new Hono<{
     const data = c.req.valid("json");
 
     if (!canManageWorkspace(await getMemberRole(c.env.DB, workspaceId, c.get("userId")))) {
-      return c.json({ error: MANAGER_ONLY_ERROR }, 403);
+      // Members may fill a blank client (else they are stuck mid-entry), never change one.
+      const fillingBlankClient =
+        Object.keys(data).length === 1 &&
+        typeof data.clientId === "string" &&
+        (await projectMissingClient(c.env.DB, workspaceId, id));
+      if (!fillingBlankClient) return c.json({ error: MANAGER_ONLY_ERROR }, 403);
     }
     if (data.clientId !== undefined && !(await isActiveClient(c.env.DB, workspaceId, data.clientId))) {
       return c.json({ error: "Choose an active client in this workspace" }, 400);
