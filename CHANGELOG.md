@@ -1,5 +1,29 @@
 # Changelog
 
+## 2026-09-15 (2)
+### Changed
+- **The client is created where the hours are logged, and no project takes time without one.**
+  Creating a project from the picker asked for a client in a select squeezed between the search box
+  and the list, and a workspace with no clients yet got "Add a client under Clients first" — sending
+  someone who is mid-entry to another screen. Choosing "Create <name>…" now opens a panel inside the
+  picker with a labelled **Project name** and **Client** field, where the client is either picked or
+  named on the spot and created with the project; the same field (`components/projects/ClientField`
+  plus the pure helpers in `lib/clientChoice.ts`) replaced the dead-end in the full project form, so
+  both places behave alike. The project form and the picker use the ordinary primary button for the
+  action, and a client name that already exists selects that client instead of minting a duplicate.
+  The rule itself got stricter rather than looser: `findActiveProject` now also requires the project
+  to have a client, so an entry, recurring template, draft confirmation, calendar conversion or MCP
+  log against a pre-client project is refused with one shared message (`PROJECT_REQUIRED_ERROR`).
+  Such a project reads "Needs a client" in the picker and opens a **Link a client** panel that fills
+  it in before selecting it — a member may fill that one blank field while it is blank (otherwise
+  they are stuck mid-entry with no way to fix it), while moving a client that is already set stays
+  owner/admin-only.
+  Verified: `pnpm build` exit 0, `pnpm lint` 0 errors, and 39/39 across the picker's neighbours
+  (`project-required`, `report-per-person`, `manual-entry`, `calendar-create`, `feature-ports`,
+  `timer-billable`, `drafts-review`, `clients`, `task-log-time`, `timer-per-user`, `invite-only`),
+  including a new test that creates the project and its client from the picker and one asserting a
+  member is still refused when repointing a project that already has a client.
+
 ## 2026-09-15
 ### Added
 - **Reports by person, and a member only ever sees their own hours (D3).** Reports could group by
