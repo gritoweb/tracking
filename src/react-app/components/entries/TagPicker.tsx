@@ -13,9 +13,9 @@ import {
   CommandItem,
 } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
-import { DEFAULT_PROJECT_COLOR } from "@/components/ColorDot";
-import { useTags, useUpdateTag } from "@/hooks/useProjects";
-import { PROJECT_COLORS, PROJECT_COLOR_NAMES } from "@/lib/colorUtils";
+import { ColorDot, DEFAULT_PROJECT_COLOR } from "@/components/ColorDot";
+import { useCreateTag, useTags, useUpdateTag } from "@/hooks/useProjects";
+import { SWATCH_COLORS, SWATCH_COLOR_NAMES } from "@/lib/colorUtils";
 
 interface TagPickerProps {
   value: string[];
@@ -40,6 +40,7 @@ export function TagPicker({
   const [recoloring, setRecoloring] = useState<string | null>(null);
   const { data: allTags = [] } = useTags();
   const updateTag = useUpdateTag();
+  const createTag = useCreateTag();
 
   const byName = new Map(allTags.map((t) => [t.name, t]));
   // Untinted tags fall back to the shared swatch default rather than a
@@ -59,6 +60,9 @@ export function TagPicker({
     const trimmed = tag.trim();
     if (trimmed && !value.includes(trimmed)) {
       onChange([...value, trimmed]);
+      // Create it now rather than when the entry saves: the row (and its colour)
+      // is what the chip shows, and a tag that exists can be recoloured at once.
+      if (!byName.has(trimmed)) createTag.mutate(trimmed);
     }
     setInput("");
   };
@@ -109,8 +113,7 @@ export function TagPicker({
                 variant="secondary"
                 className="gap-1 text-xs font-normal"
               >
-                {/* Recolor is only possible once the tag exists server-side (it's
-                    created when the entry saves); before that, show a static dot. */}
+                {/* The tag is created as it is added, so this is its real colour. */}
                 {byName.has(tag) ? (
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -118,17 +121,16 @@ export function TagPicker({
                         type="button"
                         aria-label={`Recolor ${tag}`}
                         onClick={() => setRecoloring((cur) => (cur === tag ? null : tag))}
-                        className="h-2.5 w-2.5 shrink-0 rounded-full ring-offset-1 transition-transform duration-fast ease-out-quart hover:scale-125 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                        style={{ backgroundColor: colorOf(tag) }}
-                      />
+                        // inline-flex, or the dot inside stays an inline span and Tailwind's size is ignored.
+                        className="inline-flex rounded-full ring-offset-1 transition-transform duration-fast ease-out-quart hover:scale-125 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                      >
+                        <ColorDot color={colorOf(tag)} />
+                      </button>
                     </TooltipTrigger>
                     <TooltipContent>Change color</TooltipContent>
                   </Tooltip>
                 ) : (
-                  <span
-                    className="h-2.5 w-2.5 shrink-0 rounded-full"
-                    style={{ backgroundColor: colorOf(tag) }}
-                  />
+                  <ColorDot color={colorOf(tag)} />
                 )}
                 {tag}
                 <button
@@ -147,12 +149,12 @@ export function TagPicker({
         {/* Inline recolor palette for the tag whose dot was clicked. */}
         {recoloring && byName.has(recoloring) && (
           <div className="flex flex-wrap gap-1.5 border-b p-2">
-            {PROJECT_COLORS.map((c) => (
+            {SWATCH_COLORS.map((c) => (
               <Tooltip key={c}>
                 <TooltipTrigger asChild>
                   <button
                     type="button"
-                    aria-label={`Set ${recoloring} to ${PROJECT_COLOR_NAMES[c] ?? c}`}
+                    aria-label={`Set ${recoloring} to ${SWATCH_COLOR_NAMES[c] ?? c}`}
                     onClick={() => {
                       const t = byName.get(recoloring);
                       if (t) updateTag.mutate({ id: t.id, color: c });
@@ -165,7 +167,7 @@ export function TagPicker({
                     style={{ backgroundColor: c }}
                   />
                 </TooltipTrigger>
-                <TooltipContent>{PROJECT_COLOR_NAMES[c] ?? c}</TooltipContent>
+                <TooltipContent>{SWATCH_COLOR_NAMES[c] ?? c}</TooltipContent>
               </Tooltip>
             ))}
           </div>

@@ -1,5 +1,5 @@
 import type { CreateProject } from "@shared/schemas";
-import { DISTINCT_COLORS, spreadColor } from "./colors";
+import { DISTINCT_COLORS, spreadColor } from "@shared/colors";
 
 /** Project rows with their tracked time; `scoped` adds one `te.user_id = ?` binding (in the join, before the WHERE's) for a member. */
 export function projectSelect(scoped: boolean): string {

@@ -1,4 +1,4 @@
-import { pickUnusedColor } from "../lib/colors";
+import { nextUnusedColor } from "@shared/colors";
 
 // Helper to broadcast events via Durable Object
 export async function broadcast(
@@ -205,7 +205,7 @@ export async function upsertTags(
     .all<{ color: string | null }>();
   const taken = new Set(inUse.map((r) => r.color).filter((c): c is string => Boolean(c)));
   const nextColor = () => {
-    const color = pickUnusedColor(taken);
+    const color = nextUnusedColor(taken);
     taken.add(color);
     return color;
   };

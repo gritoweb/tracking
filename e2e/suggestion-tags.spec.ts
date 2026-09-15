@@ -138,3 +138,27 @@ test("a tag created with the entry shows its colour without a reload", async ({ 
   expect(colours.length).toBeGreaterThan(0);
   expect(colours).not.toContain("rgb(100, 116, 139)"); // the #64748b fallback
 });
+
+test("a tag is created as it is added, so its swatch is real before the entry is saved", async ({
+  page,
+}) => {
+  await signUp(page);
+  await createProject(page);
+  await page.reload();
+
+  await page.getByRole("button", { name: "Add entry" }).click();
+  const dialog = page.getByRole("dialog", { name: "New entry" });
+  await dialog.getByRole("button", { name: "Add tags" }).click();
+  await page.getByPlaceholder("Add a tag...").fill("brandnew");
+  await page.keyboard.press("Enter");
+
+  // Recolouring is only offered for a tag the server already holds, so this
+  // asserts the row exists — and with it, the colour on the chip.
+  const recolor = page.getByRole("button", { name: "Recolor brandnew" });
+  await expect(recolor).toBeVisible();
+  const swatch = recolor.locator("span").first();
+  await expect(swatch).toBeVisible();
+  const colour = await swatch.evaluate((el) => getComputedStyle(el).backgroundColor);
+  expect(colour).not.toBe("rgb(148, 163, 184)"); // the untinted fallback
+  expect(colour).not.toBe("rgb(100, 116, 139)"); // the old grey
+});

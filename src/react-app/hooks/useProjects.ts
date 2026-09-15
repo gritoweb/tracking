@@ -192,6 +192,16 @@ export function useTagColors() {
   return (name: string) => map.get(name) ?? "#64748b";
 }
 
+/** Creates the tag as soon as it's added, so its swatch is the real one rather than a guess. */
+export function useCreateTag() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (name: string) => api.tags.create(name),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["tags"] }),
+    onError: () => toast.error("Failed to create tag"),
+  });
+}
+
 export function useUpdateTag() {
   const queryClient = useQueryClient();
   return useMutation({

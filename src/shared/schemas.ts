@@ -260,6 +260,10 @@ export const TagSchema = z.object({
   color: z.string(),
 });
 
+export const CreateTagSchema = z.object({
+  name: z.string().min(1).max(60),
+});
+
 export const UpdateTagSchema = z.object({
   color: z.string().regex(/^#[0-9a-f]{6}$/i),
 });

@@ -34,7 +34,7 @@ import {
   useCreateClient,
 } from "@/hooks/useProjects";
 import { useUIStore } from "@/stores/uiStore";
-import { nextProjectColor, randomProjectColor } from "@/lib/colorUtils";
+import { nextUnusedColor, randomColor } from "@/lib/colorUtils";
 
 interface ProjectPickerProps {
   value: string | null;
@@ -156,8 +156,8 @@ export function ProjectPicker({
     const project = await createProject.mutateAsync({
       name,
       color: autoAssignColors
-        ? nextProjectColor(projects.map((p) => p.color))
-        : randomProjectColor(),
+        ? nextUnusedColor(projects.map((p) => p.color))
+        : randomColor(),
       billable: false,
       clientId,
     });

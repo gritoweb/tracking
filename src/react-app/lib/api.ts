@@ -279,6 +279,11 @@ export const api = {
   // ─── Tags ─────────────────────────────────────────────────────────────────
   tags: {
     list: () => request<unknown[]>("/tags"),
+    create: (name: string) =>
+      request<{ id: string; name: string; color: string }>("/tags", {
+        method: "POST",
+        body: JSON.stringify({ name }),
+      }),
     update: (id: string, body: { color: string }) =>
       request<{ ok: boolean }>(`/tags/${id}`, {
         method: "PATCH",

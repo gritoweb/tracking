@@ -34,7 +34,7 @@ import {
 import { useIntegrations } from "@/hooks/useIntegrations";
 import { useWorkspaceRole } from "@/hooks/useWorkspaceRole";
 import { useUIStore } from "@/stores/uiStore";
-import { PROJECT_COLORS, PROJECT_COLOR_NAMES, nextProjectColor, randomProjectColor } from "@/lib/colorUtils";
+import { SWATCH_COLORS, SWATCH_COLOR_NAMES, nextUnusedColor, randomColor } from "@/lib/colorUtils";
 import { cn } from "@/lib/utils";
 import type { Project } from "@shared/schemas";
 
@@ -54,8 +54,8 @@ export function ProjectForm({ project, open, onClose }: ProjectFormProps) {
     () =>
       project?.color ??
       (autoAssignColors
-        ? nextProjectColor(existingProjects.map((p) => p.color))
-        : randomProjectColor())
+        ? nextUnusedColor(existingProjects.map((p) => p.color))
+        : randomColor())
   );
   const [client, setClient] = useState<ClientChoice>(
     project?.clientId ? { clientId: project.clientId, newName: "" } : NO_CLIENT
@@ -141,13 +141,13 @@ export function ProjectForm({ project, open, onClose }: ProjectFormProps) {
           <div className="space-y-1.5">
             <Label>Color</Label>
             <div className="flex flex-wrap gap-2">
-              {PROJECT_COLORS.map((c) => (
+              {SWATCH_COLORS.map((c) => (
                 <button
                   key={c}
                   type="button"
-                  aria-label={`Select color ${PROJECT_COLOR_NAMES[c] ?? c}`}
+                  aria-label={`Select color ${SWATCH_COLOR_NAMES[c] ?? c}`}
                   aria-pressed={color === c}
-                  title={PROJECT_COLOR_NAMES[c] ?? c}
+                  title={SWATCH_COLOR_NAMES[c] ?? c}
                   className={cn(
                     // Selection and focus use different CSS properties on
                     // purpose. Both used to be `ring-*`, so a swatch that was

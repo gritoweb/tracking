@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { AiQuickEntryRawSchema, type AiQuickEntryRaw } from "@shared/schemas";
-import { DISTINCT_COLORS, PALETTE } from "./colors";
+import { DISTINCT_COLORS, PALETTE } from "@shared/colors";
 
 // Used for every json_schema-mode call (quick entry, project recolor, event→
 // project inference). Was llama-3.1-8b-instruct-fp8 until Workers AI dropped

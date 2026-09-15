@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { CreateProjectSchema, UpdateProjectSchema } from "@shared/schemas";
-import { DISTINCT_COLORS, spreadColor } from "../lib/colors";
+import { DISTINCT_COLORS, spreadColor } from "@shared/colors";
 import { runProjectColorAssignment } from "../lib/ai";
 import { loadProjectPacing } from "../lib/pacing";
 import { isActiveClient } from "../lib/clients";
