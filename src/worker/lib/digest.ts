@@ -13,7 +13,7 @@ import { atRiskProjects, loadProjectPacing } from "./pacing";
 import { isManager } from "./permissions";
 import { runBriefNarrative } from "./ai";
 
-import { appUrl } from "@shared/app";
+import { appUrl } from "./app-url";
 /** Top N projects in the split — past this it stops being a glance. */
 const MAX_PROJECT_LINES = 6;
 const MAX_BUDGET_LINES = 3;

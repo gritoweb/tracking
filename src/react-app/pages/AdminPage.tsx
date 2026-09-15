@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { APP_HOST } from "@shared/app";
+import { APP_HOST } from "@/lib/appUrl";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Navigate } from "react-router-dom";
 import { toast } from "sonner";

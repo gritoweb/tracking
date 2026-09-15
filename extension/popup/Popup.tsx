@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { APP_HOST } from "@shared/app";
+import { APP_HOST } from "../lib/appUrl";
 import { normalizeApiUrl, DEFAULT_API_URL } from "../lib/apiUrl";
 import { makeAuthClient, type ExtAuthClient } from "../lib/auth-client";
 

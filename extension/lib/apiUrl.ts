@@ -1,4 +1,4 @@
-import { APP_HOST, APP_URL } from "@shared/app";
+import { APP_HOST, APP_URL } from "./appUrl";
 
 // Allow-list for the API base URL the extension talks to.
 //

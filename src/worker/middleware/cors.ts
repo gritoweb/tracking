@@ -1,4 +1,4 @@
-import { APP_URL } from "@shared/app";
+import { appUrl } from "../lib/app-url";
 import { cors } from "hono/cors";
 
 // Exact-match allow-list mirroring trustedOrigins in auth.ts. Never
@@ -6,8 +6,8 @@ import { cors } from "hono/cors";
 // also matches http://localhost.evil.com, *.workers.dev is registrable by
 // anyone, and chrome-extension://* is every extension — only the pinned one is
 // ours. Localhost origins are compiled in for dev/e2e builds only.
-const ALLOWED_ORIGINS = new Set<string>([
-  APP_URL,
+const allowedOrigins = (env: Env) => new Set<string>([
+  appUrl(env),
   // Pinned dev extension ID (manifest "key") — add the Chrome Web Store ID
   // after first publish, same as trustedOrigins in auth.ts.
   "chrome-extension://nogikmhdpnnedmfldanickgpikmifcje",
@@ -15,9 +15,9 @@ const ALLOWED_ORIGINS = new Set<string>([
 ]);
 
 export const corsMiddleware = cors({
-  origin: (origin) => {
+  origin: (origin, c) => {
     if (!origin) return "*";
-    return ALLOWED_ORIGINS.has(origin) ? origin : null;
+    return allowedOrigins(c.env as Env).has(origin) ? origin : null;
   },
   allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowHeaders: ["Content-Type", "Authorization"],
