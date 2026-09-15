@@ -1,5 +1,37 @@
 # Changelog
 
+## 2026-09-15 (4)
+### Fixed
+- **Nothing opens a picker at you any more.** Starting a timer without a project popped the project
+  picker over the bar, and the description field opened its suggestion list on *focus* — which the
+  New-entry sheet and the edit form both trigger by autofocusing it, so a dropdown greeted you on top
+  of the form you came to fill. The timer bar now remembers the last project used (`lastProjectId`,
+  persisted in `uiStore`) and starts on it; with no project at all the Start button is disabled and
+  says "Choose a project to start", and a favourite, task or `Alt+Shift+S` start says the same in a
+  toast and waits for a pick rather than taking the screen. The suggestion list opens when you type
+  or press ArrowDown, never on focus alone.
+- **Demoting yourself no longer needs a reload.** The caller's role is cached (`GET /api/me`,
+  60s), and changing a role in Settings → Team invalidated only the organization query — so an admin
+  who made themselves a member kept seeing the manager-only controls (the project row's "…" menu,
+  Edit/Archive, budgets) until F5. The role and member queries are now invalidated with it. Covered
+  by an e2e that fails without the fix.
+- **A new project is no longer always the same blue, and neither are tags.** With "Auto-assign
+  colors" off, both the quick create and the project form fell back to one fixed palette entry;
+  they now take a random one. Tag colours came from a hash of the tag name, which packs short words
+  into the same few blues — a new tag now takes the first palette colour the workspace isn't using,
+  and a random one once they're all taken.
+
+### Changed
+- **Calendar blocks sit square in their column.** FullCalendar's own gutter is 2px on the left and
+  2.5% on the right, so a day column left a widening empty strip down its right edge; both sides now
+  read as 3px, and two, three or four overlapping entries split the column in equal shares (measured:
+  65/65, 43/43/43, 33/33/33/33 in a 134px column). The drag and resize preview used to be drawn at
+  full column width straight over the blocks beside it — `CalendarView` now pins it to the share the
+  dragged block itself holds (measured: 43px, aligned to the block it came from).
+  Verified: `pnpm build` exit 0, `pnpm lint` 0 errors, and the calendar, timer, favourites,
+  suggestion, report and project-rule specs pass (the pre-existing `tier2-features` gaps-toggle
+  failure aside); the picker, drag preview and both entry forms were checked on screen.
+
 ## 2026-09-15 (3)
 ### Fixed
 - **The project-with-a-client rule reached three paths that were still deciding on their own.**
