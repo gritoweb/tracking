@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-09-15 (8)
+### Fixed
+- **Blocks stopped covering the hours underneath them.** Two changes from earlier today combined
+  badly: a 22px floor on short blocks stretched a five-minute entry to the height of fifteen, and the
+  staggered overlap drew a later block at full width over the one still running — so a 10:00–10:05
+  entry hid the middle of a 09:30–10:30 one. The floor is gone (a five-minute entry measures 14px
+  again, the height its duration earns) and overlapping blocks split the column again
+  (`slotEventOverlap: false`), which is the only arrangement that never hides an entry: measured on
+  the same day, 09:30–10:30 now renders in full beside the short ones, and an entry that shares its
+  time with nothing still spans the whole column (130px of 134px).
+  The cost, deliberately accepted: a block keeps half the column for its whole length once it shares
+  a minute with another, so it looks narrow in the stretch where it runs alone. Hiding tracked hours
+  is the worse failure of the two.
+  Verified: `pnpm build` exit 0, `pnpm lint` 0 errors, 10 passing across the calendar, density,
+  day-rollover and tag specs (the `tier2-features` gaps toggle is the pre-existing failure).
+
 ## 2026-09-15 (7)
 ### Removed
 - **The description field no longer suggests anything.** Typing dropped a list of past descriptions
