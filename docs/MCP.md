@@ -8,7 +8,7 @@ your time in plain language — then act on it.
 > *"What did I actually work on last Thursday?"*
 > *"Start a timer on the Acme redesign."*
 
-The server speaks **Streamable HTTP** at `https://timetracker.run/mcp` and
+The server speaks **Streamable HTTP** at `https://tracking.gritoweb.com.br/mcp` and
 authenticates with a workspace **API key**. It is stateless — no session, no
 Durable Object — so a client can reconnect at any time without losing anything.
 
@@ -38,7 +38,7 @@ easy to revoke just the one that leaked.
 One command — it speaks HTTP with a bearer header natively:
 
 ```bash
-claude mcp add --transport http timetracker https://timetracker.run/mcp \
+claude mcp add --transport http timetracker https://tracking.gritoweb.com.br/mcp \
   --header "Authorization: Bearer tt_live_…"
 ```
 
@@ -53,7 +53,7 @@ does not implement, so bridge it with `mcp-remote`. Edit
   "mcpServers": {
     "timetracker": {
       "command": "npx",
-      "args": ["-y", "mcp-remote", "https://timetracker.run/mcp",
+      "args": ["-y", "mcp-remote", "https://tracking.gritoweb.com.br/mcp",
                "--header", "Authorization:${TT_AUTH}"],
       "env": { "TT_AUTH": "Bearer tt_live_…" }
     }
@@ -76,7 +76,7 @@ instance will not pick up a new key, or a new server name, until it reconnects.
 ### ChatGPT and other clients
 
 Anything that supports **remote MCP over Streamable HTTP with a custom header**
-works. Point it at `https://timetracker.run/mcp` and send:
+works. Point it at `https://tracking.gritoweb.com.br/mcp` and send:
 
 ```
 Authorization: Bearer tt_live_…
@@ -89,7 +89,7 @@ a bearer token field) needs `mcp-remote` in front of it, as above.
 
 ```bash
 KEY=tt_live_…
-curl -s -X POST https://timetracker.run/mcp \
+curl -s -X POST https://tracking.gritoweb.com.br/mcp \
   -H "Authorization: Bearer $KEY" \
   -H 'Content-Type: application/json' \
   -H 'Accept: application/json, text/event-stream' \
@@ -102,7 +102,7 @@ A healthy server answers with an SSE frame containing:
 
 ```json
 {"serverInfo":{"name":"timetracker","title":"TimeTracker","version":"1.1.0",
-               "websiteUrl":"https://timetracker.run","icons":[…]}}
+               "websiteUrl":"https://tracking.gritoweb.com.br","icons":[…]}}
 ```
 
 Swap `"method":"tools/list"` (and drop `params`) to see the tools your key can

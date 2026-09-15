@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-09-15 (12)
+### Fixed
+- **Every surface now says the domain the app actually runs on.** Transactional email still signed off
+  as the old project's domain — "Sent by …", the header wordmark, the invitation and magic-link copy —
+  and so did the MCP connector's `websiteUrl` and its icon URLs, the CORS allow-list, the Admin page
+  blurb, the extension's content script and its error text, and every doc. All of it points at the
+  live domain now; the sender address was already on the company domain.
+  Verified: `pnpm build` exit 0, `pnpm lint` 0 errors, `mcp` 3/3 (the spec asserts both the site URL
+  and that every icon URL is absolute on that domain — and all three icons answer 200 there),
+  `invite-only` and `contrast` green.
+
 ## 2026-09-15 (11)
 ### Fixed
 - **The Timer list follows the role again, as the card asks.** D3 says a *member* sees only their own

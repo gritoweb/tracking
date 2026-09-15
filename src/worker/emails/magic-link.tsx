@@ -4,9 +4,9 @@ import { bodyTextStyle, buttonStyle, colors, fallbackLinkTextStyle, headingStyle
 
 export function MagicLinkEmail({ url }: { url: string }) {
   return (
-    <EmailLayout preview="Your sign-in link for timetracker.run">
+    <EmailLayout preview="Your sign-in link for tracking.gritoweb.com.br">
       <Heading as="h1" style={headingStyle}>
-        Sign in to timetracker.run
+        Sign in to tracking.gritoweb.com.br
       </Heading>
       <Text style={bodyTextStyle}>Click the button below to sign in. This link expires in 5 minutes.</Text>
       <Button href={url} style={buttonStyle}>
@@ -23,7 +23,7 @@ export function MagicLinkEmail({ url }: { url: string }) {
 }
 
 MagicLinkEmail.PreviewProps = {
-  url: "https://timetracker.run/api/auth/magic-link/verify?token=example-token",
+  url: "https://tracking.gritoweb.com.br/api/auth/magic-link/verify?token=example-token",
 };
 
 export default MagicLinkEmail;

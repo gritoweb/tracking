@@ -12,13 +12,13 @@ export function WorkspaceInvitationEmail({
   url: string;
 }) {
   return (
-    <EmailLayout preview={`${inviterName} invited you to join ${workspaceName} on timetracker.run`}>
+    <EmailLayout preview={`${inviterName} invited you to join ${workspaceName} on tracking.gritoweb.com.br`}>
       <Heading as="h1" style={headingStyle}>
         Join {workspaceName}
       </Heading>
       <Text style={bodyTextStyle}>
         <strong>{inviterName}</strong> invited you to join the &quot;{workspaceName}&quot; workspace on
-        timetracker.run.
+        tracking.gritoweb.com.br.
       </Text>
       <Button href={url} style={buttonStyle}>
         Accept invitation
@@ -36,7 +36,7 @@ export function WorkspaceInvitationEmail({
 WorkspaceInvitationEmail.PreviewProps = {
   inviterName: "Blake Bauman",
   workspaceName: "Blake's Workspace",
-  url: "https://timetracker.run/accept-invite?id=example-invite-id",
+  url: "https://tracking.gritoweb.com.br/accept-invite?id=example-invite-id",
 };
 
 export default WorkspaceInvitationEmail;

@@ -1,6 +1,6 @@
 # Time Tracker — User Guide
 
-Everything you can do in [timetracker.run](https://timetracker.run), organized by task. If you're new, read [Getting started](#getting-started) and [Tracking time](#tracking-time) — the rest is reference.
+Everything you can do in [tracking.gritoweb.com.br](https://tracking.gritoweb.com.br), organized by task. If you're new, read [Getting started](#getting-started) and [Tracking time](#tracking-time) — the rest is reference.
 
 ## Contents
 
@@ -127,7 +127,7 @@ Connect Claude, ChatGPT, or any other MCP client to your workspace and ask about
 
 Under **Settings → Workspace → MCP connector**:
 
-1. Copy the **server URL** (`https://timetracker.run/mcp`).
+1. Copy the **server URL** (`https://tracking.gritoweb.com.br/mcp`).
 2. Create a key. **Read only** lets the assistant look at projects, clients, entries, summaries, budgets and drafts. **Read + write** also lets it start and stop timers, log entries, and draft a day.
 3. Paste both into your client — it authenticates with `Authorization: Bearer <your key>`.
 

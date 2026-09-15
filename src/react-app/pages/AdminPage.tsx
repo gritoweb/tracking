@@ -121,7 +121,7 @@ export function AdminPage() {
     <div className="space-y-6 p-6">
       <div>
         <h1 className="text-xl font-semibold">Admin</h1>
-        <p className="text-sm text-muted-foreground">Manage all timetracker.run users</p>
+        <p className="text-sm text-muted-foreground">Manage all tracking.gritoweb.com.br users</p>
       </div>
 
       <Card>

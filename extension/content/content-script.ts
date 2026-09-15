@@ -12,7 +12,7 @@
 // context detection (below); we must not accept spoofed timer state from those.
 const APP_ORIGINS = new Set([
   "http://localhost:5173",
-  "https://timetracker.run",
+  "https://tracking.gritoweb.com.br",
 ]);
 
 if (APP_ORIGINS.has(window.location.origin)) {

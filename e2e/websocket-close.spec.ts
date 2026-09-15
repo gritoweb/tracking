@@ -23,7 +23,7 @@ import { signUp } from "./auth";
  * So: this guards the client contract in CI, but the only thing that actually
  * verifies close behaviour is a probe against the deployed worker:
  *
- *   const ws = new WebSocket("wss://timetracker.run/api/ws");   // authenticated tab
+ *   const ws = new WebSocket("wss://tracking.gritoweb.com.br/api/ws");   // authenticated tab
  *   ws.onopen = () => ws.close(1000, "probe");
  *   ws.onclose = (e) => console.log(e.code, e.wasClean);        // want 1000, true
  */

@@ -13,7 +13,7 @@ import { atRiskProjects, loadProjectPacing } from "./pacing";
 import { isManager } from "./permissions";
 import { runBriefNarrative } from "./ai";
 
-const APP_URL = "https://timetracker.run";
+const APP_URL = "https://tracking.gritoweb.com.br";
 /** Top N projects in the split — past this it stops being a glance. */
 const MAX_PROJECT_LINES = 6;
 const MAX_BUDGET_LINES = 3;

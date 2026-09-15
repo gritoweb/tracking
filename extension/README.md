@@ -1,6 +1,6 @@
 # Time Tracker browser extension
 
-A Manifest V3 Chrome extension that mirrors the [Time Tracker](https://timetracker.run)
+A Manifest V3 Chrome extension that mirrors the [Time Tracker](https://tracking.gritoweb.com.br)
 web app: start/stop and view your running timer from the toolbar, with a live
 badge, and pre-fill descriptions from issue/PR pages. Starting a timer needs a
 project, picked from the workspace's active projects grouped by client.
@@ -37,7 +37,7 @@ extension/
   (`chrome-extension://<id>`) in the worker's `trustedOrigins`
   (`src/worker/auth.ts`) — not by disabling CSRF.
 - **API base URL:** configurable in the popup's settings but validated against an
-  allow-list (`lib/apiUrl.ts`: `timetracker.run`, `*.workers.dev`,
+  allow-list (`lib/apiUrl.ts`: `tracking.gritoweb.com.br`, `*.workers.dev`,
   `localhost`/`127.0.0.1`) so the bearer token is never sent to an arbitrary
   origin.
 - **Content script:** the `timetracker:sync` and `timetracker:assistant`
@@ -60,7 +60,7 @@ Then load it unpacked:
 3. Confirm the ID reads `nogikmhdpnnedmfldanickgpikmifcje` (pinned via the
    manifest `key`).
 4. Run the app/API with `pnpm dev` (or point the popup's API URL at
-   `https://timetracker.run`), then sign in from the popup.
+   `https://tracking.gritoweb.com.br`), then sign in from the popup.
 
 Rebuild after changes with `pnpm build:ext` and hit **Reload** on the extension
 card. There is no HMR for the extension build.

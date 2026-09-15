@@ -204,7 +204,7 @@ DailyBriefEmail.PreviewProps = {
   draftsWaiting: 3,
   narrative:
     "Most of the day went to the homepage rebuild, with a scope call in the afternoon and a short pass over the client's feedback before close.",
-  appUrl: "https://timetracker.run",
+  appUrl: "https://tracking.gritoweb.com.br",
 } satisfies DailyBriefEmailProps;
 
 export default DailyBriefEmail;

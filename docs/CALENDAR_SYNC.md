@@ -55,7 +55,7 @@ Until the two secrets below are set, the app runs fine and the Settings card sho
      **separate** from the Google *login* client so it carries the calendar scope
      and its own redirect URIs. Add authorized redirect URIs:
      - `http://localhost:5173/api/calendar/google/callback` (local dev)
-     - `https://timetracker.run/api/calendar/google/callback` (production)
+     - `https://tracking.gritoweb.com.br/api/calendar/google/callback` (production)
    - Copy the client ID and client secret.
 
 2. **Local dev** — add to `.dev.vars`:
@@ -92,7 +92,7 @@ Until the two secrets below are set, the app runs fine and the Settings card sho
      organizational directory and personal Microsoft accounts" is the most
      permissive.
    - **Redirect URI**: platform **Web**, value
-     `https://timetracker.run/api/calendar/microsoft/callback`. Add
+     `https://tracking.gritoweb.com.br/api/calendar/microsoft/callback`. Add
      `http://localhost:5173/api/calendar/microsoft/callback` too for local dev —
      Entra allows `http` only for `localhost`.
 2. **API permissions → Add a permission → Microsoft Graph → Delegated

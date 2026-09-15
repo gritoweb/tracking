@@ -14,7 +14,7 @@ Chrome extension ───────┤─ /api/ws       → TimerRoom (timer 
 Cron (*/5 min) ─────────── scheduled()   → auto-track + recurring materializers
 ```
 
-- **Runtime:** Cloudflare Workers (`nodejs_compat`), custom domain `timetracker.run`
+- **Runtime:** Cloudflare Workers (`nodejs_compat`), custom domain `tracking.gritoweb.com.br`
 - **Data:** Cloudflare D1 (SQLite, direct SQL — no ORM), plus per-DO SQLite for the chat agent
 - **Bindings** (`wrangler.jsonc`): `DB` (D1), `TIMER_ROOM` + `CHAT_AGENT` (Durable Objects), `AI` (Workers AI), `EMAIL` (send_email)
 
@@ -69,7 +69,7 @@ Notable decisions:
 - `session.freshAge = 0` — otherwise Better Auth's `list-sessions` 403s (`SESSION_NOT_FRESH`) after a day and breaks the Settings sessions card. Freshness is re-imposed selectively on sensitive ops (`update-user`, `unlink-account`).
 - Access is invite-only (`lib/invite-only.ts`). `databaseHooks.user.create.before` refuses any new account without a pending, unexpired invitation from a workspace owned by an `ADMIN_EMAILS` address, and `hooks.before` refuses a sign-in code or magic link for such an email before anything is sent (the magic-link verify step can't surface a hook error, and errors thrown inside Better Auth's send callbacks are swallowed). Only an `ADMIN_EMAILS` address may create a workspace through the API (`allowUserToCreateOrganization`); apart from that, only the very first `ADMIN_EMAILS` account, and `@example.com` e2e accounts in dev builds, get one from `user.create.after`. A signed-in user with no workspace sees `NoWorkspacePage` with their pending invitations.
 - `trustedOrigins` includes the pinned `chrome-extension://<id>` origin — the extension is trusted by origin, CSRF stays on for the cookie web app (see `extension/SECURITY_AUDIT.md`).
-- **Email** goes out through the `EMAIL` send_email binding (MIME built with `mimetext`, from `noreply@timetracker.run`): invites, OTP codes, magic links. Bodies are React Email templates (`src/worker/emails/*.tsx`) rendered on the worker with `render`/`toPlainText` from `react-email`; the plain-text MIME part is derived from the HTML, and `pnpm email:dev` serves a local template preview.
+- **Email** goes out through the `EMAIL` send_email binding (MIME built with `mimetext`, from `noreply@gritoweb.com.br`): invites, OTP codes, magic links. Bodies are React Email templates (`src/worker/emails/*.tsx`) rendered on the worker with `render`/`toPlainText` from `react-email`; the plain-text MIME part is derived from the HTML, and `pnpm email:dev` serves a local template preview.
 - Better Auth tables use camelCase columns; everything else is snake_case.
 
 ## Durable Objects

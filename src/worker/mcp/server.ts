@@ -47,7 +47,7 @@ const MUTATES = {
 // their config off it, so it must not change with the display name.
 const SERVER_NAME = "timetracker";
 const SERVER_VERSION = "1.2.0";
-const SITE_URL = "https://timetracker.run";
+const SITE_URL = "https://tracking.gritoweb.com.br";
 
 /**
  * What a client shows next to the connector: display name, site, blurb, icons.

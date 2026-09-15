@@ -14,7 +14,7 @@ extension will fail to sign in with a `403`.
 2. **Host a privacy policy.** Because this extension handles authentication data
    (email/password → session token), CWS **requires** a privacy policy URL.
    Use `extension/PRIVACY.md` as the starting draft, host it at a public URL
-   (e.g. `https://timetracker.run/privacy`), and link it in the listing.
+   (e.g. `https://tracking.gritoweb.com.br/privacy`), and link it in the listing.
 
 ## 1. Build the package
 
@@ -63,7 +63,7 @@ listed there. So after the first upload you must reconcile the IDs:
    **add** the CWS-assigned `chrome-extension://<published-id>` as a second entry
    in `trustedOrigins` alongside the dev one, then `pnpm run deploy`.
 
-> The published `host_permissions` already cover `https://timetracker.run/*`, so
+> The published `host_permissions` already cover `https://tracking.gritoweb.com.br/*`, so
 > no host-permission change is needed for production.
 
 ## 3. Upload & fill the listing
@@ -82,7 +82,7 @@ In the [developer dashboard](https://chrome.google.com/webstore/devconsole):
    - **Permission justifications:**
      - `storage` — cache the session token and running-timer state locally.
      - `alarms` — periodically refresh the timer and update the toolbar badge.
-     - `host_permissions` (`timetracker.run`, `*.workers.dev`, `localhost`) —
+     - `host_permissions` (`tracking.gritoweb.com.br`, `*.workers.dev`, `localhost`) —
        call the Time Tracker API the user is signed in to.
      - content-script hosts (`github.com`, `*.atlassian.net`, `linear.app`) —
        read the current issue/PR title to pre-fill the timer description.

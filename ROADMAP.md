@@ -107,7 +107,7 @@ through the app.
 - **CSP tightening** — two CSPs exist and only one of them matters much.
   `public/_headers` governs the **document** (where the Assistant renders LLM
   output) and is already tight: connect-src pinned to `'self'
-  https://timetracker.run wss://timetracker.run`, plus `base-uri`,
+  https://tracking.gritoweb.com.br wss://tracking.gritoweb.com.br`, plus `base-uri`,
   `object-src 'none'`, `form-action 'self'`. The remaining real gap there is
   `script-src 'self' 'unsafe-inline'` → nonce/hash-based, which needs Vite to
   emit a nonce-able build (no inline bootstrap) or a hash allow-list generated

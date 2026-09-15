@@ -2,7 +2,7 @@
 
 > **Draft template.** Review with your own legal counsel, fill the
 > `<PLACEHOLDERS>`, and host the final version at a public URL (e.g.
-> `https://timetracker.run/privacy`). The Chrome Web Store listing must link to
+> `https://tracking.gritoweb.com.br/privacy`). The Chrome Web Store listing must link to
 > that URL. Keep the "Last updated" date current.
 
 **Last updated:** `<DATE>`
@@ -15,7 +15,7 @@ extension accesses, why, and how it is handled.
 
 - **Account credentials.** When you sign in through the popup, your email
   address and the one-time code we email you are sent directly to the Time
-  Tracker API (`https://timetracker.run` or a URL you configure) to
+  Tracker API (`https://tracking.gritoweb.com.br` or a URL you configure) to
   authenticate you. There is no password, and the extension stores neither
   your email nor the code.
 - **Session token.** On successful sign-in, a session (bearer) token is stored
@@ -45,7 +45,7 @@ removal. Timer data is retained by the Time Tracker service per its own policy.
 
 - `storage` — cache the session token and timer state locally.
 - `alarms` — periodically refresh the timer and update the toolbar badge.
-- Host access to `timetracker.run` / `*.workers.dev` / `localhost` — call the
+- Host access to `tracking.gritoweb.com.br` / `*.workers.dev` / `localhost` — call the
   Time Tracker API you are signed in to.
 - Content-script access to `github.com` / `*.atlassian.net` / `linear.app` —
   read the current issue/PR title to pre-fill the description.

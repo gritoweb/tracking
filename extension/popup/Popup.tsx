@@ -234,7 +234,7 @@ export function Popup() {
   const handleSaveApiUrl = () => {
     const normalized = normalizeApiUrl(apiUrl);
     if (!normalized) {
-      setApiUrlError("Must be timetracker.run, a *.workers.dev URL, or localhost");
+      setApiUrlError("Must be tracking.gritoweb.com.br, a *.workers.dev URL, or localhost");
       return;
     }
     setApiUrlError(null);

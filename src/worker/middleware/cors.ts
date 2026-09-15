@@ -6,7 +6,7 @@ import { cors } from "hono/cors";
 // anyone, and chrome-extension://* is every extension — only the pinned one is
 // ours. Localhost origins are compiled in for dev/e2e builds only.
 const ALLOWED_ORIGINS = new Set<string>([
-  "https://timetracker.run",
+  "https://tracking.gritoweb.com.br",
   // Pinned dev extension ID (manifest "key") — add the Chrome Web Store ID
   // after first publish, same as trustedOrigins in auth.ts.
   "chrome-extension://nogikmhdpnnedmfldanickgpikmifcje",
