@@ -1,5 +1,35 @@
 # Changelog
 
+## 2026-09-15 (15)
+### Added
+- **Task statuses are configurable, and the board built on them.** A task used to be open or done and
+  nothing else, so "in progress" and "waiting on the client" had nowhere to live — and the list's
+  existing `Group: Status` rendered exactly two buckets. A workspace now owns a `task_statuses` table,
+  seeded with **Backlog → To do → In progress → Feedback → Done**, and a new **Board** view sits beside
+  Today / Upcoming / All with a column per status and drag-and-drop (`@dnd-kit`) between and within
+  them. Capture lands in the column marked default (To do out of the box), not the first one. Moves
+  reach other members live over the existing `TimerRoom` socket.
+  **The status is the source of truth and `active`/`completed_at` are its mirror**, written together
+  from the status category in one helper (`worker/lib/task-statuses.ts`). That is what keeps every
+  existing reader of `tasks.active` correct without touching it: the AI grounding query, the Timer's
+  task rail, the subtask rollup counts and the recurrence spawn. Both doors — the row checkbox and a
+  board drop — go through that helper, so a task's column and its done flag cannot disagree.
+  Ordering inside a column is a new `board_order`, deliberately **not** the list's `sort_order`: one
+  number shared between the two surfaces would make tidying the board silently reshuffle
+  "Sort: Plan order" over in the list.
+  Configuring statuses (rename, recolor, retype, reorder, make default, archive) is owner/admin only
+  and lives in the column's own `⋮` menu; *moving* a card is ordinary work and any member can do it.
+  The server refuses, not just the screen: a workspace always keeps one open and one completed column
+  and exactly one default, two live statuses may not share a name, archiving a status that still holds
+  tasks must name where they go, and retyping a column carries the tasks already in it across the
+  done line in both directions.
+  Verified: `pnpm check` exit 0 (typecheck + build + wrangler dry-run), `pnpm lint` 0 errors,
+  `task-board` 12/12 — including a **keyboard** drag (Space, arrows, Space), a member getting 403 on
+  every configuration route while still moving cards, and a move on one person's board appearing on
+  another's without a reload — plus `task-planning` and `task-log-time` 8/8. Migration `0038` applied
+  to the **local** D1 only: 125 existing tasks backfilled, none left without a status, none with the
+  mirror out of step.
+
 ## 2026-09-15 (14)
 ### Changed
 - **The app's domain is configuration, not code.** It had been a TypeScript constant — better than the

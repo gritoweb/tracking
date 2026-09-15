@@ -17,9 +17,13 @@ import { TaskRow } from "./TaskRow";
 import { QuickAddTask } from "./QuickAddTask";
 import { TaskDialog } from "./TaskDialog";
 import { TaskViewTabs, type TaskView } from "./TaskViewTabs";
+import { TaskBoard } from "./board/TaskBoard";
 import { useAllTasks, useDeleteTask, useUpdateTask } from "@/hooks/useTasks";
+import { useTaskStatuses } from "@/hooks/useTaskStatuses";
+import { useProjects } from "@/hooks/useProjects";
 import { useUIStore } from "@/stores/uiStore";
 import { formatDurationShort } from "@/lib/dateUtils";
+import { cn } from "@/lib/utils";
 import {
   comparePlanned,
   formatDueHeading,
@@ -70,6 +74,8 @@ function nodeSeconds(node: TaskNode) {
 
 export function TaskBoardList() {
   const { data: tasks = [], isLoading } = useAllTasks();
+  const { data: statuses = [] } = useTaskStatuses();
+  const { data: projects = [] } = useProjects();
   const deleteTask = useDeleteTask();
   const updateTask = useUpdateTask();
   const openTaskLogTime = useUIStore((s) => s.openTaskLogTime);
@@ -84,11 +90,14 @@ export function TaskBoardList() {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [subtaskParent, setSubtaskParent] = useState<string | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
+  const [boardProjectId, setBoardProjectId] = useState<string | null>(null);
 
   const today = todayLocalDate();
   const hasAnyTask = tasks.length > 0;
 
   const sections = useMemo<Section[]>(() => {
+    // The board groups by column inside TaskBoard; none of this applies to it.
+    if (view === "board") return [];
     const compare = SORTERS[sortBy];
 
     // ─── Today ──────────────────────────────────────────────────────────────
@@ -188,8 +197,10 @@ export function TaskBoardList() {
         key = t.projectId ?? "none";
         label = t.projectName ?? "No project";
       } else if (groupBy === "status") {
-        key = t.active ? "active" : "done";
-        label = t.active ? "Active" : "Done";
+        // The real columns now, not just Active/Done — this grouping predates
+        // configurable statuses and used to render exactly two buckets.
+        key = t.statusId ?? "none";
+        label = t.statusName ?? "No status";
       } else {
         key = t.dueDate ?? "none";
         label = t.dueDate ? formatDueHeading(t.dueDate, today) : "No due date";
@@ -198,7 +209,7 @@ export function TaskBoardList() {
       if (!bucket) {
         bucket = {
           label,
-          color: groupBy === "project" ? t.projectColor : null,
+          color: groupBy === "project" ? t.projectColor : groupBy === "status" ? t.statusColor : null,
           tasks: [],
           defaultProjectId: groupBy === "project" ? t.projectId : null,
           defaultDueDate: groupBy === "due" && t.dueDate ? t.dueDate : null,
@@ -224,11 +235,23 @@ export function TaskBoardList() {
       };
     });
 
-    // Due groups sort chronologically ("No due date" last); everything else by name.
-    return groupBy === "due"
-      ? entries.sort((a, b) => (a.key === "none" ? 1 : b.key === "none" ? -1 : a.key.localeCompare(b.key)))
-      : entries.sort((a, b) => a.label.localeCompare(b.label));
-  }, [tasks, view, status, groupBy, sortBy, today]);
+    // Due groups sort chronologically ("No due date" last); status groups follow
+    // the board's own column order, because that order is a workflow and
+    // alphabetising it ("Backlog, Done, In progress") destroys the only reading
+    // it has; everything else by name.
+    if (groupBy === "due") {
+      return entries.sort((a, b) =>
+        a.key === "none" ? 1 : b.key === "none" ? -1 : a.key.localeCompare(b.key)
+      );
+    }
+    if (groupBy === "status") {
+      const rank = new Map(statuses.map((s, i) => [s.id, i]));
+      return entries.sort(
+        (a, b) => (rank.get(a.key) ?? Infinity) - (rank.get(b.key) ?? Infinity)
+      );
+    }
+    return entries.sort((a, b) => a.label.localeCompare(b.label));
+  }, [tasks, view, status, groupBy, sortBy, today, statuses]);
 
   const isEmpty = sections.length === 0;
   const upcomingCount = tasks.filter(
@@ -246,6 +269,7 @@ export function TaskBoardList() {
       overdue,
       today: overdue + top.filter((t) => t.dueDate === today).length,
       upcoming: top.filter((t) => t.dueDate && compareLocalDates(t.dueDate, today) > 0).length,
+      board: top.length,
       all: top.length,
     };
   }, [tasks, today]);
@@ -278,7 +302,7 @@ export function TaskBoardList() {
   // nothing" is a dead end that needs a way out. Collapsing them into a single
   // "Nothing here" is how an empty Today comes across as a broken page.
   let empty: React.ReactNode = null;
-  if (isEmpty && !isLoading) {
+  if (isEmpty && !isLoading && view !== "board") {
     if (!hasAnyTask) {
       empty = (
         <EmptyState
@@ -375,6 +399,7 @@ export function TaskBoardList() {
         <TaskRow
           task={node.task}
           showProject={groupBy !== "project" || view !== "all"}
+          showStatus={groupBy !== "status" || view !== "all"}
           expanded={open}
           onToggleExpanded={() => toggleCollapsed(node.task.id)}
           onRequestDelete={setDeleteTarget}
@@ -435,6 +460,28 @@ export function TaskBoardList() {
             switcher read as a fourth dropdown in a row of four, and the one
             control that changes *what page you are on* looked exactly as
             important as the one that changes the sort. */}
+        {view === "board" && projects.length > 1 && (
+          <>
+            <div className="mx-1 h-5 w-px bg-border" aria-hidden />
+            <Select
+              value={boardProjectId ?? "all"}
+              onValueChange={(v) => setBoardProjectId(v === "all" ? null : v)}
+            >
+              <SelectTrigger size="sm" className="w-44" aria-label="Filter by project">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All projects</SelectItem>
+                {projects.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </>
+        )}
+
         {view === "all" && (
           <>
             <div className="mx-1 h-5 w-px bg-border" aria-hidden />
@@ -491,7 +538,23 @@ export function TaskBoardList() {
           ))}
         </div>
       ) : (
-        <div className="-mx-6 min-h-0 flex-1 overflow-y-auto px-6 pb-6">
+        <div
+          className={cn(
+            "-mx-6 min-h-0 flex-1 px-6 pb-6",
+            // The board scrolls its columns sideways and each column scrolls its
+            // own cards; a page-level vertical scroll on top of that gives the
+            // cursor two scrollers to fight over.
+            view === "board" ? "overflow-hidden" : "overflow-y-auto"
+          )}
+        >
+          {view === "board" ? (
+            <TaskBoard
+              tasks={tasks}
+              projectId={boardProjectId}
+              onOpenTask={setEditTarget}
+            />
+          ) : (
+          <>
           {hasAnyTask && (
             <QuickAddTask
               className="mb-4"
@@ -534,6 +597,8 @@ export function TaskBoardList() {
                 );
               })}
             </div>
+          )}
+          </>
           )}
         </div>
       )}

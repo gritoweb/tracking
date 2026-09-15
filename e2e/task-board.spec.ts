@@ -302,3 +302,128 @@ test("two live statuses may not share a name", async ({ page }) => {
   expect(ok.status()).toBe(201);
   expect((await statuses(page)).map((s) => s.name)).toEqual([...DEFAULT_ORDER, "Blocked"]);
 });
+
+// ─── The board itself ────────────────────────────────────────────────────────
+
+/** Drags with the keyboard, which is both the a11y path and the one Playwright can drive reliably against dnd-kit. */
+async function dragWithKeyboard(page: Page, taskName: string, key: "ArrowRight" | "ArrowLeft", times = 1) {
+  const handle = page.getByRole("button", { name: `Move ${taskName}` });
+  await handle.focus();
+  await page.keyboard.press("Space");
+  // dnd-kit measures the droppable rects on the tick after a drag starts; an
+  // arrow key pressed before that lands on nothing and the drop is a no-op.
+  await page.waitForTimeout(250);
+  for (let i = 0; i < times; i++) {
+    await page.keyboard.press(key);
+    await page.waitForTimeout(250);
+  }
+  await page.keyboard.press("Space");
+}
+
+test("the Board tab shows a column per status and a card can be moved with the keyboard", async ({ page }) => {
+  await signUp(page);
+  const origin = new URL(page.url()).origin;
+  const project = await createProject(page, { name: "ERP Migration", color: "#e11d48" });
+  await page.request.post("/api/tasks", {
+    data: { name: "Cutover plan", projectId: project.id },
+    headers: { origin },
+  });
+
+  await page.goto("/tasks");
+  await page.getByRole("tab", { name: /Board/ }).click();
+
+  for (const name of DEFAULT_ORDER) {
+    await expect(page.getByRole("region", { name })).toBeVisible();
+  }
+  // It starts in the default column, not the first one.
+  await expect(page.getByRole("region", { name: "To do" }).getByText("Cutover plan")).toBeVisible();
+
+  await dragWithKeyboard(page, "Cutover plan", "ArrowRight");
+  await expect(page.getByRole("region", { name: "In progress" }).getByText("Cutover plan")).toBeVisible();
+
+  await expect
+    .poll(async () => (await tasks(page))[0].statusName, { timeout: 8000 })
+    .toBe("In progress");
+  expect((await tasks(page))[0].active).toBe(true);
+});
+
+test("a member sees the board but none of its configuration", async ({ browser }) => {
+  const { owner, ownerHeaders, member } = await workspaceWithMember(browser);
+  const project = await createProject(owner, { name: "ERP Migration", color: "#e11d48" });
+  await owner.request.post("/api/tasks", {
+    data: { name: "Cutover plan", projectId: project.id },
+    headers: ownerHeaders,
+  });
+
+  await member.goto("/tasks");
+  await member.getByRole("tab", { name: /Board/ }).click();
+  await expect(member.getByRole("region", { name: "To do" })).toBeVisible();
+  await expect(member.getByRole("region", { name: "To do" }).getByText("Cutover plan")).toBeVisible();
+
+  // The screen hides only what the server already refuses.
+  await expect(member.getByRole("button", { name: "Configure To do" })).toHaveCount(0);
+  await expect(member.getByRole("button", { name: "Add status" })).toHaveCount(0);
+
+  await owner.goto("/tasks");
+  await owner.getByRole("tab", { name: /Board/ }).click();
+  await expect(owner.getByRole("button", { name: "Configure To do" })).toBeVisible();
+  await expect(owner.getByRole("button", { name: "Add status" })).toBeVisible();
+
+  await owner.context().close();
+  await member.context().close();
+});
+
+test("a move by one person reaches the other's board without a reload", async ({ browser }) => {
+  const { owner, ownerHeaders, member } = await workspaceWithMember(browser);
+  const project = await createProject(owner, { name: "ERP Migration", color: "#e11d48" });
+  await owner.request.post("/api/tasks", {
+    data: { name: "Cutover plan", projectId: project.id },
+    headers: ownerHeaders,
+  });
+
+  await member.goto("/tasks");
+  await member.getByRole("tab", { name: /Board/ }).click();
+  await expect(member.getByRole("region", { name: "To do" }).getByText("Cutover plan")).toBeVisible();
+
+  await owner.goto("/tasks");
+  await owner.getByRole("tab", { name: /Board/ }).click();
+  await expect(owner.getByRole("region", { name: "To do" }).getByText("Cutover plan")).toBeVisible();
+  await dragWithKeyboard(owner, "Cutover plan", "ArrowRight");
+
+  // `tasks:changed` carries no payload — a member's tracked hours are their own —
+  // so the other board refetches rather than reading the broadcast.
+  await expect(
+    member.getByRole("region", { name: "In progress" }).getByText("Cutover plan")
+  ).toBeVisible({ timeout: 10_000 });
+
+  await owner.context().close();
+  await member.context().close();
+});
+
+test("the list's Group: Status follows the real columns, in board order", async ({ page }) => {
+  await signUp(page);
+  const origin = new URL(page.url()).origin;
+  const project = await createProject(page, { name: "ERP Migration", color: "#e11d48" });
+  const live = await statuses(page);
+
+  for (const [name, status] of [
+    ["Write the runbook", "Backlog"],
+    ["Cutover plan", "In progress"],
+    ["Sign-off", "Done"],
+  ] as const) {
+    await page.request.post("/api/tasks", {
+      data: { name, projectId: project.id, statusId: byName(live, status).id },
+      headers: { origin },
+    });
+  }
+
+  await page.goto("/tasks");
+  await page.getByRole("tab", { name: /All/ }).click();
+  await page.getByLabel("Group by").click();
+  await page.getByRole("option", { name: "Group: Status" }).click();
+
+  // Column order, not alphabetical — "Backlog, Done, In progress" would read as
+  // a workflow that runs backwards.
+  const headings = page.locator("main h2:visible");
+  await expect(headings).toHaveText(["Backlog", "In progress", "Done"]);
+});

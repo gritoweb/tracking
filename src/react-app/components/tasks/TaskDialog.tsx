@@ -21,6 +21,8 @@ import {
 } from "@/components/ui/select";
 import { ProjectPicker } from "@/components/entries/ProjectPicker";
 import { useCreateTask, useUpdateTask } from "@/hooks/useTasks";
+import { useTaskStatuses } from "@/hooks/useTaskStatuses";
+import { ColorDot } from "@/components/ColorDot";
 import { parseTimeInput, formatTimeInput } from "@/lib/dateUtils";
 import {
   PRIORITIES,
@@ -39,6 +41,8 @@ interface TaskDialogProps {
   defaultProjectId?: string | null;
   /** Create only: pre-fill the due date (e.g. adding into a dated group). */
   defaultDueDate?: string | null;
+  /** Create only: pre-select this board column. */
+  defaultStatusId?: string | null;
 }
 
 const REPEAT_OPTIONS = [
@@ -69,9 +73,11 @@ export function TaskDialog({
   task = null,
   defaultProjectId = null,
   defaultDueDate = null,
+  defaultStatusId = null,
 }: TaskDialogProps) {
   const createTask = useCreateTask();
   const updateTask = useUpdateTask();
+  const { data: statuses = [] } = useTaskStatuses();
   const editing = Boolean(task);
 
   const [name, setName] = useState(task?.name ?? "");
@@ -81,6 +87,7 @@ export function TaskDialog({
   const [dueDate, setDueDate] = useState<string | null>(task?.dueDate ?? defaultDueDate);
   const [priority, setPriority] = useState(task?.priority ?? 4);
   const [repeat, setRepeat] = useState(repeatValue(task?.recurRule ?? null));
+  const [statusId, setStatusId] = useState<string | null>(task?.statusId ?? defaultStatusId);
 
   // The dialog stays mounted between openings; reseed when it opens on another
   // task (or switches between create and edit).
@@ -94,6 +101,7 @@ export function TaskDialog({
     setDueDate(task?.dueDate ?? defaultDueDate);
     setPriority(task?.priority ?? 4);
     setRepeat(repeatValue(task?.recurRule ?? null));
+    setStatusId(task?.statusId ?? defaultStatusId);
   }
 
   const reset = () => {
@@ -105,6 +113,7 @@ export function TaskDialog({
     setDueDate(defaultDueDate);
     setPriority(4);
     setRepeat("none");
+    setStatusId(defaultStatusId);
   };
 
   /**
@@ -139,12 +148,19 @@ export function TaskDialog({
       dueDate,
       priority,
       recurRule: resolveRepeat(),
+      // Only when it actually changed: sending it on every save would re-run the
+      // server's status resolver and refresh `completed_at` on a done task each
+      // time someone fixed a typo in its notes.
+      ...(statusId && statusId !== task?.statusId ? { statusId } : {}),
     };
 
     if (task) {
       updateTask.mutate({ id: task.id, data: fields }, { onSuccess: handleClose });
     } else {
-      createTask.mutate({ ...fields, projectId }, { onSuccess: handleClose });
+      createTask.mutate(
+        { ...fields, projectId, ...(statusId ? { statusId } : {}) },
+        { onSuccess: handleClose }
+      );
     }
   };
 
@@ -199,6 +215,31 @@ export function TaskDialog({
               </div>
             </div>
           )}
+
+          {/* Next to Project rather than beside Estimate: both answer "where does
+              this live", and a third field in the two-column pair below would
+              orphan a cell (DESIGN.md §8). */}
+          <div className="space-y-1.5">
+            <Label>Status</Label>
+            <Select
+              value={statusId ?? statuses.find((s) => s.isDefault)?.id ?? ""}
+              onValueChange={setStatusId}
+            >
+              <SelectTrigger className="w-full" aria-label="Status">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                {statuses.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    <span className="flex items-center gap-2">
+                      <ColorDot color={s.color} className="h-2 w-2" />
+                      {s.name}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">

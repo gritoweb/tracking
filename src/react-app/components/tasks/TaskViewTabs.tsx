@@ -1,19 +1,21 @@
 import { useRef } from "react";
 import { cn } from "@/lib/utils";
 
-export type TaskView = "today" | "upcoming" | "all";
+export type TaskView = "today" | "upcoming" | "board" | "all";
 
 export interface TaskViewCounts {
   today: number;
   /** Part of `today` that is already late — tints the count, never the label. */
   overdue: number;
   upcoming: number;
+  board: number;
   all: number;
 }
 
 const VIEWS: { value: TaskView; label: string }[] = [
   { value: "today", label: "Today" },
   { value: "upcoming", label: "Upcoming" },
+  { value: "board", label: "Board" },
   { value: "all", label: "All" },
 ];
 

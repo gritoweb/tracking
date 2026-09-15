@@ -15,6 +15,8 @@ interface QuickAddTaskProps {
   defaultDueDate?: string | null;
   /** Creates a subtask of this task instead of a top-level one. */
   parentId?: string | null;
+  /** Board column to capture into — omitted means the workspace default. */
+  defaultStatusId?: string | null;
   autoFocus?: boolean;
   placeholder?: string;
   onDone?: () => void;
@@ -39,6 +41,7 @@ export function QuickAddTask({
   defaultProjectId = null,
   defaultDueDate = null,
   parentId = null,
+  defaultStatusId = null,
   autoFocus = false,
   placeholder = "Add a task — try “draft report tomorrow p1”",
   onDone,
@@ -76,6 +79,7 @@ export function QuickAddTask({
         ...(dueDate ? { dueDate } : {}),
         ...(parsed.priority ? { priority: parsed.priority } : {}),
         ...(parentId ? { parentId } : {}),
+        ...(defaultStatusId ? { statusId: defaultStatusId } : {}),
       },
       {
         // Clear on success only. Clearing optimistically and then failing loses

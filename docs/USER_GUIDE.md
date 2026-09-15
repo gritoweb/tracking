@@ -140,14 +140,14 @@ The key is shown **once** and can't be recovered; if you lose it, revoke it and 
 - **Clients** hold contact details and notes; each client's detail page shows its projects and recent activity.
 - **Who changes what:** anyone in the workspace can add a client or a project — from its page, or straight from the project picker, which asks for the client. Editing, archiving and recoloring clients and projects, and setting a project's rate, budget, dates or integration link, is for **owners and admins**. The project picker groups projects under their client, and entry rows read *Project · Client*.
 - **Projects** belong to a client (required — every project has one), carry a **color**, a **billable** flag, an optional **billing rate**, and an optional budget. The Projects page can be searched (by project *or* client name), sorted by name, client, tracked time or rate, and scoped to a period — the same four options Clients uses (this month / last month / this year / all time). Projects opens on **all time** and Clients on **this month**, because they answer different questions; both say which window they are showing, and the tracked figure on each row follows it. The budget bar underneath does **not** — a budget is cumulative, so `11h / 40h` is always all-time and says so when the page is scoped to anything else. Rate × billable hours = the amounts you see in Reports. The billable flag is the default for new time on that project — the timer bar adopts it when you pick the project, and any entry created without an explicit flag (the browser extension, AI Quick Add, the API) inherits it too.
-- **Tasks** belong to projects, and are the plan side of the timer. A task carries a **due date**, a **priority** (Urgent / High / Normal / None), an optional **estimate**, free-text **notes**, up to one level of **subtasks**, and an optional **repeat**. See "Planning with tasks" below.
+- **Tasks** belong to projects, and are the plan side of the timer. A task carries a **status** (the board's columns — configurable per workspace), a **due date**, a **priority** (Urgent / High / Normal / None), an optional **estimate**, free-text **notes**, up to one level of **subtasks**, and an optional **repeat**. See "Planning with tasks" below.
 - **Tags** are freeform labels; new tags automatically get a distinct color (editable later, along with renames, on the fly from any tag picker).
 
 **Colors:** by default the app auto-assigns visually distinct colors to new projects and tags. Under Settings → Appearance you can toggle auto-assign and run **"Apply to existing"**, which uses AI to recolor your current projects sensibly (e.g. matching a project's name to a fitting hue) while keeping every color distinct.
 
 ## Planning with tasks
 
-The Tasks page opens on **Today**: overdue work first, then what's due today, then what you've already finished today. **Upcoming** shows the next seven days a day at a time, and **All** is the full list with the grouping, sorting and status filters.
+The Tasks page opens on **Today**: overdue work first, then what's due today, then what you've already finished today. **Upcoming** shows the next seven days a day at a time, **Board** is the kanban view, and **All** is the full list with the grouping, sorting and status filters.
 
 Each tab carries a count, so you can see whether a view is worth opening without opening it. Today's count turns red when part of it is overdue.
 
@@ -177,6 +177,16 @@ The line under the field shows what it understood before you commit it.
 **Subtasks.** A task can hold a checklist one level deep. Time is tracked against whichever one you actually worked on, and a parent's tracked total includes its subtasks'. Ticking a parent ticks its children with it.
 
 **Repeats.** A task can repeat daily, on weekdays, weekly on chosen days, or monthly on a date. The next occurrence is created **when you tick the current one off** — so a repeating task you never complete simply goes overdue rather than piling up copies. If it has subtasks, the fresh occurrence gets a fresh checklist.
+
+**Statuses and the board.** Every task sits in a status — a workspace starts with **Backlog → To do → In progress → Feedback → Done** — and the **Board** tab shows one column per status. Drag a card between columns, or reorder within one; a drop saves straight away and appears on your teammates' boards within a few seconds. Filter the whole board to a single project from the header. The chip on each row in the list shows the same status, and clicking it changes it without opening anything.
+
+Only top-level tasks get a card. A parent's checklist rides along as a `2/5` chip rather than filling the column with its own cards.
+
+Marking a task done and dropping it in a **completed** column are the same act: either way the task is closed and stamped with the time, and pulling it back out of that column reopens it. That is what the status *type* means — each column is Not started, Active or Completed, and only the last one closes a task.
+
+**Configuring statuses** (workspace owners and admins). The `⋮` on a column header renames it, recolors it, changes its type, moves it left or right, makes it the column new tasks land in, or archives it. `+ Add status` at the end of the board creates one. Everyone else sees the board and can move cards, but not the menu.
+
+Three things the app won't let you do, because each one breaks something quietly: leave a workspace with no open column (a new task would have nowhere to go) or no completed one (the done checkbox would have nowhere to send a task), give two live columns the same name, or archive a column that still holds tasks without saying where they go.
 
 **The task rail.** In the Timer's calendar and split views (on wider screens) a rail on the right shows what's due today, so you can start or drag straight onto the grid you're tracking into. Collapse it with the control in its header.
 

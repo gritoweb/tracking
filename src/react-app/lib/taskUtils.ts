@@ -5,7 +5,7 @@ import {
   localWeekday,
   todayLocalDate,
 } from "@shared/task-recurrence";
-import type { Task } from "@shared/schemas";
+import type { Task, TaskStatusCategory } from "@shared/schemas";
 
 // ─── Priority ────────────────────────────────────────────────────────────────
 
@@ -34,6 +34,15 @@ export const PRIORITY_LABEL: Record<number, string> = {
 };
 
 export const PRIORITIES = [1, 2, 3, 4] as const;
+
+// ─── Status categories ───────────────────────────────────────────────────────
+
+/** A status category, in the workspace's own words. Only `completed` is behaviour. */
+export const STATUS_CATEGORY_LABEL: Record<TaskStatusCategory, string> = {
+  not_started: "Not started",
+  active: "Active",
+  completed: "Completed",
+};
 
 // ─── Due dates ───────────────────────────────────────────────────────────────
 

@@ -32,6 +32,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ProjectBadge } from "@/components/ProjectBadge";
+import { TaskStatusChip } from "./TaskStatusChip";
 import { useUpdateTask, useCompleteTask } from "@/hooks/useTasks";
 import { useTimer } from "@/hooks/useTimer";
 import { useTimerStore } from "@/stores/timerStore";
@@ -69,6 +70,8 @@ interface TaskRowProps {
   task: Task;
   /** Show the project pill on the row (hidden when the list is grouped by project). */
   showProject?: boolean;
+  /** Show the status chip (hidden when the list is already grouped by status). */
+  showStatus?: boolean;
   /** Rendered as a subtask: indented, no project pill, no nesting affordances. */
   nested?: boolean;
   /** Compact single-line form for the Timer rail. */
@@ -102,6 +105,7 @@ interface TaskRowProps {
 export function TaskRow({
   task,
   showProject = true,
+  showStatus = true,
   nested = false,
   dense = false,
   expanded = false,
@@ -429,6 +433,10 @@ export function TaskRow({
           )}
         </PopoverContent>
       </Popover>
+
+      {/* A subtask follows its parent across the done line, so its own column is
+          never news — it is always the parent's. */}
+      {showStatus && !nested && <TaskStatusChip task={task} />}
 
       {showProject && !nested && task.projectName && (
         <ProjectBadge name={task.projectName} color={task.projectColor} />
