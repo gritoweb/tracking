@@ -70,6 +70,7 @@
   min-height: 22px;
 }
 
+
 /* The drag preview is rendered full-width over its neighbours; CalendarView pins
    it to the dragged block's own share of the column through these vars. */
 .tt-calendar .fc-timegrid-event-harness:has(.fc-event-mirror) {
@@ -82,9 +83,8 @@
   border-radius: var(--radius-sm);
   border: none;
   border-left: 3px solid var(--fc-event-border-color, var(--primary));
-  /* Toggl leaves ~3px of gutter between same-time columns (slotEventOverlap
-     divides the width evenly but doesn't itself leave a gap) — an inset
-     shadow, not a real border, so it doesn't shift FC's own width/left math. */
+  /* ~3px of gutter so stacked blocks stay distinct — an inset shadow, not a
+     real border, so it doesn't shift FC's own width/left math. */
   box-shadow: inset -3px 0 0 var(--fc-page-bg-color);
   padding: 0;
   overflow: hidden;
@@ -98,6 +98,16 @@
      column widths at similar viewports. Without this, the meta line wraps into
      "9:00 –" / "10:30" / "1h" / "30m" — four lines of shrapnel. */
   container-type: inline-size;
+}
+
+/* The range you drag to create wears FullCalendar's own solid blue, where the
+   app's dark event ink is unreadable — white on it, in both themes. */
+.tt-calendar .fc .fc-timegrid-event.tt-event-select,
+.tt-calendar .fc .fc-timegrid-event.tt-event-select .fc-event-main,
+.tt-calendar .fc .fc-timegrid-event.tt-event-select .fc-event-time,
+.tt-calendar .fc .fc-timegrid-event.tt-event-select .fc-event-title,
+.tt-calendar .fc .fc-timegrid-event.tt-event-select .tt-on-tint-muted {
+  color: #fff;
 }
 
 /* "9:00 – 10:30 · 1h 30m" needs ~145px at 11px mono. Narrower than that and the

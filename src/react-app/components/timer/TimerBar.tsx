@@ -8,7 +8,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { TimerControl } from "./TimerControl";
 import { FavoritesMenu } from "./FavoritesMenu";
 import { ResumeLastButton } from "./ResumeLastButton";
-import { DescriptionAutocomplete } from "./DescriptionAutocomplete";
+import { Input } from "@/components/ui/input";
 import { ProjectPicker } from "@/components/entries/ProjectPicker";
 import { TaskPicker } from "@/components/entries/TaskPicker";
 import { AssistantButton } from "@/components/assistant/AssistantButton";
@@ -21,7 +21,6 @@ import { useTagColors } from "@/hooks/useProjects";
 import { BillableToggle } from "./BillableToggle";
 import { getDefaultBillable } from "@/lib/billable";
 import { cn } from "@/lib/utils";
-import type { EntrySuggestion } from "@shared/schemas";
 
 export function TimerBar() {
   const { runningEntry } = useTimerStore();
@@ -167,30 +166,6 @@ export function TimerBar() {
   // not just the text — mirroring FavoritesMenu. While a timer is running the
   // project/task have to be pushed to the server too, exactly as the pickers
   // below do; the description rides along on the existing debounced save.
-  const handleSuggestion = (s: EntrySuggestion) => {
-    setDescription(s.description);
-    setProjectId(s.projectId);
-    setTaskId(s.taskId);
-    setTags(s.tags);
-    // `billable` was the one field of the combo the bar dropped, even though the
-    // server computes it per description×project×task and ships it in the
-    // suggestion. "Make it like last time" has to include whether last time was
-    // invoiceable.
-    setBillable(s.billable);
-    if (runningEntry) {
-      updateEntry.mutate({
-        id: runningEntry.id,
-        data: {
-          description: s.description,
-          ...(s.projectId ? { projectId: s.projectId } : {}),
-          taskId: s.taskId,
-          tags: s.tags,
-          billable: s.billable,
-        },
-      });
-    }
-    descRef.current?.focus();
-  };
 
   // Chips are explicit state, removable one by one; typing a different
   // description deliberately does NOT clear them (the bar fully resets on
@@ -229,13 +204,17 @@ export function TimerBar() {
     // the numbers actually fit, and the controls are one shrink-0 unit that
     // wraps whole rather than being pushed off.
     <header aria-label="Timer controls" className="flex flex-wrap items-center gap-2 bg-card px-4 py-2 xl:h-14 xl:flex-nowrap xl:gap-3 xl:py-0">
-      {/* Description input, with autocomplete over the last 90 days of entries */}
-      <DescriptionAutocomplete
-        inputRef={descRef}
+      {/* Plain description field: free text, no suggestions dropdown. */}
+      <Input
+        ref={descRef}
         value={description}
-        onChange={setDescription}
-        onSelect={handleSuggestion}
-        onSubmit={handleSubmit}
+        onChange={(e) => setDescription(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key !== "Enter") return;
+          e.preventDefault();
+          handleSubmit();
+        }}
+        placeholder="What are you working on?"
         className={cn(
           // `focus-visible:ring-0` left the app's most-used control with no
           // focus indicator at all (WCAG 2.4.7) — and axe doesn't catch it,

@@ -137,10 +137,11 @@ export const CalendarView = forwardRef<FullCalendar, CalendarViewProps>(
           firstDay={firstDay}
           weekends={weekends}
           allDaySlot={false}
-          // Default (true) staggers overlapping events, each new one covering
-          // most of the last — Toggl instead splits the column evenly so both
-          // stay fully visible side by side.
-          slotEventOverlap={false}
+          // Stagger overlapping events (the Google Calendar look) rather than
+          // splitting the column: a block that shares an hour with another kept
+          // half the width for its whole length, leaving it lopsided in the
+          // stretch where it ran alone.
+          slotEventOverlap
           nowIndicator
           slotDuration="00:30:00"
           snapDuration="00:15:00"
@@ -159,6 +160,8 @@ export const CalendarView = forwardRef<FullCalendar, CalendarViewProps>(
           eventContent={CalendarEventContent}
           eventClassNames={(arg) => {
             const props = arg.event.extendedProps as CalendarEventExtendedProps;
+            // The range you drag to create: FullCalendar's own block, not one of ours.
+            if (arg.isMirror && !arg.event.id) return ["tt-event-select"];
             if (props.ghost) return ["tt-event-ghost"];
             if (props.draft) return ["tt-event-draft"];
             return props.running ? ["tt-event-running"] : [];
