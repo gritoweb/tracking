@@ -1,6 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { signUp } from "./auth";
-import { createProject } from "./project-helpers";
+import { chooseProject, createProject } from "./project-helpers";
+import { fillTimeRange } from "./entry-helpers";
 
 // Seed a project + two completed entries sharing a description but with
 // different tags (older vs newer), so the suggestion should carry the NEWER
@@ -101,4 +102,39 @@ test("add-entry form: suggestion fills TagPicker with carried tags", async ({ pa
     })
   ).toBeVisible();
   await expect(dialog.getByRole("button", { name: /^Project: Alpha/ })).toBeVisible();
+});
+
+test("a tag created with the entry shows its colour without a reload", async ({ page }) => {
+  await signUp(page);
+  await createProject(page);
+  await page.reload();
+
+  await page.getByRole("button", { name: "Add entry" }).click();
+  const dialog = page.getByRole("dialog", { name: "New entry" });
+  await dialog.locator("textarea").fill("Tagged work");
+  await fillTimeRange(dialog, "09:00", "10:00");
+  await dialog.getByRole("button", { name: "Select project" }).click();
+  await chooseProject(page);
+
+  await dialog.getByRole("button", { name: "Add tags" }).click();
+  await page.getByPlaceholder("Add a tag...").fill("brandnew");
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Escape");
+  await dialog.getByRole("button", { name: "Add entry" }).click();
+  await dialog.waitFor({ state: "hidden" });
+
+  // The list's swatch reads from the tags cache; a stale one paints every new
+  // tag in the fallback grey until a reload.
+  await page.getByRole("tab", { name: "List" }).click();
+  await expect(page.getByText("Tagged work").first()).toBeVisible();
+  await expect(page.getByText("brandnew").first()).toBeVisible();
+  const colours = await page.evaluate(() => {
+    const out: string[] = [];
+    for (const el of document.querySelectorAll<HTMLElement>("[style*='background-color']")) {
+      if (el.parentElement?.textContent?.includes("brandnew")) out.push(el.style.backgroundColor);
+    }
+    return out;
+  });
+  expect(colours.length).toBeGreaterThan(0);
+  expect(colours).not.toContain("rgb(100, 116, 139)"); // the #64748b fallback
 });

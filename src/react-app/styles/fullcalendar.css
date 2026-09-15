@@ -63,6 +63,13 @@
   margin-inline: 3px 0;
 }
 
+/* A 5- or 10-minute entry renders a few pixels tall, too small to aim at (and to
+   right-click for its menu). Floor it at a pointer-sized block; the overflow sits
+   under whatever comes next, which is empty time in the case that matters. */
+.tt-calendar .fc .fc-timegrid-event-harness {
+  min-height: 22px;
+}
+
 /* The drag preview is rendered full-width over its neighbours; CalendarView pins
    it to the dragged block's own share of the column through these vars. */
 .tt-calendar .fc-timegrid-event-harness:has(.fc-event-mirror) {
