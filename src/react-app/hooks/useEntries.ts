@@ -225,8 +225,7 @@ export function invalidateEntryDerived(queryClient: QueryClient, suggestions = f
   queryClient.invalidateQueries({ queryKey: ["reports"] });
   queryClient.invalidateQueries({ queryKey: ["projects"] });
   queryClient.invalidateQueries({ queryKey: ["tasks"] });
-  // Entries mint tags (upsertTags); without this the name→colour map is stale for
-  // its 5-minute staleTime and every new tag renders in the fallback grey.
+  // Entries mint tags, and a stale tag list paints every new one in the fallback grey.
   queryClient.invalidateQueries({ queryKey: ["tags"] });
   if (suggestions) queryClient.invalidateQueries({ queryKey: ["entry-suggestions"] });
 }

@@ -60,8 +60,7 @@ export function TagPicker({
     const trimmed = tag.trim();
     if (trimmed && !value.includes(trimmed)) {
       onChange([...value, trimmed]);
-      // Create it now rather than when the entry saves: the row (and its colour)
-      // is what the chip shows, and a tag that exists can be recoloured at once.
+      // Created now, not on save: the chip shows the row's own colour.
       if (!byName.has(trimmed)) createTag.mutate(trimmed);
     }
     setInput("");

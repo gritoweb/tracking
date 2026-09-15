@@ -24,8 +24,7 @@ test("a tag created with the entry shows its colour without a reload", async ({ 
   await dialog.getByRole("button", { name: "Add entry" }).click();
   await dialog.waitFor({ state: "hidden" });
 
-  // The list's swatch reads from the tags cache; a stale one paints every new
-  // tag in the fallback grey until a reload.
+  // The swatch reads the tags cache; a stale one paints new tags grey until a reload.
   await page.getByRole("tab", { name: "List" }).click();
   await expect(page.getByText("Tagged work").first()).toBeVisible();
   await expect(page.getByText("brandnew").first()).toBeVisible();
@@ -53,8 +52,7 @@ test("a tag is created as it is added, so its swatch is real before the entry is
   await page.getByPlaceholder("Add a tag...").fill("brandnew");
   await page.keyboard.press("Enter");
 
-  // Recolouring is only offered for a tag the server already holds, so this
-  // asserts the row exists — and with it, the colour on the chip.
+  // Recolouring is offered only for a tag the server holds, so this asserts the row exists.
   const recolor = page.getByRole("button", { name: "Recolor brandnew" });
   await expect(recolor).toBeVisible();
   const swatch = recolor.locator("span").first();

@@ -17,13 +17,11 @@ test("favorites: save current draft and start from it", async ({ page }) => {
   // The menu stays open on save; the new favorite appears as a startable item.
   await expect(page.getByRole("menuitem", { name: /Design review/ })).toBeVisible();
 
-  // The favorite carries no project and nothing has been picked yet, so starting
-  // it says so instead of opening a picker over the menu.
+  // No project anywhere yet, so starting the favorite says so instead of opening a picker.
   await page.getByRole("menuitem", { name: /Design review/ }).click();
   await expect(page.getByText("Choose a project to start")).toBeVisible();
 
-  // The start waits for a project instead of being dropped: picking one in the
-  // bar runs it. The open menu aria-hides the rest of the page, so close it first.
+  // The start waits for a project; the open menu aria-hides the bar, so close it first.
   await page.keyboard.press("Escape");
   await pickProjectInBar(page);
   await expect(page.getByRole("button", { name: "Stop timer" })).toBeVisible();

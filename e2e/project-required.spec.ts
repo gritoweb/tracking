@@ -3,8 +3,7 @@ import { signUp } from "./auth";
 import { originHeaders, workspaceWithMember } from "./team";
 import { createClient, createProject } from "./project-helpers";
 
-// Every entry belongs to a project and every project to a client (D3), on every way in —
-// and a member creates clients and projects but never changes them.
+// Every entry needs a project and every project a client, on every way in.
 
 const START = "2026-05-04T09:00:00.000Z";
 const STOP = "2026-05-04T10:00:00.000Z";

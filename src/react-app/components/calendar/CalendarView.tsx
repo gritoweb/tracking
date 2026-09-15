@@ -91,8 +91,7 @@ export const CalendarView = forwardRef<FullCalendar, CalendarViewProps>(
       ? ({ hour: "numeric", minute: "2-digit", hour12: true, meridiem: true } as const)
       : ({ hour: "2-digit", minute: "2-digit", hour12: false, meridiem: false } as const);
 
-    // FullCalendar renders the drag/resize preview at full column width, straight
-    // over the blocks beside it. These pin it to the share the dragged block holds.
+    // The drag preview is drawn full-column-width; pin it to the dragged block's share.
     const hostRef = useRef<HTMLDivElement>(null);
 
     const pinMirror = useCallback((el: HTMLElement) => {
@@ -137,9 +136,7 @@ export const CalendarView = forwardRef<FullCalendar, CalendarViewProps>(
           firstDay={firstDay}
           weekends={weekends}
           allDaySlot={false}
-          // Split the column between blocks that share an hour instead of
-          // stacking them: the stagger draws a later block full width over the
-          // one still running, hiding the hours underneath it.
+          // Split the column: stacking draws a later block over the one still running.
           slotEventOverlap={false}
           nowIndicator
           slotDuration="00:30:00"

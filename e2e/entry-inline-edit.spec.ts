@@ -56,8 +56,7 @@ test.describe("entry list inline editing", () => {
     // store, and the store key was only cleared by a callback on the row — which
     // the save itself unmounted. The store stayed set, so the row that remounted
     // immediately reopened the sheet the user had just dismissed by saving.
-    // The "no project" stop toast used to be the way in; every entry has a
-    // project now (D3), so the row menu's Edit, which uses the same store, is.
+    // Every entry has a project now, so the row menu's Edit is the way into this store.
     await addManualEntry(page, { description: "Toast edit", start: "09:00", stop: "10:00" });
     const row = page.locator("div.group", { hasText: "Toast edit" }).first();
     await row.hover();

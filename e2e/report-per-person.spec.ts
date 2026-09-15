@@ -4,8 +4,7 @@ import { signUp } from "./auth";
 import { workspaceWithMember } from "./team";
 import { E2E_PROJECT, createProject } from "./project-helpers";
 
-// A member's hours are theirs alone; owners and admins see the team and can split it by person (D3).
-// Most reads below are forged requests a member's screen never makes: the server is the boundary.
+// A member's hours are theirs alone; the reads below are forged, because the server is the boundary.
 
 const RANGE = "since=2026-05-01T00:00:00.000Z&until=2026-06-01T00:00:00.000Z";
 

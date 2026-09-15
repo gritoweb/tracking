@@ -93,8 +93,7 @@ export function TeamCard() {
       return;
     }
     toast.success("Role updated");
-    // Demoting yourself has to reach the cached role too, or manager-only controls
-    // stay on screen until a reload.
+    // Demoting yourself has to reach the cached role, or its controls stay until a reload.
     await queryClient.invalidateQueries({ queryKey: ["me"] });
     await queryClient.invalidateQueries({ queryKey: ["workspace-members"] });
     refetch();

@@ -79,8 +79,7 @@ test("assistant surfaces a long-running-timer nudge and dismisses it", async ({ 
   await expect(page.getByPlaceholder("Ask the assistant…")).toBeFocused();
 });
 
-// Every entry needs a project (D3): a meeting nothing can place is refused and
-// stays a ghost block; with a project it materializes exactly once.
+// A meeting with no project stays a ghost block; with one it materializes exactly once.
 test("track-event materializes a meeting idempotently", async ({ page }) => {
   await signUp(page);
 

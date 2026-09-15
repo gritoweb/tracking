@@ -197,8 +197,7 @@ export async function upsertTags(
 ): Promise<void> {
   if (!tagNames.length) return;
 
-  // Colours already in play, so a new tag lands on a free one — hashing the name
-  // clustered short words into the same few blues.
+  // Colours already in play, so a new tag lands on a free one.
   const { results: inUse } = await db
     .prepare(`SELECT DISTINCT color FROM tags WHERE workspace_id = ?`)
     .bind(workspaceId)
