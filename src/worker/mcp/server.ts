@@ -18,6 +18,7 @@ import { z } from "zod";
 import { buildReportWhere, durationExpr, formatEntry, ENTRY_SELECT, broadcast } from "../db/queries";
 import { loadProjectPacing } from "../lib/pacing";
 import { entryScopeUserId, getMemberRole } from "../lib/permissions";
+import { appUrl } from "@shared/app";
 import { generateDrafts, listDrafts } from "../lib/drafts";
 import { createClient, isActiveClient } from "../lib/clients";
 import { createProject, findActiveProject, memberProjectInput } from "../lib/projects";
@@ -47,7 +48,7 @@ const MUTATES = {
 // their config off it, so it must not change with the display name.
 const SERVER_NAME = "timetracker";
 const SERVER_VERSION = "1.2.0";
-const SITE_URL = "https://tracking.gritoweb.com.br";
+
 
 /**
  * What a client shows next to the connector: display name, site, blurb, icons.
@@ -61,19 +62,19 @@ const SITE_URL = "https://tracking.gritoweb.com.br";
  * they're already served (and cached) at the edge, and inlining ~35KB of base64
  * into every initialize response to save one cacheable request is a bad trade.
  */
-const SERVER_INFO = {
+const serverInfo = (env: Env) => ({
   name: SERVER_NAME,
   title: "TimeTracker",
   version: SERVER_VERSION,
-  websiteUrl: SITE_URL,
+  websiteUrl: appUrl(env),
   description:
     "Your tracked time, projects and budgets — ask about them in plain language, or start and stop timers.",
   icons: [
-    { src: `${SITE_URL}/logo.svg`, mimeType: "image/svg+xml", sizes: ["any"] },
-    { src: `${SITE_URL}/logo192.png`, mimeType: "image/png", sizes: ["192x192"] },
-    { src: `${SITE_URL}/logo512.png`, mimeType: "image/png", sizes: ["512x512"] },
+    { src: `${appUrl(env)}/logo.svg`, mimeType: "image/svg+xml", sizes: ["any"] },
+    { src: `${appUrl(env)}/logo192.png`, mimeType: "image/png", sizes: ["192x192"] },
+    { src: `${appUrl(env)}/logo512.png`, mimeType: "image/png", sizes: ["512x512"] },
   ],
-};
+});
 
 /**
  * Sent to the client on connect and typically prepended to the model's context.
@@ -154,7 +155,7 @@ export interface McpContext {
 export function buildMcpServer(ctx: McpContext): McpServer {
   const { env, workspaceId, userId, scope } = ctx;
   const db = env.DB;
-  const server = new McpServer(SERVER_INFO, { instructions: SERVER_INSTRUCTIONS });
+  const server = new McpServer(serverInfo(env), { instructions: SERVER_INSTRUCTIONS });
   // Owner/admin keys read the whole workspace; a member's key reads only their own hours (D3).
   let scopePromise: Promise<string | null> | null = null;
   const scopeUserId = () =>

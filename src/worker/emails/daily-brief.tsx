@@ -1,4 +1,5 @@
 import { Button, Heading, Hr, Section, Text } from "react-email";
+import { APP_URL } from "@shared/app";
 import { EmailLayout } from "./layout";
 import { bodyTextStyle, buttonStyle, colors, headingStyle } from "./theme";
 
@@ -204,7 +205,7 @@ DailyBriefEmail.PreviewProps = {
   draftsWaiting: 3,
   narrative:
     "Most of the day went to the homepage rebuild, with a scope call in the afternoon and a short pass over the client's feedback before close.",
-  appUrl: "https://tracking.gritoweb.com.br",
+  appUrl: APP_URL,
 } satisfies DailyBriefEmailProps;
 
 export default DailyBriefEmail;

@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-09-15 (13)
+### Changed
+- **The app's domain lives in one place.** It had been written into fifteen files — the email
+  wordmark and footer, three email subjects, the invitation and magic-link copy, the digest's link,
+  the MCP `websiteUrl` and its three icon URLs, the CORS allow-list, Better Auth's trusted origin, the
+  Admin page blurb and the extension's default API URL, allow-list check and error text. Changing it
+  meant a grep, and the last change had left the old domain behind in exactly that way.
+  `src/shared/app.ts` now holds `APP_URL`/`APP_HOST` plus `appUrl(env)`, which prefers a deployed
+  `APP_URL` var (added to `wrangler.jsonc`, typed through `wrangler types`) over the constant — so a
+  staging deploy answers on its own domain without a code change. Everything imports from there,
+  including the extension, whose bundler already aliased `@shared` and whose TS project now does too.
+  The links *inside* email were already dynamic (built from the request origin), and
+  `extension/manifest.json` keeps the literal host, since JSON can't import.
+  Verified: `pnpm build` and `pnpm build:ext` exit 0, `pnpm lint` 0 errors, `mcp` 3/3 (it asserts the
+  site and icon URLs), `invite-only`, `report-per-person` and `timer-per-user` green.
+
 ## 2026-09-15 (12)
 ### Fixed
 - **Every surface now says the domain the app actually runs on.** Transactional email still signed off

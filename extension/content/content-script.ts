@@ -1,3 +1,4 @@
+import { APP_URL } from "@shared/app";
 // Content script — detects page context from supported apps
 // and sends it to the background service worker
 
@@ -12,7 +13,7 @@
 // context detection (below); we must not accept spoofed timer state from those.
 const APP_ORIGINS = new Set([
   "http://localhost:5173",
-  "https://tracking.gritoweb.com.br",
+  APP_URL,
 ]);
 
 if (APP_ORIGINS.has(window.location.origin)) {

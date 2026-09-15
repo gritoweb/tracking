@@ -2,8 +2,12 @@
   "extends": "@timetracker/typescript-config/dom.json",
   "compilerOptions": {
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.ext.tsbuildinfo",
-    "types": ["chrome"]
+    "types": ["chrome"],
+    "baseUrl": ".",
+    "paths": {
+      "@shared/*": ["./src/shared/*"]
+    }
   },
-  "include": ["extension"],
+  "include": ["extension", "src/shared"],
   "exclude": ["extension/node_modules"]
 }

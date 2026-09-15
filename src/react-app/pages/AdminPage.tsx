@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { APP_HOST } from "@shared/app";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Navigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -121,7 +122,7 @@ export function AdminPage() {
     <div className="space-y-6 p-6">
       <div>
         <h1 className="text-xl font-semibold">Admin</h1>
-        <p className="text-sm text-muted-foreground">Manage all tracking.gritoweb.com.br users</p>
+        <p className="text-sm text-muted-foreground">Manage all {APP_HOST} users</p>
       </div>
 
       <Card>

@@ -13,7 +13,7 @@ import { atRiskProjects, loadProjectPacing } from "./pacing";
 import { isManager } from "./permissions";
 import { runBriefNarrative } from "./ai";
 
-const APP_URL = "https://tracking.gritoweb.com.br";
+import { appUrl } from "@shared/app";
 /** Top N projects in the split — past this it stops being a glance. */
 const MAX_PROJECT_LINES = 6;
 const MAX_BUDGET_LINES = 3;
@@ -259,7 +259,7 @@ export async function sendDigest(
       budgets: content.budgets,
       draftsWaiting: content.draftsWaiting,
       narrative: content.narrative,
-      appUrl: APP_URL,
+      appUrl: appUrl(env),
     })
   );
   return content;

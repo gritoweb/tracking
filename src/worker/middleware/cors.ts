@@ -1,3 +1,4 @@
+import { APP_URL } from "@shared/app";
 import { cors } from "hono/cors";
 
 // Exact-match allow-list mirroring trustedOrigins in auth.ts. Never
@@ -6,7 +7,7 @@ import { cors } from "hono/cors";
 // anyone, and chrome-extension://* is every extension — only the pinned one is
 // ours. Localhost origins are compiled in for dev/e2e builds only.
 const ALLOWED_ORIGINS = new Set<string>([
-  "https://tracking.gritoweb.com.br",
+  APP_URL,
   // Pinned dev extension ID (manifest "key") — add the Chrome Web Store ID
   // after first publish, same as trustedOrigins in auth.ts.
   "chrome-extension://nogikmhdpnnedmfldanickgpikmifcje",

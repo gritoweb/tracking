@@ -1,3 +1,5 @@
+import { APP_HOST, APP_URL } from "@shared/app";
+
 // Allow-list for the API base URL the extension talks to.
 //
 // The bearer session token is attached to every authenticated request sent to
@@ -5,7 +7,7 @@
 // exfiltrate the token. Only origins we actually ship against are accepted.
 // Keep this in sync with `host_permissions` in manifest.json.
 
-export const DEFAULT_API_URL = "https://tracking.gritoweb.com.br";
+export const DEFAULT_API_URL = APP_URL;
 
 /**
  * Validate and normalize a candidate API base URL.
@@ -29,7 +31,7 @@ export function normalizeApiUrl(input: string): string | null {
     (hostname === "localhost" || hostname === "127.0.0.1");
 
   // Production.
-  const isProd = protocol === "https:" && hostname === "tracking.gritoweb.com.br";
+  const isProd = protocol === "https:" && hostname === APP_HOST;
 
   // Cloudflare preview deploys. Uses the parsed hostname so lookalikes such as
   // `phish.workers.dev.attacker.com` (hostname ends in `.attacker.com`) are

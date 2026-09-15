@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { APP_HOST } from "@shared/app";
 import { normalizeApiUrl, DEFAULT_API_URL } from "../lib/apiUrl";
 import { makeAuthClient, type ExtAuthClient } from "../lib/auth-client";
 
@@ -234,7 +235,7 @@ export function Popup() {
   const handleSaveApiUrl = () => {
     const normalized = normalizeApiUrl(apiUrl);
     if (!normalized) {
-      setApiUrlError("Must be tracking.gritoweb.com.br, a *.workers.dev URL, or localhost");
+      setApiUrlError(`Must be ${APP_HOST}, a *.workers.dev URL, or localhost`);
       return;
     }
     setApiUrlError(null);

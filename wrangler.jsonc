@@ -24,6 +24,7 @@
   "workers_dev": false,
   "preview_urls": false,
   "vars": {
+    "APP_URL": "https://tracking.gritoweb.com.br",
     "ENABLE_PASSWORD_AUTH": "true"
   },
   // Auto-track: sweep finished Google Calendar events into time entries every 5 min.
