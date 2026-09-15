@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-09-15 (11)
+### Fixed
+- **The Timer list follows the role again, as the card asks.** D3 says a *member* sees only their own
+  hours — in reports, in the Timer list and calendar, in `GET /api/time_entries`, in the MCP and the
+  Assistant — while an owner or admin sees everyone's. The list had been hard-scoped to the caller for
+  every role, which is stricter than that: an owner could not see, let alone correct, an hour logged
+  by someone else, even though the server has always allowed a manager to edit a *completed* entry of
+  another (a running one stays its owner's alone). `GET /api/time_entries` now runs through
+  `entryScopeUserId` like every other read of hours, so the Timer list is the workspace for a manager
+  and the caller's own for a member. Reports and the MCP already behaved this way; suggestions stay
+  personal, since they answer "what do I usually log".
+  Verified: `pnpm build` exit 0, `pnpm lint` 0 errors, `report-per-person` 5/5 — including an owner
+  reading a teammate's entry from the Timer list — plus `timer-per-user`, `project-required` and
+  `mcp` green. Also fixed a leftover from the palette move: `e2e/contrast.spec.ts` still imported
+  `PROJECT_COLORS`, which broke that spec's module load.
+
 ## 2026-09-15 (10)
 ### Fixed
 - **Deploying now builds first.** Workers Builds runs a bare `wrangler deploy` with no build step,

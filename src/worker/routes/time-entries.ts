@@ -20,7 +20,7 @@ import {
   upsertTags,
   ENTRY_SELECT,
 } from "../db/queries";
-import { getMemberRole, canManageWorkspace, canWriteEntry } from "../lib/permissions";
+import { getMemberRole, canManageWorkspace, canWriteEntry, entryScopeUserId } from "../lib/permissions";
 import { findActiveProject, PROJECT_REQUIRED_ERROR } from "../lib/projects";
 
 
@@ -96,12 +96,17 @@ export const timeEntriesRouter = new Hono<{
     ).toISOString();
     const defaultUntil = new Date(now.getTime() + 86_400_000).toISOString();
 
+    // A member sees only their own hours; an owner or admin sees the workspace (D3).
+    const scopeUserId = entryScopeUserId(
+      await getMemberRole(c.env.DB, workspaceId, userId),
+      userId
+    );
     const { results } = await c.env.DB.prepare(
       `${ENTRY_SELECT}
-       WHERE te.workspace_id = ? AND te.user_id = ? AND te.start >= ? AND te.start < ?
+       WHERE te.workspace_id = ? AND (?2 IS NULL OR te.user_id = ?2) AND te.start >= ?3 AND te.start < ?4
        GROUP BY te.id ORDER BY te.start DESC LIMIT ${ENTRY_LIST_LIMIT}`
     )
-      .bind(workspaceId, userId, since ?? defaultSince, until ?? defaultUntil)
+      .bind(workspaceId, scopeUserId, since ?? defaultSince, until ?? defaultUntil)
       .all<Record<string, unknown>>();
 
     return c.json(results.map(formatEntry));

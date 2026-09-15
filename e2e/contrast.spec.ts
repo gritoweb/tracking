@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { PROJECT_COLORS } from "../src/react-app/lib/colorUtils";
+import { SWATCH_COLORS } from "../src/react-app/lib/colorUtils";
 
 /**
  * Contrast regression guard.
@@ -115,7 +115,7 @@ test("swatch labels clear WCAG AA on every palette color, theme, and surface", a
       return bad;
     },
     {
-      palette: PROJECT_COLORS,
+      palette: SWATCH_COLORS,
       alphas: TINT_ALPHAS,
       surfaceTokens: SURFACES,
       threshold: AA_NORMAL,

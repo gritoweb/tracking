@@ -80,7 +80,7 @@ test.describe("reports per person", () => {
     expect(ownerView.estimatedHours).toBe(10);
   });
 
-  test("an owner splits the team's hours by person, while their Timer stays personal", async ({
+  test("an owner splits the team's hours by person and sees them in the Timer too", async ({
     browser,
   }) => {
     const { owner, member } = await teamWithHours(browser);
@@ -98,8 +98,13 @@ test.describe("reports per person", () => {
     const byPerson = Object.fromEntries(grouped.groups.map((g: Named) => [g.name, g.totalSeconds]));
     expect(byPerson).toEqual({ "Test User": 3600, Outsider: 1800 });
 
+    // The Timer list follows the same rule as the reports: the whole workspace
+    // for an owner or admin, so a teammate's hours can be reviewed and corrected.
     const list = await (await owner.request.get(`/api/time_entries?${RANGE}`)).json();
-    expect(list.map((e: { description: string }) => e.description)).toEqual(["Owner confidential"]);
+    expect(list.map((e: { description: string }) => e.description).sort()).toEqual([
+      "Member work",
+      "Owner confidential",
+    ]);
   });
 
   test("screens hide what a member can't do", async ({ browser }) => {
