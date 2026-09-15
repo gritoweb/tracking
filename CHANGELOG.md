@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-09-15 (5)
+### Fixed
+- **A tag stayed grey until the page was reloaded.** Tags are minted server-side when an entry that
+  names them is saved (`upsertTags`), but `invalidateEntryDerived` refreshed entries, reports,
+  projects and tasks and not the tag list — which the name→colour map is built from and which holds
+  a 5-minute `staleTime`. Every freshly created tag therefore rendered in the `#64748b` fallback grey
+  on the entry row, the timer bar and the calendar until a reload or five minutes passed. The tag
+  query is invalidated with the rest, so it covers every write path at once: create, edit, bulk edit,
+  delete, the timer's own start/stop and the WebSocket echo. Covered by an e2e that creates the tag
+  through the Add-entry form and fails on the fallback grey without the fix.
+
+### Changed
+- **A five-minute entry is now big enough to click.** A short block was drawn a few pixels tall —
+  hard to hit at all, and harder to right-click for its menu; time-grid blocks now have a 22px floor,
+  so 5, 10 and 15-minute entries all render as one comfortable line (measured 21px against a 43px
+  half-hour), and the overflow sits under whatever follows, which is empty time in the case that
+  matters.
+  Verified: `pnpm build` exit 0, `pnpm lint` 0 errors, and the tag, suggestion, calendar, draft,
+  manual-entry and autocomplete specs pass (17/18 — the odd one out is the pre-existing
+  `tier2-features` gaps toggle).
+
 ## 2026-09-15 (4)
 ### Fixed
 - **Nothing opens a picker at you any more.** Starting a timer without a project popped the project
