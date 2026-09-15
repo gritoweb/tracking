@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-09-15 (14)
+### Changed
+- **The app's domain is configuration, not code.** It had been a TypeScript constant — better than the
+  fifteen copies before it, but still a code edit (and a redeploy of the SPA) to change. The worker
+  reads `APP_URL` from the environment (`wrangler.jsonc` vars for deploys, `.dev.vars` locally) via
+  `lib/app-url.ts`, which **throws** if it is unset rather than guessing; the SPA and the extension
+  read `VITE_APP_URL` from `.env` at build time. Email templates now take the URL as a prop, so the
+  worker passes the environment's value and `pnpm email:dev` passes its own — the templates stopped
+  knowing the domain at all. CORS resolves its allow-list per request from `c.env`, since middleware
+  has no module-level env. `extension/manifest.json` keeps the literal host: Chrome requires
+  `host_permissions` to be static.
+  Verified: `pnpm build` and `pnpm build:ext` exit 0, `pnpm lint` 0 errors, 14 e2e green across `mcp`
+  (which asserts the advertised site and icon URLs), `invite-only` and `report-per-person`. CI and
+  `.dev.vars.example` carry the new variable, so a fresh checkout starts.
+
 ## 2026-09-15 (13)
 ### Changed
 - **The app's domain lives in one place.** It had been written into fifteen files — the email

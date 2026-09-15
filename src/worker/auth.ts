@@ -6,7 +6,8 @@ import { WorkspaceInvitationEmail } from "./emails/workspace-invitation";
 import { VerificationOtpEmail } from "./emails/verification-otp";
 import { MagicLinkEmail } from "./emails/magic-link";
 import { sendEmail } from "./lib/mailer";
-import { APP_HOST, appUrl } from "@shared/app";
+import { appUrl } from "./lib/app-url";
+import { appHost } from "@shared/app";
 import {
   accountExists,
   canCreateAccount,
@@ -171,11 +172,12 @@ export function createAuth(env: Env, baseURL: string) {
           await sendEmail(
             env,
             data.email,
-            `You've been invited to a ${APP_HOST} workspace`,
+            `You've been invited to a ${appHost(appUrl(env))} workspace`,
             WorkspaceInvitationEmail({
               inviterName: data.inviter.user.name,
               workspaceName: data.organization.name,
               url,
+              appUrl: appUrl(env),
             }),
           );
         },
@@ -183,12 +185,12 @@ export function createAuth(env: Env, baseURL: string) {
       admin(),
       emailOTP({
         async sendVerificationOTP({ email, otp }) {
-          await sendEmail(env, email, `Your ${APP_HOST} verification code`, VerificationOtpEmail({ otp }));
+          await sendEmail(env, email, `Your ${appHost(appUrl(env))} verification code`, VerificationOtpEmail({ otp, appUrl: appUrl(env) }));
         },
       }),
       magicLink({
         async sendMagicLink({ email, url }) {
-          await sendEmail(env, email, `Sign in to ${APP_HOST}`, MagicLinkEmail({ url }));
+          await sendEmail(env, email, `Sign in to ${appHost(appUrl(env))}`, MagicLinkEmail({ url, appUrl: appUrl(env) }));
         },
       }),
       passkey({

@@ -1,9 +1,17 @@
 import { Body, Container, Head, Hr, Html, Link, Preview, Text } from "react-email";
 import type { ReactNode } from "react";
-import { APP_HOST, APP_URL } from "@shared/app";
+import { appHost } from "@shared/app";
 import { colors, fontSans } from "./theme";
 
-export function EmailLayout({ preview, children }: { preview: string; children: ReactNode }) {
+export function EmailLayout({
+  preview,
+  appUrl,
+  children,
+}: {
+  preview: string;
+  appUrl: string;
+  children: ReactNode;
+}) {
   return (
     <Html lang="en">
       <Head />
@@ -19,7 +27,7 @@ export function EmailLayout({ preview, children }: { preview: string; children: 
           }}
         >
           <Text style={{ color: colors.ink, fontSize: "15px", fontWeight: 600, margin: "0 0 24px" }}>
-            {APP_HOST}
+            {appHost(appUrl)}
           </Text>
           {children}
           {/* Override the borderTop key itself — Hr's default `border-top: 1px solid #eaeaea`
@@ -27,8 +35,8 @@ export function EmailLayout({ preview, children }: { preview: string; children: 
           <Hr style={{ borderTop: `1px solid ${colors.border}`, margin: "28px 0 16px" }} />
           <Text style={{ color: colors.mutedInk, fontSize: "12px", lineHeight: "1.5", margin: 0 }}>
             Sent by{" "}
-            <Link href={APP_URL} style={{ color: colors.mutedInk, textDecoration: "underline" }}>
-              {APP_HOST}
+            <Link href={appUrl} style={{ color: colors.mutedInk, textDecoration: "underline" }}>
+              {appHost(appUrl)}
             </Link>
             . If you didn&apos;t expect this email, you can safely ignore it.
           </Text>

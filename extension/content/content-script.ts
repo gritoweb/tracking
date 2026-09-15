@@ -1,4 +1,4 @@
-import { APP_URL } from "@shared/app";
+import { APP_URL } from "../lib/appUrl";
 // Content script — detects page context from supported apps
 // and sends it to the background service worker
 

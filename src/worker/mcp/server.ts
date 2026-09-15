@@ -18,7 +18,7 @@ import { z } from "zod";
 import { buildReportWhere, durationExpr, formatEntry, ENTRY_SELECT, broadcast } from "../db/queries";
 import { loadProjectPacing } from "../lib/pacing";
 import { entryScopeUserId, getMemberRole } from "../lib/permissions";
-import { appUrl } from "@shared/app";
+import { appUrl } from "../lib/app-url";
 import { generateDrafts, listDrafts } from "../lib/drafts";
 import { createClient, isActiveClient } from "../lib/clients";
 import { createProject, findActiveProject, memberProjectInput } from "../lib/projects";

@@ -84,6 +84,15 @@ Configured in `wrangler.jsonc` under `triggers.crons`. Three independent jobs ru
 
 All three jobs iterate their subjects independently and swallow per-subject errors, so one broken connection, template or address never blocks the rest of the sweep.
 
+### The app's own URL
+
+Never written into code. The worker reads `APP_URL` (a `wrangler.jsonc` var for deploys, `.dev.vars`
+locally) through `lib/app-url.ts`, which **throws** when it is missing rather than falling back to a
+guess; the SPA and the extension read `VITE_APP_URL` from `.env` at build time (`lib/appUrl.ts` on
+each side). Email templates take the URL as a prop — the worker passes `appUrl(env)`, `pnpm email:dev`
+passes `PREVIEW_APP_URL`. The one unavoidable literal is `extension/manifest.json`, whose
+`host_permissions` Chrome requires to be static.
+
 ### Database
 
 Cloudflare D1 (SQLite). Direct SQL — no ORM (Drizzle is only a peer dep for Better Auth's adapter). Add schema changes as new migration files in `migrations/`. Run `wrangler types` after modifying `wrangler.jsonc` bindings.

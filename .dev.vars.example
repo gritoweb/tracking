@@ -1,3 +1,6 @@
+# Where this deployment answers; the SPA and extension read VITE_APP_URL from .env instead.
+APP_URL=http://localhost:5173
+
 # Local dev secrets for `pnpm dev` — copy to .dev.vars and fill in real values.
 # Production equivalents are set with `wrangler secret put <NAME>`.
 
@@ -20,7 +23,7 @@ GOOGLE_CLIENT_SECRET=GOCSPX-replace-with-client-secret
 # request the sensitive calendar.readonly scope with its own consent screen.
 # Enable the Google Calendar API, and add these authorized redirect URIs:
 #   http://localhost:5173/api/calendar/google/callback   (local)
-#   https://tracking.gritoweb.com.br/api/calendar/google/callback (prod)
+#   https://<your-deployment>/api/calendar/google/callback (prod)
 # Optional — calendar sync is disabled until both are set.
 GOOGLE_CALENDAR_CLIENT_ID=1234567890-calendar.apps.googleusercontent.com
 GOOGLE_CALENDAR_CLIENT_SECRET=GOCSPX-replace-with-calendar-client-secret

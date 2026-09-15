@@ -37,6 +37,7 @@ jobs:
           BETTER_AUTH_SECRET=ci-test-secret-at-least-32-characters-long
           AUTH_SECRET=ci-test-secret-at-least-32-characters-long
           BETTER_AUTH_URL=http://localhost:8787
+          APP_URL=http://localhost:5173
           ENABLE_PASSWORD_AUTH=true
           EOF
 

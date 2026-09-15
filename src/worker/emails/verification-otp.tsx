@@ -1,10 +1,11 @@
+import { PREVIEW_APP_URL } from "./preview";
 import { Heading, Section, Text } from "react-email";
 import { EmailLayout } from "./layout";
 import { bodyTextStyle, colors, fontMono, headingStyle } from "./theme";
 
-export function VerificationOtpEmail({ otp }: { otp: string }) {
+export function VerificationOtpEmail({ otp, appUrl }: { otp: string; appUrl: string }) {
   return (
-    <EmailLayout preview={`Your verification code is ${otp}`}>
+    <EmailLayout preview={`Your verification code is ${otp}`} appUrl={appUrl}>
       <Heading as="h1" style={headingStyle}>
         Your verification code
       </Heading>
@@ -39,6 +40,6 @@ export function VerificationOtpEmail({ otp }: { otp: string }) {
   );
 }
 
-VerificationOtpEmail.PreviewProps = { otp: "123456" };
+VerificationOtpEmail.PreviewProps = { otp: "123456", appUrl: PREVIEW_APP_URL };
 
 export default VerificationOtpEmail;

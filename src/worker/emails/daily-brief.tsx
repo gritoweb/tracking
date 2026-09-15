@@ -1,5 +1,5 @@
 import { Button, Heading, Hr, Section, Text } from "react-email";
-import { APP_URL } from "@shared/app";
+import { PREVIEW_APP_URL } from "./preview";
 import { EmailLayout } from "./layout";
 import { bodyTextStyle, buttonStyle, colors, headingStyle } from "./theme";
 
@@ -64,7 +64,7 @@ export function DailyBriefEmail({
   const total = projects.reduce((sum, p) => sum + p.seconds, 0);
 
   return (
-    <EmailLayout preview={`${periodLabel} — ${totalLabel} tracked`}>
+    <EmailLayout preview={`${periodLabel} — ${totalLabel} tracked`} appUrl={appUrl}>
       <Heading as="h1" style={headingStyle}>
         {greeting}
       </Heading>
@@ -205,7 +205,7 @@ DailyBriefEmail.PreviewProps = {
   draftsWaiting: 3,
   narrative:
     "Most of the day went to the homepage rebuild, with a scope call in the afternoon and a short pass over the client's feedback before close.",
-  appUrl: APP_URL,
+  appUrl: PREVIEW_APP_URL,
 } satisfies DailyBriefEmailProps;
 
 export default DailyBriefEmail;
