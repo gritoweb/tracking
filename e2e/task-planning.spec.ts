@@ -56,6 +56,7 @@ test("quick-add parses a due date and a priority out of the line", async ({ page
   });
 
   await page.goto("/tasks");
+  await page.getByRole("tab", { name: /^Today/ }).click();
   await page.waitForTimeout(800);
 
   const field = page.getByRole("textbox", { name: "Add a task" }).first();
@@ -84,6 +85,7 @@ test("completing a repeating task creates the next occurrence", async ({ page })
   });
 
   await page.goto("/tasks");
+  await page.getByRole("tab", { name: /^Today/ }).click();
   await page.waitForTimeout(1000);
   await page.getByRole("button", { name: "Mark task done" }).first().click();
   await page.waitForTimeout(1500);
@@ -169,9 +171,10 @@ test("the view tabs carry counts, and overdue tints Today's", async ({ page }) =
 
   await expect(page.getByRole("tab", { name: "Today, 2 tasks, 1 overdue" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "Upcoming, 1 task" })).toBeVisible();
-  await expect(page.getByRole("tab", { name: "All, 4 tasks" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "List, 4 tasks" })).toBeVisible();
 
   // Arrow keys move between tabs — it's a tablist, not a radiogroup.
+  await page.getByRole("tab", { name: /^Today/ }).click();
   await page.getByRole("tab", { name: /^Today/ }).press("ArrowRight");
   await page.waitForTimeout(300);
   await expect(page.getByRole("tab", { name: /^Upcoming/ })).toHaveAttribute("aria-selected", "true");
@@ -185,6 +188,7 @@ test("a task carries notes, editable through the task dialog", async ({ page }) 
   });
 
   await page.goto("/tasks");
+  await page.getByRole("tab", { name: /^Today/ }).click();
   await page.waitForTimeout(1000);
 
   const row = page.locator(".group", { hasText: "Reconcile Q3 invoices" }).first();

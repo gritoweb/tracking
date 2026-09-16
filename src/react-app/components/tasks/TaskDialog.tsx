@@ -148,9 +148,7 @@ export function TaskDialog({
       dueDate,
       priority,
       recurRule: resolveRepeat(),
-      // Only when it actually changed: sending it on every save would re-run the
-      // server's status resolver and refresh `completed_at` on a done task each
-      // time someone fixed a typo in its notes.
+      // Only when changed — sending it every save would refresh a done task's completed_at.
       ...(statusId && statusId !== task?.statusId ? { statusId } : {}),
     };
 
@@ -216,9 +214,7 @@ export function TaskDialog({
             </div>
           )}
 
-          {/* Next to Project rather than beside Estimate: both answer "where does
-              this live", and a third field in the two-column pair below would
-              orphan a cell (DESIGN.md §8). */}
+          {/* Beside Project, not Estimate — a third field there would orphan a cell. */}
           <div className="space-y-1.5">
             <Label>Status</Label>
             <Select

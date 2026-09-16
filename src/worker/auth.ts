@@ -167,9 +167,7 @@ export function createAuth(env: Env, baseURL: string) {
         // Only an ADMIN_EMAILS account opens workspaces; the server-side bootstrap in user.create.after is exempt.
         allowUserToCreateOrganization: (user) => isAdminEmail(env, user.email),
         organizationHooks: {
-          // A workspace is born with the five default task statuses. `ensureStatuses`
-          // repairs a workspace that somehow missed this, so the board never renders
-          // a page with no columns.
+          // Seeds the five default task statuses; ensureStatuses repairs one that somehow missed this.
           afterCreateOrganization: async ({ organization }) => {
             await ensureStatuses(env.DB, organization.id);
           },

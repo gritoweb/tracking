@@ -5,7 +5,7 @@ import {
   localWeekday,
   todayLocalDate,
 } from "@shared/task-recurrence";
-import type { Task, TaskStatusCategory } from "@shared/schemas";
+import type { Project, Task, TaskStatusCategory } from "@shared/schemas";
 
 // ─── Priority ────────────────────────────────────────────────────────────────
 
@@ -34,6 +34,25 @@ export const PRIORITY_LABEL: Record<number, string> = {
 };
 
 export const PRIORITIES = [1, 2, 3, 4] as const;
+
+// ─── Project grouping (task rail) ───────────────────────────────────────────
+
+/** Projects bucketed under their client, clients alphabetical; client-less projects come last. */
+export interface ProjectClientGroup {
+  clientName: string | null;
+  projects: Project[];
+}
+
+export function groupProjectsByClient(projects: Project[]): ProjectClientGroup[] {
+  const byClient = new Map<string, Project[]>();
+  for (const project of projects) {
+    const client = project.clientName ?? "";
+    byClient.set(client, [...(byClient.get(client) ?? []), project]);
+  }
+  return [...byClient.entries()]
+    .sort(([a], [b]) => (a === "" ? 1 : b === "" ? -1 : a.localeCompare(b)))
+    .map(([clientName, group]) => ({ clientName: clientName || null, projects: group }));
+}
 
 // ─── Status categories ───────────────────────────────────────────────────────
 

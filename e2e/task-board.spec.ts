@@ -4,14 +4,7 @@ import { createProject } from "./project-helpers";
 import { workspaceWithMember, originHeaders } from "./team";
 import type { Task, TaskStatus } from "../src/shared/schemas";
 
-/**
- * Configurable task statuses and the board built on them (D4).
- *
- * The API assertions carry the weight here: the status is the source of truth
- * and `active`/`completed_at` are its mirror, and that invariant is invisible on
- * screen until something downstream (the task rail, the AI grounding query, the
- * subtask counts) quietly disagrees.
- */
+// Configurable task statuses and the board built on them (D4).
 
 const DEFAULT_ORDER = ["Backlog", "To do", "In progress", "Feedback", "Done"];
 
@@ -215,8 +208,7 @@ test("the board keeps one open and one completed column, and one default", async
   const live = await statuses(page);
   const done = byName(live, "Done");
 
-  // Done is the only completed column: it can be neither archived nor reopened
-  // without leaving the checkbox nowhere to send a task.
+  // Done is the only completed column, so it can be neither archived nor reopened.
   const archived = await page.request.post(`/api/task-statuses/${done.id}/archive`, {
     data: {},
     headers: { origin },
@@ -310,8 +302,7 @@ async function dragWithKeyboard(page: Page, taskName: string, key: "ArrowRight" 
   const handle = page.getByRole("button", { name: `Move ${taskName}` });
   await handle.focus();
   await page.keyboard.press("Space");
-  // dnd-kit measures the droppable rects on the tick after a drag starts; an
-  // arrow key pressed before that lands on nothing and the drop is a no-op.
+  // dnd-kit measures droppables a tick after the drag starts.
   await page.waitForTimeout(250);
   for (let i = 0; i < times; i++) {
     await page.keyboard.press(key);
@@ -390,8 +381,7 @@ test("a move by one person reaches the other's board without a reload", async ({
   await expect(owner.getByRole("region", { name: "To do" }).getByText("Cutover plan")).toBeVisible();
   await dragWithKeyboard(owner, "Cutover plan", "ArrowRight");
 
-  // `tasks:changed` carries no payload — a member's tracked hours are their own —
-  // so the other board refetches rather than reading the broadcast.
+  // `tasks:changed` carries no payload, so the other board refetches rather than reading it.
   await expect(
     member.getByRole("region", { name: "In progress" }).getByText("Cutover plan")
   ).toBeVisible({ timeout: 10_000 });
@@ -418,12 +408,11 @@ test("the list's Group: Status follows the real columns, in board order", async 
   }
 
   await page.goto("/tasks");
-  await page.getByRole("tab", { name: /All/ }).click();
+  await page.getByRole("tab", { name: "List" }).click();
   await page.getByLabel("Group by").click();
   await page.getByRole("option", { name: "Group: Status" }).click();
 
-  // Column order, not alphabetical — "Backlog, Done, In progress" would read as
-  // a workflow that runs backwards.
+  // Column order, not alphabetical.
   const headings = page.locator("main h2:visible");
   await expect(headings).toHaveText(["Backlog", "In progress", "Done"]);
 });

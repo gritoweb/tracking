@@ -16,15 +16,7 @@ interface TaskStatusChipProps {
   className?: string;
 }
 
-/**
- * A task's column, in the list.
- *
- * The chip *is* the control, the same call the due chip makes: showing which
- * column a task sits in and then making you open a dialog to change it puts a
- * read-only label where the obvious affordance already is. It writes through
- * `useUpdateTask` with `statusId`, so the server's one resolver keeps `active`
- * and `completed_at` in step exactly as a board drop would.
- */
+/** A task's column, in the list — the chip is the control, same as the due chip. */
 export function TaskStatusChip({ task, className }: TaskStatusChipProps) {
   const { data: statuses = [] } = useTaskStatuses();
   const updateTask = useUpdateTask();

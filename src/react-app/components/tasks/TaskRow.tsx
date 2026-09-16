@@ -434,8 +434,7 @@ export function TaskRow({
         </PopoverContent>
       </Popover>
 
-      {/* A subtask follows its parent across the done line, so its own column is
-          never news — it is always the parent's. */}
+      {/* A subtask always follows its parent's column, so its own is never shown. */}
       {showStatus && !nested && <TaskStatusChip task={task} />}
 
       {showProject && !nested && task.projectName && (

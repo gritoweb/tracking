@@ -41,10 +41,7 @@ export const taskStatusesRouter = new Hono<{
   Bindings: Env;
   Variables: { workspaceId: string; userId: string };
 }>()
-  // ─── List ─────────────────────────────────────────────────────────────────
-  //
-  // Every member reads this: the board can't render columns it can't see, and
-  // a member moving a card is ordinary work. Only writing is manager-only.
+  // ─── List — any member; only writes are manager-only ────────────────────────
   .get("/", async (c) => {
     return c.json(await listStatuses(c.env.DB, c.get("workspaceId")));
   })
@@ -89,10 +86,7 @@ export const taskStatusesRouter = new Hono<{
     const live = await listStatuses(c.env.DB, workspaceId);
     const nextCategory = data.category ?? existing.category;
 
-    // The board must keep at least one column of each behaviour: without an open
-    // column a new task has nowhere to be born, and without a completed one the
-    // done checkbox has nowhere to send a task. Both failures are invisible
-    // until someone tries, so they are refused here instead.
+    // Keep at least one open and one completed column, or a task has nowhere to go.
     if (data.category && data.category !== existing.category) {
       const others = live.filter((s) => s.id !== id);
       if (nextCategory === "completed" && !others.some((s) => s.category !== "completed")) {
@@ -134,10 +128,7 @@ export const taskStatusesRouter = new Hono<{
       );
     }
 
-    // Recategorising moves every task already sitting here across the done line,
-    // in both directions. Skipping this leaves rows whose `active` disagrees with
-    // their own column — and `active` is what the task rail, the AI grounding
-    // query and the subtask counts read.
+    // Recategorising carries every task already here across the done line, both ways.
     if (data.category && data.category !== existing.category) {
       if (nextCategory === "completed") {
         writes.push(
@@ -163,11 +154,7 @@ export const taskStatusesRouter = new Hono<{
     );
     return c.json((await resolveStatus(c.env.DB, workspaceId, id))!);
   })
-  // ─── Archive ──────────────────────────────────────────────────────────────
-  //
-  // Archive, never delete — the same choice clients and projects make. A status
-  // holding tasks must say where they go: dropping them somewhere by default is
-  // how a column of work disappears from the board without anyone noticing.
+  // ─── Archive — never delete; tasks still there must say where they go ───────
   .post("/:id/archive", zValidator("json", ArchiveTaskStatusSchema), async (c) => {
     const workspaceId = c.get("workspaceId");
     if (!(await isManager(c.env.DB, workspaceId, c.get("userId")))) {
@@ -229,8 +216,7 @@ export const taskStatusesRouter = new Hono<{
         `UPDATE task_statuses SET archived = 1, is_default = 0 WHERE id = ? AND workspace_id = ?`
       ).bind(id, workspaceId)
     );
-    // Archiving the default would leave new tasks with nowhere to land, so the
-    // flag passes to the first open column rather than being dropped.
+    // The default flag passes to the next open column instead of being dropped.
     if (existing.isDefault) {
       const heir = others.find((s) => s.category !== "completed") ?? others[0];
       writes.push(

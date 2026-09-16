@@ -20,18 +20,7 @@ interface TaskBoardColumnProps {
   onOpenTask: (task: Task) => void;
 }
 
-/**
- * One column of the board.
- *
- * A container, so `rounded-container` on a recessed `--muted` ground — the cards
- * inside are the data cells (DESIGN.md §5). The status colour appears once, as
- * the header dot: repeating it on every card would paint one fact twenty times.
- *
- * `useDroppable` on the column *as well as* the sortable list is what makes an
- * empty column a legal target — a `SortableContext` with no items has nothing to
- * collide with, so without this you could never drop the first card into a new
- * column.
- */
+/** One column of the board — `useDroppable` here (not just the sortable list) is what lets an empty column receive a card. */
 export function TaskBoardColumn({
   status,
   statuses,
@@ -86,10 +75,7 @@ export function TaskBoardColumn({
         )}
       </div>
 
-      {/* Collapsed until asked for. Left open, each column shows its own project
-          picker on a second line, so a five-column board rests under five
-          pickers it isn't using — the toolbar bloat PRODUCT.md rejects by name.
-          One click is a fair price for a field nobody is typing into yet. */}
+      {/* Collapsed until asked for — open by default, five columns rest under five project pickers. */}
       <div className="px-2 pb-2">
         {adding ? (
           <QuickAddTask

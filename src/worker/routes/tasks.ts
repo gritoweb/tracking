@@ -123,14 +123,7 @@ async function nextBoardOrder(db: D1Database, workspaceId: string, statusId: str
   return ((row?.m as number) ?? 0) + 1;
 }
 
-/**
- * The single place `status_id`, `active` and `completed_at` are decided together.
- *
- * Both doors into "is this done" — the row's checkbox (`active`) and a drop on a
- * board column (`statusId`) — come through here, so they can never leave a task
- * whose column says one thing and whose `active` flag says another. Returns the
- * columns to write, or `undefined` when the request said nothing about either.
- */
+/** The one place `status_id`/`active`/`completed_at` are decided together — checkbox and board drop both go through here. */
 async function resolveStatusChange(
   db: D1Database,
   workspaceId: string,
@@ -141,8 +134,7 @@ async function resolveStatusChange(
   if (data.statusId !== undefined) {
     status = await resolveStatus(db, workspaceId, data.statusId);
   } else if (data.active !== undefined) {
-    // The checkbox: done goes to the first completed column, reopening returns
-    // to the same column a brand-new task would be born in.
+    // The checkbox: done goes to the first completed column, reopening to the default.
     status = data.active ? await defaultStatus(db, workspaceId) : await completedStatus(db, workspaceId);
   } else {
     return undefined;
@@ -207,9 +199,7 @@ export const tasksRouter = new Hono<{
     // would spawn siblings inside a parent that never repeats.
     const recurRule = parentId ? null : normalizeRecurRule(data.recurRule);
 
-    // A subtask is born in the workspace default too, never in its parent's
-    // column: a parent already in Done would otherwise mint a child that is
-    // finished before anyone has read it.
+    // A subtask is born in the workspace default too, never in its parent's column.
     const status = data.statusId
       ? await resolveStatus(c.env.DB, workspaceId, data.statusId)
       : await defaultStatus(c.env.DB, workspaceId);
@@ -287,9 +277,7 @@ export const tasksRouter = new Hono<{
       }
     }
 
-    // `active` (the row checkbox) and `statusId` (a drop on a board column) are
-    // the same decision seen from two surfaces, so both go through one resolver
-    // and write all three columns together.
+    // `active` and `statusId` are the same decision from two surfaces — one resolver for both.
     const change = await resolveStatusChange(c.env.DB, workspaceId, existing, data);
     if (change === null) return c.json({ error: "Status not found" }, 400);
 
@@ -303,8 +291,7 @@ export const tasksRouter = new Hono<{
       // `active` alone says a task is done but not when. "Completed today", the
       // log-time prompt and the recurrence spawn all read this.
       set("completed_at", change.completedAt);
-      // Changing column from a form (not a drag) drops the card at the bottom of
-      // the new one — the board has no opinion about where it should go.
+      // A column change from a form (not a drag) lands at the bottom of the new one.
       if (change.status.id !== existing.status_id) {
         set("board_order", await nextBoardOrder(c.env.DB, workspaceId, change.status.id));
       }
@@ -320,9 +307,7 @@ export const tasksRouter = new Hono<{
     // subtasks is a list that disagrees with itself. Reopening does the same in
     // reverse, so the round trip is lossless.
     if ((completing || reopening) && !isSubtask && change) {
-      // The children follow into the same column, not just into the same flag:
-      // a subtask left in "In progress" under a parent in "Done" is exactly the
-      // list disagreeing with itself that this cascade exists to prevent.
+      // Children follow into the same column, not just the same flag.
       await c.env.DB.prepare(
         `UPDATE tasks SET active = ?, completed_at = ?, status_id = ? WHERE parent_id = ? AND workspace_id = ?`
       ).bind(
@@ -349,8 +334,7 @@ export const tasksRouter = new Hono<{
       if (due) {
         const spawnId = crypto.randomUUID();
         const now = new Date().toISOString();
-        // The next occurrence starts where a fresh task starts. Reusing the
-        // completed one's column would spawn it straight into Done.
+        // The next occurrence starts where a fresh task starts, not in the completed column.
         const spawnStatus = await defaultStatus(c.env.DB, workspaceId);
         const spawnOrder = await nextBoardOrder(c.env.DB, workspaceId, spawnStatus.id);
         await c.env.DB.prepare(
@@ -423,11 +407,7 @@ export const tasksRouter = new Hono<{
     );
     return c.json(formatTask(row));
   })
-  // ─── Move on the board ────────────────────────────────────────────────────
-  //
-  // A drop is one write: the column it landed in and where inside it. Splitting
-  // it into "set status" then "set order" would leave a card visibly in the
-  // right column at the wrong height whenever the second request lost.
+  // ─── Move on the board — status and order in one write, never two ───────────
   .patch("/:id/move", zValidator("json", MoveTaskSchema), async (c) => {
     const workspaceId = c.get("workspaceId");
     const id = c.req.param("id");
@@ -457,9 +437,7 @@ export const tasksRouter = new Hono<{
       ).bind(change.active, change.completedAt, change.status.id, id, workspaceId).run();
     }
 
-    // Dropping a repeating task on a completed column is the same act as ticking
-    // its checkbox, so it spawns the next occurrence the same way — measured from
-    // the dropping client's local date, never the worker's UTC clock.
+    // A drop onto a completed column spawns the next occurrence, same as the checkbox.
     const rule = existing.recur_rule as string | null;
     if (completing && !isSubtask && rule && completedOn) {
       const due = nextOccurrence(rule, completedOn);
@@ -486,8 +464,7 @@ export const tasksRouter = new Hono<{
             rule,
             new Date().toISOString()
           ),
-          // The rule travels with the new occurrence, so reopening the old one
-          // and completing it again can't mint a second.
+          // The rule moves to the new occurrence, so re-completing the old one can't mint a second.
           c.env.DB.prepare(`UPDATE tasks SET recur_rule = NULL WHERE id = ? AND workspace_id = ?`)
             .bind(id, workspaceId),
         ]);

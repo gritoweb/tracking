@@ -95,15 +95,7 @@ export function useUpdateTask() {
   });
 }
 
-/**
- * Commit a board drop.
- *
- * Takes the whole target status, not just its id, because the optimistic patch
- * has to repaint the card completely on the frame it was released — column,
- * colour, and the strike-through that follows a drop on a completed column. With
- * only an id the card would sit correct-but-uncoloured until the refetch landed,
- * which reads as the drag having half-failed.
- */
+/** Commit a board drop — takes the whole target status, not just its id, so the optimistic patch can repaint the card fully. */
 export function useMoveTask() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -129,8 +121,7 @@ export function useMoveTask() {
       queryClient.setQueriesData<Task[]>({ queryKey: ["tasks"] }, (old) =>
         old?.map((t) => {
           if (t.id === id) return { ...patch(t), boardOrder };
-          // The server carries a parent's children across with it; mirror that
-          // here or the subtask rows contradict the card for a beat.
+          // A parent's children follow it server-side; mirror that so rows don't contradict.
           if (t.parentId === id) return patch(t);
           return t;
         })

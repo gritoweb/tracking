@@ -179,14 +179,7 @@ export const ProjectPacingSchema = z.object({
 
 // ─── Task status ─────────────────────────────────────────────────────────────
 
-/**
- * The only part of a status that is behaviour rather than vocabulary.
- *
- * `completed` is what drives `active`/`completed_at` on the task row; the other
- * two exist so a board can tell "not picked up" from "being worked on" without
- * the server caring which is which. A workspace renames the columns freely —
- * the category is what every reader downstream keys off.
- */
+/** `completed` drives `active`/`completed_at`; the other two just tell "not picked up" from "in progress". */
 export const TaskStatusCategorySchema = z.enum(["not_started", "active", "completed"]);
 
 export const TaskStatusSchema = z.object({
@@ -303,10 +296,7 @@ export const UpdateTaskSchema = z.object({
    * from — the worker runs in UTC and must never guess this.
    */
   completedOn: LocalDateSchema.optional(),
-  /**
-   * Moving between columns. Passing this also rewrites `active`/`completed_at`
-   * from the target's category, so `statusId` and `active` can never disagree.
-   */
+  /** Also rewrites `active`/`completed_at` from the target's category. */
   statusId: z.string().optional(),
 });
 

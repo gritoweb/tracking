@@ -1,32 +1,26 @@
+import { SWATCH_COLORS, SWATCH_COLOR_NAMES } from "@shared/colors";
 import type { TaskStatus, TaskStatusCategory } from "@shared/schemas";
 
-/**
- * Configurable task statuses, and the one rule that keeps the rest of the app
- * standing: **the status is the source of truth, `active`/`completed_at` are its
- * mirror.**
- *
- * Nothing outside this module knows about categories. `loadGroundingProjects`
- * (`lib/ai.ts`), the Timer's task rail, the subtask counts in `routes/tasks.ts`
- * and the recurrence spawn all still read `tasks.active`, and they keep being
- * right only because every write path goes through `syncFromCategory` below.
- * Inverting that — making `active` the master — breaks all four in silence.
- */
+// Status is the source of truth; active/completed_at is its mirror — see CLAUDE.md.
 
-/** The five a workspace is born with, in ClickUp's own order. Colors are swatches from `@shared/colors`. */
+function swatch(name: string): string {
+  const found = SWATCH_COLORS.find((c) => SWATCH_COLOR_NAMES[c] === name);
+  if (!found) throw new Error(`Unknown swatch: ${name}`);
+  return found;
+}
+
+/** The five a workspace is born with. */
 const DEFAULT_STATUSES: {
   name: string;
   color: string;
   category: TaskStatusCategory;
   isDefault: boolean;
 }[] = [
-  { name: "Backlog", color: "#64748b", category: "not_started", isDefault: false },
-  // Capture lands here, not in Backlog: a task typed into the quick-add is work
-  // someone means to do, and making them drag it out of a holding pen first is
-  // a step the tool added, not one the work needed.
-  { name: "To do", color: "#3b82f6", category: "not_started", isDefault: true },
-  { name: "In progress", color: "#f59e0b", category: "active", isDefault: false },
-  { name: "Feedback", color: "#8b5cf6", category: "active", isDefault: false },
-  { name: "Done", color: "#22c55e", category: "completed", isDefault: false },
+  { name: "Backlog", color: swatch("Slate"), category: "not_started", isDefault: false },
+  { name: "To do", color: swatch("Blue"), category: "not_started", isDefault: true }, // capture lands here
+  { name: "In progress", color: swatch("Amber"), category: "active", isDefault: false },
+  { name: "Feedback", color: swatch("Violet"), category: "active", isDefault: false },
+  { name: "Done", color: swatch("Green"), category: "completed", isDefault: false },
 ];
 
 type Row = Record<string, unknown>;
@@ -44,14 +38,7 @@ export function formatStatus(row: Row): TaskStatus {
   };
 }
 
-/**
- * Seed the defaults for a workspace that has none.
- *
- * Belt and braces: `organizationHooks.afterCreateOrganization` seeds at creation
- * and the migration seeded every workspace that already existed, but a board
- * with no columns is a dead page, so any read repairs itself rather than
- * rendering nothing.
- */
+/** Seed the defaults for a workspace that has none — a lazy repair, belt and braces with the creation hook. */
 export async function ensureStatuses(db: D1Database, workspaceId: string): Promise<void> {
   const row = await db
     .prepare(`SELECT COUNT(*) AS n FROM task_statuses WHERE workspace_id = ?`)
@@ -85,10 +72,7 @@ export async function listStatuses(db: D1Database, workspaceId: string): Promise
   return results.map(formatStatus);
 }
 
-/**
- * The status a requested id really is — same workspace, not archived.
- * `null` is the caller's cue to answer 400 rather than write a dangling id.
- */
+/** The status a requested id really is — same workspace, not archived; `null` means 400 it. */
 export async function resolveStatus(
   db: D1Database,
   workspaceId: string,
@@ -113,11 +97,7 @@ export async function completedStatus(db: D1Database, workspaceId: string): Prom
   return live.find((s) => s.category === "completed") ?? null;
 }
 
-/**
- * The mirror. `wasActive` keeps a completion timestamp from being refreshed
- * every time an already-done task is touched — "completed today" would otherwise
- * follow any edit.
- */
+/** The mirror. `wasActive` stops `completed_at` from refreshing on every edit of an already-done task. */
 export function syncFromCategory(
   category: TaskStatusCategory,
   wasActive: boolean,

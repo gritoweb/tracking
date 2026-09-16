@@ -228,9 +228,7 @@ export function useWebSocket() {
           break;
         }
         case "tasks:changed": {
-          // Always a bare signal, never the row. A task's `trackedSeconds` is
-          // scoped to the reader's role (a member sees only their own hours), so
-          // fanning the payload out would hand a member a teammate's total.
+          // Bare signal only — trackedSeconds is role-scoped, so no row goes over the wire.
           if (!isOwnEcho) {
             queryClient.invalidateQueries({ queryKey: ["tasks"] });
             queryClient.invalidateQueries({ queryKey: ["task-statuses"] });

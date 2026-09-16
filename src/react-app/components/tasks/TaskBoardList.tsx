@@ -18,10 +18,11 @@ import { QuickAddTask } from "./QuickAddTask";
 import { TaskDialog } from "./TaskDialog";
 import { TaskViewTabs, type TaskView } from "./TaskViewTabs";
 import { TaskBoard } from "./board/TaskBoard";
+import { TaskProjectRail } from "./TaskProjectRail";
 import { useAllTasks, useDeleteTask, useUpdateTask } from "@/hooks/useTasks";
 import { useTaskStatuses } from "@/hooks/useTaskStatuses";
-import { useProjects } from "@/hooks/useProjects";
 import { useUIStore } from "@/stores/uiStore";
+import { useMediaQuery, BELOW_MD } from "@/hooks/useMediaQuery";
 import { formatDurationShort } from "@/lib/dateUtils";
 import { cn } from "@/lib/utils";
 import {
@@ -75,12 +76,13 @@ function nodeSeconds(node: TaskNode) {
 export function TaskBoardList() {
   const { data: tasks = [], isLoading } = useAllTasks();
   const { data: statuses = [] } = useTaskStatuses();
-  const { data: projects = [] } = useProjects();
   const deleteTask = useDeleteTask();
   const updateTask = useUpdateTask();
   const openTaskLogTime = useUIStore((s) => s.openTaskLogTime);
+  const narrow = useMediaQuery(BELOW_MD);
 
-  const [view, setView] = useState<TaskView>("today");
+  // Structure: projects on the left, cards or a list on the right — opens on the board.
+  const [view, setView] = useState<TaskView>("board");
   const [status, setStatus] = useState<StatusFilter>("all");
   const [groupBy, setGroupBy] = useState<GroupBy>("project");
   const [sortBy, setSortBy] = useState<SortBy>("plan");
@@ -90,10 +92,17 @@ export function TaskBoardList() {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [subtaskParent, setSubtaskParent] = useState<string | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
-  const [boardProjectId, setBoardProjectId] = useState<string | null>(null);
+  // The rail's own scope: filters all four views alike, not just the board.
+  const [railProjectId, setRailProjectId] = useState<string | null>(null);
 
   const today = todayLocalDate();
   const hasAnyTask = tasks.length > 0;
+
+  // The Board filters the same way internally, from the unfiltered list (`tasks={tasks}` below).
+  const scopedTasks = useMemo(
+    () => (railProjectId ? tasks.filter((t) => t.projectId === railProjectId) : tasks),
+    [tasks, railProjectId]
+  );
 
   const sections = useMemo<Section[]>(() => {
     // The board groups by column inside TaskBoard; none of this applies to it.
@@ -106,9 +115,9 @@ export function TaskBoardList() {
     // that a task isn't today's problem; sweeping them in here would make this
     // view identical to All and remove the only reason to open it.
     if (view === "today") {
-      const overdue = tasks.filter((t) => t.active && t.dueDate && compareLocalDates(t.dueDate, today) < 0);
-      const due = tasks.filter((t) => t.active && t.dueDate === today);
-      const doneToday = tasks.filter(
+      const overdue = scopedTasks.filter((t) => t.active && t.dueDate && compareLocalDates(t.dueDate, today) < 0);
+      const due = scopedTasks.filter((t) => t.active && t.dueDate === today);
+      const doneToday = scopedTasks.filter(
         (t) => !t.active && t.completedAt && t.completedAt.slice(0, 10) === today
       );
       return [
@@ -116,18 +125,18 @@ export function TaskBoardList() {
           key: "overdue",
           label: "Overdue",
           tone: "overdue" as const,
-          nodes: nest(withSubtasks(overdue, tasks), compare),
+          nodes: nest(withSubtasks(overdue, scopedTasks), compare),
         },
         {
           key: "today",
           label: "Due today",
-          nodes: nest(withSubtasks(due, tasks), compare),
+          nodes: nest(withSubtasks(due, scopedTasks), compare),
           defaultDueDate: today,
         },
         {
           key: "done",
           label: "Completed today",
-          nodes: nest(withSubtasks(doneToday, tasks), compare),
+          nodes: nest(withSubtasks(doneToday, scopedTasks), compare),
         },
       ]
         .filter((s) => s.nodes.length > 0)
@@ -143,9 +152,9 @@ export function TaskBoardList() {
       const out: Section[] = [];
       for (let i = 0; i <= 7; i++) {
         const day = addLocalDays(today, i);
-        const forDay = tasks.filter((t) => t.active && t.dueDate === day);
+        const forDay = scopedTasks.filter((t) => t.active && t.dueDate === day);
         if (!forDay.length) continue;
-        const nodes = nest(withSubtasks(forDay, tasks), compare);
+        const nodes = nest(withSubtasks(forDay, scopedTasks), compare);
         out.push({
           key: day,
           label: formatDueHeading(day, today),
@@ -154,11 +163,11 @@ export function TaskBoardList() {
           trackedSeconds: nodes.reduce((sum, n) => sum + nodeSeconds(n), 0),
         });
       }
-      const later = tasks.filter(
+      const later = scopedTasks.filter(
         (t) => t.active && t.dueDate && compareLocalDates(t.dueDate, horizon) > 0
       );
       if (later.length) {
-        const nodes = nest(withSubtasks(later, tasks), compare);
+        const nodes = nest(withSubtasks(later, scopedTasks), compare);
         out.push({
           key: "later",
           label: "Later",
@@ -170,7 +179,7 @@ export function TaskBoardList() {
     }
 
     // ─── All ────────────────────────────────────────────────────────────────
-    const filtered = tasks.filter((t) =>
+    const filtered = scopedTasks.filter((t) =>
       status === "all" ? true : status === "active" ? t.active : !t.active
     );
 
@@ -197,8 +206,7 @@ export function TaskBoardList() {
         key = t.projectId ?? "none";
         label = t.projectName ?? "No project";
       } else if (groupBy === "status") {
-        // The real columns now, not just Active/Done — this grouping predates
-        // configurable statuses and used to render exactly two buckets.
+        // The real columns now, not just Active/Done.
         key = t.statusId ?? "none";
         label = t.statusName ?? "No status";
       } else {
@@ -235,10 +243,7 @@ export function TaskBoardList() {
       };
     });
 
-    // Due groups sort chronologically ("No due date" last); status groups follow
-    // the board's own column order, because that order is a workflow and
-    // alphabetising it ("Backlog, Done, In progress") destroys the only reading
-    // it has; everything else by name.
+    // Due groups sort chronologically; status groups follow the board's own column order.
     if (groupBy === "due") {
       return entries.sort((a, b) =>
         a.key === "none" ? 1 : b.key === "none" ? -1 : a.key.localeCompare(b.key)
@@ -251,19 +256,17 @@ export function TaskBoardList() {
       );
     }
     return entries.sort((a, b) => a.label.localeCompare(b.label));
-  }, [tasks, view, status, groupBy, sortBy, today, statuses]);
+  }, [scopedTasks, view, status, groupBy, sortBy, today, statuses]);
 
   const isEmpty = sections.length === 0;
-  const upcomingCount = tasks.filter(
+  const upcomingCount = scopedTasks.filter(
     (t) => t.active && t.dueDate && compareLocalDates(t.dueDate, today) > 0
   ).length;
-  const undatedCount = tasks.filter((t) => !t.dueDate).length;
+  const undatedCount = scopedTasks.filter((t) => !t.dueDate).length;
 
-  // Counts are of *top-level* tasks. A subtask has no due date of its own and
-  // rides its parent's row, so counting them would make "Today 3" disagree with
-  // the three rows underneath it.
+  // Top-level tasks only, scoped to the rail's project — a subtask rides its parent's row.
   const counts = useMemo(() => {
-    const top = tasks.filter((t) => !t.parentId && t.active);
+    const top = scopedTasks.filter((t) => !t.parentId && t.active);
     const overdue = top.filter((t) => t.dueDate && compareLocalDates(t.dueDate, today) < 0).length;
     return {
       overdue,
@@ -272,7 +275,7 @@ export function TaskBoardList() {
       board: top.length,
       all: top.length,
     };
-  }, [tasks, today]);
+  }, [scopedTasks, today]);
 
   /** Commit a drag: one row's `sort_order` becomes the midpoint of its new neighbours. */
   const handleDrop = (ordered: Task[], toIndex: number) => {
@@ -326,10 +329,10 @@ export function TaskBoardList() {
       empty = (
         <EmptyState
           icon={CalendarCheck}
-          title={undatedCount === tasks.length ? "Nothing is scheduled yet" : "Nothing due today"}
+          title={undatedCount === scopedTasks.length ? "Nothing is scheduled yet" : "Nothing due today"}
           description={
-            undatedCount === tasks.length
-              ? `None of your ${tasks.length} task${tasks.length === 1 ? " has" : "s have"} a due date. Give one a date and it shows up here.`
+            undatedCount === scopedTasks.length
+              ? `None of your ${scopedTasks.length} task${scopedTasks.length === 1 ? " has" : "s have"} a due date. Give one a date and it shows up here.`
               : upcomingCount > 0
                 ? `${upcomingCount} task${upcomingCount === 1 ? "" : "s"} coming up.`
                 : "Nothing scheduled ahead either."
@@ -445,7 +448,17 @@ export function TaskBoardList() {
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col p-6 pb-0">
+    <div
+      className={cn(
+        "flex h-full min-h-0 gap-4 p-6 pb-0",
+        // The rail collapses to a Select on narrow screens; the page stacks to match.
+        narrow ? "flex-col" : "flex-row"
+      )}
+    >
+      <TaskProjectRail tasks={tasks} projectId={railProjectId} onChange={setRailProjectId} />
+
+      {/* min-w-0: without it the board's wide columns stretch this flex item past the viewport. */}
+      <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
       {/* Same header shape as Projects and Clients. This used to be a bordered
           toolbar with a `text-sm` <h1> — a page title rendered at body size,
           6px under every sibling page's, in the one collection page that also
@@ -453,35 +466,7 @@ export function TaskBoardList() {
       <CollectionHeader title="Tasks" className="shrink-0">
         <TaskViewTabs view={view} counts={counts} onChange={setView} />
 
-        {/* Grouping and status only mean anything in All — Today and Upcoming
-            *are* a grouping, and stacking a second one on top reads as two
-            controls fighting over the same list.
-            The rule separates navigation from filtering: without it the view
-            switcher read as a fourth dropdown in a row of four, and the one
-            control that changes *what page you are on* looked exactly as
-            important as the one that changes the sort. */}
-        {view === "board" && projects.length > 1 && (
-          <>
-            <div className="mx-1 h-5 w-px bg-border" aria-hidden />
-            <Select
-              value={boardProjectId ?? "all"}
-              onValueChange={(v) => setBoardProjectId(v === "all" ? null : v)}
-            >
-              <SelectTrigger size="sm" className="w-44" aria-label="Filter by project">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All projects</SelectItem>
-                {projects.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </>
-        )}
-
+        {/* Grouping/status/sort only mean anything in All; project filtering moved to the rail. */}
         {view === "all" && (
           <>
             <div className="mx-1 h-5 w-px bg-border" aria-hidden />
@@ -541,16 +526,14 @@ export function TaskBoardList() {
         <div
           className={cn(
             "-mx-6 min-h-0 flex-1 px-6 pb-6",
-            // The board scrolls its columns sideways and each column scrolls its
-            // own cards; a page-level vertical scroll on top of that gives the
-            // cursor two scrollers to fight over.
+            // The board and each column scroll themselves; a page scroll too would fight the cursor.
             view === "board" ? "overflow-hidden" : "overflow-y-auto"
           )}
         >
           {view === "board" ? (
             <TaskBoard
               tasks={tasks}
-              projectId={boardProjectId}
+              projectId={railProjectId}
               onOpenTask={setEditTarget}
             />
           ) : (
@@ -631,6 +614,7 @@ export function TaskBoardList() {
           setDeleteTarget(null);
         }}
       />
+      </div>
     </div>
   );
 }

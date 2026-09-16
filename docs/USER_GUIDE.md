@@ -147,7 +147,7 @@ The key is shown **once** and can't be recovered; if you lose it, revoke it and 
 
 ## Planning with tasks
 
-The Tasks page opens on **Today**: overdue work first, then what's due today, then what you've already finished today. **Upcoming** shows the next seven days a day at a time, **Board** is the kanban view, and **All** is the full list with the grouping, sorting and status filters.
+The Tasks page opens on **Board**, with a rail of your projects (grouped by client) on the left — pick one to filter every tab. **List** is the full list with grouping, sorting and status filters, **Today** puts overdue work first then what's due today, and **Upcoming** shows the next seven days a day at a time.
 
 Each tab carries a count, so you can see whether a view is worth opening without opening it. Today's count turns red when part of it is overdue.
 
@@ -178,7 +178,7 @@ The line under the field shows what it understood before you commit it.
 
 **Repeats.** A task can repeat daily, on weekdays, weekly on chosen days, or monthly on a date. The next occurrence is created **when you tick the current one off** — so a repeating task you never complete simply goes overdue rather than piling up copies. If it has subtasks, the fresh occurrence gets a fresh checklist.
 
-**Statuses and the board.** Every task sits in a status — a workspace starts with **Backlog → To do → In progress → Feedback → Done** — and the **Board** tab shows one column per status. Drag a card between columns, or reorder within one; a drop saves straight away and appears on your teammates' boards within a few seconds. Filter the whole board to a single project from the header. The chip on each row in the list shows the same status, and clicking it changes it without opening anything.
+**Statuses and the board.** Every task sits in a status — a workspace starts with **Backlog → To do → In progress → Feedback → Done** — and the **Board** tab shows one column per status. Drag a card between columns, or reorder within one; a drop saves straight away and appears on your teammates' boards within a few seconds. The project rail on the left filters the board the same way it filters every other tab. The chip on each row in the list shows the same status, and clicking it changes it without opening anything.
 
 Only top-level tasks get a card. A parent's checklist rides along as a `2/5` chip rather than filling the column with its own cards.
 

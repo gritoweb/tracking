@@ -20,15 +20,7 @@ interface AddStatusColumnProps {
   statuses: TaskStatus[];
 }
 
-/**
- * The `+` at the end of the board.
- *
- * An inline panel rather than a dialog, for the same reason `QuickAddTask` is a
- * line and not a modal: adding a column happens while looking at the board, and
- * a modal takes the board away at the moment you were deciding where the column
- * should go. The colour is pre-picked from the first free swatch so the common
- * case is type-a-name-and-Enter.
- */
+/** The `+` at the end of the board — an inline panel, not a dialog, same as `QuickAddTask`. */
 export function AddStatusColumn({ statuses }: AddStatusColumnProps) {
   const create = useCreateTaskStatus();
   const [open, setOpen] = useState(false);

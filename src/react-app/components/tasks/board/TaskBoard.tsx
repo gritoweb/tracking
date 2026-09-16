@@ -31,17 +31,7 @@ interface TaskBoardProps {
   onOpenTask: (task: Task) => void;
 }
 
-/**
- * The kanban view.
- *
- * Top-level tasks only: a subtask rides its parent's card as a `2/5` chip. A
- * column where twenty of thirty cards are checklist items has stopped being a
- * board and become a list with gutters.
- *
- * Ordering inside a column is `boardOrder`, never the list's `sortOrder` — see
- * migration 0038. One number shared between the two surfaces means tidying the
- * board silently reshuffles "Sort: Plan order" over in the list.
- */
+/** The kanban view. Top-level tasks only — a subtask rides its parent's card as a `2/5` chip. */
 export function TaskBoard({ tasks, projectId, onOpenTask }: TaskBoardProps) {
   const { data: statuses = [], isLoading } = useTaskStatuses();
   const { canManage } = useWorkspaceRole();
@@ -63,8 +53,7 @@ export function TaskBoard({ tasks, projectId, onOpenTask }: TaskBoardProps) {
     for (const status of statuses) map.set(status.id, []);
     for (const task of visible) {
       const bucket = task.statusId ? map.get(task.statusId) : undefined;
-      // A task whose status was archived out from under it would otherwise
-      // vanish from the board with no way back; it lands in the first column.
+      // A status archived out from under a task lands it in the first column, not nowhere.
       (bucket ?? map.get(statuses[0]?.id ?? "") ?? []).push(task);
     }
     for (const list of map.values()) list.sort((a, b) => a.boardOrder - b.boardOrder);
@@ -94,18 +83,14 @@ export function TaskBoard({ tasks, projectId, onOpenTask }: TaskBoardProps) {
     const task = tasks.find((t) => t.id === activeId);
     if (!target || !task) return;
 
-    // The column as it will be, with the dragged card taken out: the new
-    // position is the midpoint of the two rows it lands between, so a drop
-    // rewrites exactly one row (the same trick `sortOrder` uses in the list).
+    // The midpoint of the two rows it lands between — a drop rewrites exactly one row.
     const column = (byColumn.get(target.id) ?? []).filter((t) => t.id !== activeId);
     const index = overId.startsWith(COLUMN_PREFIX)
       ? column.length
       : (() => {
           const at = column.findIndex((t) => t.id === overId);
           if (at === -1) return column.length;
-          // Dragging downward inside the same column lands *after* the card you
-          // were over; every other case lands before it. Without this a drag one
-          // place down did nothing, because the midpoint came out unchanged.
+          // Dragging down within the same column lands after the card you were over.
           const wasBefore =
             task.statusId === target.id &&
             (byColumn.get(target.id) ?? []).findIndex((t) => t.id === activeId) < at + 1;

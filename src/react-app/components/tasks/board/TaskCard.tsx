@@ -25,20 +25,7 @@ interface TaskCardProps {
   overlay?: boolean;
 }
 
-/**
- * One task on the board.
- *
- * A card is a **dense data cell**, not a container: `rounded-lg`, per the
- * Geometry Rule (DESIGN.md §5). A column of twenty pills would trade scanning a
- * sprint for a look. The status colour lives on the column header alone — the
- * card repeating it would paint the same fact twenty times and spend the One
- * Accent Rule on a thing the column already says.
- *
- * The drag handle is explicit rather than "the whole card is draggable": the
- * card is also a click target (it opens the editor) and a host for the Start
- * button, and a card that moves when you meant to press play is the failure that
- * makes people stop trusting the board.
- */
+/** One task on the board — a dense cell (`rounded-lg`), never a pill; the drag handle is explicit since the card is also a click target. */
 export function TaskCard({ task, onOpen, overlay = false }: TaskCardProps) {
   const { startTimer, stopTimer } = useTimer();
   const runningEntry = useTimerStore((s) => s.runningEntry);
@@ -61,9 +48,7 @@ export function TaskCard({ task, onOpen, overlay = false }: TaskCardProps) {
         "group flex flex-col gap-1.5 rounded-lg bg-background p-2.5",
         "transition-colors duration-fast ease-out-quart",
         running && "bg-primary/5",
-        // The original stays in place as a hole while the overlay follows the
-        // pointer: hiding it entirely makes the list collapse and re-expand under
-        // the cursor, so the drop target moves while you are aiming at it.
+        // Stays in place as a hole while the overlay follows the pointer.
         !overlay && sortable.isDragging && "opacity-40",
         overlay && "shadow-lg"
       )}
@@ -86,8 +71,7 @@ export function TaskCard({ task, onOpen, overlay = false }: TaskCardProps) {
           </button>
         )}
 
-        {/* Priority keeps the same vocabulary as the list: a tinted ring at the
-            row's leading edge, and only P1/P2 carry colour. */}
+        {/* Same vocabulary as the list: tinted ring, only P1/P2 carry colour. */}
         {task.priority < 4 && (
           <span
             title={`Priority: ${PRIORITY_LABEL[task.priority]}`}
@@ -122,8 +106,7 @@ export function TaskCard({ task, onOpen, overlay = false }: TaskCardProps) {
             </span>
           </Button>
         ) : (
-          // Persistent, not hover-revealed: starting a timer on a task is the
-          // primary action of this whole surface (TaskRow makes the same call).
+          // Persistent, not hover-revealed — the primary action of the surface.
           <Button
             variant="ghost"
             size="icon-xs"
@@ -154,8 +137,7 @@ export function TaskCard({ task, onOpen, overlay = false }: TaskCardProps) {
           </span>
         )}
         {repeats && <Repeat className="h-3 w-3 text-muted-foreground" aria-label={repeats} />}
-        {/* Subtasks ride their parent here. The board shows top-level work only —
-            thirty cards where twenty are checklist items is a list, not a board. */}
+        {/* Subtasks ride their parent here — the board shows top-level work only. */}
         {task.subtaskTotal > 0 && (
           <span
             className="text-micro tabular-nums text-muted-foreground"

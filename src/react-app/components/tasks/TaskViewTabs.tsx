@@ -12,11 +12,12 @@ export interface TaskViewCounts {
   all: number;
 }
 
+// Internal value stays "all"; only the label changed to "List".
 const VIEWS: { value: TaskView; label: string }[] = [
+  { value: "board", label: "Board" },
+  { value: "all", label: "List" },
   { value: "today", label: "Today" },
   { value: "upcoming", label: "Upcoming" },
-  { value: "board", label: "Board" },
-  { value: "all", label: "All" },
 ];
 
 interface TaskViewTabsProps {

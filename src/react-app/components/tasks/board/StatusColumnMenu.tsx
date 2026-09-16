@@ -43,17 +43,7 @@ interface StatusColumnMenuProps {
   taskCount: number;
 }
 
-/**
- * Configuring a column, where the column is.
- *
- * Reordering is "Move left" / "Move right" rather than dragging the header: it
- * costs one menu item, it is keyboard-operable without a second drag vocabulary,
- * and the board already has one drag interaction that matters more.
- *
- * Nothing here is the last word — every rule it enforces (a name that is taken,
- * the last completed column, archiving a column that still holds work) is
- * refused by the server too. This just refuses it sooner and says why.
- */
+/** Configuring a column. Every rule enforced here is refused server-side too — this just says why sooner. */
 export function StatusColumnMenu({ status, statuses, taskCount }: StatusColumnMenuProps) {
   const update = useUpdateTaskStatus();
   const archive = useArchiveTaskStatus();
@@ -222,9 +212,7 @@ export function StatusColumnMenu({ status, statuses, taskCount }: StatusColumnMe
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* Archiving a column that still holds work has to say where the work goes.
-          Choosing for them is how a column of tasks vanishes from the board with
-          nobody noticing — the server refuses it too. */}
+      {/* A column that still holds work must say where it goes — the server refuses it too. */}
       <Dialog open={archiveOpen} onOpenChange={setArchiveOpen}>
         <DialogContent>
           <DialogHeader>

@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-09-16 (1)
+### Added
+- **Tasks opens on a Board, with a project rail on the left.** Projects grouped by client in a
+  left rail that filters Board/List/Today/Upcoming alike, Board leading as the default tab (the
+  old "All" tab is relabelled "List", same data). Default status colors now pull from the shared
+  swatch palette (`@shared/colors`) by name instead of duplicating hex literals.
+  Verified: `pnpm check` exit 0, `pnpm lint` 0 errors, `task-board` + `task-planning` +
+  `task-log-time` 40/40, `report-per-person` 5/5.
+
 ## 2026-09-15 (15)
 ### Added
 - **Task statuses are configurable, and the board built on them.** A task used to be open or done and

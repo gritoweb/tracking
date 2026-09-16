@@ -3,10 +3,7 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import type { CreateTaskStatus, TaskStatus, UpdateTaskStatus } from "@shared/schemas";
 
-/**
- * The board's columns. Statuses change rarely and every task row wants to name
- * one, so this is cached longer than the tasks themselves.
- */
+/** The board's columns — cached longer than tasks, since statuses change rarely. */
 export function useTaskStatuses() {
   return useQuery({
     queryKey: ["task-statuses"],
@@ -33,8 +30,7 @@ export function useCreateTaskStatus() {
       invalidate();
       toast.success(`Status "${status.name}" added`);
     },
-    // The server's message is the useful one — it names the rule that refused
-    // (duplicate name, last open column), which a generic failure toast loses.
+    // The server's message names the rule that refused — a generic toast would lose it.
     onError: (error: Error) => toast.error(error.message || "Failed to add status"),
   });
 }
