@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-09-16 (3)
+### Added
+- **Dragging empty board background pans it sideways**, instead of the browser starting a text
+  selection — `usePanScroll` (`hooks/usePanScroll.ts`), a callback-ref hook wired with plain
+  `addEventListener` outside React's render cycle, since the React Compiler's ref-safety check
+  refuses to let a `{ ref, onPointerDown }` pair through render otherwise. Skips anything already
+  interactive (a card, a button) so it never competes with a card's own drag.
+
+Verified: `pnpm check` exit 0, `pnpm lint` 0 errors, `task-board` + `task-planning` +
+`task-log-time` 20/20, plus a manual check that panning moves `scrollLeft` by the dragged distance
+and that dragging from a card still drags the card.
+
 ## 2026-09-16 (2)
 ### Added
 - **Drag a task card from anywhere on it, not a dedicated handle.** The card itself is the drag

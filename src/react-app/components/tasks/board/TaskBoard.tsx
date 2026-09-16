@@ -23,6 +23,7 @@ import { useMoveTask } from "@/hooks/useTasks";
 import { useTaskStatuses } from "@/hooks/useTaskStatuses";
 import { useWorkspaceRole } from "@/hooks/useWorkspaceRole";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
+import { usePanScroll } from "@/hooks/usePanScroll";
 import { matchesDueFilter, midpointOrder, type DueFilter } from "@/lib/taskUtils";
 import { todayLocalDate } from "@shared/task-recurrence";
 import type { Task } from "@shared/schemas";
@@ -54,6 +55,7 @@ export function TaskBoard({ tasks, projectId, dueFilter, onOpenTask }: TaskBoard
   const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const lastOverId = useRef<string | null>(null);
+  const panRef = usePanScroll<HTMLDivElement>();
 
   const sensors = useSensors(
     // A few pixels of slop, so pressing the card's own buttons doesn't start a drag.
@@ -208,7 +210,7 @@ export function TaskBoard({ tasks, projectId, dueFilter, onOpenTask }: TaskBoard
         },
       }}
     >
-      <div className="flex h-full min-h-0 items-stretch gap-3 overflow-x-auto pb-4">
+      <div ref={panRef} className="flex h-full min-h-0 items-stretch gap-3 overflow-x-auto pb-4">
         {statuses.map((status) => (
           <TaskBoardColumn
             key={status.id}
