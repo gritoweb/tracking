@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Plus, ListChecks, CalendarCheck, SearchX } from "lucide-react";
+import { Plus, ListChecks, SearchX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -8,6 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import { CollectionHeader } from "@/components/layout/CollectionHeader";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -16,7 +17,6 @@ import { ColorDot } from "@/components/ColorDot";
 import { TaskRow } from "./TaskRow";
 import { QuickAddTask } from "./QuickAddTask";
 import { TaskDialog } from "./TaskDialog";
-import { TaskViewTabs, type TaskView } from "./TaskViewTabs";
 import { TaskBoard } from "./board/TaskBoard";
 import { TaskProjectRail } from "./TaskProjectRail";
 import { useAllTasks, useDeleteTask, useUpdateTask } from "@/hooks/useTasks";
@@ -28,32 +28,36 @@ import { cn } from "@/lib/utils";
 import {
   comparePlanned,
   formatDueHeading,
+  matchesDueFilter,
   midpointOrder,
   nest,
   withSubtasks,
+  DUE_FILTER_LABEL,
+  type DueFilter,
   type TaskNode,
 } from "@/lib/taskUtils";
-import {
-  addLocalDays,
-  compareLocalDates,
-  todayLocalDate,
-} from "@shared/task-recurrence";
+import { todayLocalDate } from "@shared/task-recurrence";
 import type { Task } from "@shared/schemas";
 
+type Layout = "board" | "list";
 type StatusFilter = "all" | "active" | "done";
 type GroupBy = "project" | "status" | "due" | "none";
 type SortBy = "name" | "estimate" | "tracked" | "recent" | "plan";
+
+const LAYOUT_OPTIONS = [
+  { value: "board" as const, label: "Board" },
+  { value: "list" as const, label: "List" },
+];
+const DUE_FILTER_OPTIONS: DueFilter[] = ["all", "today", "upcoming"];
 
 interface Section {
   key: string;
   label: string;
   color?: string | null;
-  tone?: "overdue";
   trackedSeconds: number;
   nodes: TaskNode[];
-  /** Seeds the section's own quick-add, so adding inside "Tomorrow" is due tomorrow. */
-  defaultDueDate?: string | null;
   defaultProjectId?: string | null;
+  defaultDueDate?: string | null;
   /** Drag-to-reorder is only meaningful where the order is the user's own. */
   reorderable?: boolean;
 }
@@ -81,8 +85,9 @@ export function TaskBoardList() {
   const openTaskLogTime = useUIStore((s) => s.openTaskLogTime);
   const narrow = useMediaQuery(BELOW_MD);
 
-  // Structure: projects on the left, cards or a list on the right — opens on the board.
-  const [view, setView] = useState<TaskView>("board");
+  const [layout, setLayout] = useState<Layout>("board");
+  // Due date is a filter, not a view: it narrows either layout, it isn't a third one.
+  const [dueFilter, setDueFilter] = useState<DueFilter>("all");
   const [status, setStatus] = useState<StatusFilter>("all");
   const [groupBy, setGroupBy] = useState<GroupBy>("project");
   const [sortBy, setSortBy] = useState<SortBy>("plan");
@@ -92,11 +97,12 @@ export function TaskBoardList() {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [subtaskParent, setSubtaskParent] = useState<string | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
-  // The rail's own scope: filters all four views alike, not just the board.
+  // The rail's own scope: filters both layouts alike.
   const [railProjectId, setRailProjectId] = useState<string | null>(null);
 
   const today = todayLocalDate();
   const hasAnyTask = tasks.length > 0;
+  const defaultDueDate = dueFilter === "today" ? today : null;
 
   // The Board filters the same way internally, from the unfiltered list (`tasks={tasks}` below).
   const scopedTasks = useMemo(
@@ -105,81 +111,16 @@ export function TaskBoardList() {
   );
 
   const sections = useMemo<Section[]>(() => {
-    // The board groups by column inside TaskBoard; none of this applies to it.
-    if (view === "board") return [];
+    if (layout === "board") return [];
     const compare = SORTERS[sortBy];
 
-    // ─── Today ──────────────────────────────────────────────────────────────
-    //
-    // Undated tasks are deliberately absent. Being undated *is* the statement
-    // that a task isn't today's problem; sweeping them in here would make this
-    // view identical to All and remove the only reason to open it.
-    if (view === "today") {
-      const overdue = scopedTasks.filter((t) => t.active && t.dueDate && compareLocalDates(t.dueDate, today) < 0);
-      const due = scopedTasks.filter((t) => t.active && t.dueDate === today);
-      const doneToday = scopedTasks.filter(
-        (t) => !t.active && t.completedAt && t.completedAt.slice(0, 10) === today
-      );
-      return [
-        {
-          key: "overdue",
-          label: "Overdue",
-          tone: "overdue" as const,
-          nodes: nest(withSubtasks(overdue, scopedTasks), compare),
-        },
-        {
-          key: "today",
-          label: "Due today",
-          nodes: nest(withSubtasks(due, scopedTasks), compare),
-          defaultDueDate: today,
-        },
-        {
-          key: "done",
-          label: "Completed today",
-          nodes: nest(withSubtasks(doneToday, scopedTasks), compare),
-        },
-      ]
-        .filter((s) => s.nodes.length > 0)
-        .map((s) => ({
-          ...s,
-          trackedSeconds: s.nodes.reduce((sum, n) => sum + nodeSeconds(n), 0),
-        }));
+    let byDue = scopedTasks;
+    if (dueFilter !== "all") {
+      const matched = scopedTasks.filter((t) => matchesDueFilter(t, dueFilter, today));
+      // Subtasks have no due date of their own, so a matched parent needs them re-attached.
+      byDue = withSubtasks(matched, scopedTasks);
     }
-
-    // ─── Upcoming ───────────────────────────────────────────────────────────
-    if (view === "upcoming") {
-      const horizon = addLocalDays(today, 7);
-      const out: Section[] = [];
-      for (let i = 0; i <= 7; i++) {
-        const day = addLocalDays(today, i);
-        const forDay = scopedTasks.filter((t) => t.active && t.dueDate === day);
-        if (!forDay.length) continue;
-        const nodes = nest(withSubtasks(forDay, scopedTasks), compare);
-        out.push({
-          key: day,
-          label: formatDueHeading(day, today),
-          nodes,
-          defaultDueDate: day,
-          trackedSeconds: nodes.reduce((sum, n) => sum + nodeSeconds(n), 0),
-        });
-      }
-      const later = scopedTasks.filter(
-        (t) => t.active && t.dueDate && compareLocalDates(t.dueDate, horizon) > 0
-      );
-      if (later.length) {
-        const nodes = nest(withSubtasks(later, scopedTasks), compare);
-        out.push({
-          key: "later",
-          label: "Later",
-          nodes,
-          trackedSeconds: nodes.reduce((sum, n) => sum + nodeSeconds(n), 0),
-        });
-      }
-      return out;
-    }
-
-    // ─── All ────────────────────────────────────────────────────────────────
-    const filtered = scopedTasks.filter((t) =>
+    const filtered = byDue.filter((t) =>
       status === "all" ? true : status === "active" ? t.active : !t.active
     );
 
@@ -256,26 +197,9 @@ export function TaskBoardList() {
       );
     }
     return entries.sort((a, b) => a.label.localeCompare(b.label));
-  }, [scopedTasks, view, status, groupBy, sortBy, today, statuses]);
+  }, [scopedTasks, layout, dueFilter, status, groupBy, sortBy, today, statuses]);
 
   const isEmpty = sections.length === 0;
-  const upcomingCount = scopedTasks.filter(
-    (t) => t.active && t.dueDate && compareLocalDates(t.dueDate, today) > 0
-  ).length;
-  const undatedCount = scopedTasks.filter((t) => !t.dueDate).length;
-
-  // Top-level tasks only, scoped to the rail's project — a subtask rides its parent's row.
-  const counts = useMemo(() => {
-    const top = scopedTasks.filter((t) => !t.parentId && t.active);
-    const overdue = top.filter((t) => t.dueDate && compareLocalDates(t.dueDate, today) < 0).length;
-    return {
-      overdue,
-      today: overdue + top.filter((t) => t.dueDate === today).length,
-      upcoming: top.filter((t) => t.dueDate && compareLocalDates(t.dueDate, today) > 0).length,
-      board: top.length,
-      all: top.length,
-    };
-  }, [scopedTasks, today]);
 
   /** Commit a drag: one row's `sort_order` becomes the midpoint of its new neighbours. */
   const handleDrop = (ordered: Task[], toIndex: number) => {
@@ -300,12 +224,14 @@ export function TaskBoardList() {
       return next;
     });
 
-  // Three empty states, not one. "No tasks yet" teaches the surface; "nothing
-  // due today" is a *result* and should read like one; "this filter matched
-  // nothing" is a dead end that needs a way out. Collapsing them into a single
-  // "Nothing here" is how an empty Today comes across as a broken page.
+  const clearFilters = () => {
+    setStatus("all");
+    setDueFilter("all");
+  };
+
+  // "No tasks yet" teaches the surface; anything else is a filter with nothing left.
   let empty: React.ReactNode = null;
-  if (isEmpty && !isLoading && view !== "board") {
+  if (isEmpty && !isLoading && layout === "list") {
     if (!hasAnyTask) {
       empty = (
         <EmptyState
@@ -321,60 +247,20 @@ export function TaskBoardList() {
           }
         />
       );
-    } else if (view === "today") {
-      // Two different nothings. "Nothing due today" over a backlog of dated work
-      // is a clear day; over a list where nothing has a due date at all it's a
-      // dead end — the view can never fill, and an empty state with no way out
-      // reads as a broken page. Both always offer somewhere to go.
-      empty = (
-        <EmptyState
-          icon={CalendarCheck}
-          title={undatedCount === scopedTasks.length ? "Nothing is scheduled yet" : "Nothing due today"}
-          description={
-            undatedCount === scopedTasks.length
-              ? `None of your ${scopedTasks.length} task${scopedTasks.length === 1 ? " has" : "s have"} a due date. Give one a date and it shows up here.`
-              : upcomingCount > 0
-                ? `${upcomingCount} task${upcomingCount === 1 ? "" : "s"} coming up.`
-                : "Nothing scheduled ahead either."
-          }
-          className="py-24"
-          action={
-            upcomingCount > 0 ? (
-              <Button size="sm" variant="outline" onClick={() => setView("upcoming")}>
-                See what's upcoming
-              </Button>
-            ) : (
-              <Button size="sm" variant="outline" onClick={() => setView("all")}>
-                Show all tasks
-              </Button>
-            )
-          }
-        />
-      );
-    } else if (view === "upcoming") {
-      empty = (
-        <EmptyState
-          icon={CalendarCheck}
-          title="Nothing scheduled"
-          description="Tasks with a due date show up here. Everything else lives under All."
-          className="py-24"
-          action={
-            <Button size="sm" variant="outline" onClick={() => setView("all")}>
-              Show all tasks
-            </Button>
-          }
-        />
-      );
     } else {
+      const clauses = [
+        status !== "all" ? (status === "done" ? "done" : "active") : null,
+        dueFilter !== "all" ? DUE_FILTER_LABEL[dueFilter].toLowerCase() : null,
+      ].filter(Boolean);
       empty = (
         <EmptyState
           icon={SearchX}
           title="No tasks match this filter"
-          description={`Showing ${status === "done" ? "done" : "active"} tasks only.`}
+          description={clauses.length ? `Showing ${clauses.join(", ")} tasks only.` : undefined}
           className="py-24"
           action={
-            <Button size="sm" variant="outline" onClick={() => setStatus("all")}>
-              Clear filter
+            <Button size="sm" variant="outline" onClick={clearFilters}>
+              Clear filters
             </Button>
           }
         />
@@ -401,8 +287,8 @@ export function TaskBoardList() {
       <div key={node.task.id}>
         <TaskRow
           task={node.task}
-          showProject={groupBy !== "project" || view !== "all"}
-          showStatus={groupBy !== "status" || view !== "all"}
+          showProject={groupBy !== "project"}
+          showStatus={groupBy !== "status"}
           expanded={open}
           onToggleExpanded={() => toggleCollapsed(node.task.id)}
           onRequestDelete={setDeleteTarget}
@@ -464,10 +350,23 @@ export function TaskBoardList() {
           6px under every sibling page's, in the one collection page that also
           centred itself in a 768px column. */}
       <CollectionHeader title="Tasks" className="shrink-0">
-        <TaskViewTabs view={view} counts={counts} onChange={setView} />
+        <SegmentedControl value={layout} options={LAYOUT_OPTIONS} onChange={setLayout} label="Task layout" />
 
-        {/* Grouping/status/sort only mean anything in All; project filtering moved to the rail. */}
-        {view === "all" && (
+        <Select value={dueFilter} onValueChange={(v) => setDueFilter(v as DueFilter)}>
+          <SelectTrigger size="sm" className="w-32" aria-label="Filter by due date">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {DUE_FILTER_OPTIONS.map((f) => (
+              <SelectItem key={f} value={f}>
+                {DUE_FILTER_LABEL[f]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Grouping/status/sort only mean anything in List. */}
+        {layout === "list" && (
           <>
             <div className="mx-1 h-5 w-px bg-border" aria-hidden />
             <Select value={status} onValueChange={(v) => setStatus(v as StatusFilter)}>
@@ -527,22 +426,20 @@ export function TaskBoardList() {
           className={cn(
             "-mx-6 min-h-0 flex-1 px-6 pb-6",
             // The board and each column scroll themselves; a page scroll too would fight the cursor.
-            view === "board" ? "overflow-hidden" : "overflow-y-auto"
+            layout === "board" ? "overflow-hidden" : "overflow-y-auto"
           )}
         >
-          {view === "board" ? (
+          {layout === "board" ? (
             <TaskBoard
               tasks={tasks}
               projectId={railProjectId}
+              dueFilter={dueFilter}
               onOpenTask={setEditTarget}
             />
           ) : (
           <>
           {hasAnyTask && (
-            <QuickAddTask
-              className="mb-4"
-              defaultDueDate={view === "today" ? today : null}
-            />
+            <QuickAddTask className="mb-4" defaultDueDate={defaultDueDate} />
           )}
 
           {empty ?? (
@@ -552,15 +449,10 @@ export function TaskBoardList() {
                 return (
                   <div key={section.key}>
                     <div className="mb-1 flex items-center gap-2 px-2">
-                      {groupBy === "project" && view === "all" && <ColorDot color={section.color} />}
+                      {groupBy === "project" && <ColorDot color={section.color} />}
                       {/* Sentence case at Label weight. Uppercase + tracking on every group
                           heading is the eyebrow pattern PRODUCT.md and DESIGN.md §8 both
                           reject by name; the ColorDot and count already do the work. */}
-                      {/* Not tinted, even for the overdue group. Inside that
-                          section every row's due date is already red, so the
-                          heading made one fact red twice — and a section
-                          heading is a heading, not a state indicator. The word
-                          "Overdue" carries it. */}
                       <h2 className="text-xs font-medium text-muted-foreground">
                         {section.label}
                       </h2>
@@ -589,7 +481,7 @@ export function TaskBoardList() {
       <TaskDialog
         open={addOpen}
         onClose={() => setAddOpen(false)}
-        defaultDueDate={view === "today" ? today : null}
+        defaultDueDate={defaultDueDate}
       />
 
       <TaskDialog

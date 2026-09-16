@@ -299,7 +299,7 @@ test("two live statuses may not share a name", async ({ page }) => {
 
 /** Drags with the keyboard, which is both the a11y path and the one Playwright can drive reliably against dnd-kit. */
 async function dragWithKeyboard(page: Page, taskName: string, key: "ArrowRight" | "ArrowLeft", times = 1) {
-  const handle = page.getByRole("button", { name: `Move ${taskName}` });
+  const handle = page.getByRole("group", { name: `Move ${taskName}` });
   await handle.focus();
   await page.keyboard.press("Space");
   // dnd-kit measures droppables a tick after the drag starts.
@@ -321,7 +321,7 @@ test("the Board tab shows a column per status and a card can be moved with the k
   });
 
   await page.goto("/tasks");
-  await page.getByRole("tab", { name: /Board/ }).click();
+  await page.getByRole("radio", { name: "Board" }).click();
 
   for (const name of DEFAULT_ORDER) {
     await expect(page.getByRole("region", { name })).toBeVisible();
@@ -347,7 +347,7 @@ test("a member sees the board but none of its configuration", async ({ browser }
   });
 
   await member.goto("/tasks");
-  await member.getByRole("tab", { name: /Board/ }).click();
+  await member.getByRole("radio", { name: "Board" }).click();
   await expect(member.getByRole("region", { name: "To do" })).toBeVisible();
   await expect(member.getByRole("region", { name: "To do" }).getByText("Cutover plan")).toBeVisible();
 
@@ -356,7 +356,7 @@ test("a member sees the board but none of its configuration", async ({ browser }
   await expect(member.getByRole("button", { name: "Add status" })).toHaveCount(0);
 
   await owner.goto("/tasks");
-  await owner.getByRole("tab", { name: /Board/ }).click();
+  await owner.getByRole("radio", { name: "Board" }).click();
   await expect(owner.getByRole("button", { name: "Configure To do" })).toBeVisible();
   await expect(owner.getByRole("button", { name: "Add status" })).toBeVisible();
 
@@ -373,11 +373,11 @@ test("a move by one person reaches the other's board without a reload", async ({
   });
 
   await member.goto("/tasks");
-  await member.getByRole("tab", { name: /Board/ }).click();
+  await member.getByRole("radio", { name: "Board" }).click();
   await expect(member.getByRole("region", { name: "To do" }).getByText("Cutover plan")).toBeVisible();
 
   await owner.goto("/tasks");
-  await owner.getByRole("tab", { name: /Board/ }).click();
+  await owner.getByRole("radio", { name: "Board" }).click();
   await expect(owner.getByRole("region", { name: "To do" }).getByText("Cutover plan")).toBeVisible();
   await dragWithKeyboard(owner, "Cutover plan", "ArrowRight");
 
@@ -408,7 +408,7 @@ test("the list's Group: Status follows the real columns, in board order", async 
   }
 
   await page.goto("/tasks");
-  await page.getByRole("tab", { name: "List" }).click();
+  await page.getByRole("radio", { name: "List" }).click();
   await page.getByLabel("Group by").click();
   await page.getByRole("option", { name: "Group: Status" }).click();
 

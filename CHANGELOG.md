@@ -1,5 +1,29 @@
 # Changelog
 
+## 2026-09-16 (2)
+### Added
+- **Drag a task card from anywhere on it, not a dedicated handle.** The card itself is the drag
+  surface now (`role: "group"` on `useSortable`, since it wraps two real buttons); a plain click
+  still opens the task or starts its timer, via the pointer sensor's activation distance.
+- **Board and List are two views of the same data; Today/Upcoming are a filter, not a third view.**
+  A `SegmentedControl` toggles Board/List, and a "Due" dropdown (All dates/Today/Upcoming) narrows
+  either one — including through the project rail's filter. `TaskViewTabs` is retired.
+### Fixed
+- **Dragging up, or fast, sometimes didn't register.** Collision detection was `closestCorners`
+  alone, which can misjudge near a card's edge on a quick upward flick. It's now `pointerWithin`
+  with a `rectIntersection` fallback, and cross-column moves are live-spliced during the drag
+  (`onDragOver`) instead of computed after the fact — the card visibly follows the drop as you
+  drag it, the way a board like this should feel.
+- **A completed drag animated back to its old spot before snapping to the new one.** The
+  `DragOverlay`'s own drop animation samples the real list's current position at the moment of
+  release; clearing the local drag state in the same tick raced that sample. It now clears two
+  animation frames later, once the drop has settled.
+
+Verified: `pnpm check` exit 0, `pnpm lint` 0 errors, `task-board` + `task-planning` +
+`task-log-time` 20/20 (plus a manual upward and cross-column drag), `report-per-person` +
+`project-required` + `drafts-review` + `tier2-features` 18/19 (the one failure is
+`tier2-features`' pre-existing "gaps toggle" spec, unrelated to Tasks).
+
 ## 2026-09-16 (1)
 ### Added
 - **Tasks opens on a Board, with a project rail on the left.** Projects grouped by client in a

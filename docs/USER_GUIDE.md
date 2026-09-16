@@ -147,9 +147,7 @@ The key is shown **once** and can't be recovered; if you lose it, revoke it and 
 
 ## Planning with tasks
 
-The Tasks page opens on **Board**, with a rail of your projects (grouped by client) on the left — pick one to filter every tab. **List** is the full list with grouping, sorting and status filters, **Today** puts overdue work first then what's due today, and **Upcoming** shows the next seven days a day at a time.
-
-Each tab carries a count, so you can see whether a view is worth opening without opening it. Today's count turns red when part of it is overdue.
+The Tasks page opens on **Board**, with a rail of your projects (grouped by client) on the left — pick one to filter both layouts. **List** is the same tasks as a flat list, with grouping, sorting and status filters. **Board** and **List** are two views of the same data, not a filter — the **Due** dropdown beside them narrows either one to **Today** (overdue counts as today too) or **Upcoming** (the next seven days).
 
 **Capturing.** The field at the top of the list adds a task and stays open for the next one, so several go in as several lines of typing. It reads a few tokens out of what you type and strips them from the name:
 

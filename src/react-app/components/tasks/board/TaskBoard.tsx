@@ -1,13 +1,17 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   DndContext,
   DragOverlay,
   KeyboardSensor,
   PointerSensor,
-  closestCorners,
+  getFirstCollision,
+  pointerWithin,
+  rectIntersection,
   useSensor,
   useSensors,
+  type CollisionDetection,
   type DragEndEvent,
+  type DragOverEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
@@ -19,8 +23,9 @@ import { useMoveTask } from "@/hooks/useTasks";
 import { useTaskStatuses } from "@/hooks/useTaskStatuses";
 import { useWorkspaceRole } from "@/hooks/useWorkspaceRole";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
-import { midpointOrder } from "@/lib/taskUtils";
-import type { Task, TaskStatus } from "@shared/schemas";
+import { matchesDueFilter, midpointOrder, type DueFilter } from "@/lib/taskUtils";
+import { todayLocalDate } from "@shared/task-recurrence";
+import type { Task } from "@shared/schemas";
 
 const COLUMN_PREFIX = "column:";
 
@@ -28,16 +33,27 @@ interface TaskBoardProps {
   tasks: Task[];
   /** Board-level project filter; `null` means every project. */
   projectId: string | null;
+  dueFilter: DueFilter;
   onOpenTask: (task: Task) => void;
 }
 
+/** Which column a droppable id names — a column's own background, or the task sitting in it. */
+function columnIdOf(id: string, columns: Map<string, Task[]>): string | undefined {
+  if (id.startsWith(COLUMN_PREFIX)) return id.slice(COLUMN_PREFIX.length);
+  for (const [statusId, tasks] of columns) {
+    if (tasks.some((t) => t.id === id)) return statusId;
+  }
+  return undefined;
+}
+
 /** The kanban view. Top-level tasks only — a subtask rides its parent's card as a `2/5` chip. */
-export function TaskBoard({ tasks, projectId, onOpenTask }: TaskBoardProps) {
+export function TaskBoard({ tasks, projectId, dueFilter, onOpenTask }: TaskBoardProps) {
   const { data: statuses = [], isLoading } = useTaskStatuses();
   const { canManage } = useWorkspaceRole();
   const move = useMoveTask();
   const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const lastOverId = useRef<string | null>(null);
 
   const sensors = useSensors(
     // A few pixels of slop, so pressing the card's own buttons doesn't start a drag.
@@ -45,9 +61,13 @@ export function TaskBoard({ tasks, projectId, onOpenTask }: TaskBoardProps) {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
-  const byColumn = useMemo(() => {
+  const today = todayLocalDate();
+  const serverColumns = useMemo(() => {
     const visible = tasks.filter(
-      (t) => !t.parentId && (!projectId || t.projectId === projectId)
+      (t) =>
+        !t.parentId &&
+        (!projectId || t.projectId === projectId) &&
+        matchesDueFilter(t, dueFilter, today)
     );
     const map = new Map<string, Task[]>();
     for (const status of statuses) map.set(status.id, []);
@@ -58,51 +78,104 @@ export function TaskBoard({ tasks, projectId, onOpenTask }: TaskBoardProps) {
     }
     for (const list of map.values()) list.sort((a, b) => a.boardOrder - b.boardOrder);
     return map;
-  }, [tasks, statuses, projectId]);
+  }, [tasks, statuses, projectId, dueFilter, today]);
+
+  // Live-reshuffled while dragging (two separate SortableContexts can't do this alone); server truth otherwise.
+  const [liveColumns, setLiveColumns] = useState<Map<string, Task[]> | null>(null);
+  const columns = liveColumns ?? serverColumns;
 
   const dragging = draggingId ? tasks.find((t) => t.id === draggingId) ?? null : null;
 
-  /** The column a drop landed on — either a column's own droppable, or a card in it. */
-  const columnOf = (overId: string): TaskStatus | undefined => {
-    if (overId.startsWith(COLUMN_PREFIX)) {
-      return statuses.find((s) => s.id === overId.slice(COLUMN_PREFIX.length));
+  // pointerWithin alone missed fast upward drags near a column's top edge; rectIntersection is the fallback.
+  const collisionDetection: CollisionDetection = (args) => {
+    const pointerHits = pointerWithin(args);
+    const hits = pointerHits.length > 0 ? pointerHits : rectIntersection(args);
+    const id = getFirstCollision(hits, "id");
+    if (id != null) {
+      lastOverId.current = String(id);
+      return [{ id }];
     }
-    const overTask = tasks.find((t) => t.id === overId);
-    return statuses.find((s) => s.id === overTask?.statusId);
+    return lastOverId.current ? [{ id: lastOverId.current }] : [];
   };
 
-  const onDragStart = (event: DragStartEvent) => setDraggingId(String(event.active.id));
+  const onDragStart = (event: DragStartEvent) => {
+    setDraggingId(String(event.active.id));
+    lastOverId.current = null;
+    setLiveColumns(new Map([...serverColumns].map(([k, v]) => [k, [...v]])));
+  };
+
+  const onDragOver = (event: DragOverEvent) => {
+    const { active, over } = event;
+    if (!over || !liveColumns) return;
+
+    const activeId = String(active.id);
+    const overId = String(over.id);
+    const fromColumn = columnIdOf(activeId, liveColumns);
+    const toColumn = columnIdOf(overId, liveColumns);
+    if (!fromColumn || !toColumn) return;
+
+    const fromItems = liveColumns.get(fromColumn)!;
+    const activeIndex = fromItems.findIndex((t) => t.id === activeId);
+    if (activeIndex === -1) return;
+
+    const toItems = liveColumns.get(toColumn)!;
+    const overIndex = toItems.findIndex((t) => t.id === overId);
+
+    let newIndex: number;
+    if (overId.startsWith(COLUMN_PREFIX)) {
+      newIndex = toItems.length;
+    } else if (overIndex === -1) {
+      newIndex = toItems.length;
+    } else {
+      // Above or below by the dragged card's own edge, not the pointer — survives a fast flick.
+      const isBelow =
+        active.rect.current.translated &&
+        active.rect.current.translated.top > over.rect.top + over.rect.height / 2;
+      newIndex = overIndex + (isBelow ? 1 : 0);
+    }
+
+    if (fromColumn === toColumn && newIndex === activeIndex) return;
+
+    setLiveColumns((prev) => {
+      if (!prev) return prev;
+      const next = new Map(prev);
+      const source = [...next.get(fromColumn)!];
+      const [moved] = source.splice(activeIndex, 1);
+      next.set(fromColumn, source);
+      if (fromColumn === toColumn) {
+        const adjusted = newIndex > activeIndex ? newIndex - 1 : newIndex;
+        source.splice(adjusted, 0, moved);
+      } else {
+        const dest = [...next.get(toColumn)!];
+        dest.splice(newIndex, 0, moved);
+        next.set(toColumn, dest);
+      }
+      return next;
+    });
+  };
 
   const onDragEnd = (event: DragEndEvent) => {
     const activeId = String(event.active.id);
+    const finalColumns = liveColumns;
     setDraggingId(null);
-    if (!event.over) return;
+    // Keep liveColumns through the drop animation, or it samples the old spot and snaps back first.
+    requestAnimationFrame(() => requestAnimationFrame(() => setLiveColumns(null)));
 
-    const overId = String(event.over.id);
-    const target = columnOf(overId);
+    if (!finalColumns) return;
     const task = tasks.find((t) => t.id === activeId);
-    if (!target || !task) return;
+    const columnId = columnIdOf(activeId, finalColumns);
+    if (!task || !columnId) return;
+    const status = statuses.find((s) => s.id === columnId);
+    if (!status) return;
 
-    // The midpoint of the two rows it lands between — a drop rewrites exactly one row.
-    const column = (byColumn.get(target.id) ?? []).filter((t) => t.id !== activeId);
-    const index = overId.startsWith(COLUMN_PREFIX)
-      ? column.length
-      : (() => {
-          const at = column.findIndex((t) => t.id === overId);
-          if (at === -1) return column.length;
-          // Dragging down within the same column lands after the card you were over.
-          const wasBefore =
-            task.statusId === target.id &&
-            (byColumn.get(target.id) ?? []).findIndex((t) => t.id === activeId) < at + 1;
-          return wasBefore ? at + 1 : at;
-        })();
-
-    const before = column[index - 1] ?? null;
-    const after = column[index] ?? null;
+    const ordered = finalColumns.get(columnId)!;
+    const index = ordered.findIndex((t) => t.id === activeId);
+    const before = ordered[index - 1] ?? null;
+    const after = ordered[index + 1] ?? null;
     const boardOrder = midpointOrder(before?.boardOrder ?? null, after?.boardOrder ?? null);
 
-    if (task.statusId === target.id && boardOrder === task.boardOrder) return;
-    move.mutate({ id: activeId, status: target, boardOrder });
+    if (task.statusId === status.id && boardOrder === task.boardOrder) return;
+    move.mutate({ id: activeId, status, boardOrder });
   };
 
   if (isLoading) {
@@ -118,10 +191,14 @@ export function TaskBoard({ tasks, projectId, onOpenTask }: TaskBoardProps) {
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={closestCorners}
+      collisionDetection={collisionDetection}
       onDragStart={onDragStart}
+      onDragOver={onDragOver}
       onDragEnd={onDragEnd}
-      onDragCancel={() => setDraggingId(null)}
+      onDragCancel={() => {
+        setDraggingId(null);
+        setLiveColumns(null);
+      }}
       accessibility={{
         announcements: {
           onDragStart: ({ active }) => `Picked up ${active.id}. Use the arrow keys to move it.`,
@@ -137,7 +214,7 @@ export function TaskBoard({ tasks, projectId, onOpenTask }: TaskBoardProps) {
             key={status.id}
             status={status}
             statuses={statuses}
-            tasks={byColumn.get(status.id) ?? []}
+            tasks={columns.get(status.id) ?? []}
             canManage={canManage}
             defaultProjectId={projectId}
             onOpenTask={onOpenTask}

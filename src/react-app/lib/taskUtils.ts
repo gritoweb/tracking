@@ -63,6 +63,30 @@ export const STATUS_CATEGORY_LABEL: Record<TaskStatusCategory, string> = {
   completed: "Completed",
 };
 
+// ─── Due-date filter ─────────────────────────────────────────────────────────
+
+export type DueFilter = "all" | "today" | "upcoming";
+
+export const DUE_FILTER_LABEL: Record<DueFilter, string> = {
+  all: "All dates",
+  today: "Today",
+  upcoming: "Upcoming",
+};
+
+/** Overdue and just-completed both count as "today"; "upcoming" is the next 7 days. */
+export function matchesDueFilter(task: Task, filter: DueFilter, today: string): boolean {
+  if (filter === "all") return true;
+  if (filter === "today") {
+    if (task.active) return !!task.dueDate && compareLocalDates(task.dueDate, today) <= 0;
+    return !!task.completedAt && task.completedAt.slice(0, 10) === today;
+  }
+  if (!task.active || !task.dueDate) return false;
+  return (
+    compareLocalDates(task.dueDate, today) > 0 &&
+    compareLocalDates(task.dueDate, addLocalDays(today, 7)) <= 0
+  );
+}
+
 // ─── Due dates ───────────────────────────────────────────────────────────────
 
 const WEEKDAY_LONG = [

@@ -217,7 +217,7 @@ Corner radius is chosen by **what an element is**, never by taste, and there are
 The boundary between the families is **density**. Pills on a thirty-row entry list would trade the app's actual job — scanning a day of tracked time — for a look, so the geometry stops at the edge of the data. If a new surface is dense, it belongs to the third family no matter how it is built.
 
 ### The Segmented Rule
-There are five segmented controls in the app — `SegmentedControl`, `Tabs` (default variant), `TaskViewTabs`, `TimerViewSwitcher` and the calendar-view radiogroup inside `CalendarViewOptions` — and they must not diverge. That last one is the reason this is a written rule: it is a `grid`, not a flex row, so it did not match a search for the others and had been quietly drifting on its own. The active segment is a solid `--foreground` pill with `--background` text, on a `--muted` track.
+There are four segmented controls in the app — `SegmentedControl`, `Tabs` (default variant), `TimerViewSwitcher` and the calendar-view radiogroup inside `CalendarViewOptions` — and they must not diverge. That last one is the reason this is a written rule: it is a `grid`, not a flex row, so it did not match a search for the others and had been quietly drifting on its own. The active segment is a solid `--foreground` pill with `--background` text, on a `--muted` track.
 
 It is deliberately **not** the brand red: the one accent is spent on primary actions and the running timer, and a settings row is neither. Ink-on-track is also the only "which one is selected" signal here that survives a colour-blind reader unchanged, because it carries no hue at all.
 

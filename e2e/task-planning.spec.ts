@@ -56,7 +56,7 @@ test("quick-add parses a due date and a priority out of the line", async ({ page
   });
 
   await page.goto("/tasks");
-  await page.getByRole("tab", { name: /^Today/ }).click();
+  await page.getByRole("radio", { name: "List" }).click();
   await page.waitForTimeout(800);
 
   const field = page.getByRole("textbox", { name: "Add a task" }).first();
@@ -85,7 +85,7 @@ test("completing a repeating task creates the next occurrence", async ({ page })
   });
 
   await page.goto("/tasks");
-  await page.getByRole("tab", { name: /^Today/ }).click();
+  await page.getByRole("radio", { name: "List" }).click();
   await page.waitForTimeout(1000);
   await page.getByRole("button", { name: "Mark task done" }).first().click();
   await page.waitForTimeout(1500);
@@ -148,36 +148,39 @@ test("a subtask's tracked time rolls up into its parent", async ({ page }) => {
   expect(after.every((t: { active: boolean }) => !t.active)).toBe(true);
 });
 
-test("the view tabs carry counts, and overdue tints Today's", async ({ page }) => {
+test("the Due filter narrows the List, overdue included under Today", async ({ page }) => {
   const { project, origin } = await seed(page);
   const mk = (data: unknown) =>
     page.request.post("/api/tasks", { data, headers: { origin } });
 
   await mk({ name: "Weekly status report", projectId: project.id, dueDate: localDate(-2) });
-  const parent = await (
-    await page.request.post("/api/tasks", {
-      data: { name: "Phase 2 discovery", projectId: project.id, dueDate: localDate(0) },
-      headers: { origin },
-    })
-  ).json();
-  // Subtasks ride their parent's row and have no date of their own, so they must
-  // not be counted — "Today 2" has to match the two rows underneath it.
-  await mk({ name: "Data mapping", projectId: project.id, parentId: parent.id });
+  await mk({ name: "Phase 2 discovery", projectId: project.id, dueDate: localDate(0) });
   await mk({ name: "Prep board deck", projectId: project.id, dueDate: localDate(1) });
   await mk({ name: "Backlog grooming", projectId: project.id });
 
   await page.goto("/tasks");
-  await page.waitForTimeout(1000);
+  await page.getByRole("radio", { name: "List" }).click();
+  await page.waitForTimeout(800);
 
-  await expect(page.getByRole("tab", { name: "Today, 2 tasks, 1 overdue" })).toBeVisible();
-  await expect(page.getByRole("tab", { name: "Upcoming, 1 task" })).toBeVisible();
-  await expect(page.getByRole("tab", { name: "List, 4 tasks" })).toBeVisible();
+  // Unfiltered: all four.
+  await expect(page.getByText("Weekly status report")).toBeVisible();
+  await expect(page.getByText("Backlog grooming")).toBeVisible();
 
-  // Arrow keys move between tabs — it's a tablist, not a radiogroup.
-  await page.getByRole("tab", { name: /^Today/ }).click();
-  await page.getByRole("tab", { name: /^Today/ }).press("ArrowRight");
-  await page.waitForTimeout(300);
-  await expect(page.getByRole("tab", { name: /^Upcoming/ })).toHaveAttribute("aria-selected", "true");
+  // Today: the overdue one and the one due today, not the undated or the upcoming one.
+  await page.getByLabel("Filter by due date").click();
+  await page.getByRole("option", { name: "Today" }).click();
+  await page.waitForTimeout(500);
+  await expect(page.getByText("Weekly status report")).toBeVisible();
+  await expect(page.getByText("Phase 2 discovery")).toBeVisible();
+  await expect(page.getByText("Prep board deck")).toHaveCount(0);
+  await expect(page.getByText("Backlog grooming")).toHaveCount(0);
+
+  // Upcoming: only the one due tomorrow.
+  await page.getByLabel("Filter by due date").click();
+  await page.getByRole("option", { name: "Upcoming" }).click();
+  await page.waitForTimeout(500);
+  await expect(page.getByText("Prep board deck")).toBeVisible();
+  await expect(page.getByText("Phase 2 discovery")).toHaveCount(0);
 });
 
 test("a task carries notes, editable through the task dialog", async ({ page }) => {
@@ -188,7 +191,7 @@ test("a task carries notes, editable through the task dialog", async ({ page }) 
   });
 
   await page.goto("/tasks");
-  await page.getByRole("tab", { name: /^Today/ }).click();
+  await page.getByRole("radio", { name: "List" }).click();
   await page.waitForTimeout(1000);
 
   const row = page.locator(".group", { hasText: "Reconcile Q3 invoices" }).first();

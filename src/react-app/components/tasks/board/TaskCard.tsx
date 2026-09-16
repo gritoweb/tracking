@@ -1,6 +1,6 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, Play, Repeat, Square } from "lucide-react";
+import { Play, Repeat, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ProjectBadge } from "@/components/ProjectBadge";
 import { useTimer } from "@/hooks/useTimer";
@@ -25,13 +25,18 @@ interface TaskCardProps {
   overlay?: boolean;
 }
 
-/** One task on the board — a dense cell (`rounded-lg`), never a pill; the drag handle is explicit since the card is also a click target. */
+/** One task on the board — a dense cell (`rounded-lg`), never a pill; grab anywhere on it to drag. */
 export function TaskCard({ task, onOpen, overlay = false }: TaskCardProps) {
   const { startTimer, stopTimer } = useTimer();
   const runningEntry = useTimerStore((s) => s.runningEntry);
   const running = runningEntry?.taskId === task.id;
 
-  const sortable = useSortable({ id: task.id, disabled: overlay });
+  // role: "group" — the default "button" would nest inside the two real buttons below.
+  const sortable = useSortable({
+    id: task.id,
+    disabled: overlay,
+    attributes: { role: "group", roleDescription: "task card" },
+  });
   const tone = dueTone(task.dueDate);
   const repeats = task.recurRule ? describeRecurRule(task.recurRule) : null;
   const done = task.statusCategory === "completed";
@@ -44,9 +49,16 @@ export function TaskCard({ task, onOpen, overlay = false }: TaskCardProps) {
           ? undefined
           : { transform: CSS.Translate.toString(sortable.transform), transition: sortable.transition }
       }
+      // The whole card is the drag surface; the pointer sensor's activation distance still lets clicks through.
+      {...(overlay ? {} : sortable.attributes)}
+      {...(overlay ? {} : sortable.listeners)}
+      aria-label={overlay ? undefined : `Move ${task.name}`}
+      title={overlay ? undefined : "Drag, or press Space and use the arrow keys"}
       className={cn(
         "group flex flex-col gap-1.5 rounded-lg bg-background p-2.5",
         "transition-colors duration-fast ease-out-quart",
+        !overlay && "cursor-grab touch-none active:cursor-grabbing",
+        !overlay && "focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
         running && "bg-primary/5",
         // Stays in place as a hole while the overlay follows the pointer.
         !overlay && sortable.isDragging && "opacity-40",
@@ -54,23 +66,6 @@ export function TaskCard({ task, onOpen, overlay = false }: TaskCardProps) {
       )}
     >
       <div className="flex items-start gap-1.5">
-        {!overlay && (
-          <button
-            type="button"
-            {...sortable.attributes}
-            {...sortable.listeners}
-            aria-label={`Move ${task.name}`}
-            title="Drag, or press Space and use the arrow keys"
-            className={cn(
-              "-ml-1 mt-0.5 shrink-0 cursor-grab touch-none rounded text-muted-foreground/40",
-              "transition-colors duration-fast ease-out-quart hover:text-muted-foreground",
-              "focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-            )}
-          >
-            <GripVertical className="h-4 w-4" />
-          </button>
-        )}
-
         {/* Same vocabulary as the list: tinted ring, only P1/P2 carry colour. */}
         {task.priority < 4 && (
           <span
@@ -122,12 +117,12 @@ export function TaskCard({ task, onOpen, overlay = false }: TaskCardProps) {
       </div>
 
       {task.description && (
-        <p className="line-clamp-1 pl-4 text-micro text-muted-foreground" title={task.description}>
+        <p className="line-clamp-1 text-micro text-muted-foreground" title={task.description}>
           {task.description}
         </p>
       )}
 
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 pl-4">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         {task.projectName && (
           <ProjectBadge name={task.projectName} color={task.projectColor} className="max-w-36" />
         )}
