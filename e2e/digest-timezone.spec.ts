@@ -1,5 +1,7 @@
 import { test, expect } from "@playwright/test";
-import { signUp } from "./auth";
+import { OWNER_STATE } from "./auth-state";
+
+test.use({ storageState: OWNER_STATE });
 
 /**
  * The digest cron has no request to read a timezone from, so it works off the
@@ -12,7 +14,7 @@ import { signUp } from "./auth";
  * that the client's offset is both used and persisted.
  */
 test("digest preview persists the caller's timezone offset", async ({ page }) => {
-  await signUp(page);
+  await page.goto("/");
   const origin = new URL(page.url()).origin;
 
   const before = await (await page.request.get("/api/settings")).json();

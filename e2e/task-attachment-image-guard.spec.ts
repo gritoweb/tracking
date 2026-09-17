@@ -1,6 +1,8 @@
 import { test, expect } from "@playwright/test";
-import { signUp } from "./auth";
+import { OWNER_STATE } from "./auth-state";
 import { createProject } from "./project-helpers";
+
+test.use({ storageState: OWNER_STATE });
 
 /** A minimal PNG: real signature + IHDR, with a forged width/height — no pixel data needed to trip the dimension guard. */
 function forgedPng(width: number, height: number): Buffer {
@@ -16,7 +18,6 @@ function forgedPng(width: number, height: number): Buffer {
 test("a forged image header declaring an absurd size is rejected, and the worker keeps answering", async ({
   page,
 }) => {
-  await signUp(page);
   const project = await createProject(page, { name: "Image Guard Project" });
   const created = await page.request.post("/api/tasks", {
     data: { name: "Attach a bomb", projectId: project.id },

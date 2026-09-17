@@ -1,12 +1,12 @@
 import { test, expect } from "@playwright/test";
-import { signUp } from "./auth";
+import { OWNER_STATE } from "./auth-state";
 
 // The admin UI needs an admin-role user (assigned manually in the DB), so the
 // page itself isn't driven here — these guard the removal endpoint's
 // authorization, which must hold for every signed-in non-admin.
-test("admin remove-user endpoint rejects self-removal and non-admins", async ({ page }) => {
-  await signUp(page);
+test.use({ storageState: OWNER_STATE });
 
+test("admin remove-user endpoint rejects self-removal and non-admins", async ({ page }) => {
   const session = await page.request.get("/api/auth/get-session");
   expect(session.ok()).toBeTruthy();
   const { user } = await session.json();

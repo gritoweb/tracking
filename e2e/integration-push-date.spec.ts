@@ -1,23 +1,21 @@
 import { test, expect } from "@playwright/test";
-import { signUp } from "./auth";
+import { OWNER_STATE } from "./auth-state";
 import { addManualEntry, goToListView } from "./entry-helpers";
 import { createProject } from "./project-helpers";
 
 // Workfront and Dynamics file an entry against a calendar day, and the server
 // stores only UTC instants — so the push has to carry the zone the day was
 // lived in. Pinned west of UTC, where the two disagree all evening.
-test.use({ timezoneId: "America/Denver" });
+test.use({ timezoneId: "America/Denver", storageState: OWNER_STATE });
 
 test("pushing entries carries the browser's timezone so the work date is local", async ({
   page,
 }) => {
-  await signUp(page);
-
   // An integration has to exist for the bulk bar to offer the push at all.
   const integration = await page.request.post("/api/integrations", {
     data: {
       type: "workfront",
-      name: "Acme Workfront",
+      name: "Acme Workfront Push Date",
       baseUrl: "https://acme.my.workfront.com",
       credentials: { apiKey: "k" },
     },

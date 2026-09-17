@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { signUp } from "./auth";
+import { OWNER_STATE } from "./auth-state";
 
 /**
  * TimerRoom used to complete the WebSocket close handshake by hand, because on
@@ -27,8 +27,10 @@ import { signUp } from "./auth";
  *   ws.onopen = () => ws.close(1000, "probe");
  *   ws.onclose = (e) => console.log(e.code, e.wasClean);        // want 1000, true
  */
+test.use({ storageState: OWNER_STATE });
+
 test("closing a timer socket completes the handshake cleanly", async ({ page }) => {
-  await signUp(page);
+  await page.goto("/");
 
   const result = await page.evaluate(
     () =>

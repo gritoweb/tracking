@@ -1,6 +1,8 @@
 import { test, expect } from "@playwright/test";
-import { signUp } from "./auth";
+import { OWNER_STATE } from "./auth-state";
 import { chooseProject, createProject } from "./project-helpers";
+
+test.use({ storageState: OWNER_STATE });
 
 /**
  * Click-to-create on the calendar grid. This path had no coverage, which made
@@ -10,7 +12,6 @@ import { chooseProject, createProject } from "./project-helpers";
  * verify skill); click-to-create is the reliable automation path.
  */
 test("creating an entry by clicking an empty calendar slot", async ({ page }) => {
-  await signUp(page);
   await createProject(page, { name: "Alpha", color: "#e11d48", billable: true });
 
   await page.goto("/");

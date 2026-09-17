@@ -36,7 +36,8 @@ test("a task starts a timer in one click, and stopping offers to close it out", 
 
   await page.getByRole("button", { name: "Stop timer for Cutover plan" }).click();
   // Due today counts as evidence the task may be finished, so the loop closes here.
-  await expect(page.getByRole("button", { name: "Mark done" })).toBeVisible({ timeout: 8000 });
+  // Longer than the suite default: this prompt trails the stop round-trip, which parallel workers can queue behind.
+  await expect(page.getByRole("button", { name: "Mark done" })).toBeVisible({ timeout: 15_000 });
   await page.getByRole("button", { name: "Mark done" }).click();
   await page.waitForTimeout(1200);
 

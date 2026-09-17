@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { signUp } from "./auth";
+import { OWNER_STATE } from "./auth-state";
 
 /**
  * Calendar grid density regression guard.
@@ -15,6 +15,8 @@ import { signUp } from "./auth";
 
 const MIN_LEGIBLE_COLUMN = 90; // slightly under MIN_DAY_COLUMN to allow borders
 
+test.use({ storageState: OWNER_STATE });
+
 async function columnMetrics(page: import("@playwright/test").Page) {
   return page.evaluate(() => {
     const cols = document.querySelectorAll(".fc-col-header-cell");
@@ -26,7 +28,6 @@ async function columnMetrics(page: import("@playwright/test").Page) {
 }
 
 test("calendar density follows the pane, not the viewport", async ({ page }) => {
-  await signUp(page);
   await page.goto("/");
   await page.waitForLoadState("networkidle");
   await page.waitForTimeout(1000);
