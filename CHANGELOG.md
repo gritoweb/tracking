@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-09-17 (4)
+### Fixed
+- **BUG-1 — leaving a workspace (or being removed from one) now drops the person as a task assignee,
+  and never touches their logged hours.** `task_assignees` only had a foreign key to `"user"`, so
+  deleting the `member` row left the assignment behind and the person kept rendering as the task's
+  assignee. `removeMemberFromTasks` (`lib/task-assignees.ts`) clears that workspace's rows and
+  broadcasts `tasks:changed`; it is wired to the organization plugin's `afterRemoveMember` and — since
+  better-auth's `leaveOrganization` never calls that hook — to a top-level `hooks.after` on
+  `/organization/leave`. Reads defend themselves too: `assignees_json`, the `assignee` filter and the
+  status-change notifier all require a live `member` row, and `validMemberIds` became
+  `currentMemberIds` in `lib/permissions.ts` so mentions, assignee writes and notifications share one
+  membership check. Migration `0044` prunes the rows left behind before this existed. A former
+  member's time entries are deliberately untouched: the per-person report reads the name from `"user"`,
+  not from `member`, so their hours stay in every total.
+
+Verified: `tsc -b` exit 0, `pnpm lint` 0 errors, new `e2e/workspace-member-removal.spec.ts` 2/2 green
+against a single dev server — both the owner-removes-member and the member-leaves paths assert the
+assignee disappears, the task/report/entry-list hours are unchanged and no notification reaches the
+former member.
+
 ## 2026-09-17 (3)
 ### Fixed
 - **A task whose comment carries an image could never be deleted, and neither could that image.**
