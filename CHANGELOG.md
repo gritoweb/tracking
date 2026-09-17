@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-09-17 (9)
+### Added
+- **Unit tests exist now** — vitest with v8 coverage, 259 tests across 12 files, wired into the CI
+  `quality` job. The first modules covered are the ones where a wrong answer costs money or hours:
+  budget pacing, draft scaling, task recurrence, date/duration formatting and local-day keys,
+  UTC↔local recurrence conversion (including the accepted one-hour DST drift), role permissions,
+  invite-only gating, rich-text round-trips, image sniffing on forged headers, the SSRF URL guard
+  (private ranges, cloud metadata, IPv6 literals) and the API error parser against a real serialized
+  zod rejection. `process.env.TZ` is pinned in the config so timezone logic is deterministic on any
+  machine, and `src/test/d1-stub.ts` fakes the D1 `prepare/bind/all/first/run` chain instead of
+  reaching for a database.
+- **Coverage thresholds sit at the measured 28% lines / 31% branches, not the 80% target**, with a
+  comment saying so. The covered modules are at 63–100%; the average is dragged down by the files that
+  still have no test at all (all of `worker/middleware`, most of `worker/lib` and `react-app/lib`).
+  From here each lot tests the modules it touches and raises the floor when it closes, which keeps the
+  number honest instead of aspirational.
+
+Verified: `npx tsc -b` exit 0, `pnpm lint` exit 0, `pnpm test:coverage` 259 passed exit 0.
+
 ## 2026-09-17 (8)
 ### Changed
 - **The e2e suite is green again and twice as fast** (125 tests, 8 min at one worker, down from 27

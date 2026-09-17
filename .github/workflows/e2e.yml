@@ -31,7 +31,8 @@ jobs:
       - name: Build
         run: pnpm build
 
-      # Vitest coverage steps go here once that suite exists.
+      - name: Unit test coverage
+        run: pnpm test:coverage
 
   e2e:
     needs: quality
