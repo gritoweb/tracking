@@ -259,32 +259,25 @@ export function TaskSheet({ open, onClose, task, onRequestDelete }: TaskSheetPro
   return (
     <>
       <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
-        <SheetContent
-          showCloseButton={false}
-          className="flex w-full flex-col gap-0 rounded-l-none p-0 sm:max-w-lg sm:rounded-l-container"
-        >
-          {/* A real row, not two absolutely-positioned buttons floating over nothing — the border
-              is what separates this chrome strip from the tabs below it. Close on the left, actions
-              on the right — "..." rather than a bare trash icon, so delete isn't a stray misclick. */}
-          <div className="flex h-12 shrink-0 items-center justify-between border-b px-4">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Close"
-              onClick={onClose}
-              className="text-muted-foreground"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-
+        <SheetContent className="flex w-full flex-col gap-0 rounded-l-none p-0 sm:max-w-lg sm:rounded-l-container">
+          {/* The border is what separates this chrome strip from the tabs below it. Actions on
+              the left, matching EntryFormSheet's built-in top-right close — "..." rather than a
+              bare trash icon, so delete isn't a stray misclick. */}
+          <div className="flex h-12 shrink-0 items-center border-b px-4">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button type="button" variant="ghost" size="icon-sm" aria-label="Task actions" className="text-muted-foreground">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="Task actions"
+                  title="Task actions"
+                  className="text-muted-foreground"
+                >
                   <MoreHorizontal className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
+              <DropdownMenuContent align="start">
                 <DropdownMenuItem
                   variant="destructive"
                   onClick={() => {

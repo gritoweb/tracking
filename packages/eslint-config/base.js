@@ -145,7 +145,7 @@ const UI_PRIMITIVE_CHECKS = [
 
 /** Shared flat config: TypeScript + React hooks/refresh, browser globals. */
 export default tseslint.config(
-	{ ignores: ["dist", "worker-configuration.d.ts"] },
+	{ ignores: ["dist", "coverage", "worker-configuration.d.ts"] },
 	{
 		extends: [js.configs.recommended, ...tseslint.configs.recommended],
 		files: ["**/*.{ts,tsx}"],
