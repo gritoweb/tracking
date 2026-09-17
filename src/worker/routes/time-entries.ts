@@ -5,7 +5,9 @@ import {
   UpdateTimeEntrySchema,
   BulkUpdateTimeEntriesSchema,
   BulkDeleteTimeEntriesSchema,
+  CopyWeekEntriesRequestSchema,
   ENTRY_LIST_LIMIT,
+  type CopyWeekEntriesResult,
 } from "@shared/schemas";
 
 // Autocomplete draws on the last quarter of work — long enough to cover
@@ -24,6 +26,7 @@ import {
 import type { TimeEntryJoinRow } from "../db/rows";
 import { getMemberRole, canManageWorkspace, canWriteEntry, entryScopeUserId } from "../lib/permissions";
 import { findActiveProject, PROJECT_REQUIRED_ERROR } from "../lib/projects";
+import { planCopyWeek } from "../lib/copy-week";
 import { resolveEntryBillable } from "@shared/billable";
 import type { EntrySuggestion } from "@shared/schemas";
 
@@ -237,6 +240,40 @@ export const timeEntriesRouter = new Hono<{
       broadcast(c.env, workspaceId, data.stop ? "entries:changed" : "timer:start", entry, requestOrigin(c), userId)
     );
     return c.json(entry, 201);
+  })
+  // ─── Copy a week ────────────────────────────────────────────────────────
+  // Replaces the client's N-POST-plus-rollback "copy last week" with one atomic batch.
+  .post("/copy-week", zValidator("json", CopyWeekEntriesRequestSchema), async (c) => {
+    const workspaceId = c.get("workspaceId");
+    const userId = c.get("userId");
+    const { sourceWeekStart, targetWeekStart } = c.req.valid("json");
+
+    const outcome = await planCopyWeek(c.env.DB, workspaceId, userId, sourceWeekStart, targetWeekStart);
+    if (!outcome.ok) {
+      return c.json({ error: outcome.error, entryIds: outcome.entryIds }, 400);
+    }
+    const { statements, createdIds, tagsByCreatedId } = outcome.plan;
+    if (!statements.length) {
+      return c.json({ created: [] } satisfies CopyWeekEntriesResult);
+    }
+
+    await c.env.DB.batch(statements);
+    // Tags aren't part of the atomic batch — same secondary-step shape as a single POST /.
+    await Promise.all(
+      [...tagsByCreatedId.entries()].map(([id, tags]) => upsertTags(c.env.DB, workspaceId, id, tags))
+    );
+
+    const { results } = await c.env.DB.prepare(
+      `${ENTRY_SELECT} WHERE te.workspace_id = ? AND te.id IN (${createdIds.map(() => "?").join(",")}) GROUP BY te.id ORDER BY te.start ASC`
+    )
+      .bind(workspaceId, ...createdIds)
+      .all<TimeEntryJoinRow>();
+    const created = results.map(formatEntry);
+
+    c.executionCtx.waitUntil(
+      broadcast(c.env, workspaceId, "entries:changed", { source: "copy-week" }, requestOrigin(c), userId)
+    );
+    return c.json({ created } satisfies CopyWeekEntriesResult, 201);
   })
   // ─── Current running entry ─────────────────────────────────────────────
   .get("/current", async (c) => {

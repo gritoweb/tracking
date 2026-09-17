@@ -144,7 +144,13 @@ export async function loadTodayEvents(
       const len = new Date(e.stop).getTime() - new Date(e.start).getTime();
       return len > 0 && len < ALL_DAY_MS;
     });
-  } catch {
+  } catch (err) {
+    // fetchUserEvents logs per-provider failures itself; reaching here means something broke upstream of that.
+    console.warn("assistant: calendar read failed, degrading to timer-only nudges", {
+      workspaceId,
+      userId,
+      cause: String(err),
+    });
     return [];
   }
 }

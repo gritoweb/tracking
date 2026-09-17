@@ -1,6 +1,15 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { ReportQuerySchema, GroupedReportQuerySchema } from "@shared/schemas";
+import {
+  ReportQuerySchema,
+  GroupedReportQuerySchema,
+  type ReportSummary,
+  type ReportBreakdownRow,
+  type GroupedReport,
+  type ReportGroupRow,
+  type ReportWeekly,
+  type ReportDetailedEntry,
+} from "@shared/schemas";
 import { buildReportWhere, durationExpr } from "../db/queries";
 import { entryScopeUserId, getMemberRole } from "../lib/permissions";
 
@@ -259,7 +268,11 @@ export const reportsRouter = new Hono<{
     const byTag = byTagRes.results;
     const daily = dailyRes.results;
 
-    const mapBreakdown = (rows: SummaryBatchRow[], noneLabel: string, defaultColor?: string) =>
+    const mapBreakdown = (
+      rows: SummaryBatchRow[],
+      noneLabel: string,
+      defaultColor?: string
+    ): ReportBreakdownRow[] =>
       rows.map((r) => ({
         id: r.id ?? null,
         name: r.name ?? noneLabel,
@@ -285,7 +298,7 @@ export const reportsRouter = new Hono<{
         billableSeconds: r.billable_seconds ?? 0,
         entryCount: r.entry_count ?? 0,
       })),
-    });
+    } satisfies ReportSummary);
   })
   .get(
     "/grouped",
@@ -355,17 +368,7 @@ export const reportsRouter = new Hono<{
       const totals = totalsRes.results;
 
       // Nest rows into group → subGroup.
-      type Row = {
-        id: string | null;
-        name: string;
-        color: string | null;
-        entryCount: number;
-        totalSeconds: number;
-        billableSeconds: number;
-        billableAmount: number;
-        subGroups?: Row[];
-      };
-      const groups = new Map<string, Row>();
+      const groups = new Map<string, ReportGroupRow>();
       for (const r of results) {
         const gid = r.g_id ?? "__none__";
         let grp = groups.get(gid);
@@ -411,7 +414,7 @@ export const reportsRouter = new Hono<{
         billableAmount: totals[0]?.billable_amount ?? 0,
         entryCount: totals[0]?.entry_count ?? 0,
         groups: [...groups.values()],
-      });
+      } satisfies GroupedReport);
     }
   )
   .get(
@@ -441,7 +444,7 @@ export const reportsRouter = new Hono<{
         .bind(...bindings)
         .all<WeeklyRow>();
 
-      const weekMap = new Map<string, { week: string; days: unknown[] }>();
+      const weekMap = new Map<string, ReportWeekly>();
       for (const r of results) {
         const week = r.week;
         let bucket = weekMap.get(week);
@@ -457,7 +460,7 @@ export const reportsRouter = new Hono<{
         });
       }
 
-      return c.json([...weekMap.values()]);
+      return c.json([...weekMap.values()] satisfies ReportWeekly[]);
     }
   )
   .get(
@@ -495,7 +498,7 @@ export const reportsRouter = new Hono<{
         .all<DetailedRow>();
 
       return c.json(
-        results.map((r) => {
+        results.map((r): ReportDetailedEntry => {
           const billable = Boolean(r.billable);
           const duration = r.rounded_duration ?? 0;
           const rate = r.project_rate ?? 0;

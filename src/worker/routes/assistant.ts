@@ -6,10 +6,9 @@ import {
   type AssistantTrackEventResult,
 } from "@shared/schemas";
 import { computeNudges } from "../lib/assistant";
-import { inferEventProjects } from "../lib/ai";
 import { resolveEntryBillable } from "@shared/billable";
 import { listMemories, deleteMemory, clearMemories } from "../lib/assistant-memory";
-import { findActiveProject } from "../lib/projects";
+import { findActiveProject, inferProjectForTitle } from "../lib/projects";
 import { broadcast } from "../db/queries";
 
 // Clamp to sane UTC offsets so a bad client can't shift day-bound queries
@@ -56,13 +55,9 @@ export const assistantRouter = new Hono<{
       const active = await findActiveProject(c.env.DB, workspaceId, projectId);
       project = active ? { id: active.id, name: active.name } : null;
     } else {
-      try {
-        const match = (await inferEventProjects(c.env.DB, c.env.AI, workspaceId, [title])).get(title.trim());
-        if (match?.projectId) {
-          project = { id: match.projectId, name: match.projectName };
-        }
-      } catch {
-        // Best-effort only.
+      const match = await inferProjectForTitle(c.env.DB, c.env.AI, workspaceId, title);
+      if (match) {
+        project = { id: match.projectId, name: match.projectName };
       }
     }
     if (!project) {

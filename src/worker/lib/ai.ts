@@ -162,6 +162,7 @@ ${styleInstruction} Do not invent work not listed above. Output only the summary
  */
 export async function runBriefNarrative(
   ai: Ai,
+  workspaceId: string,
   entries: SummaryEntryInput[],
   period: "day" | "week"
 ): Promise<string | null> {
@@ -190,7 +191,8 @@ Do not invent work that isn't listed, do not moralise, do not give advice, and d
       { gateway: GATEWAY }
     )) as { response?: string };
     return raw.response?.trim() || null;
-  } catch {
+  } catch (err) {
+    console.warn("ai: brief narrative generation failed", { workspaceId, cause: String(err) });
     return null;
   }
 }
@@ -303,12 +305,19 @@ ${projects.map((p) => `- "${p.name}"`).join("\n")}`;
       },
       { gateway: GATEWAY }
     );
-  } catch {
+  } catch (err) {
+    console.warn("ai: event-project inference call failed", { workspaceId, cause: String(err) });
     return resolved;
   }
 
   const parsed = EventProjectSchema.safeParse(extractJson(raw));
-  if (!parsed.success) return resolved;
+  if (!parsed.success) {
+    console.warn("ai: event-project inference returned an unexpected response", {
+      workspaceId,
+      cause: parsed.error.message,
+    });
+    return resolved;
+  }
 
   const byTitle = new Map(unique.map((t) => [normalize(t), t]));
   for (const a of parsed.data.assignments) {
@@ -375,6 +384,7 @@ export interface DraftEnrichment {
  */
 export async function runDayDraftEnrichment(
   ai: Ai,
+  workspaceId: string,
   dayContext: string,
   candidates: DraftEnrichmentCandidate[],
   projects: ProjectGrounding[]
@@ -422,12 +432,20 @@ ${candidates.map((c) => `[${c.index}] ${c.when} — ${c.signal}`).join("\n")}`;
       },
       { gateway: GATEWAY }
     );
-  } catch {
-    return out; // AI unavailable — the caller's deterministic drafts stand.
+  } catch (err) {
+    // AI unavailable — the caller's deterministic drafts stand.
+    console.warn("ai: day-draft enrichment call failed", { workspaceId, cause: String(err) });
+    return out;
   }
 
   const parsed = DayDraftSchema.safeParse(extractJson(raw));
-  if (!parsed.success) return out;
+  if (!parsed.success) {
+    console.warn("ai: day-draft enrichment returned an unexpected response", {
+      workspaceId,
+      cause: parsed.error.message,
+    });
+    return out;
+  }
 
   const valid = new Set(candidates.map((c) => c.index));
   for (const e of parsed.data.entries) {

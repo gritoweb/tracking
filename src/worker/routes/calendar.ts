@@ -212,7 +212,8 @@ export const calendarRouter = new Hono<{
         )
         .run();
       return c.redirect("/settings?calendar=connected");
-    } catch {
+    } catch (err) {
+      console.warn("calendar: oauth callback failed", { workspaceId, userId, provider, cause: String(err) });
       return c.redirect("/settings?calendar=error");
     }
   })

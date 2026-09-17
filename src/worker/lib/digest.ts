@@ -183,6 +183,7 @@ export async function buildDigest(
   // none, and neither is worth failing the whole send over.
   const narrative = await runBriefNarrative(
     env.AI,
+    user.workspaceId,
     entryRows.results.map((e) => ({
       description: e.description ?? "",
       projectName: e.project_name ?? null,

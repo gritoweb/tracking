@@ -92,8 +92,9 @@ export const projectsRouter = new Hono<{
         results.map((r) => r.name)
       );
       usedAI = aiColors.size > 0;
-    } catch {
+    } catch (err) {
       // AI unavailable / bad response — fall through to the deterministic spread.
+      console.warn("ai: project recolor assignment failed", { workspaceId, cause: String(err) });
     }
 
     // Assign in order: take the AI color when valid and not already used;

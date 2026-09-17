@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { UpdateSettingsSchema } from "@shared/schemas";
+import { UpdateSettingsSchema, type Settings } from "@shared/schemas";
 import { sendDigest, localDateAt } from "../lib/digest";
 
 type Row = {
@@ -18,7 +18,7 @@ type Row = {
   digest_tz_offset: number;
 };
 
-function toSettings(row: Row | null) {
+function toSettings(row: Row | null): Settings {
   return {
     currency: row?.currency ?? "USD",
     timeFormat: (row?.time_format as "24h" | "12h") ?? "24h",

@@ -471,6 +471,7 @@ export async function generateDrafts(
 
   const enrichment = await runDayDraftEnrichment(
     env.AI,
+    workspaceId,
     buildDayContext(entries, capped, offsetMinutes),
     enrichmentInput,
     projects

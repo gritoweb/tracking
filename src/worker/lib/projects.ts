@@ -1,6 +1,7 @@
 import type { CreateProject, Project } from "@shared/schemas";
 import { DISTINCT_COLORS, spreadColor } from "@shared/colors";
 import type { ProjectRow } from "../db/rows";
+import { inferEventProjects } from "./ai";
 
 /** Project rows with their tracked time; `scoped` adds one `te.user_id = ?` binding (in the join, before the WHERE's) for a member. */
 export function projectSelect(scoped: boolean): string {
@@ -59,6 +60,22 @@ export async function findActiveProject(
     .bind(projectId, workspaceId)
     .first<{ id: string; name: string; billable: number }>();
   return row ? { id: row.id, name: row.name, billable: Boolean(row.billable) } : null;
+}
+
+/** Best-effort AI inference of a meeting title's project, shared by the assistant's chat tool and its track-event endpoint. */
+export async function inferProjectForTitle(
+  db: D1Database,
+  ai: Ai,
+  workspaceId: string,
+  title: string
+): Promise<{ projectId: string; projectName: string } | null> {
+  try {
+    const match = (await inferEventProjects(db, ai, workspaceId, [title])).get(title.trim());
+    return match ? { projectId: match.projectId, projectName: match.projectName } : null;
+  } catch (err) {
+    console.warn("project inference from meeting title failed", { workspaceId, cause: String(err) });
+    return null;
+  }
 }
 
 /** Whether the project exists here with its client still blank — the one gap a member is allowed to fill. */

@@ -536,6 +536,21 @@ export const BulkDeleteTimeEntriesSchema = z.object({
   ids: z.array(z.string()).min(1),
 });
 
+// Source week is a fixed 7-day window from `sourceWeekStart`; every copied entry shifts by (targetWeekStart - sourceWeekStart).
+export const CopyWeekEntriesRequestSchema = z
+  .object({
+    sourceWeekStart: z.string(),
+    targetWeekStart: z.string(),
+  })
+  .refine(
+    (data) => new Date(data.targetWeekStart).getTime() !== new Date(data.sourceWeekStart).getTime(),
+    { message: "Target week must differ from the source week", path: ["targetWeekStart"] }
+  );
+
+export const CopyWeekEntriesResultSchema = z.object({
+  created: z.array(TimeEntrySchema),
+});
+
 // ─── Drafted entries ─────────────────────────────────────────────────────────
 
 // A proposed time entry the app wrote for a day, waiting for the user to
@@ -649,6 +664,105 @@ export const SubGroupDimensionSchema = z.enum([
 export const GroupedReportQuerySchema = ReportQuerySchema.extend({
   group: GroupDimensionSchema.default("project"),
   subGroup: SubGroupDimensionSchema.default("none"),
+});
+
+// ─── Report responses (pinned so the client infers them instead of `unknown`) ─
+
+export const ReportBreakdownRowSchema = z.object({
+  id: z.string().nullable(),
+  name: z.string(),
+  color: z.string().optional(),
+  entryCount: z.number(),
+  totalSeconds: z.number(),
+  billableSeconds: z.number(),
+  billableAmount: z.number(),
+});
+
+export const ReportDailyRowSchema = z.object({
+  date: z.string(),
+  totalSeconds: z.number(),
+  billableSeconds: z.number(),
+  entryCount: z.number(),
+});
+
+export const ReportSummarySchema = z.object({
+  totalSeconds: z.number(),
+  billableSeconds: z.number(),
+  billableAmount: z.number(),
+  entryCount: z.number(),
+  byProject: z.array(ReportBreakdownRowSchema),
+  byClient: z.array(ReportBreakdownRowSchema),
+  byTask: z.array(ReportBreakdownRowSchema),
+  byTag: z.array(ReportBreakdownRowSchema),
+  daily: z.array(ReportDailyRowSchema),
+});
+
+export interface ReportGroupRow {
+  id: string | null;
+  name: string;
+  color: string | null;
+  entryCount: number;
+  totalSeconds: number;
+  billableSeconds: number;
+  billableAmount: number;
+  subGroups?: ReportGroupRow[];
+}
+
+// Recursive shape (one optional nesting level in practice) needs z.lazy + an explicit z.ZodType annotation.
+export const ReportGroupRowSchema: z.ZodType<ReportGroupRow> = z.lazy(() =>
+  z.object({
+    id: z.string().nullable(),
+    name: z.string(),
+    color: z.string().nullable(),
+    entryCount: z.number(),
+    totalSeconds: z.number(),
+    billableSeconds: z.number(),
+    billableAmount: z.number(),
+    subGroups: z.array(ReportGroupRowSchema).optional(),
+  })
+);
+
+export const GroupedReportSchema = z.object({
+  group: GroupDimensionSchema,
+  subGroup: SubGroupDimensionSchema,
+  totalSeconds: z.number(),
+  billableSeconds: z.number(),
+  billableAmount: z.number(),
+  entryCount: z.number(),
+  groups: z.array(ReportGroupRowSchema),
+});
+
+export const ReportWeeklyDaySchema = z.object({
+  date: z.string(),
+  totalSeconds: z.number(),
+  billableSeconds: z.number(),
+  entryCount: z.number(),
+});
+
+export const ReportWeeklySchema = z.object({
+  week: z.string(),
+  days: z.array(ReportWeeklyDaySchema),
+});
+
+export const ReportDetailedEntrySchema = z.object({
+  id: z.string(),
+  description: z.string(),
+  projectId: z.string().nullable(),
+  projectName: z.string().nullable(),
+  projectColor: z.string().nullable(),
+  clientName: z.string().nullable(),
+  taskId: z.string().nullable(),
+  taskName: z.string().nullable(),
+  userId: z.string().nullable(),
+  userName: z.string().nullable(),
+  userEmail: z.string().nullable(),
+  userImage: z.string().nullable(),
+  start: z.string(),
+  stop: z.string().nullable(),
+  duration: z.number(),
+  billable: z.boolean(),
+  amount: z.number(),
+  tags: z.array(z.string()),
 });
 
 // ─── Saved reports ───────────────────────────────────────────────────────────
@@ -993,7 +1107,11 @@ export type TimeEntry = z.infer<typeof TimeEntrySchema>;
 export type EntrySuggestion = z.infer<typeof EntrySuggestionSchema>;
 export type CreateTimeEntry = z.infer<typeof CreateTimeEntrySchema>;
 export type UpdateTimeEntry = z.infer<typeof UpdateTimeEntrySchema>;
+export type BulkUpdateTimeEntries = z.infer<typeof BulkUpdateTimeEntriesSchema>;
+export type CopyWeekEntriesRequest = z.infer<typeof CopyWeekEntriesRequestSchema>;
+export type CopyWeekEntriesResult = z.infer<typeof CopyWeekEntriesResultSchema>;
 export type CreateProject = z.infer<typeof CreateProjectSchema>;
+export type UpdateProject = z.infer<typeof UpdateProjectSchema>;
 export type PacingStatus = z.infer<typeof PacingStatusSchema>;
 export type ProjectPacing = z.infer<typeof ProjectPacingSchema>;
 export type CreateClient = z.infer<typeof CreateClientSchema>;
@@ -1006,6 +1124,7 @@ export type TaskStatus = z.infer<typeof TaskStatusSchema>;
 export type TaskStatusCategory = z.infer<typeof TaskStatusCategorySchema>;
 export type CreateTaskStatus = z.infer<typeof CreateTaskStatusSchema>;
 export type UpdateTaskStatus = z.infer<typeof UpdateTaskStatusSchema>;
+export type ArchiveTaskStatus = z.infer<typeof ArchiveTaskStatusSchema>;
 export type ApiKeyScope = z.infer<typeof ApiKeyScopeSchema>;
 export type ApiKey = z.infer<typeof ApiKeySchema>;
 export type CreateApiKey = z.infer<typeof CreateApiKeySchema>;
@@ -1028,3 +1147,12 @@ export type AssistantNudge = z.infer<typeof AssistantNudgeSchema>;
 export type AssistantMemory = z.infer<typeof AssistantMemorySchema>;
 export type AssistantTrackEventRequest = z.infer<typeof AssistantTrackEventRequestSchema>;
 export type AssistantTrackEventResult = z.infer<typeof AssistantTrackEventResultSchema>;
+export type GroupDimension = z.infer<typeof GroupDimensionSchema>;
+export type SubGroupDimension = z.infer<typeof SubGroupDimensionSchema>;
+export type ReportBreakdownRow = z.infer<typeof ReportBreakdownRowSchema>;
+export type ReportDailyRow = z.infer<typeof ReportDailyRowSchema>;
+export type ReportSummary = z.infer<typeof ReportSummarySchema>;
+export type GroupedReport = z.infer<typeof GroupedReportSchema>;
+export type ReportWeeklyDay = z.infer<typeof ReportWeeklyDaySchema>;
+export type ReportWeekly = z.infer<typeof ReportWeeklySchema>;
+export type ReportDetailedEntry = z.infer<typeof ReportDetailedEntrySchema>;

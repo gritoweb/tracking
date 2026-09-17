@@ -8,9 +8,10 @@
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 import { broadcast, getEntryById } from "../db/queries";
-import { loadGroundingProjects, resolveGrounding, inferEventProjects } from "./ai";
+import { loadGroundingProjects, resolveGrounding } from "./ai";
 import { rememberFact, searchMemories } from "./assistant-memory";
 import { canWriteEntry, getMemberRole } from "./permissions";
+import { inferProjectForTitle } from "./projects";
 import { resolveEntryBillable } from "@shared/billable";
 
 export interface AssistantToolContext {
@@ -212,13 +213,9 @@ export function buildAssistantTools(ctx: AssistantToolContext): ToolSet {
         if (projectName) {
           project = await resolveProject(env, workspaceId, projectName);
         } else {
-          try {
-            const match = (await inferEventProjects(db, env.AI, workspaceId, [title])).get(title.trim());
-            if (match?.projectId) {
-              project = { projectId: match.projectId, projectName: match.projectName };
-            }
-          } catch {
-            // best-effort
+          const match = await inferProjectForTitle(db, env.AI, workspaceId, title);
+          if (match) {
+            project = { projectId: match.projectId, projectName: match.projectName };
           }
         }
         if (!project.projectId) return { ok: false, reason: NEEDS_PROJECT };
