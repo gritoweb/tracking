@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-09-17 (5)
+### Docs
+- **The hosted Workers Builds pipeline fails for a different reason than this file recorded on
+  2026-09-15.** It is not only the missing `dist/client`: its deploy command runs `wrangler` directly,
+  and wrangler reads the configuration *before* any build step, so it bundles `src/worker/index.ts`
+  from source and cannot resolve the `@shared/*` tsconfig aliases — `Could not resolve
+  "@shared/schemas"`, reproduced locally with `npx wrangler versions upload --dry-run` after deleting
+  `dist/` and `.wrangler/deploy/`. The build has to complete *before* wrangler starts, so that
+  `vite build` has written `.wrangler/deploy/config.json` and wrangler follows the redirect to the
+  pre-bundled `dist/tracking/wrangler.json`. Adding `build.command` to `wrangler.jsonc` does not help
+  either, and not only because of the ordering: Workers Builds documents that it ignores Wrangler's
+  Custom Builds. The remaining fix is a dashboard field (Settings → Build → Build command `pnpm build`,
+  or a deploy command pointed at `pnpm run deploy` / `pnpm run versions:upload`), now written into
+  `CLAUDE.md` next to the deploy sequence.
+
 ## 2026-09-17 (4)
 ### Fixed
 - **BUG-1 — leaving a workspace (or being removed from one) now drops the person as a task assignee,

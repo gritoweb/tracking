@@ -35,6 +35,8 @@ No unit test framework is configured. Playwright e2e tests live in `e2e/` and dr
 
 Migrations must land before the worker code that queries their new columns/tables — D1 is one shared remote database, not a per-deploy migration step.
 
+**Workers Builds (the git-connected pipeline) needs its Build command set in the dashboard.** Its deploy command runs `wrangler` directly, and wrangler reads the config *before* any build step, so it bundles `src/worker/index.ts` from source and dies on the `@shared/*` tsconfig aliases it knows nothing about (`Could not resolve "@shared/schemas"`). The build must therefore finish *before* wrangler starts, so that `vite build` has written `.wrangler/deploy/config.json` and wrangler follows the redirect to the already-bundled `dist/tracking/wrangler.json`. Setting `build.command` in `wrangler.jsonc` does **not** work: Workers Builds explicitly ignores Wrangler's Custom Builds. The fix lives in Settings → Build of the Worker: **Build command `pnpm build`** (keeping `npx wrangler deploy` / `npx wrangler versions upload` as the deploy commands), or point the deploy command itself at `pnpm run deploy` / `pnpm run versions:upload`, which build first. Until one of those is set, every hosted build fails while `pnpm run deploy` from a clean checkout keeps working.
+
 ## Architecture
 
 Full-stack TypeScript time tracker (Toggl-like) running entirely on Cloudflare's edge platform.
