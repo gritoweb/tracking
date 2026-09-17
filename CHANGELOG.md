@@ -1,5 +1,44 @@
 # Changelog
 
+## 2026-09-17 (10)
+### Fixed
+- **Deleting a task only cleaned up its first subtask.** `task_id IN (?, (SELECT …))` is a scalar
+  subquery in SQLite, so a parent with three subtasks left the other two subtasks' images in R2
+  forever — deleted from the app, still stored. One `taskAndSubtaskIds()` helper now feeds all three
+  statements, and an e2e test deletes a parent with three attached subtasks and proves all four
+  attachment ids answer 404.
+- **Notifications were scoped by user alone.** Someone removed from a workspace kept reading its task
+  titles and whole comment bodies from another workspace, and one workspace's notifications showed up
+  while another was active. All five routes now filter by `workspace_id` too, `notifyUser` stores a
+  140-character excerpt instead of the full comment, a 90-day sweep runs in the cron, and leaving a
+  workspace deletes that workspace's notifications for the leaver.
+- **An image upload could take the Worker down.** The limit was bytes, not pixels, so a small PNG
+  declaring 20000×20000 was decoded in full. Dimensions are now read from the header (PNG, JPEG, WebP,
+  GIF) and anything over 8000px a side or 40 megapixels is refused before Photon sees it; the decode
+  runs in `try/finally` so WASM memory is always released, and a corrupt image returns 400 instead of
+  500.
+- **Anyone could delete anyone's task or attachment.** `canDeleteTask`/`canDeleteAttachment` restrict
+  it to the author or a workspace manager (migration `0045` adds `tasks.created_by`; a task with no
+  recorded author is manager-only), applied in REST and in the MCP tools.
+- `assigneeIds` had no length cap, so a single request could exceed D1's 100-parameter limit and fan
+  out notifications; it is `.max(50)` now, like mentions. The per-push `console.log` is gone.
+### Changed
+- **Every logged entry is now born billable.** The project's `billable` flag no longer cascades into
+  entries — it stays as the project's own classification (still shown in the project list and the
+  assistant's project card). One shared `resolveEntryBillable` covers all sixteen creation paths: the
+  timer, manual entry, the calendar, the timesheet grid, drafts, recurring templates, favourites, the
+  MCP tools, the assistant tools, the meeting nudge and `useEntryDraft` — the last one being the real
+  default behind "Add entry" and clicking an empty calendar slot, which would otherwise have kept
+  creating non-billable entries. The inert "Default billable" preference and the project form's
+  billable switch are gone.
+- **The task panel's header follows the rest of the app**: actions menu on the left, close on the
+  right, reusing `SheetContent`'s own close button instead of a hand-rolled one.
+
+Verified: `npx tsc -b` exit 0, `pnpm lint` exit 0, `pnpm test` 318 passed, `npx playwright test
+--workers=1` 133 passed in 8.1 min, exit 0 — including four new specs (deletion permissions and the
+orphaned-attachment case, notification scoping and excerpt, the forged oversized PNG, and a rewritten
+billable spec).
+
 ## 2026-09-17 (9)
 ### Added
 - **Unit tests exist now** — vitest with v8 coverage, 259 tests across 12 files, wired into the CI
