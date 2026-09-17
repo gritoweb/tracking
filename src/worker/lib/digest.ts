@@ -163,7 +163,7 @@ export async function buildDigest(
        ORDER BY te.start ASC LIMIT 120`
     )
       .bind(user.workspaceId, user.id, sinceIso, untilIso)
-      .all<Record<string, unknown>>(),
+      .all<NarrativeEntryRow>(),
     env.DB.prepare(
       `SELECT COUNT(*) AS n FROM draft_entries
        WHERE workspace_id = ? AND user_id = ? AND local_date >= ? AND local_date <= ?`
@@ -184,10 +184,10 @@ export async function buildDigest(
   const narrative = await runBriefNarrative(
     env.AI,
     entryRows.results.map((e) => ({
-      description: (e.description as string) ?? "",
-      projectName: (e.project_name as string | null) ?? null,
-      start: e.start as string,
-      duration: (e.duration as number | null) ?? null,
+      description: e.description ?? "",
+      projectName: e.project_name ?? null,
+      start: e.start,
+      duration: e.duration ?? null,
       billable: Boolean(e.billable),
     })),
     kind === "weekly" ? "week" : "day"
@@ -263,6 +263,15 @@ export async function sendDigest(
     })
   );
   return content;
+}
+
+/** `buildDigest`'s own projection, fed to `runBriefNarrative` — a completed entry joined for its project name. */
+interface NarrativeEntryRow {
+  description: string | null;
+  start: string;
+  duration: number | null;
+  billable: number;
+  project_name: string | null;
 }
 
 interface DigestRow {

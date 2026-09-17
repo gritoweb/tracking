@@ -1,17 +1,16 @@
 import type { Notification } from "@shared/schemas";
+import type { NotificationRow } from "../db/rows";
 import { currentMemberIds } from "./permissions";
 
-type Row = Record<string, unknown>;
-
-export function formatNotification(row: Row): Notification {
+export function formatNotification(row: NotificationRow): Notification {
   return {
-    id: row.id as string,
-    type: row.type as string,
-    title: row.title as string,
-    body: row.body as string,
-    link: (row.link as string | null) ?? null,
+    id: row.id,
+    type: row.type,
+    title: row.title,
+    body: row.body,
+    link: row.link ?? null,
     isRead: Boolean(row.is_read),
-    createdAt: row.created_at as string,
+    createdAt: row.created_at,
   };
 }
 
@@ -35,8 +34,11 @@ async function pushLive(env: Env, userId: string, notification: Notification): P
 
 /** The name every notification's title quotes as the actor — falls back to email, then "Someone". */
 export async function actorDisplayName(db: D1Database, userId: string): Promise<string> {
-  const row = await db.prepare(`SELECT name, email FROM "user" WHERE id = ?`).bind(userId).first<Row>();
-  return (row?.name as string) || (row?.email as string) || "Someone";
+  const row = await db
+    .prepare(`SELECT name, email FROM "user" WHERE id = ?`)
+    .bind(userId)
+    .first<{ name: string | null; email: string | null }>();
+  return row?.name || row?.email || "Someone";
 }
 
 export interface NotificationTemplate {
@@ -69,7 +71,7 @@ export async function notifyUser(
     .bind(id, workspaceId, userId, template.type, template.title, notificationExcerpt(template.body), template.link ?? null)
     .run();
 
-  const row = await env.DB.prepare(`SELECT * FROM notifications WHERE id = ?`).bind(id).first<Row>();
+  const row = await env.DB.prepare(`SELECT * FROM notifications WHERE id = ?`).bind(id).first<NotificationRow>();
   if (row) await pushLive(env, userId, formatNotification(row));
 }
 

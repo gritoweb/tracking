@@ -4,6 +4,7 @@ import {
   CreateIntegrationSchema,
   UpdateIntegrationSchema,
   PushTimeEntriesSchema,
+  type Integration,
   type IntegrationCredentials,
   type IntegrationType,
   type PushResult,
@@ -13,6 +14,7 @@ import { localDateInZone } from "../lib/local-date";
 import { broadcast } from "../db/queries";
 import { getAdapter, IntegrationError, type Connection } from "../integrations";
 import { safeIntegrationOrigin } from "../integrations/url-guard";
+import type { IntegrationRow } from "../db/rows";
 import {
   canManageWorkspace,
   canWriteEntry,
@@ -20,27 +22,22 @@ import {
   MANAGER_ONLY_ERROR,
 } from "../lib/permissions";
 
-function formatIntegration(row: Record<string, unknown>) {
+function formatIntegration(row: IntegrationRow): Integration {
   return {
-    id: row.id as string,
-    workspaceId: row.workspace_id as string,
-    type: row.type as IntegrationType,
-    name: row.name as string,
-    baseUrl: row.base_url as string,
+    id: row.id,
+    workspaceId: row.workspace_id,
+    type: row.type,
+    name: row.name,
+    baseUrl: row.base_url,
     hasCredentials: Boolean(row.credentials),
-    createdAt: row.created_at as string,
+    createdAt: row.created_at,
   };
 }
 
-interface IntegrationRow {
-  id: string;
-  type: IntegrationType;
-  name: string;
-  base_url: string;
-  credentials: string;
-}
-
-async function toConnection(secret: string, row: IntegrationRow): Promise<Connection> {
+async function toConnection(
+  secret: string,
+  row: Pick<IntegrationRow, "id" | "type" | "name" | "base_url" | "credentials">
+): Promise<Connection> {
   return {
     id: row.id,
     type: row.type,
@@ -48,6 +45,26 @@ async function toConnection(secret: string, row: IntegrationRow): Promise<Connec
     baseUrl: row.base_url,
     credentials: await decryptJSON<IntegrationCredentials>(secret, row.credentials),
   };
+}
+
+/** `POST /push`'s own join — a time entry plus its project and (if assigned) integration credentials. */
+interface PushEntryRow {
+  id: string;
+  user_id: string | null;
+  description: string | null;
+  start: string;
+  stop: string | null;
+  duration: number | null;
+  p_id: string | null;
+  p_name: string | null;
+  integration_id: string | null;
+  external_project_id: string | null;
+  external_task_id: string | null;
+  i_id: string | null;
+  i_type: IntegrationType | null;
+  i_name: string | null;
+  i_base_url: string | null;
+  i_credentials: string | null;
 }
 
 /** Workfront/Dynamics credentials are workspace configuration: only owner/admin create, change, test or remove them. */
@@ -69,7 +86,7 @@ export const integrationsRouter = new Hono<{
       `SELECT * FROM integrations WHERE workspace_id = ?
          AND type NOT IN ('google_calendar', 'microsoft_calendar')
        ORDER BY name ASC`
-    ).bind(c.get("workspaceId")).all<Record<string, unknown>>();
+    ).bind(c.get("workspaceId")).all<IntegrationRow>();
     return c.json(results.map(formatIntegration));
   })
   .post("/", zValidator("json", CreateIntegrationSchema), async (c) => {
@@ -94,7 +111,8 @@ export const integrationsRouter = new Hono<{
 
     const { results } = await c.env.DB.prepare(
       `SELECT * FROM integrations WHERE id = ?`
-    ).bind(id).all<Record<string, unknown>>();
+    ).bind(id).all<IntegrationRow>();
+    if (!results.length) return c.json({ error: "integration insert did not produce a readable row" }, 500);
     return c.json(formatIntegration(results[0]), 201);
   })
   .put("/:id", zValidator("json", UpdateIntegrationSchema), async (c) => {
@@ -129,7 +147,7 @@ export const integrationsRouter = new Hono<{
 
     const { results } = await c.env.DB.prepare(
       `SELECT * FROM integrations WHERE id = ? AND workspace_id = ?`
-    ).bind(id, workspaceId).all<Record<string, unknown>>();
+    ).bind(id, workspaceId).all<IntegrationRow>();
     if (!results.length) return c.json({ error: "Not found" }, 404);
     return c.json(formatIntegration(results[0]));
   })
@@ -180,15 +198,15 @@ export const integrationsRouter = new Hono<{
          LEFT JOIN projects p ON p.id = te.project_id
          LEFT JOIN integrations i ON i.id = p.integration_id AND i.workspace_id = te.workspace_id
          WHERE te.id = ? AND te.workspace_id = ?`
-      ).bind(entryId, workspaceId).first<Record<string, unknown>>();
+      ).bind(entryId, workspaceId).first<PushEntryRow>();
 
       if (!row) {
         results.push({ id: entryId, ok: false, error: "Entry not found" });
         continue;
       }
       const entryOwner = {
-        user_id: (row.user_id as string | null) ?? null,
-        stop: (row.stop as string | null) ?? null,
+        user_id: row.user_id ?? null,
+        stop: row.stop ?? null,
       };
       if (!canWriteEntry(role, entryOwner, userId)) {
         results.push({ id: entryId, ok: false, error: "Not your entry" });
@@ -198,26 +216,26 @@ export const integrationsRouter = new Hono<{
         results.push({ id: entryId, ok: false, error: "Entry has no project" });
         continue;
       }
-      if (!row.i_id) {
+      if (!row.i_id || !row.i_type) {
         results.push({ id: entryId, ok: false, error: "Project has no integration assigned" });
         continue;
       }
-      const duration = (row.duration as number | null) ?? 0;
+      const duration = row.duration ?? 0;
       if (!row.stop || duration <= 0) {
         results.push({ id: entryId, ok: false, error: "Entry is not completed" });
         continue;
       }
 
       try {
-        const integrationId = row.i_id as string;
+        const integrationId = row.i_id;
         let conn = connCache.get(integrationId);
         if (!conn) {
           conn = await toConnection(c.env.AUTH_SECRET, {
             id: integrationId,
-            type: row.i_type as IntegrationType,
-            name: row.i_name as string,
-            base_url: row.i_base_url as string,
-            credentials: row.i_credentials as string,
+            type: row.i_type,
+            name: row.i_name ?? "",
+            base_url: row.i_base_url ?? "",
+            credentials: row.i_credentials ?? "",
           });
           connCache.set(integrationId, conn);
         }
@@ -225,20 +243,20 @@ export const integrationsRouter = new Hono<{
         const { externalId } = await getAdapter(conn.type).pushTimeEntry({
           connection: conn,
           project: {
-            id: row.p_id as string,
-            name: row.p_name as string,
-            externalProjectId: (row.external_project_id as string | null) ?? null,
-            externalTaskId: (row.external_task_id as string | null) ?? null,
+            id: row.p_id,
+            name: row.p_name ?? "",
+            externalProjectId: row.external_project_id ?? null,
+            externalTaskId: row.external_task_id ?? null,
           },
           entry: {
             id: entryId,
-            description: (row.description as string) ?? "",
-            start: row.start as string,
-            stop: row.stop as string,
+            description: row.description ?? "",
+            start: row.start,
+            stop: row.stop,
             durationSeconds: duration,
-            localDate: localDateInZone(row.start as string, timezone),
+            localDate: localDateInZone(row.start, timezone),
           },
-          comment: comment ?? ((row.description as string) || ""),
+          comment: comment ?? (row.description || ""),
         });
 
         await c.env.DB.prepare(

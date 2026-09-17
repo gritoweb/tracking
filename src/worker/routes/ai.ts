@@ -16,6 +16,15 @@ import {
   type SummaryEntryInput,
 } from "../lib/ai";
 
+/** `POST /summary`'s own projection — one entry per row, joined for a project display name. */
+interface SummaryRow {
+  description: string | null;
+  start: string;
+  duration: number | null;
+  billable: number;
+  project_name: string | null;
+}
+
 export const aiRouter = new Hono<{
   Bindings: Env;
   Variables: { workspaceId: string; userId: string };
@@ -95,13 +104,13 @@ export const aiRouter = new Hono<{
        ORDER BY te.start ASC`
     )
       .bind(...bindings)
-      .all<Record<string, unknown>>();
+      .all<SummaryRow>();
 
     const entries: SummaryEntryInput[] = results.map((r) => ({
-      description: (r.description as string) ?? "",
-      projectName: (r.project_name as string | null) ?? null,
-      start: r.start as string,
-      duration: (r.duration as number | null) ?? null,
+      description: r.description ?? "",
+      projectName: r.project_name ?? null,
+      start: r.start,
+      duration: r.duration ?? null,
       billable: Boolean(r.billable),
     }));
 

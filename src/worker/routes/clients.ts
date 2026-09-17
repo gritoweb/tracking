@@ -1,8 +1,9 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { CreateClientSchema, UpdateClientSchema } from "@shared/schemas";
+import { CreateClientSchema, UpdateClientSchema, type ClientStats } from "@shared/schemas";
 import { buildReportWhere } from "../db/queries";
+import type { ClientRow } from "../db/rows";
 import { createClient, formatClient } from "../lib/clients";
 import {
   canManageWorkspace,
@@ -10,6 +11,16 @@ import {
   getMemberRole,
   MANAGER_ONLY_ERROR,
 } from "../lib/permissions";
+
+/** `GET /stats`'s own aggregation — one row per client_id, over the report's date window. */
+interface ClientStatsRow {
+  client_id: string;
+  total_seconds: number | null;
+  billable_seconds: number | null;
+  billable_amount: number | null;
+  project_count: number | null;
+  last_tracked: string | null;
+}
 
 export const clientsRouter = new Hono<{
   Bindings: Env;
@@ -28,7 +39,7 @@ export const clientsRouter = new Hono<{
     `
     )
       .bind(workspaceId)
-      .all<Record<string, unknown>>();
+      .all<ClientRow>();
 
     return c.json(results.map(formatClient));
   })
@@ -81,17 +92,19 @@ export const clientsRouter = new Hono<{
     `
       )
         .bind(...bindings)
-        .all<Record<string, unknown>>();
+        .all<ClientStatsRow>();
 
       return c.json(
-        results.map((r) => ({
-          clientId: r.client_id as string,
-          totalSeconds: (r.total_seconds as number) ?? 0,
-          billableSeconds: (r.billable_seconds as number) ?? 0,
-          billableAmount: (r.billable_amount as number) ?? 0,
-          projectCount: (r.project_count as number) ?? 0,
-          lastTracked: (r.last_tracked as string | null) ?? null,
-        }))
+        results.map(
+          (r): ClientStats => ({
+            clientId: r.client_id,
+            totalSeconds: r.total_seconds ?? 0,
+            billableSeconds: r.billable_seconds ?? 0,
+            billableAmount: r.billable_amount ?? 0,
+            projectCount: r.project_count ?? 0,
+            lastTracked: r.last_tracked ?? null,
+          })
+        )
       );
     }
   )
@@ -100,7 +113,7 @@ export const clientsRouter = new Hono<{
       `SELECT * FROM clients WHERE id = ? AND workspace_id = ?`
     )
       .bind(c.req.param("id"), c.get("workspaceId"))
-      .all<Record<string, unknown>>();
+      .all<ClientRow>();
 
     if (!results.length) return c.json({ error: "Not found" }, 404);
     return c.json(formatClient(results[0]));
@@ -136,7 +149,7 @@ export const clientsRouter = new Hono<{
       `SELECT * FROM clients WHERE id = ? AND workspace_id = ?`
     )
       .bind(id, workspaceId)
-      .all<Record<string, unknown>>();
+      .all<ClientRow>();
 
     if (!results.length) return c.json({ error: "Not found" }, 404);
     return c.json(formatClient(results[0]));

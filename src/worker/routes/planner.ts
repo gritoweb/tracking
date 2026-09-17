@@ -4,8 +4,10 @@ import { z } from "zod";
 import {
   UpsertAllocationSchema,
   BulkUpsertAllocationsSchema,
+  type Allocation,
   type UpsertAllocation,
 } from "@shared/schemas";
+import type { AllocationRow } from "../db/rows";
 
 // Per-user planned allocations (workspace + user scoped): planned seconds per
 // project(+task) per local date. task_id is stored as '' for "no task" so the
@@ -25,17 +27,17 @@ const ALLOCATION_SELECT = `
   LEFT JOIN tasks t ON t.id = a.task_id AND t.workspace_id = a.workspace_id
 `;
 
-function formatAllocation(row: Record<string, unknown>) {
+function formatAllocation(row: AllocationRow): Allocation {
   return {
-    id: row.id as string,
-    projectId: row.project_id as string,
-    taskId: (row.task_id as string) === "" ? null : (row.task_id as string),
-    date: row.date as string,
-    plannedSeconds: row.planned_seconds as number,
-    projectName: (row.project_name as string) ?? null,
-    projectColor: (row.project_color as string) ?? null,
-    taskName: (row.task_name as string) ?? null,
-    updatedAt: row.updated_at as string,
+    id: row.id,
+    projectId: row.project_id,
+    taskId: row.task_id === "" ? null : row.task_id,
+    date: row.date,
+    plannedSeconds: row.planned_seconds,
+    projectName: row.project_name ?? null,
+    projectColor: row.project_color ?? null,
+    taskName: row.task_name ?? null,
+    updatedAt: row.updated_at,
   };
 }
 
@@ -81,7 +83,7 @@ export const plannerRouter = new Hono<{
        ORDER BY a.date ASC`
     )
       .bind(workspaceId, userId, since, until)
-      .all<Record<string, unknown>>();
+      .all<AllocationRow>();
     return c.json(results.map(formatAllocation));
   })
   // Per-cell upsert: plannedSeconds 0 clears the cell.
@@ -118,8 +120,9 @@ export const plannerRouter = new Hono<{
        WHERE a.workspace_id = ? AND a.user_id = ? AND a.project_id = ? AND a.task_id = ? AND a.date = ?`
     )
       .bind(workspaceId, userId, data.projectId, taskId, data.date)
-      .first<Record<string, unknown>>();
-    return c.json(formatAllocation(row!));
+      .first<AllocationRow>();
+    if (!row) return c.json({ error: "allocation upsert did not produce a readable row" }, 500);
+    return c.json(formatAllocation(row));
   })
   // Bulk upsert — serves CSV import and copy-last-week in one D1 batch.
   .post("/bulk", zValidator("json", BulkUpsertAllocationsSchema), async (c) => {

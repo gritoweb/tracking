@@ -1,7 +1,6 @@
 import { Hono } from "hono";
 import { formatNotification } from "../lib/notifications";
-
-type Row = Record<string, unknown>;
+import type { NotificationRow } from "../db/rows";
 
 // Mounted at /api/notifications — the bell's own list/read endpoints, plus its live socket.
 export const notificationsRouter = new Hono<{
@@ -13,7 +12,7 @@ export const notificationsRouter = new Hono<{
     const userId = c.get("userId");
     const { results } = await c.env.DB.prepare(
       `SELECT * FROM notifications WHERE user_id = ? AND workspace_id = ? ORDER BY created_at DESC LIMIT 50`
-    ).bind(userId, workspaceId).all<Row>();
+    ).bind(userId, workspaceId).all<NotificationRow>();
     const unread = await c.env.DB.prepare(
       `SELECT COUNT(*) AS n FROM notifications WHERE user_id = ? AND workspace_id = ? AND is_read = 0`
     ).bind(userId, workspaceId).first<{ n: number }>();

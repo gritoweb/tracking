@@ -1,7 +1,8 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { CreateTagSchema, UpdateTagSchema } from "@shared/schemas";
+import { CreateTagSchema, UpdateTagSchema, type Tag } from "@shared/schemas";
 import { nextUnusedColor } from "@shared/colors";
+import type { TagRow } from "../db/rows";
 
 export const tagsRouter = new Hono<{
   Bindings: Env;
@@ -13,15 +14,17 @@ export const tagsRouter = new Hono<{
       `SELECT * FROM tags WHERE workspace_id = ? ORDER BY name ASC`
     )
       .bind(workspaceId)
-      .all<Record<string, unknown>>();
+      .all<TagRow>();
 
     return c.json(
-      results.map((r) => ({
-        id: r.id,
-        workspaceId: r.workspace_id,
-        name: r.name,
-        color: (r.color as string | null) ?? "#64748b",
-      }))
+      results.map(
+        (r): Tag => ({
+          id: r.id,
+          workspaceId: r.workspace_id,
+          name: r.name,
+          color: r.color ?? "#64748b",
+        })
+      )
     );
   })
   .post("/", zValidator("json", CreateTagSchema), async (c) => {

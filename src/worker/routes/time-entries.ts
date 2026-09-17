@@ -21,9 +21,25 @@ import {
   upsertTags,
   ENTRY_SELECT,
 } from "../db/queries";
+import type { TimeEntryJoinRow } from "../db/rows";
 import { getMemberRole, canManageWorkspace, canWriteEntry, entryScopeUserId } from "../lib/permissions";
 import { findActiveProject, PROJECT_REQUIRED_ERROR } from "../lib/projects";
 import { resolveEntryBillable } from "@shared/billable";
+import type { EntrySuggestion } from "@shared/schemas";
+
+/** `GET /suggestions`'s own projection: a description's dominant project/task/billable combo plus its usage stats. */
+interface SuggestionRow {
+  description: string;
+  project_id: string | null;
+  project_name: string | null;
+  project_color: string | null;
+  task_id: string | null;
+  task_name: string | null;
+  billable: number;
+  tag_names: string | null;
+  uses: number;
+  last_used: string;
+}
 
 /** Ids (already workspace-scoped) the caller may not change: someone else's entry for a member, or anyone else's running timer. */
 async function forbiddenEntryIds(
@@ -61,7 +77,7 @@ export const timeEntriesRouter = new Hono<{
     if (running === "true") {
       const { results } = await c.env.DB.prepare(
         `${ENTRY_SELECT} WHERE te.workspace_id = ? AND te.user_id = ? AND te.stop IS NULL GROUP BY te.id LIMIT 1`
-      ).bind(workspaceId, userId).all<Record<string, unknown>>();
+      ).bind(workspaceId, userId).all<TimeEntryJoinRow>();
       return c.json(results.map(formatEntry));
     }
 
@@ -82,7 +98,7 @@ export const timeEntriesRouter = new Hono<{
        GROUP BY te.id ORDER BY te.start DESC LIMIT ${ENTRY_LIST_LIMIT}`
     )
       .bind(workspaceId, scopeUserId, since ?? defaultSince, until ?? defaultUntil)
-      .all<Record<string, unknown>>();
+      .all<TimeEntryJoinRow>();
 
     return c.json(results.map(formatEntry));
   })
@@ -153,23 +169,23 @@ export const timeEntriesRouter = new Hono<{
        LIMIT ${SUGGESTION_LIMIT}`
     )
       .bind(workspaceId, since, c.get("userId"))
-      .all<Record<string, unknown>>();
+      .all<SuggestionRow>();
 
     return c.json(
-      results.map((r) => ({
-        description: r.description as string,
-        projectId: (r.project_id as string) ?? null,
-        projectName: (r.project_name as string) ?? null,
-        projectColor: (r.project_color as string) ?? null,
-        taskId: (r.task_id as string) ?? null,
-        taskName: (r.task_name as string) ?? null,
-        billable: Boolean(r.billable),
-        tags: r.tag_names
-          ? String(r.tag_names).split(",").filter(Boolean)
-          : [],
-        uses: Number(r.uses),
-        lastUsed: r.last_used as string,
-      }))
+      results.map(
+        (r): EntrySuggestion => ({
+          description: r.description,
+          projectId: r.project_id ?? null,
+          projectName: r.project_name ?? null,
+          projectColor: r.project_color ?? null,
+          taskId: r.task_id ?? null,
+          taskName: r.task_name ?? null,
+          billable: Boolean(r.billable),
+          tags: r.tag_names ? r.tag_names.split(",").filter(Boolean) : [],
+          uses: r.uses,
+          lastUsed: r.last_used,
+        })
+      )
     );
   })
   // ─── Create ───────────────────────────────────────────────────────────────
@@ -226,7 +242,7 @@ export const timeEntriesRouter = new Hono<{
   .get("/current", async (c) => {
     const { results } = await c.env.DB.prepare(
       `${ENTRY_SELECT} WHERE te.workspace_id = ? AND te.user_id = ? AND te.stop IS NULL GROUP BY te.id ORDER BY te.start DESC LIMIT 1`
-    ).bind(c.get("workspaceId"), c.get("userId")).all<Record<string, unknown>>();
+    ).bind(c.get("workspaceId"), c.get("userId")).all<TimeEntryJoinRow>();
 
     if (!results.length) return c.json(null);
     return c.json(formatEntry(results[0]));

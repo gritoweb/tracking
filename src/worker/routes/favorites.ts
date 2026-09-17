@@ -1,7 +1,10 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { CreateFavoriteSchema } from "@shared/schemas";
+import { CreateFavoriteSchema, type Favorite } from "@shared/schemas";
 import { resolveEntryBillable } from "@shared/billable";
+import { z } from "zod";
+import type { FavoriteRow } from "../db/rows";
+import { parseJsonColumn } from "../lib/json";
 
 // Joins in the project/task display fields so the favorites bar can render a
 // colored chip without a second round-trip.
@@ -12,26 +15,21 @@ const FAVORITE_SELECT = `
   LEFT JOIN tasks t ON t.id = f.task_id AND t.workspace_id = f.workspace_id
 `;
 
-function formatFavorite(row: Record<string, unknown>) {
-  let tags: string[] = [];
-  try {
-    const parsed = JSON.parse((row.tags as string) || "[]");
-    if (Array.isArray(parsed)) tags = parsed.filter((t): t is string => typeof t === "string");
-  } catch {
-    tags = [];
-  }
+const stringArray = z.array(z.string());
+
+function formatFavorite(row: FavoriteRow): Favorite {
   return {
-    id: row.id as string,
-    workspaceId: row.workspace_id as string,
-    description: (row.description as string) ?? "",
-    projectId: (row.project_id as string | null) ?? null,
-    projectName: (row.project_name as string | null) ?? null,
-    projectColor: (row.project_color as string | null) ?? null,
-    taskId: (row.task_id as string | null) ?? null,
-    taskName: (row.task_name as string | null) ?? null,
-    tags,
+    id: row.id,
+    workspaceId: row.workspace_id,
+    description: row.description ?? "",
+    projectId: row.project_id ?? null,
+    projectName: row.project_name ?? null,
+    projectColor: row.project_color ?? null,
+    taskId: row.task_id ?? null,
+    taskName: row.task_name ?? null,
+    tags: parseJsonColumn(row.tags, stringArray, [], "favorites.tags"),
     billable: Boolean(row.billable),
-    createdAt: row.created_at as string,
+    createdAt: row.created_at,
   };
 }
 
@@ -45,7 +43,7 @@ export const favoritesRouter = new Hono<{
       `${FAVORITE_SELECT} WHERE f.workspace_id = ? ORDER BY f.created_at DESC`
     )
       .bind(workspaceId)
-      .all<Record<string, unknown>>();
+      .all<FavoriteRow>();
 
     return c.json(results.map(formatFavorite));
   })
@@ -76,7 +74,8 @@ export const favoritesRouter = new Hono<{
       `${FAVORITE_SELECT} WHERE f.id = ? AND f.workspace_id = ?`
     )
       .bind(id, workspaceId)
-      .all<Record<string, unknown>>();
+      .all<FavoriteRow>();
+    if (!results.length) return c.json({ error: "favorite insert did not produce a readable row" }, 500);
 
     return c.json(formatFavorite(results[0]), 201);
   })

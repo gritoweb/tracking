@@ -1,16 +1,17 @@
-import type { CreateClient } from "@shared/schemas";
+import type { Client, CreateClient } from "@shared/schemas";
+import type { ClientRow } from "../db/rows";
 
-export function formatClient(row: Record<string, unknown>) {
+export function formatClient(row: ClientRow): Client {
   return {
-    id: row.id as string,
-    workspaceId: row.workspace_id as string,
-    name: row.name as string,
-    notes: (row.notes as string | null) ?? null,
-    email: (row.email as string | null) ?? null,
-    phone: (row.phone as string | null) ?? null,
-    address: (row.address as string | null) ?? null,
+    id: row.id,
+    workspaceId: row.workspace_id,
+    name: row.name,
+    notes: row.notes ?? null,
+    email: row.email ?? null,
+    phone: row.phone ?? null,
+    address: row.address ?? null,
     archived: Boolean(row.archived),
-    createdAt: row.created_at as string,
+    createdAt: row.created_at,
   };
 }
 
@@ -24,7 +25,7 @@ export async function isActiveClient(db: D1Database, workspaceId: string, client
 }
 
 /** Shared by the REST route and the MCP `create_client` tool. */
-export async function createClient(db: D1Database, workspaceId: string, data: CreateClient) {
+export async function createClient(db: D1Database, workspaceId: string, data: CreateClient): Promise<Client> {
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
 
@@ -48,7 +49,8 @@ export async function createClient(db: D1Database, workspaceId: string, data: Cr
   const row = await db
     .prepare(`SELECT * FROM clients WHERE id = ? AND workspace_id = ?`)
     .bind(id, workspaceId)
-    .first<Record<string, unknown>>();
+    .first<ClientRow>();
+  if (!row) throw new Error("client insert did not produce a readable row");
 
-  return formatClient(row!);
+  return formatClient(row);
 }

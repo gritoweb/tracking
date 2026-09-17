@@ -28,6 +28,16 @@ interface RunningEntry {
   start: string;
 }
 
+/** `buildAssistantContext`'s own projection — a completed entry (`stop IS NOT NULL` in the WHERE) joined for its project name. */
+interface ContextEntryRow {
+  description: string | null;
+  start: string;
+  stop: string;
+  duration: number | null;
+  billable: number;
+  project_name: string | null;
+}
+
 interface TodayFacts {
   running: RunningEntry | null;
   entryCount: number;
@@ -318,7 +328,7 @@ export async function buildAssistantContext(
        ORDER BY te.start ASC LIMIT 40`
     )
       .bind(workspaceId, userId, dayStartIso, dayEndIso)
-      .all<Record<string, unknown>>(),
+      .all<ContextEntryRow>(),
     env.DB.prepare(
       `SELECT name FROM projects WHERE workspace_id = ? AND active = 1 ORDER BY name ASC LIMIT 50`
     )
@@ -332,8 +342,8 @@ export async function buildAssistantContext(
   const entryLines = entries.results.length
     ? entries.results
         .map((e) => {
-          const hours = (((e.duration as number) ?? 0) / 3600).toFixed(2);
-          return `- ${t(e.start as string)}–${t(e.stop as string)} | ${(e.project_name as string) ?? "No project"} | ${hours}h | ${e.billable ? "billable" : "non-billable"} | ${(e.description as string) || "(no description)"}`;
+          const hours = ((e.duration ?? 0) / 3600).toFixed(2);
+          return `- ${t(e.start)}–${t(e.stop)} | ${e.project_name ?? "No project"} | ${hours}h | ${e.billable ? "billable" : "non-billable"} | ${e.description || "(no description)"}`;
         })
         .join("\n")
     : "(none yet)";

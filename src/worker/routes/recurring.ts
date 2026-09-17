@@ -3,9 +3,13 @@ import { zValidator } from "@hono/zod-validator";
 import {
   CreateRecurringEntrySchema,
   UpdateRecurringEntrySchema,
+  type RecurringEntry,
 } from "@shared/schemas";
+import { z } from "zod";
 import { findActiveProject, PROJECT_REQUIRED_ERROR } from "../lib/projects";
 import { resolveEntryBillable } from "@shared/billable";
+import type { RecurringEntryJoinRow } from "../db/rows";
+import { parseJsonColumn } from "../lib/json";
 
 const RECURRING_SELECT = `
   SELECT r.*, p.name AS project_name, p.color AS project_color, t.name AS task_name
@@ -14,37 +18,31 @@ const RECURRING_SELECT = `
   LEFT JOIN tasks t ON t.id = r.task_id AND t.workspace_id = r.workspace_id
 `;
 
+const stringArray = z.array(z.string());
 
-function formatRecurring(row: Record<string, unknown>) {
-  let tags: string[] = [];
-  try {
-    const parsed = JSON.parse((row.tags as string) || "[]");
-    if (Array.isArray(parsed)) tags = parsed.filter((t): t is string => typeof t === "string");
-  } catch {
-    tags = [];
-  }
-  const days = String(row.days_of_week ?? "")
+function formatRecurring(row: RecurringEntryJoinRow): RecurringEntry {
+  const days = row.days_of_week
     .split(",")
     .filter((s) => s !== "")
     .map(Number)
     .filter((n) => Number.isInteger(n) && n >= 0 && n <= 6);
   return {
-    id: row.id as string,
-    workspaceId: row.workspace_id as string,
-    description: (row.description as string) ?? "",
-    projectId: (row.project_id as string | null) ?? null,
-    projectName: (row.project_name as string | null) ?? null,
-    projectColor: (row.project_color as string | null) ?? null,
-    taskId: (row.task_id as string | null) ?? null,
-    taskName: (row.task_name as string | null) ?? null,
-    tags,
+    id: row.id,
+    workspaceId: row.workspace_id,
+    description: row.description ?? "",
+    projectId: row.project_id ?? null,
+    projectName: row.project_name ?? null,
+    projectColor: row.project_color ?? null,
+    taskId: row.task_id ?? null,
+    taskName: row.task_name ?? null,
+    tags: parseJsonColumn(row.tags, stringArray, [], "recurring_entries.tags"),
     billable: Boolean(row.billable),
-    durationSeconds: row.duration_seconds as number,
+    durationSeconds: row.duration_seconds,
     daysOfWeek: days,
-    timeUtcMinutes: row.time_utc as number,
+    timeUtcMinutes: row.time_utc,
     active: Boolean(row.active),
-    lastMaterialized: (row.last_materialized as string | null) ?? null,
-    createdAt: row.created_at as string,
+    lastMaterialized: row.last_materialized ?? null,
+    createdAt: row.created_at,
   };
 }
 
@@ -58,7 +56,7 @@ export const recurringRouter = new Hono<{
       `${RECURRING_SELECT} WHERE r.workspace_id = ? AND r.user_id = ? ORDER BY r.created_at DESC`
     )
       .bind(c.get("workspaceId"), c.get("userId"))
-      .all<Record<string, unknown>>();
+      .all<RecurringEntryJoinRow>();
     return c.json(results.map(formatRecurring));
   })
   .post("/", zValidator("json", CreateRecurringEntrySchema), async (c) => {
@@ -94,7 +92,8 @@ export const recurringRouter = new Hono<{
       `${RECURRING_SELECT} WHERE r.id = ? AND r.workspace_id = ? AND r.user_id = ?`
     )
       .bind(id, workspaceId, userId)
-      .all<Record<string, unknown>>();
+      .all<RecurringEntryJoinRow>();
+    if (!results.length) return c.json({ error: "recurring entry insert did not produce a readable row" }, 500);
     return c.json(formatRecurring(results[0]), 201);
   })
   .put("/:id", zValidator("json", UpdateRecurringEntrySchema), async (c) => {
@@ -133,7 +132,7 @@ export const recurringRouter = new Hono<{
       `${RECURRING_SELECT} WHERE r.id = ? AND r.workspace_id = ? AND r.user_id = ?`
     )
       .bind(id, workspaceId, userId)
-      .all<Record<string, unknown>>();
+      .all<RecurringEntryJoinRow>();
     if (!results.length) return c.json({ error: "Not found" }, 404);
     return c.json(formatRecurring(results[0]));
   })

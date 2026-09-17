@@ -7,6 +7,7 @@ import { loadProjectPacing } from "../lib/pacing";
 import { isActiveClient } from "../lib/clients";
 import { canManageWorkspace, getMemberRole, MANAGER_ONLY_ERROR } from "../lib/permissions";
 import { projectSelect, createProject, formatProject, memberProjectInput, projectMissingClient } from "../lib/projects";
+import type { ProjectRow } from "../db/rows";
 
 /*
  * Projects reported an unqualified all-time total while Clients defaulted to
@@ -54,7 +55,7 @@ export const projectsRouter = new Hono<{
       ? c.env.DB.prepare(`${projectSelectRanged(!manager)} ${tail}`).bind(since, until, ...scope, workspaceId)
       : c.env.DB.prepare(`${projectSelect(!manager)} ${tail}`).bind(...scope, workspaceId);
 
-    const { results } = await stmt.all<Record<string, unknown>>();
+    const { results } = await stmt.all<ProjectRow>();
 
     return c.json(results.map((row) => formatProject(row, { hideBudget: !manager })));
   })
@@ -141,7 +142,7 @@ export const projectsRouter = new Hono<{
     const manager = canManageWorkspace(await getMemberRole(c.env.DB, workspaceId, userId));
     const { results } = await c.env.DB.prepare(
       `${projectSelect(!manager)} WHERE p.id = ? AND p.workspace_id = ? GROUP BY p.id`
-    ).bind(...(manager ? [] : [userId]), c.req.param("id"), workspaceId).all<Record<string, unknown>>();
+    ).bind(...(manager ? [] : [userId]), c.req.param("id"), workspaceId).all<ProjectRow>();
 
     if (!results.length) return c.json({ error: "Not found" }, 404);
     return c.json(formatProject(results[0], { hideBudget: !manager }));
@@ -187,7 +188,7 @@ export const projectsRouter = new Hono<{
 
     const { results } = await c.env.DB.prepare(
       `${projectSelect(false)} WHERE p.id = ? AND p.workspace_id = ? GROUP BY p.id`
-    ).bind(id, workspaceId).all<Record<string, unknown>>();
+    ).bind(id, workspaceId).all<ProjectRow>();
 
     if (!results.length) return c.json({ error: "Not found" }, 404);
     return c.json(formatProject(results[0]));

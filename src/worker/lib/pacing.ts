@@ -45,6 +45,22 @@ export interface ProjectPacing extends PacingInput {
   status: PacingStatus;
 }
 
+/** `loadProjectPacing`'s own aggregation: a project plus its client name and windowed totals. */
+interface PacingProjectRow {
+  id: string;
+  name: string;
+  color: string;
+  estimated_hours: number | null;
+  start_date: string | null;
+  end_date: string | null;
+  rate: number | null;
+  client_name: string | null;
+  tracked_seconds: number | null;
+  recent_seconds: number | null;
+  billable_seconds: number | null;
+  last_tracked: string | null;
+}
+
 /** At/over this share of the budget a project is worth a second look regardless of dates. */
 const AT_RISK_THRESHOLD = 0.85;
 
@@ -154,24 +170,24 @@ export async function loadProjectPacing(
        ORDER BY last_tracked DESC, p.name ASC`
     )
     .bind(workspaceId, windowStart)
-    .all<Record<string, unknown>>();
+    .all<PacingProjectRow>();
 
   return results.map((row) => {
-    const estimatedHours = (row.estimated_hours as number | null) ?? null;
-    const rate = (row.rate as number | null) ?? 0;
+    const estimatedHours = row.estimated_hours ?? null;
+    const rate = row.rate ?? 0;
     return computePacing(
       {
-        projectId: row.id as string,
-        projectName: row.name as string,
-        projectColor: row.color as string,
-        clientName: (row.client_name as string | null) ?? null,
+        projectId: row.id,
+        projectName: row.name,
+        projectColor: row.color,
+        clientName: row.client_name ?? null,
         estimatedSeconds: estimatedHours ? Math.round(estimatedHours * 3600) : null,
-        trackedSeconds: (row.tracked_seconds as number) ?? 0,
-        recentSeconds: (row.recent_seconds as number) ?? 0,
-        billableAmount: (((row.billable_seconds as number) ?? 0) / 3600) * rate,
-        startDate: (row.start_date as string | null) ?? null,
-        endDate: (row.end_date as string | null) ?? null,
-        lastTracked: (row.last_tracked as string | null) ?? null,
+        trackedSeconds: row.tracked_seconds ?? 0,
+        recentSeconds: row.recent_seconds ?? 0,
+        billableAmount: (row.billable_seconds ?? 0) / 3600 * rate,
+        startDate: row.start_date ?? null,
+        endDate: row.end_date ?? null,
+        lastTracked: row.last_tracked ?? null,
       },
       nowMs
     );

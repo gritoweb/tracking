@@ -1,5 +1,6 @@
 import { nextUnusedColor, SWATCH_COLORS, SWATCH_COLOR_NAMES } from "@shared/colors";
 import type { TaskStatus, TaskStatusCategory } from "@shared/schemas";
+import type { TaskStatusRow } from "../db/rows";
 
 // Status is the source of truth; active/completed_at is its mirror — see CLAUDE.md.
 //
@@ -30,17 +31,15 @@ const DEFAULT_STATUSES: {
   { name: "Closed", color: swatch("Green"), category: "completed", isDefault: false },
 ];
 
-type Row = Record<string, unknown>;
-
-export function formatStatus(row: Row): TaskStatus {
+export function formatStatus(row: TaskStatusRow): TaskStatus {
   return {
-    id: row.id as string,
-    workspaceId: row.workspace_id as string,
-    projectId: (row.project_id as string | null) ?? null,
-    name: row.name as string,
-    color: row.color as string,
-    category: row.category as TaskStatusCategory,
-    sortOrder: (row.sort_order as number) ?? 0,
+    id: row.id,
+    workspaceId: row.workspace_id,
+    projectId: row.project_id ?? null,
+    name: row.name,
+    color: row.color,
+    category: row.category,
+    sortOrder: row.sort_order ?? 0,
     archived: Boolean(row.archived),
     isDefault: Boolean(row.is_default),
   };
@@ -86,7 +85,7 @@ export async function listStatuses(
           ORDER BY sort_order ASC, name ASC`
       )
       .bind(workspaceId, projectId)
-      .all<Row>();
+      .all<TaskStatusRow>();
     if (forked.length) return forked.map(formatStatus);
   }
 
@@ -97,7 +96,7 @@ export async function listStatuses(
         ORDER BY sort_order ASC, name ASC`
     )
     .bind(workspaceId)
-    .all<Row>();
+    .all<TaskStatusRow>();
   return results.map(formatStatus);
 }
 
@@ -114,7 +113,7 @@ export async function ensureProjectFork(
   const existing = await db
     .prepare(`SELECT * FROM task_statuses WHERE workspace_id = ? AND project_id = ? AND archived = 0`)
     .bind(workspaceId, projectId)
-    .all<Row>();
+    .all<TaskStatusRow>();
   if (existing.results.length) return existing.results.map(formatStatus);
 
   const global = await listStatuses(db, workspaceId, null);
@@ -148,7 +147,7 @@ export async function resolveStatus(
   const row = await db
     .prepare(`SELECT * FROM task_statuses WHERE id = ? AND workspace_id = ? AND archived = 0`)
     .bind(statusId, workspaceId)
-    .first<Row>();
+    .first<TaskStatusRow>();
   return row ? formatStatus(row) : null;
 }
 

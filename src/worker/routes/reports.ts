@@ -82,6 +82,64 @@ const DIM: Record<
   },
 };
 
+// ─── Row shapes for this file's own aggregation queries (not a table's own row) ──
+
+/** `db.batch()` shares one row type across all six `/summary` aggregates, so this is the union of what any one selects. */
+interface SummaryBatchRow {
+  entry_count?: number | null;
+  total_seconds?: number | null;
+  billable_seconds?: number | null;
+  billable_amount?: number | null;
+  id?: string | null;
+  name?: string | null;
+  color?: string | null;
+  date?: string;
+}
+
+/** Same reasoning as `SummaryBatchRow`, for `/grouped`'s two-statement batch (grouped rows + grand totals). */
+interface GroupedBatchRow {
+  entry_count: number | null;
+  total_seconds: number | null;
+  billable_seconds: number | null;
+  billable_amount: number | null;
+  g_id?: string | null;
+  g_name?: string | null;
+  g_color?: string | null;
+  s_id?: string | null;
+  s_name?: string | null;
+  s_color?: string | null;
+}
+
+interface WeeklyRow {
+  date: string;
+  week: string;
+  total_seconds: number | null;
+  billable_seconds: number | null;
+  entry_count: number;
+}
+
+/** `/detailed`: every `time_entries` column plus the rounded duration and every display join. */
+interface DetailedRow {
+  id: string;
+  description: string | null;
+  project_id: string | null;
+  task_id: string | null;
+  user_id: string | null;
+  start: string;
+  stop: string | null;
+  billable: number;
+  rounded_duration: number | null;
+  project_name: string | null;
+  project_color: string | null;
+  project_rate: number | null;
+  client_name: string | null;
+  task_name: string | null;
+  user_name: string | null;
+  user_email: string | null;
+  user_image: string | null;
+  tag_names: string | null;
+}
+
 export const reportsRouter = new Hono<{
   Bindings: Env;
   Variables: { workspaceId: string; userId: string };
@@ -96,7 +154,7 @@ export const reportsRouter = new Hono<{
     // trip (consistent snapshot) instead of six serial D1 queries, which from a
     // far-away PoP is the difference between ~1 RTT and ~6.
     const [totalsRes, byProjectRes, byClientRes, byTaskRes, byTagRes, dailyRes] =
-      await c.env.DB.batch<Record<string, unknown>>([
+      await c.env.DB.batch<SummaryBatchRow>([
         // Total stats
         c.env.DB.prepare(
           `
@@ -194,44 +252,38 @@ export const reportsRouter = new Hono<{
     `
         ).bind(...bindings),
       ]);
-    const totals = totalsRes.results as Record<string, number>[];
+    const totals = totalsRes.results;
     const byProject = byProjectRes.results;
     const byClient = byClientRes.results;
     const byTask = byTaskRes.results;
     const byTag = byTagRes.results;
     const daily = dailyRes.results;
 
-    const mapBreakdown = (
-      rows: Record<string, unknown>[],
-      noneLabel: string,
-      defaultColor?: string
-    ) =>
+    const mapBreakdown = (rows: SummaryBatchRow[], noneLabel: string, defaultColor?: string) =>
       rows.map((r) => ({
-        id: (r.id as string | null) ?? null,
-        name: (r.name as string) ?? noneLabel,
-        ...(defaultColor !== undefined
-          ? { color: (r.color as string) ?? defaultColor }
-          : {}),
-        entryCount: (r.entry_count as number) ?? 0,
-        totalSeconds: (r.total_seconds as number) ?? 0,
-        billableSeconds: (r.billable_seconds as number) ?? 0,
-        billableAmount: (r.billable_amount as number) ?? 0,
+        id: r.id ?? null,
+        name: r.name ?? noneLabel,
+        ...(defaultColor !== undefined ? { color: r.color ?? defaultColor } : {}),
+        entryCount: r.entry_count ?? 0,
+        totalSeconds: r.total_seconds ?? 0,
+        billableSeconds: r.billable_seconds ?? 0,
+        billableAmount: r.billable_amount ?? 0,
       }));
 
     return c.json({
-      totalSeconds: (totals[0]?.total_seconds as number) ?? 0,
-      billableSeconds: (totals[0]?.billable_seconds as number) ?? 0,
-      billableAmount: (totals[0]?.billable_amount as number) ?? 0,
-      entryCount: (totals[0]?.entry_count as number) ?? 0,
+      totalSeconds: totals[0]?.total_seconds ?? 0,
+      billableSeconds: totals[0]?.billable_seconds ?? 0,
+      billableAmount: totals[0]?.billable_amount ?? 0,
+      entryCount: totals[0]?.entry_count ?? 0,
       byProject: mapBreakdown(byProject, "No project", "#94a3b8"),
       byClient: mapBreakdown(byClient, "No client"),
       byTask: mapBreakdown(byTask, "No task"),
       byTag: mapBreakdown(byTag, "No tag"),
       daily: daily.map((r) => ({
-        date: r.date as string,
-        totalSeconds: r.total_seconds as number,
-        billableSeconds: (r.billable_seconds as number) ?? 0,
-        entryCount: r.entry_count as number,
+        date: r.date ?? "",
+        totalSeconds: r.total_seconds ?? 0,
+        billableSeconds: r.billable_seconds ?? 0,
+        entryCount: r.entry_count ?? 0,
       })),
     });
   })
@@ -274,7 +326,7 @@ export const reportsRouter = new Hono<{
 
       // Grouped rows + grand totals (a separate statement so tag double-counting
       // never inflates them) in one batched round trip.
-      const [groupedRes, totalsRes] = await c.env.DB.batch<Record<string, unknown>>([
+      const [groupedRes, totalsRes] = await c.env.DB.batch<GroupedBatchRow>([
         c.env.DB.prepare(
           `
         SELECT ${cols.join(", ")},
@@ -300,7 +352,7 @@ export const reportsRouter = new Hono<{
         ).bind(...bindings),
       ]);
       const results = groupedRes.results;
-      const totals = totalsRes.results as Record<string, number>[];
+      const totals = totalsRes.results;
 
       // Nest rows into group → subGroup.
       type Row = {
@@ -315,13 +367,13 @@ export const reportsRouter = new Hono<{
       };
       const groups = new Map<string, Row>();
       for (const r of results) {
-        const gid = (r.g_id as string | null) ?? "__none__";
+        const gid = r.g_id ?? "__none__";
         let grp = groups.get(gid);
         if (!grp) {
           grp = {
-            id: (r.g_id as string | null) ?? null,
-            name: (r.g_name as string) ?? "—",
-            color: (r.g_color as string | null) ?? null,
+            id: r.g_id ?? null,
+            name: r.g_name ?? "—",
+            color: r.g_color ?? null,
             entryCount: 0,
             totalSeconds: 0,
             billableSeconds: 0,
@@ -330,19 +382,19 @@ export const reportsRouter = new Hono<{
           };
           groups.set(gid, grp);
         }
-        const secs = (r.total_seconds as number) ?? 0;
-        const bsecs = (r.billable_seconds as number) ?? 0;
-        const amt = (r.billable_amount as number) ?? 0;
-        const cnt = (r.entry_count as number) ?? 0;
+        const secs = r.total_seconds ?? 0;
+        const bsecs = r.billable_seconds ?? 0;
+        const amt = r.billable_amount ?? 0;
+        const cnt = r.entry_count ?? 0;
         grp.totalSeconds += secs;
         grp.billableSeconds += bsecs;
         grp.billableAmount += amt;
         grp.entryCount += cnt;
         if (sub) {
-          grp.subGroups!.push({
-            id: (r.s_id as string | null) ?? null,
-            name: (r.s_name as string) ?? "—",
-            color: (r.s_color as string | null) ?? null,
+          grp.subGroups?.push({
+            id: r.s_id ?? null,
+            name: r.s_name ?? "—",
+            color: r.s_color ?? null,
             entryCount: cnt,
             totalSeconds: secs,
             billableSeconds: bsecs,
@@ -354,10 +406,10 @@ export const reportsRouter = new Hono<{
       return c.json({
         group: q.group,
         subGroup: q.subGroup,
-        totalSeconds: (totals[0]?.total_seconds as number) ?? 0,
-        billableSeconds: (totals[0]?.billable_seconds as number) ?? 0,
-        billableAmount: (totals[0]?.billable_amount as number) ?? 0,
-        entryCount: (totals[0]?.entry_count as number) ?? 0,
+        totalSeconds: totals[0]?.total_seconds ?? 0,
+        billableSeconds: totals[0]?.billable_seconds ?? 0,
+        billableAmount: totals[0]?.billable_amount ?? 0,
+        entryCount: totals[0]?.entry_count ?? 0,
         groups: [...groups.values()],
       });
     }
@@ -387,17 +439,21 @@ export const reportsRouter = new Hono<{
       `
       )
         .bind(...bindings)
-        .all<Record<string, unknown>>();
+        .all<WeeklyRow>();
 
       const weekMap = new Map<string, { week: string; days: unknown[] }>();
       for (const r of results) {
-        const week = r.week as string;
-        if (!weekMap.has(week)) weekMap.set(week, { week, days: [] });
-        weekMap.get(week)!.days.push({
-          date: r.date as string,
-          totalSeconds: (r.total_seconds as number) ?? 0,
-          billableSeconds: (r.billable_seconds as number) ?? 0,
-          entryCount: (r.entry_count as number) ?? 0,
+        const week = r.week;
+        let bucket = weekMap.get(week);
+        if (!bucket) {
+          bucket = { week, days: [] };
+          weekMap.set(week, bucket);
+        }
+        bucket.days.push({
+          date: r.date,
+          totalSeconds: r.total_seconds ?? 0,
+          billableSeconds: r.billable_seconds ?? 0,
+          entryCount: r.entry_count ?? 0,
         });
       }
 
@@ -436,13 +492,13 @@ export const reportsRouter = new Hono<{
     `
       )
         .bind(...bindings)
-        .all<Record<string, unknown>>();
+        .all<DetailedRow>();
 
       return c.json(
         results.map((r) => {
           const billable = Boolean(r.billable);
-          const duration = (r.rounded_duration as number | null) ?? 0;
-          const rate = (r.project_rate as number | null) ?? 0;
+          const duration = r.rounded_duration ?? 0;
+          const rate = r.project_rate ?? 0;
           return {
             id: r.id,
             description: r.description ?? "",

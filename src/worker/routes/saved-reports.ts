@@ -1,6 +1,23 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { CreateSavedReportSchema } from "@shared/schemas";
+import { z } from "zod";
+import { CreateSavedReportSchema, type SavedReport } from "@shared/schemas";
+import type { SavedReportRow } from "../db/rows";
+import { parseJsonColumn } from "../lib/json";
+
+// Config is client-owned JSON (report filters/rounding/grouping) — validated
+// only as "an object", same trust boundary as CreateSavedReportSchema's own field.
+const configSchema = z.record(z.string(), z.unknown());
+
+function formatSavedReport(row: SavedReportRow): SavedReport {
+  return {
+    id: row.id,
+    name: row.name,
+    config: parseJsonColumn(row.config, configSchema, {}, "saved_reports.config"),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
 
 // Per-user saved report views (workspace + user scoped).
 export const savedReportsRouter = new Hono<{
@@ -17,17 +34,9 @@ export const savedReportsRouter = new Hono<{
        ORDER BY created_at DESC`
     )
       .bind(workspaceId, userId)
-      .all<Record<string, string>>();
+      .all<SavedReportRow>();
 
-    return c.json(
-      results.map((r) => ({
-        id: r.id,
-        name: r.name,
-        config: safeParse(r.config),
-        createdAt: r.created_at,
-        updatedAt: r.updated_at,
-      }))
-    );
+    return c.json(results.map(formatSavedReport));
   })
   .post("/", zValidator("json", CreateSavedReportSchema), async (c) => {
     const workspaceId = c.get("workspaceId");
@@ -46,18 +55,10 @@ export const savedReportsRouter = new Hono<{
       `SELECT id, name, config, created_at, updated_at FROM saved_reports WHERE id = ?`
     )
       .bind(id)
-      .first<Record<string, string>>();
+      .first<SavedReportRow>();
+    if (!row) return c.json({ error: "saved report insert did not produce a readable row" }, 500);
 
-    return c.json(
-      {
-        id: row!.id,
-        name: row!.name,
-        config: safeParse(row!.config),
-        createdAt: row!.created_at,
-        updatedAt: row!.updated_at,
-      },
-      201
-    );
+    return c.json(formatSavedReport(row), 201);
   })
   .delete("/:id", async (c) => {
     const workspaceId = c.get("workspaceId");
@@ -70,11 +71,3 @@ export const savedReportsRouter = new Hono<{
       .run();
     return c.body(null, 204);
   });
-
-function safeParse(json: string): Record<string, unknown> {
-  try {
-    return JSON.parse(json);
-  } catch {
-    return {};
-  }
-}

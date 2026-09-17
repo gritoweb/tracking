@@ -1,4 +1,6 @@
 import { nextUnusedColor } from "@shared/colors";
+import type { TimeEntry } from "@shared/schemas";
+import type { TimeEntryJoinRow } from "./rows";
 
 /** The tab that made this request, so its own broadcast can be filtered out client-side. */
 export const requestOrigin = (c: { req: { header: (n: string) => string | undefined } }) =>
@@ -149,35 +151,33 @@ export function durationExpr(
 }
 
 // Format a raw D1 time entry row into the API shape
-export function formatEntry(row: Record<string, unknown>) {
+export function formatEntry(row: TimeEntryJoinRow): TimeEntry {
   return {
-    id: row.id as string,
-    workspaceId: row.workspace_id as string,
-    userId: (row.user_id as string | null) ?? null,
-    userName: (row.user_name as string | null) ?? null,
-    userEmail: (row.user_email as string | null) ?? null,
-    userImage: (row.user_image as string | null) ?? null,
-    projectId: (row.project_id as string | null) ?? null,
-    projectName: (row.project_name as string | null) ?? null,
-    projectColor: (row.project_color as string | null) ?? null,
-    clientName: (row.client_name as string | null) ?? null,
-    taskId: (row.task_id as string | null) ?? null,
-    taskName: (row.task_name as string | null) ?? null,
-    description: (row.description as string) ?? "",
-    start: row.start as string,
-    stop: (row.stop as string | null) ?? null,
-    duration: (row.duration as number | null) ?? null,
+    id: row.id,
+    workspaceId: row.workspace_id,
+    userId: row.user_id ?? null,
+    userName: row.user_name ?? null,
+    userEmail: row.user_email ?? null,
+    userImage: row.user_image ?? null,
+    projectId: row.project_id ?? null,
+    projectName: row.project_name ?? null,
+    projectColor: row.project_color ?? null,
+    clientName: row.client_name ?? null,
+    taskId: row.task_id ?? null,
+    taskName: row.task_name ?? null,
+    description: row.description ?? "",
+    start: row.start,
+    stop: row.stop ?? null,
+    duration: row.duration ?? null,
     billable: Boolean(row.billable),
-    tags: row.tag_names
-      ? String(row.tag_names).split(",").filter(Boolean)
-      : [],
-    syncStatus: (row.sync_status as "synced" | "error" | null) ?? null,
-    externalId: (row.external_id as string | null) ?? null,
-    syncedAt: (row.synced_at as string | null) ?? null,
-    syncError: (row.sync_error as string | null) ?? null,
-    calendarEventId: (row.calendar_event_id as string | null) ?? null,
-    createdAt: row.created_at as string,
-    updatedAt: row.updated_at as string,
+    tags: row.tag_names ? row.tag_names.split(",").filter(Boolean) : [],
+    syncStatus: row.sync_status ?? null,
+    externalId: row.external_id ?? null,
+    syncedAt: row.synced_at ?? null,
+    syncError: row.sync_error ?? null,
+    calendarEventId: row.calendar_event_id ?? null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
   };
 }
 
@@ -185,11 +185,11 @@ export async function getEntryById(
   db: D1Database,
   id: string,
   workspaceId: string
-) {
+): Promise<TimeEntry | null> {
   const { results } = await db
     .prepare(`${ENTRY_SELECT} WHERE te.id = ? AND te.workspace_id = ? GROUP BY te.id`)
     .bind(id, workspaceId)
-    .all<Record<string, unknown>>();
+    .all<TimeEntryJoinRow>();
   return results[0] ? formatEntry(results[0]) : null;
 }
 

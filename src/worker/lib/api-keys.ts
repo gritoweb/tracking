@@ -75,6 +75,15 @@ export async function createApiKey(
   };
 }
 
+interface ApiKeyListRow {
+  id: string;
+  name: string;
+  prefix: string;
+  scope: ApiKeyScope;
+  last_used_at: string | null;
+  created_at: string;
+}
+
 export async function listApiKeys(
   db: D1Database,
   workspaceId: string
@@ -85,14 +94,14 @@ export async function listApiKeys(
        FROM api_keys WHERE workspace_id = ? ORDER BY created_at DESC`
     )
     .bind(workspaceId)
-    .all<Record<string, unknown>>();
+    .all<ApiKeyListRow>();
   return results.map((r) => ({
-    id: r.id as string,
-    name: r.name as string,
-    prefix: r.prefix as string,
-    scope: r.scope as ApiKeyScope,
-    lastUsedAt: (r.last_used_at as string | null) ?? null,
-    createdAt: r.created_at as string,
+    id: r.id,
+    name: r.name,
+    prefix: r.prefix,
+    scope: r.scope,
+    lastUsedAt: r.last_used_at ?? null,
+    createdAt: r.created_at,
   }));
 }
 
@@ -136,14 +145,14 @@ export async function resolveApiKey(
        WHERE k.key_hash = ?`
     )
     .bind(await hashKey(token))
-    .first<{ id: string; workspace_id: string; user_id: string; scope: string }>();
+    .first<{ id: string; workspace_id: string; user_id: string; scope: ApiKeyScope }>();
   if (!row) return null;
 
   return {
     id: row.id,
     workspaceId: row.workspace_id,
     userId: row.user_id,
-    scope: row.scope as ApiKeyScope,
+    scope: row.scope,
   };
 }
 

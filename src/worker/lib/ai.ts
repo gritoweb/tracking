@@ -197,6 +197,15 @@ Do not invent work that isn't listed, do not moralise, do not give advice, and d
 
 /** Active projects (+tasks) shaped for AI grounding. Shared by the AI routes,
  *  calendar materialization, and the assistant's track-event action. */
+/** `loadGroundingProjects`'s own projection: one row per project×task (or project alone, with nulls, when it has none). */
+interface GroundingRow {
+  project_id: string;
+  project_name: string;
+  project_billable: number;
+  task_id: string | null;
+  task_name: string | null;
+}
+
 // Only projects that can take time: the Assistant, Quick Add and calendar matching all ground on this.
 export async function loadGroundingProjects(
   db: D1Database,
@@ -212,21 +221,21 @@ export async function loadGroundingProjects(
        ORDER BY p.name ASC`
     )
     .bind(workspaceId)
-    .all<Record<string, unknown>>();
+    .all<GroundingRow>();
 
   const byId = new Map<string, ProjectGrounding>();
   for (const row of results) {
-    const id = row.project_id as string;
+    const id = row.project_id;
     if (!byId.has(id)) {
       byId.set(id, {
         id,
-        name: row.project_name as string,
+        name: row.project_name,
         billable: Boolean(row.project_billable),
         tasks: [],
       });
     }
     if (row.task_id) {
-      byId.get(id)!.tasks.push({ id: row.task_id as string, name: row.task_name as string });
+      byId.get(id)?.tasks.push({ id: row.task_id, name: row.task_name ?? "" });
     }
   }
   return [...byId.values()];

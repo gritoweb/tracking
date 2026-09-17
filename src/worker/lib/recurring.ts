@@ -2,9 +2,14 @@
 // occurrence for today once the scheduled UTC time has passed. last_materialized
 // (UTC date) keeps it idempotent across the 5-minute cron cycles.
 
+import { z } from "zod";
 import { broadcast, upsertTags } from "../db/queries";
+import type { RecurringEntryRow } from "../db/rows";
 import { findActiveProject } from "./projects";
 import { resolveEntryBillable } from "@shared/billable";
+import { parseJsonColumn } from "./json";
+
+const stringArray = z.array(z.string());
 
 export async function runRecurring(env: Env): Promise<void> {
   const now = new Date();
@@ -24,23 +29,23 @@ export async function runRecurring(env: Env): Promise<void> {
        AND instr(',' || days_of_week || ',', ?) > 0`
   )
     .bind(nowMinutes, todayStr, `,${todayDay},`)
-    .all<Record<string, unknown>>();
+    .all<RecurringEntryRow>();
 
   for (const row of results) {
     try {
-      const days = String(row.days_of_week ?? "")
+      const days = row.days_of_week
         .split(",")
         .filter(Boolean)
         .map(Number);
       if (!days.includes(todayDay)) continue;
 
-      const timeUtc = row.time_utc as number;
+      const timeUtc = row.time_utc;
       if (nowMinutes < timeUtc) continue; // scheduled time hasn't passed yet today
       if (row.last_materialized === todayStr) continue; // already created today
 
-      const userId = (row.user_id as string | null) ?? null;
+      const userId = row.user_id ?? null;
       const project = row.project_id
-        ? await findActiveProject(env.DB, row.workspace_id as string, row.project_id as string)
+        ? await findActiveProject(env.DB, row.workspace_id, row.project_id)
         : null;
       // Hours need an author (0037) and an active project (D3); a template missing either is skipped and warned once a day.
       if (!userId || !project) {
@@ -57,10 +62,10 @@ export async function runRecurring(env: Env): Promise<void> {
       const startMs =
         Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0) +
         timeUtc * 60_000;
-      const duration = row.duration_seconds as number;
+      const duration = row.duration_seconds;
       const startIso = new Date(startMs).toISOString();
       const stopIso = new Date(startMs + duration * 1000).toISOString();
-      const workspaceId = row.workspace_id as string;
+      const workspaceId = row.workspace_id;
       const entryId = crypto.randomUUID();
       const nowIso = new Date().toISOString();
 
@@ -74,8 +79,8 @@ export async function runRecurring(env: Env): Promise<void> {
           workspaceId,
           userId,
           project.id,
-          (row.task_id as string | null) ?? null,
-          (row.description as string) ?? "",
+          row.task_id ?? null,
+          row.description ?? "",
           startIso,
           stopIso,
           duration,
@@ -85,13 +90,7 @@ export async function runRecurring(env: Env): Promise<void> {
         )
         .run();
 
-      let tags: string[] = [];
-      try {
-        const parsed = JSON.parse((row.tags as string) || "[]");
-        if (Array.isArray(parsed)) tags = parsed.filter((t): t is string => typeof t === "string");
-      } catch {
-        tags = [];
-      }
+      const tags = parseJsonColumn(row.tags, stringArray, [], "recurring_entries.tags");
       if (tags.length) await upsertTags(env.DB, workspaceId, entryId, tags);
 
       await env.DB.prepare(

@@ -15,8 +15,6 @@ import {
   resolveStatus,
 } from "../lib/task-statuses";
 
-type Row = Record<string, unknown>;
-
 const NAME_TAKEN = "A status with that name already exists";
 
 /** How many tasks sit in a status right now — the archive guard reads this. */
@@ -42,7 +40,7 @@ async function nameTaken(
           AND archived = 0 AND lower(name) = lower(?) AND id != ?`
     )
     .bind(...(projectId ? [workspaceId, projectId] : [workspaceId]), name.trim(), exceptId ?? "")
-    .first<Row>();
+    .first<{ id: string }>();
   return Boolean(row);
 }
 
@@ -101,7 +99,8 @@ export const taskStatusesRouter = new Hono<{
       broadcast(c.env, workspaceId, "tasks:changed", null, requestOrigin(c))
     );
     const row = await resolveStatus(c.env.DB, workspaceId, id);
-    return c.json(row!, 201);
+    if (!row) return c.json({ error: "status insert did not produce a readable row" }, 500);
+    return c.json(row, 201);
   })
   // ─── Update: rename, recolor, recategorise, reorder, make default ─────────
   .put("/:id", zValidator("json", UpdateTaskStatusSchema), async (c) => {
@@ -188,7 +187,9 @@ export const taskStatusesRouter = new Hono<{
     c.executionCtx.waitUntil(
       broadcast(c.env, workspaceId, "tasks:changed", null, requestOrigin(c))
     );
-    return c.json((await resolveStatus(c.env.DB, workspaceId, id))!);
+    const updated = await resolveStatus(c.env.DB, workspaceId, id);
+    if (!updated) return c.json({ error: "Not found" }, 404);
+    return c.json(updated);
   })
   // ─── Archive — never delete; tasks still there must say where they go ───────
   .post("/:id/archive", zValidator("json", ArchiveTaskStatusSchema), async (c) => {

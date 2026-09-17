@@ -26,6 +26,7 @@ import {
   type DraftEnrichment,
 } from "./ai";
 import { resolveEntryBillable } from "@shared/billable";
+import type { DraftEntryRow } from "../db/rows";
 
 /** Ignore uncovered stretches shorter than this — a coffee is not lost time. */
 const MIN_GAP_MS = 30 * 60_000;
@@ -83,6 +84,18 @@ interface DayEntry {
   calendarEventId: string | null;
 }
 
+/** `generateDrafts`'s own query behind `DayEntry` — the day's entries joined for a project display name. */
+interface DayEntryRow {
+  id: string;
+  description: string | null;
+  start: string;
+  stop: string | null;
+  duration: number | null;
+  project_id: string | null;
+  calendar_event_id: string | null;
+  project_name: string | null;
+}
+
 // ─── Interval helpers ────────────────────────────────────────────────────────
 
 function mergeIntervals(intervals: Interval[]): Interval[] {
@@ -135,6 +148,16 @@ function humanDuration(seconds: number): string {
 
 // ─── Candidate discovery ─────────────────────────────────────────────────────
 
+/** `findPatternCandidates`'s own projection over `time_entries`, no joins. */
+interface PatternEntryRow {
+  description: string;
+  start: string;
+  duration: number | null;
+  project_id: string | null;
+  task_id: string | null;
+  billable: number;
+}
+
 /**
  * Work this person logs on this weekday in most recent weeks but hasn't logged
  * on this date. Purely historical: no model, no guessing at content — the
@@ -160,7 +183,7 @@ async function findPatternCandidates(
        ORDER BY start DESC LIMIT 1000`
     )
     .bind(workspaceId, userId, since, new Date(dayStartMs).toISOString())
-    .all<Record<string, unknown>>();
+    .all<PatternEntryRow>();
 
   interface Bucket {
     description: string;
@@ -174,11 +197,11 @@ async function findPatternCandidates(
   const buckets = new Map<string, Bucket>();
 
   for (const row of results) {
-    const startMs = new Date(row.start as string).getTime();
+    const startMs = new Date(row.start).getTime();
     const local = new Date(startMs - offsetMinutes * 60_000);
     if (local.getUTCDay() !== localWeekday) continue;
 
-    const description = (row.description as string).trim();
+    const description = row.description.trim();
     const key = description.toLowerCase();
     let bucket = buckets.get(key);
     if (!bucket) {
@@ -187,14 +210,14 @@ async function findPatternCandidates(
         days: new Set(),
         totalDuration: 0,
         startMinutes: [],
-        projectId: (row.project_id as string | null) ?? null,
-        taskId: (row.task_id as string | null) ?? null,
+        projectId: row.project_id ?? null,
+        taskId: row.task_id ?? null,
         billable: Boolean(row.billable),
       };
       buckets.set(key, bucket);
     }
     bucket.days.add(local.toISOString().slice(0, 10));
-    bucket.totalDuration += (row.duration as number) ?? 0;
+    bucket.totalDuration += row.duration ?? 0;
     bucket.startMinutes.push(local.getUTCHours() * 60 + local.getUTCMinutes());
   }
 
@@ -286,7 +309,7 @@ export async function generateDrafts(
        ORDER BY te.start ASC`
     )
       .bind(workspaceId, userId, dayEndIso, dayStartIso)
-      .all<Record<string, unknown>>(),
+      .all<DayEntryRow>(),
     env.DB.prepare(
       `SELECT start, stop, calendar_event_id FROM draft_entries
        WHERE workspace_id = ? AND user_id = ? AND local_date = ?`
@@ -298,14 +321,14 @@ export async function generateDrafts(
   ]);
 
   const entries: DayEntry[] = entriesRes.results.map((r) => ({
-    id: r.id as string,
-    description: (r.description as string) ?? "",
-    start: r.start as string,
-    stop: (r.stop as string | null) ?? null,
-    duration: (r.duration as number | null) ?? null,
-    projectId: (r.project_id as string | null) ?? null,
-    projectName: (r.project_name as string | null) ?? null,
-    calendarEventId: (r.calendar_event_id as string | null) ?? null,
+    id: r.id,
+    description: r.description ?? "",
+    start: r.start,
+    stop: r.stop ?? null,
+    duration: r.duration ?? null,
+    projectId: r.project_id ?? null,
+    projectName: r.project_name ?? null,
+    calendarEventId: r.calendar_event_id ?? null,
   }));
 
   const trackedEventIds = new Set(
@@ -519,25 +542,25 @@ There are ${candidates.length} unaccounted slots to describe.`;
 
 // ─── Reads and writes ────────────────────────────────────────────────────────
 
-function formatDraft(row: Record<string, unknown>): DraftEntry {
+function formatDraft(row: DraftEntryRow): DraftEntry {
   return {
-    id: row.id as string,
-    localDate: row.local_date as string,
-    projectId: (row.project_id as string | null) ?? null,
-    projectName: (row.project_name as string | null) ?? null,
-    projectColor: (row.project_color as string | null) ?? null,
-    taskId: (row.task_id as string | null) ?? null,
-    taskName: (row.task_name as string | null) ?? null,
-    description: (row.description as string) ?? "",
-    start: row.start as string,
-    stop: row.stop as string,
-    duration: (row.duration as number) ?? 0,
+    id: row.id,
+    localDate: row.local_date,
+    projectId: row.project_id ?? null,
+    projectName: row.project_name ?? null,
+    projectColor: row.project_color ?? null,
+    taskId: row.task_id ?? null,
+    taskName: row.task_name ?? null,
+    description: row.description ?? "",
+    start: row.start,
+    stop: row.stop,
+    duration: row.duration ?? 0,
     billable: Boolean(row.billable),
-    source: row.source as DraftSource,
-    confidence: (row.confidence as "high" | "medium" | "low") ?? "medium",
-    reason: (row.reason as string | null) ?? null,
-    calendarEventId: (row.calendar_event_id as string | null) ?? null,
-    createdAt: row.created_at as string,
+    source: row.source,
+    confidence: row.confidence ?? "medium",
+    reason: row.reason ?? null,
+    calendarEventId: row.calendar_event_id ?? null,
+    createdAt: row.created_at,
   };
 }
 
@@ -573,7 +596,7 @@ export async function listDraftRange(
        ORDER BY d.start ASC`
     )
     .bind(workspaceId, userId, since, until)
-    .all<Record<string, unknown>>();
+    .all<DraftEntryRow>();
   return results.map(formatDraft);
 }
 
@@ -586,7 +609,7 @@ export async function getDraft(
   const row = await db
     .prepare(`${DRAFT_SELECT} WHERE d.id = ? AND d.workspace_id = ? AND d.user_id = ?`)
     .bind(id, workspaceId, userId)
-    .first<Record<string, unknown>>();
+    .first<DraftEntryRow>();
   return row ? formatDraft(row) : null;
 }
 

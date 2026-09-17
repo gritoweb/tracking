@@ -1,5 +1,6 @@
-import type { CreateProject } from "@shared/schemas";
+import type { CreateProject, Project } from "@shared/schemas";
 import { DISTINCT_COLORS, spreadColor } from "@shared/colors";
+import type { ProjectRow } from "../db/rows";
 
 /** Project rows with their tracked time; `scoped` adds one `te.user_id = ?` binding (in the join, before the WHERE's) for a member. */
 export function projectSelect(scoped: boolean): string {
@@ -16,28 +17,26 @@ export function projectSelect(scoped: boolean): string {
 export const PROJECT_SELECT = projectSelect(false);
 
 /** `hideBudget` is for a member: budgets are team numbers they don't see (D3). */
-export function formatProject(row: Record<string, unknown>, opts: { hideBudget?: boolean } = {}) {
+export function formatProject(row: ProjectRow, opts: { hideBudget?: boolean } = {}): Project {
   return {
-    id: row.id as string,
-    workspaceId: row.workspace_id as string,
-    clientId: (row.client_id as string | null) ?? null,
-    clientName: (row.client_name as string | null) ?? null,
-    name: row.name as string,
-    color: row.color as string,
+    id: row.id,
+    workspaceId: row.workspace_id,
+    clientId: row.client_id ?? null,
+    clientName: row.client_name ?? null,
+    name: row.name,
+    color: row.color,
     billable: Boolean(row.billable),
-    rate: (row.rate as number | null) ?? null,
+    rate: row.rate ?? null,
     active: Boolean(row.active),
-    startDate: (row.start_date as string | null) ?? null,
-    endDate: (row.end_date as string | null) ?? null,
-    estimatedHours: opts.hideBudget ? null : ((row.estimated_hours as number | null) ?? null),
-    integrationId: (row.integration_id as string | null) ?? null,
-    externalProjectId: (row.external_project_id as string | null) ?? null,
-    externalTaskId: (row.external_task_id as string | null) ?? null,
-    trackedSeconds: (row.tracked_seconds as number) ?? 0,
-    budgetSeconds: opts.hideBudget
-      ? 0
-      : ((row.budget_seconds as number) ?? (row.tracked_seconds as number) ?? 0),
-    createdAt: row.created_at as string,
+    startDate: row.start_date ?? null,
+    endDate: row.end_date ?? null,
+    estimatedHours: opts.hideBudget ? null : (row.estimated_hours ?? null),
+    integrationId: row.integration_id ?? null,
+    externalProjectId: row.external_project_id ?? null,
+    externalTaskId: row.external_task_id ?? null,
+    trackedSeconds: row.tracked_seconds ?? 0,
+    budgetSeconds: opts.hideBudget ? 0 : (row.budget_seconds ?? row.tracked_seconds ?? 0),
+    createdAt: row.created_at,
   };
 }
 
@@ -76,7 +75,7 @@ export async function projectMissingClient(
 }
 
 /** Shared by the REST route and the MCP `create_project` tool; callers check the client first. */
-export async function createProject(db: D1Database, workspaceId: string, data: CreateProject) {
+export async function createProject(db: D1Database, workspaceId: string, data: CreateProject): Promise<Project> {
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
 
@@ -120,9 +119,10 @@ export async function createProject(db: D1Database, workspaceId: string, data: C
   const row = await db
     .prepare(`${PROJECT_SELECT} WHERE p.id = ? AND p.workspace_id = ? GROUP BY p.id`)
     .bind(id, workspaceId)
-    .first<Record<string, unknown>>();
+    .first<ProjectRow>();
+  if (!row) throw new Error("project insert did not produce a readable row");
 
-  return formatProject(row!);
+  return formatProject(row);
 }
 
 /** One refusal text, so the rule reads the same on every write path. */

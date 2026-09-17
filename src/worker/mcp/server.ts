@@ -16,6 +16,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { buildReportWhere, durationExpr, formatEntry, ENTRY_SELECT, broadcast } from "../db/queries";
+import type { TimeEntryJoinRow } from "../db/rows";
 import { loadProjectPacing } from "../lib/pacing";
 import { entryScopeUserId, getMemberRole } from "../lib/permissions";
 import { appUrl } from "../lib/app-url";
@@ -155,6 +156,44 @@ export interface McpContext {
   scope: ApiKeyScope;
 }
 
+/** `list_projects`'s own projection: a project plus its client name and tracked total. */
+interface McpProjectRow {
+  id: string;
+  name: string;
+  billable: number;
+  rate: number | null;
+  estimated_hours: number | null;
+  start_date: string | null;
+  end_date: string | null;
+  client_name: string | null;
+  tracked: number;
+}
+
+/** `list_clients`'s own projection. */
+interface McpClientRow {
+  id: string;
+  name: string;
+  archived: number;
+  project_count: number;
+}
+
+/** `get_time_summary`'s own aggregation, shared by the totals row and each breakdown row. */
+interface McpSummaryRow {
+  name?: string;
+  entries: number;
+  total: number | null;
+  billable: number | null;
+  amount: number | null;
+}
+
+/** `get_running_timer`'s own projection. */
+interface McpRunningTimerRow {
+  id: string;
+  description: string;
+  start: string;
+  project_name: string | null;
+}
+
 export function buildMcpServer(ctx: McpContext): McpServer {
   const { env, workspaceId, userId, scope } = ctx;
   const db = env.DB;
@@ -190,7 +229,7 @@ export function buildMcpServer(ctx: McpContext): McpServer {
            GROUP BY p.id ORDER BY p.name ASC`
         )
         .bind(await scopeUserId(), workspaceId)
-        .all<Record<string, unknown>>();
+        .all<McpProjectRow>();
       const manager = (await scopeUserId()) === null;
 
       return json(
@@ -202,7 +241,7 @@ export function buildMcpServer(ctx: McpContext): McpServer {
           billable: Boolean(r.billable),
           hourlyRate: r.rate ?? null,
           budgetHours: manager ? (r.estimated_hours ?? null) : null,
-          trackedHours: hours((r.tracked as number) ?? 0),
+          trackedHours: hours(r.tracked ?? 0),
           startDate: r.start_date ?? null,
           endDate: r.end_date ?? null,
         }))
@@ -228,7 +267,7 @@ export function buildMcpServer(ctx: McpContext): McpServer {
            GROUP BY c.id ORDER BY c.name ASC`
         )
         .bind(workspaceId)
-        .all<Record<string, unknown>>();
+        .all<McpClientRow>();
       return json(
         results.map((r) => ({
           id: r.id,
@@ -291,7 +330,7 @@ export function buildMcpServer(ctx: McpContext): McpServer {
         },
       }[groupBy];
 
-      const [totals, grouped] = await db.batch<Record<string, unknown>>([
+      const [totals, grouped] = await db.batch<McpSummaryRow>([
         db
           .prepare(
             `SELECT COUNT(*) AS entries, SUM(${dur}) AS total,
@@ -318,19 +357,19 @@ export function buildMcpServer(ctx: McpContext): McpServer {
           .bind(...bindings),
       ]);
 
-      const row = totals.results[0] ?? {};
+      const row = totals.results[0];
       return json({
         range: { since, until },
         groupBy,
-        totalHours: hours((row.total as number) ?? 0),
-        billableHours: hours((row.billable as number) ?? 0),
-        billableAmount: Math.round(((row.amount as number) ?? 0) * 100) / 100,
-        entryCount: row.entries ?? 0,
+        totalHours: hours(row?.total ?? 0),
+        billableHours: hours(row?.billable ?? 0),
+        billableAmount: Math.round((row?.amount ?? 0) * 100) / 100,
+        entryCount: row?.entries ?? 0,
         breakdown: grouped.results.map((r) => ({
           name: r.name,
-          hours: hours((r.total as number) ?? 0),
-          billableHours: hours((r.billable as number) ?? 0),
-          amount: Math.round(((r.amount as number) ?? 0) * 100) / 100,
+          hours: hours(r.total ?? 0),
+          billableHours: hours(r.billable ?? 0),
+          amount: Math.round((r.amount ?? 0) * 100) / 100,
           entries: r.entries,
         })),
       });
@@ -375,7 +414,7 @@ export function buildMcpServer(ctx: McpContext): McpServer {
            GROUP BY te.id ORDER BY te.start DESC LIMIT ${ROW_LIMIT}`
         )
         .bind(...bindings)
-        .all<Record<string, unknown>>();
+        .all<TimeEntryJoinRow>();
 
       return json(
         results.map(formatEntry).map((e) => ({
@@ -446,10 +485,10 @@ export function buildMcpServer(ctx: McpContext): McpServer {
            ORDER BY te.start DESC LIMIT 1`
         )
         .bind(workspaceId, userId)
-        .first<Record<string, unknown>>();
+        .first<McpRunningTimerRow>();
 
       if (!row) return json({ running: false });
-      const elapsed = Date.now() - new Date(row.start as string).getTime();
+      const elapsed = Date.now() - new Date(row.start).getTime();
       return json({
         running: true,
         id: row.id,

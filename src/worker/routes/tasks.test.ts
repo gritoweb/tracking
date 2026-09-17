@@ -1,5 +1,6 @@
+import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
-import { createD1Stub } from "../../test/d1-stub";
+import { createD1Stub, type D1StubHandlers } from "../../test/d1-stub";
 
 // tasks.ts imports lib/image.ts, which loads a real WASM module outside vitest — stub it out (same as image.test.ts).
 vi.mock("@cf-wasm/photon/workerd", () => ({
@@ -8,7 +9,19 @@ vi.mock("@cf-wasm/photon/workerd", () => ({
   resize: vi.fn(),
 }));
 
-const { taskAndSubtaskIds } = await import("./tasks");
+const { taskAndSubtaskIds, tasksRouter } = await import("./tasks");
+
+function mountedApp(handlers: D1StubHandlers) {
+  const { db } = createD1Stub(handlers);
+  const app = new Hono<{ Bindings: Env; Variables: { workspaceId: string; userId: string } }>()
+    .use("*", async (c, next) => {
+      c.set("workspaceId", "workspace-A");
+      c.set("userId", "user-1");
+      await next();
+    })
+    .route("/", tasksRouter);
+  return { app, env: { DB: db } as unknown as Env };
+}
 
 describe("taskAndSubtaskIds (P0-2)", () => {
   it("returns the task and every one of its subtasks, not just the first", async () => {
@@ -24,5 +37,84 @@ describe("taskAndSubtaskIds (P0-2)", () => {
   it("returns just the task itself when it has no subtasks", async () => {
     const { db } = createD1Stub({ all: () => ({ results: [{ id: "P" }] }) });
     expect(await taskAndSubtaskIds(db, "workspace-1", "P")).toEqual(["P"]);
+  });
+});
+
+describe("GET / — formatTask's assignees_json (TYPE-2: typed rows, parsed via parseJsonColumn)", () => {
+  const baseRow = {
+    id: "task-1",
+    workspace_id: "workspace-A",
+    project_id: "project-1",
+    project_name: "Acme",
+    project_color: "#000000",
+    name: "Write report",
+    description: null,
+    active: 1,
+    status_id: "status-1",
+    status_name: "To do",
+    status_color: "#3b82f6",
+    status_category: "not_started",
+    estimated_seconds: null,
+    tracked_seconds: 0,
+    due_date: null,
+    priority: 4,
+    sort_order: 1,
+    board_order: 1,
+    parent_id: null,
+    completed_at: null,
+    recur_rule: null,
+    subtask_total: 0,
+    subtask_done: 0,
+    created_at: "2026-01-01T00:00:00.000Z",
+  };
+
+  it("parses a well-formed assignees_json array", async () => {
+    const { app, env } = mountedApp({
+      first: () => ({ role: "member" }),
+      all: (call) =>
+        call.sql.includes("FROM tasks tk")
+          ? {
+              results: [
+                {
+                  ...baseRow,
+                  assignees_json: JSON.stringify([{ userId: "u1", name: "Ana", image: null }]),
+                },
+              ],
+            }
+          : { results: [] },
+    });
+    const res = await app.request("/", {}, env);
+    const body = (await res.json()) as Array<{ assignees: unknown }>;
+    expect(body[0]?.assignees).toEqual([{ userId: "u1", name: "Ana", image: null }]);
+  });
+
+  it("falls back to an empty list rather than throwing on malformed assignees_json", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { app, env } = mountedApp({
+      first: () => ({ role: "member" }),
+      all: (call) =>
+        call.sql.includes("FROM tasks tk")
+          ? { results: [{ ...baseRow, assignees_json: "not json" }] }
+          : { results: [] },
+    });
+    const res = await app.request("/", {}, env);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Array<{ assignees: unknown }>;
+    expect(body[0]?.assignees).toEqual([]);
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it("falls back to an empty list when assignees_json is null (no assignees)", async () => {
+    const { app, env } = mountedApp({
+      first: () => ({ role: "member" }),
+      all: (call) =>
+        call.sql.includes("FROM tasks tk")
+          ? { results: [{ ...baseRow, assignees_json: null }] }
+          : { results: [] },
+    });
+    const res = await app.request("/", {}, env);
+    const body = (await res.json()) as Array<{ assignees: unknown }>;
+    expect(body[0]?.assignees).toEqual([]);
   });
 });

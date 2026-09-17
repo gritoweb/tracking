@@ -13,6 +13,7 @@ import {
   scaleDurations,
 } from "../lib/drafts";
 import { broadcast } from "../db/queries";
+import type { DraftConfirmRow } from "../db/rows";
 import { findActiveProject, PROJECT_REQUIRED_ERROR } from "../lib/projects";
 
 const clientId = (c: { req: { header: (n: string) => string | undefined } }) =>
@@ -82,12 +83,12 @@ export const draftsRouter = new Hono<{
        ORDER BY start ASC`
     )
       .bind(workspaceId, userId, ...ids)
-      .all<Record<string, unknown>>();
+      .all<DraftConfirmRow>();
 
     if (!results.length) return c.json({ error: "No matching drafts" }, 404);
     // Every entry needs an active project of this workspace (D3); a draft's may be missing, archived since, or forged.
     const projectIds = [
-      ...new Set(results.map((r) => r.project_id as string | null).filter((p): p is string => Boolean(p))),
+      ...new Set(results.map((r) => r.project_id).filter((p): p is string => Boolean(p))),
     ];
     const activeProjects = new Set(
       projectIds.length
@@ -103,8 +104,8 @@ export const draftsRouter = new Hono<{
         : []
     );
     const withoutProject = results
-      .filter((r) => !activeProjects.has(r.project_id as string))
-      .map((r) => r.id as string);
+      .filter((r) => !activeProjects.has(r.project_id ?? ""))
+      .map((r) => r.id);
     if (withoutProject.length) {
       return c.json(
         { error: "Choose an active project for every draft before confirming", draftIds: withoutProject },
@@ -114,7 +115,7 @@ export const draftsRouter = new Hono<{
 
     // Reconcile the day's total across the batch before anything is written, so
     // a rejected scale can't leave half the drafts confirmed at the old lengths.
-    const durations = results.map((r) => (r.duration as number) ?? 0);
+    const durations = results.map((r) => r.duration ?? 0);
     const finalDurations =
       reportedTotalSeconds != null && reportedTotalSeconds > 0
         ? scaleDurations(durations, reportedTotalSeconds)
@@ -132,7 +133,7 @@ export const draftsRouter = new Hono<{
     );
 
     const statements = results.flatMap((row, i) => {
-      const startMs = new Date(row.start as string).getTime();
+      const startMs = new Date(row.start).getTime();
       // Scaling moves the end of the entry, never its start: when it began is
       // an observed fact, how long it ran is the estimate being corrected.
       const stop = new Date(startMs + finalDurations[i] * 1000).toISOString();
@@ -141,18 +142,18 @@ export const draftsRouter = new Hono<{
           crypto.randomUUID(),
           workspaceId,
           userId,
-          (row.project_id as string | null) ?? null,
-          (row.task_id as string | null) ?? null,
-          (row.description as string) ?? "",
-          row.start as string,
+          row.project_id ?? null,
+          row.task_id ?? null,
+          row.description ?? "",
+          row.start,
           stop,
           finalDurations[i],
           row.billable ? 1 : 0,
-          (row.calendar_event_id as string | null) ?? null,
+          row.calendar_event_id ?? null,
           now,
           now
         ),
-        remove.bind(row.id as string, workspaceId, userId),
+        remove.bind(row.id, workspaceId, userId),
       ];
     });
 

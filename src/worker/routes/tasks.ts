@@ -1,15 +1,19 @@
 import { Hono } from "hono";
+import { z } from "zod";
 import { canDeleteTask, currentMemberIds, entryScopeUserId, getMemberRole } from "../lib/permissions";
 import { zValidator } from "@hono/zod-validator";
 import {
   CreateTaskCommentSchema,
   CreateTaskSchema,
   MoveTaskSchema,
+  TaskAssigneeSchema,
   UpdateTaskCommentSchema,
   UpdateTaskSchema,
 } from "@shared/schemas";
 import { nextOccurrence, normalizeRecurRule } from "@shared/task-recurrence";
 import { broadcast, requestOrigin } from "../db/queries";
+import type { TaskAttachmentRow, TaskChildRow, TaskCommentRow, TaskJoinRow, TaskRow } from "../db/rows";
+import { parseJsonColumn } from "../lib/json";
 import {
   completedStatus,
   defaultStatus,
@@ -19,58 +23,58 @@ import {
 import { ImageDecodeError, processImage, sniffImage } from "../lib/image";
 import { formatAttachment } from "./attachments";
 import { actorDisplayName, notifyAssigneesOfStatusChange, notifyMentions, notifyNewAssignees } from "../lib/notifications";
-import type { CreateTask, TaskStatus, TaskStatusCategory } from "@shared/schemas";
+import type { CreateTask, Task, TaskComment, TaskStatus } from "@shared/schemas";
 
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 
-type Row = Record<string, unknown>;
+const taskAssigneeArray = z.array(TaskAssigneeSchema);
 
-function formatTask(row: Row) {
+function formatTask(row: TaskJoinRow): Task {
   return {
-    id: row.id as string,
-    workspaceId: row.workspace_id as string,
-    projectId: row.project_id as string,
-    projectName: (row.project_name as string | null) ?? null,
-    projectColor: (row.project_color as string | null) ?? null,
-    name: row.name as string,
-    description: (row.description as string | null) ?? null,
+    id: row.id,
+    workspaceId: row.workspace_id,
+    projectId: row.project_id,
+    projectName: row.project_name ?? null,
+    projectColor: row.project_color ?? null,
+    name: row.name,
+    description: row.description ?? null,
     active: Boolean(row.active),
-    statusId: (row.status_id as string | null) ?? null,
-    statusName: (row.status_name as string | null) ?? null,
-    statusColor: (row.status_color as string | null) ?? null,
-    statusCategory: (row.status_category as TaskStatusCategory | null) ?? null,
-    estimatedSeconds: (row.estimated_seconds as number | null) ?? null,
-    trackedSeconds: (row.tracked_seconds as number) ?? 0,
-    dueDate: (row.due_date as string | null) ?? null,
-    priority: (row.priority as number | null) ?? 4,
-    sortOrder: (row.sort_order as number | null) ?? 0,
-    parentId: (row.parent_id as string | null) ?? null,
-    completedAt: (row.completed_at as string | null) ?? null,
-    recurRule: (row.recur_rule as string | null) ?? null,
-    boardOrder: (row.board_order as number | null) ?? 0,
-    subtaskTotal: (row.subtask_total as number) ?? 0,
-    subtaskDone: (row.subtask_done as number) ?? 0,
-    assignees: JSON.parse((row.assignees_json as string | null) ?? "[]"),
-    createdAt: row.created_at as string,
+    statusId: row.status_id ?? null,
+    statusName: row.status_name ?? null,
+    statusColor: row.status_color ?? null,
+    statusCategory: row.status_category ?? null,
+    estimatedSeconds: row.estimated_seconds ?? null,
+    trackedSeconds: row.tracked_seconds ?? 0,
+    dueDate: row.due_date ?? null,
+    priority: row.priority ?? 4,
+    sortOrder: row.sort_order ?? 0,
+    parentId: row.parent_id ?? null,
+    completedAt: row.completed_at ?? null,
+    recurRule: row.recur_rule ?? null,
+    boardOrder: row.board_order ?? 0,
+    subtaskTotal: row.subtask_total ?? 0,
+    subtaskDone: row.subtask_done ?? 0,
+    assignees: parseJsonColumn(row.assignees_json, taskAssigneeArray, [], "tasks.assignees_json"),
+    createdAt: row.created_at,
   };
 }
 
-function formatComment(row: Row) {
-  const ids = (row.mentioned_user_ids as string).split(",").filter(Boolean);
-  const attachmentId = (row.attachment_id as string | null) ?? null;
+function formatComment(row: TaskCommentRow): TaskComment {
+  const ids = row.mentioned_user_ids.split(",").filter(Boolean);
+  const attachmentId = row.attachment_id ?? null;
   return {
-    id: row.id as string,
-    taskId: row.task_id as string,
-    userId: row.user_id as string,
-    userName: (row.user_name as string) || (row.user_email as string),
-    userImage: (row.user_image as string | null) ?? null,
-    body: row.body as string,
+    id: row.id,
+    taskId: row.task_id,
+    userId: row.user_id,
+    userName: row.user_name || row.user_email,
+    userImage: row.user_image ?? null,
+    body: row.body,
     mentionedUserIds: ids,
     attachmentId,
     attachmentUrl: attachmentId ? `/api/attachments/${attachmentId}` : null,
-    attachmentFilename: (row.attachment_filename as string | null) ?? null,
-    createdAt: row.created_at as string,
-    editedAt: (row.edited_at as string | null) ?? null,
+    attachmentFilename: row.attachment_filename ?? null,
+    createdAt: row.created_at,
+    editedAt: row.edited_at ?? null,
   };
 }
 
@@ -112,11 +116,16 @@ async function taskScope(c: { env: Env; get: (key: "workspaceId" | "userId") => 
   return entryScopeUserId(await getMemberRole(c.env.DB, c.get("workspaceId"), userId), userId);
 }
 
-async function readTask(db: D1Database, id: string, workspaceId: string, scopeUserId: string | null) {
+async function readTask(
+  db: D1Database,
+  id: string,
+  workspaceId: string,
+  scopeUserId: string | null
+): Promise<TaskJoinRow | null> {
   const { results } = await db
     .prepare(`${taskSelect(scopeUserId !== null)} WHERE tk.id = ? AND tk.workspace_id = ?`)
     .bind(...(scopeUserId ? [scopeUserId] : []), id, workspaceId)
-    .all<Row>();
+    .all<TaskJoinRow>();
   return results.length ? results[0] : null;
 }
 
@@ -127,7 +136,7 @@ export async function createTask(
   data: CreateTask,
   scopeUserId: string | null,
   createdBy: string
-): Promise<{ task: ReturnType<typeof formatTask> } | { error: string }> {
+): Promise<{ task: Task } | { error: string }> {
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
 
@@ -182,7 +191,8 @@ export async function createTask(
   if (data.assigneeIds) await setAssignees(db, workspaceId, id, data.assigneeIds);
 
   const row = await readTask(db, id, workspaceId, scopeUserId);
-  return { task: formatTask(row!) };
+  if (!row) return { error: "Task created but could not be read back" };
+  return { task: formatTask(row) };
 }
 
 /** The MCP `move_task` tool's own minimal path to a status change — the REST routes' board-drag and dialog-save paths have more surface (subtask cascade, recurrence spawn) this doesn't need. */
@@ -192,9 +202,9 @@ export async function moveTaskStatus(
   taskId: string,
   statusId: string,
   scopeUserId: string | null
-): Promise<{ task: ReturnType<typeof formatTask>; previousStatusId: string | null } | { error: string }> {
+): Promise<{ task: Task; previousStatusId: string | null } | { error: string }> {
   const existing = await db.prepare(`SELECT * FROM tasks WHERE id = ? AND workspace_id = ?`)
-    .bind(taskId, workspaceId).first<Row>();
+    .bind(taskId, workspaceId).first<TaskRow>();
   if (!existing) return { error: "Task not found" };
 
   const status = await resolveStatus(db, workspaceId, statusId);
@@ -203,14 +213,15 @@ export async function moveTaskStatus(
   const { active, completedAt } = syncFromCategory(
     status.category,
     Boolean(existing.active),
-    (existing.completed_at as string | null) ?? null
+    existing.completed_at ?? null
   );
   await db.prepare(
     `UPDATE tasks SET status_id = ?, active = ?, completed_at = ? WHERE id = ? AND workspace_id = ?`
   ).bind(status.id, active, completedAt, taskId, workspaceId).run();
 
   const row = await readTask(db, taskId, workspaceId, scopeUserId);
-  return { task: formatTask(row!), previousStatusId: (existing.status_id as string | null) ?? null };
+  if (!row) return { error: "Task moved but could not be read back" };
+  return { task: formatTask(row), previousStatusId: existing.status_id ?? null };
 }
 
 /**
@@ -229,9 +240,9 @@ async function resolveParent(
   const row = await db
     .prepare(`SELECT id, project_id, parent_id FROM tasks WHERE id = ? AND workspace_id = ?`)
     .bind(parentId, workspaceId)
-    .first<Row>();
+    .first<{ id: string; project_id: string; parent_id: string | null }>();
   if (!row || row.parent_id) return undefined;
-  return { id: row.id as string, projectId: row.project_id as string };
+  return { id: row.id, projectId: row.project_id };
 }
 
 /** A task plus its direct subtasks, resolved to a real id list — SQLite's `IN (a, (SELECT …))` is scalar and only matches the subquery's first row. */
@@ -265,8 +276,8 @@ async function nextSortOrder(db: D1Database, workspaceId: string, projectId: str
   const row = await db
     .prepare(`SELECT COALESCE(MAX(sort_order), 0) AS m FROM tasks WHERE workspace_id = ? AND project_id = ?`)
     .bind(workspaceId, projectId)
-    .first<Row>();
-  return ((row?.m as number) ?? 0) + 1;
+    .first<{ m: number }>();
+  return (row?.m ?? 0) + 1;
 }
 
 /** Next free position at the bottom of a board column. */
@@ -274,22 +285,22 @@ async function nextBoardOrder(db: D1Database, workspaceId: string, statusId: str
   const row = await db
     .prepare(`SELECT COALESCE(MAX(board_order), 0) AS m FROM tasks WHERE workspace_id = ? AND status_id = ?`)
     .bind(workspaceId, statusId)
-    .first<Row>();
-  return ((row?.m as number) ?? 0) + 1;
+    .first<{ m: number }>();
+  return (row?.m ?? 0) + 1;
 }
 
 /** The one place `status_id`/`active`/`completed_at` are decided together — checkbox and board drop both go through here. */
 async function resolveStatusChange(
   db: D1Database,
   workspaceId: string,
-  existing: Row,
+  existing: TaskRow,
   data: { statusId?: string; active?: boolean }
 ): Promise<{ status: TaskStatus; active: 0 | 1; completedAt: string | null } | undefined | null> {
   let status: TaskStatus | null;
   if (data.statusId !== undefined) {
     status = await resolveStatus(db, workspaceId, data.statusId);
   } else if (data.active !== undefined) {
-    const projectId = (existing.project_id as string | null) ?? null;
+    const projectId = existing.project_id ?? null;
     // The checkbox: done goes to the first completed column, reopening to the default.
     status = data.active
       ? await defaultStatus(db, workspaceId, projectId)
@@ -303,7 +314,7 @@ async function resolveStatusChange(
   const { active, completedAt } = syncFromCategory(
     status.category,
     wasActive,
-    (existing.completed_at as string | null) ?? null
+    existing.completed_at ?? null
   );
   return { status, active, completedAt };
 }
@@ -336,7 +347,7 @@ export const tasksRouter = new Hono<{
     const scopeUserId = await taskScope(c);
     const { results } = await c.env.DB.prepare(
       `${taskSelect(scopeUserId !== null)} ${where} ORDER BY tk.sort_order ASC, tk.name ASC`
-    ).bind(...(scopeUserId ? [scopeUserId] : []), ...bindings).all<Row>();
+    ).bind(...(scopeUserId ? [scopeUserId] : []), ...bindings).all<TaskJoinRow>();
 
     return c.json(results.map(formatTask));
   })
@@ -371,7 +382,7 @@ export const tasksRouter = new Hono<{
 
     const existing = await c.env.DB.prepare(
       `SELECT * FROM tasks WHERE id = ? AND workspace_id = ?`
-    ).bind(id, workspaceId).first<Row>();
+    ).bind(id, workspaceId).first<TaskRow>();
     if (!existing) return c.json({ error: "Not found" }, 404);
 
     const isSubtask = Boolean(existing.parent_id);
@@ -403,7 +414,7 @@ export const tasksRouter = new Hono<{
       } else {
         const parent = await resolveParent(c.env.DB, data.parentId, workspaceId);
         // Its own child can't become its parent, and neither can it.
-        if (!parent || parent.id === id || (existing.subtask_total as number) > 0) {
+        if (!parent || parent.id === id || (existing.subtask_total ?? 0) > 0) {
           return c.json({ error: "Parent task not found, or is itself a subtask" }, 400);
         }
         set("parent_id", parent.id);
@@ -440,7 +451,7 @@ export const tasksRouter = new Hono<{
     if (change && change.status.id !== existing.status_id) {
       c.executionCtx.waitUntil(
         notifyAssigneesOfStatusChange(
-          c.env, workspaceId, id, existing.name as string, userId,
+          c.env, workspaceId, id, existing.name, userId,
           await actorDisplayName(c.env.DB, userId), change.status.name
         )
       );
@@ -457,7 +468,7 @@ export const tasksRouter = new Hono<{
       if (newAssigneeIds.length) {
         c.executionCtx.waitUntil(
           notifyNewAssignees(
-            c.env, workspaceId, id, existing.name as string, userId,
+            c.env, workspaceId, id, existing.name, userId,
             await actorDisplayName(c.env.DB, userId), newAssigneeIds
           )
         );
@@ -494,7 +505,7 @@ export const tasksRouter = new Hono<{
     // anyone west of it, which is exactly the trap the calendar sync hit.
     const rule = data.recurRule !== undefined
       ? (data.recurRule === null ? null : normalizeRecurRule(data.recurRule))
-      : (existing.recur_rule as string | null);
+      : existing.recur_rule;
 
     if (completing && !isSubtask && rule && data.completedOn) {
       const due = nextOccurrence(rule, data.completedOn);
@@ -502,7 +513,7 @@ export const tasksRouter = new Hono<{
         const spawnId = crypto.randomUUID();
         const now = new Date().toISOString();
         // The next occurrence starts where a fresh task starts, not in the completed column.
-        const spawnStatus = await defaultStatus(c.env.DB, workspaceId, existing.project_id as string | null);
+        const spawnStatus = await defaultStatus(c.env.DB, workspaceId, existing.project_id);
         const spawnOrder = await nextBoardOrder(c.env.DB, workspaceId, spawnStatus.id);
         await c.env.DB.prepare(
           `INSERT INTO tasks
@@ -519,7 +530,7 @@ export const tasksRouter = new Hono<{
           existing.estimated_seconds ?? null,
           due,
           existing.priority ?? 4,
-          (existing.sort_order as number) ?? 0,
+          existing.sort_order ?? 0,
           spawnOrder,
           spawnStatus.id,
           rule,
@@ -530,7 +541,7 @@ export const tasksRouter = new Hono<{
         const { results: kids } = await c.env.DB.prepare(
           `SELECT name, description, estimated_seconds, priority, sort_order
              FROM tasks WHERE parent_id = ? AND workspace_id = ? ORDER BY sort_order ASC`
-        ).bind(id, workspaceId).all<Row>();
+        ).bind(id, workspaceId).all<TaskChildRow>();
 
         if (kids.length) {
           await c.env.DB.batch(
@@ -583,7 +594,7 @@ export const tasksRouter = new Hono<{
 
     const existing = await c.env.DB.prepare(
       `SELECT * FROM tasks WHERE id = ? AND workspace_id = ?`
-    ).bind(id, workspaceId).first<Row>();
+    ).bind(id, workspaceId).first<TaskRow>();
     if (!existing) return c.json({ error: "Not found" }, 404);
 
     const change = await resolveStatusChange(c.env.DB, workspaceId, existing, { statusId });
@@ -602,7 +613,7 @@ export const tasksRouter = new Hono<{
     if (change.status.id !== existing.status_id) {
       c.executionCtx.waitUntil(
         notifyAssigneesOfStatusChange(
-          c.env, workspaceId, id, existing.name as string, userId,
+          c.env, workspaceId, id, existing.name, userId,
           await actorDisplayName(c.env.DB, userId), change.status.name
         )
       );
@@ -615,11 +626,11 @@ export const tasksRouter = new Hono<{
     }
 
     // A drop onto a completed column spawns the next occurrence, same as the checkbox.
-    const rule = existing.recur_rule as string | null;
+    const rule = existing.recur_rule;
     if (completing && !isSubtask && rule && completedOn) {
       const due = nextOccurrence(rule, completedOn);
       if (due) {
-        const spawnStatus = await defaultStatus(c.env.DB, workspaceId, existing.project_id as string | null);
+        const spawnStatus = await defaultStatus(c.env.DB, workspaceId, existing.project_id);
         await c.env.DB.batch([
           c.env.DB.prepare(
             `INSERT INTO tasks
@@ -635,7 +646,7 @@ export const tasksRouter = new Hono<{
             existing.estimated_seconds ?? null,
             due,
             existing.priority ?? 4,
-            (existing.sort_order as number) ?? 0,
+            existing.sort_order ?? 0,
             await nextBoardOrder(c.env.DB, workspaceId, spawnStatus.id),
             spawnStatus.id,
             rule,
@@ -649,10 +660,11 @@ export const tasksRouter = new Hono<{
     }
 
     const row = await readTask(c.env.DB, id, workspaceId, await taskScope(c));
+    if (!row) return c.json({ error: "Not found" }, 404);
     c.executionCtx.waitUntil(
       broadcast(c.env, workspaceId, "tasks:changed", null, requestOrigin(c))
     );
-    return c.json(formatTask(row!));
+    return c.json(formatTask(row));
   })
   // ─── Delete ───────────────────────────────────────────────────────────────
   .delete("/:id", async (c) => {
@@ -662,11 +674,11 @@ export const tasksRouter = new Hono<{
 
     const existing = await c.env.DB.prepare(
       `SELECT created_by FROM tasks WHERE id = ? AND workspace_id = ?`
-    ).bind(id, workspaceId).first<Row>();
+    ).bind(id, workspaceId).first<{ created_by: string | null }>();
     if (!existing) return c.json({ error: "Not found" }, 404);
 
     const role = await getMemberRole(c.env.DB, workspaceId, userId);
-    if (!canDeleteTask(role, (existing.created_by as string | null) ?? null, userId)) {
+    if (!canDeleteTask(role, existing.created_by ?? null, userId)) {
       return c.json({ error: "Only the task's author or a workspace manager can delete it" }, 403);
     }
 
@@ -674,11 +686,9 @@ export const tasksRouter = new Hono<{
     const placeholders = ids.map(() => "?").join(",");
     const { results: attachments } = await c.env.DB.prepare(
       `SELECT r2_key FROM task_attachments WHERE workspace_id = ? AND task_id IN (${placeholders})`
-    ).bind(workspaceId, ...ids).all<Row>();
+    ).bind(workspaceId, ...ids).all<{ r2_key: string }>();
 
-    // Explicit, not left to ON DELETE CASCADE: D1 does not guarantee
-    // `PRAGMA foreign_keys` is on, and an orphaned subtask is invisible — it
-    // renders nowhere and still counts toward its project's tracked total.
+    // FK cascade already covers this (PRAGMA foreign_keys = 1 in D1); explicit deletes here only so the R2 keys below can be read before the rows disappear.
     await c.env.DB.batch([
       c.env.DB.prepare(`DELETE FROM task_attachments WHERE workspace_id = ? AND task_id IN (${placeholders})`).bind(workspaceId, ...ids),
       c.env.DB.prepare(`DELETE FROM task_comments WHERE workspace_id = ? AND task_id IN (${placeholders})`).bind(workspaceId, ...ids),
@@ -686,7 +696,7 @@ export const tasksRouter = new Hono<{
       c.env.DB.prepare(`DELETE FROM tasks WHERE id = ? AND workspace_id = ?`).bind(id, workspaceId),
     ]);
     for (const a of attachments) {
-      c.executionCtx.waitUntil(c.env.ATTACHMENTS.delete(a.r2_key as string));
+      c.executionCtx.waitUntil(c.env.ATTACHMENTS.delete(a.r2_key));
     }
     c.executionCtx.waitUntil(
       broadcast(c.env, workspaceId, "tasks:changed", null, requestOrigin(c))
@@ -699,7 +709,7 @@ export const tasksRouter = new Hono<{
     const taskId = c.req.param("id");
     const { results } = await c.env.DB.prepare(
       `SELECT * FROM task_attachments WHERE task_id = ? AND workspace_id = ? ORDER BY created_at ASC`
-    ).bind(taskId, workspaceId).all<Row>();
+    ).bind(taskId, workspaceId).all<TaskAttachmentRow>();
     return c.json(results.map(formatAttachment));
   })
   .post("/:id/attachments", async (c) => {
@@ -745,8 +755,9 @@ export const tasksRouter = new Hono<{
       processed.width, processed.height
     ).run();
 
-    const row = await c.env.DB.prepare(`SELECT * FROM task_attachments WHERE id = ?`).bind(id).first<Row>();
-    return c.json(formatAttachment(row!), 201);
+    const row = await c.env.DB.prepare(`SELECT * FROM task_attachments WHERE id = ?`).bind(id).first<TaskAttachmentRow>();
+    if (!row) return c.json({ error: "attachment insert did not produce a readable row" }, 500);
+    return c.json(formatAttachment(row), 201);
   })
   // ─── Comments (D8) — flat, one level, no reply/thread; @mention notifies, nothing else ────
   .get("/:id/comments", async (c) => {
@@ -759,7 +770,7 @@ export const tasksRouter = new Hono<{
          JOIN "user" u ON u.id = tc.user_id
          LEFT JOIN task_attachments ta ON ta.id = tc.attachment_id
         WHERE tc.task_id = ? AND tc.workspace_id = ? ORDER BY tc.created_at ASC`
-    ).bind(taskId, workspaceId).all<Row>();
+    ).bind(taskId, workspaceId).all<TaskCommentRow>();
     return c.json(results.map(formatComment));
   })
   .post("/:id/comments", zValidator("json", CreateTaskCommentSchema), async (c) => {
@@ -767,14 +778,14 @@ export const tasksRouter = new Hono<{
     const userId = c.get("userId");
     const taskId = c.req.param("id");
     const task = await c.env.DB.prepare(`SELECT id, name FROM tasks WHERE id = ? AND workspace_id = ?`)
-      .bind(taskId, workspaceId).first<Row>();
+      .bind(taskId, workspaceId).first<{ id: string; name: string }>();
     if (!task) return c.json({ error: "Not found" }, 404);
 
     const { body, mentionedUserIds = [], attachmentId } = c.req.valid("json");
     // Never trust an attachment id from the client — it must belong to this task.
     const attachment = attachmentId
       ? await c.env.DB.prepare(`SELECT id FROM task_attachments WHERE id = ? AND task_id = ? AND workspace_id = ?`)
-          .bind(attachmentId, taskId, workspaceId).first<Row>()
+          .bind(attachmentId, taskId, workspaceId).first<{ id: string }>()
       : null;
     // Who's tagged (persisted, shown on the comment) is not who's notified — see below.
     const mentions = await currentMemberIds(c.env.DB, workspaceId, mentionedUserIds);
@@ -787,22 +798,23 @@ export const tasksRouter = new Hono<{
        VALUES (?, ?, ?, ?, ?, ?, ?)`
     ).bind(id, workspaceId, taskId, userId, body, mentions.join(","), attachment?.id ?? null).run();
 
-    const row = (await c.env.DB.prepare(
+    const row = await c.env.DB.prepare(
       `SELECT tc.*, u.name AS user_name, u.email AS user_email, u.image AS user_image,
               ta.filename AS attachment_filename
          FROM task_comments tc
          JOIN "user" u ON u.id = tc.user_id
          LEFT JOIN task_attachments ta ON ta.id = tc.attachment_id
         WHERE tc.id = ?`
-    ).bind(id).first<Row>())!;
+    ).bind(id).first<TaskCommentRow>();
+    if (!row) return c.json({ error: "comment insert did not produce a readable row" }, 500);
 
     if (notifyTargets.length) {
-      const author = (row.user_name as string) || (row.user_email as string);
+      const author = row.user_name || row.user_email;
       c.executionCtx.waitUntil(
         notifyMentions(c.env, workspaceId, notifyTargets, {
           type: "task_mention",
           title: `${author} mentioned you`,
-          body: `${task.name as string}: ${body}`,
+          body: `${task.name}: ${body}`,
           link: `/tasks/${taskId}`,
         })
       );
@@ -820,7 +832,7 @@ export const tasksRouter = new Hono<{
     const commentId = c.req.param("commentId");
     const existing = await c.env.DB.prepare(
       `SELECT user_id FROM task_comments WHERE id = ? AND workspace_id = ?`
-    ).bind(commentId, workspaceId).first<Row>();
+    ).bind(commentId, workspaceId).first<{ user_id: string }>();
     if (!existing) return c.json({ error: "Not found" }, 404);
     if (existing.user_id !== userId) return c.json({ error: "Only the author can edit this comment" }, 403);
 
@@ -828,7 +840,7 @@ export const tasksRouter = new Hono<{
     const mentions = await currentMemberIds(c.env.DB, workspaceId, mentionedUserIds);
     const attachment = attachmentId
       ? await c.env.DB.prepare(`SELECT id FROM task_attachments WHERE id = ? AND task_id = ? AND workspace_id = ?`)
-          .bind(attachmentId, taskId, workspaceId).first<Row>()
+          .bind(attachmentId, taskId, workspaceId).first<{ id: string }>()
       : null;
     await c.env.DB.prepare(
       `UPDATE task_comments SET body = ?, mentioned_user_ids = ?, attachment_id = ?, edited_at = datetime('now') WHERE id = ?`
@@ -841,11 +853,12 @@ export const tasksRouter = new Hono<{
          JOIN "user" u ON u.id = tc.user_id
          LEFT JOIN task_attachments ta ON ta.id = tc.attachment_id
         WHERE tc.id = ?`
-    ).bind(commentId).first<Row>();
+    ).bind(commentId).first<TaskCommentRow>();
+    if (!row) return c.json({ error: "Not found" }, 404);
     c.executionCtx.waitUntil(
       broadcast(c.env, workspaceId, "task-comments:changed", { taskId }, requestOrigin(c))
     );
-    return c.json(formatComment(row!));
+    return c.json(formatComment(row));
   })
   .delete("/:id/comments/:commentId", async (c) => {
     const workspaceId = c.get("workspaceId");
@@ -854,7 +867,7 @@ export const tasksRouter = new Hono<{
     const commentId = c.req.param("commentId");
     const existing = await c.env.DB.prepare(
       `SELECT user_id FROM task_comments WHERE id = ? AND workspace_id = ?`
-    ).bind(commentId, workspaceId).first<Row>();
+    ).bind(commentId, workspaceId).first<{ user_id: string }>();
     if (!existing) return c.json({ error: "Not found" }, 404);
     if (existing.user_id !== userId) return c.json({ error: "Only the author can delete this comment" }, 403);
 
