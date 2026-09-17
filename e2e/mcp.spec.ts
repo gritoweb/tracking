@@ -84,12 +84,13 @@ test("mcp: a read-only key gets the read tools and none of the write tools", asy
   }).serverInfo;
   expect(info.name).toBe("timetracker");
   expect(info.title).toBe("TimeTracker");
-  expect(info.websiteUrl).toBe("https://tracking.gritoweb.com.br");
+  // The app's own running origin (APP_URL) — dev serves localhost, not production.
+  expect(info.websiteUrl).toBe(origin);
   expect(info.icons?.length).toBeGreaterThan(0);
   // Icons must be absolute and on our own origin — a relative src is
   // unresolvable to a client that only ever saw the /mcp endpoint.
   for (const icon of info.icons ?? []) {
-    expect(icon.src).toMatch(/^https:\/\/tracking\.gritoweb\.com\.br\//);
+    expect(icon.src.startsWith(`${origin}/`)).toBe(true);
   }
   expect((init.result as { instructions?: string }).instructions).toContain(
     "timezoneOffsetMinutes"

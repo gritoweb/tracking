@@ -27,7 +27,7 @@ Precise, calm, unobtrusive. The product earns trust through restraint, not flour
 1. **Restraint carries the design; color carries meaning.** A single saturated accent (brand red) plus purposeful project/tag colors read clearly against a calm, softened neutral ground — color is never decorative.
 2. **The tool disappears into the task.** Standard, familiar affordances (top bar + side nav, command palette, tabs) over invented interaction patterns. Users fluent in Linear/Notion/Toggl should feel at home immediately.
 3. **State is always visible, never lost.** Optimistic UI (timer stop, entry edits) so numbers don't visibly regress during a network round-trip; real-time WebSocket sync across tabs; offline queueing so a bad connection never drops a logged minute.
-4. **Every empty and gap state teaches.** Charts, breakdowns, and calendars show a clear "why is this blank + what to do" state rather than a blank axis — including newly recognized opportunities (untracked-gap fill on the calendar).
+4. **Every empty and gap state teaches.** Charts, breakdowns, and calendars show a clear "why is this blank + what to do" state rather than a blank axis.
 5. **Density is earned, not decorated.** Dense data (entry lists, detailed reports, many-project workspaces) is welcome, but every dense surface still resolves cleanly at narrow widths — legend items wrap instead of overflowing, stat strips reflow without orphaned cells.
 
 ## Accessibility & Inclusion

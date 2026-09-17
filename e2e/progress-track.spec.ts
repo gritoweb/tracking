@@ -35,6 +35,8 @@ for (const scheme of ["light", "dark"] as const) {
 
     await page.emulateMedia({ colorScheme: scheme });
     await page.goto("/tasks");
+    // Board is the default layout; the progress bar only renders in TaskRow, under List.
+    await page.getByRole("radio", { name: "List" }).click();
     await page.waitForTimeout(1000);
 
     const track = page.locator('[data-slot="progress"]').first();

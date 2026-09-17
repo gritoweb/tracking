@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { signUp } from "./auth";
-import { addManualEntry } from "./entry-helpers";
+import { addManualEntry, goToListView } from "./entry-helpers";
 import { createProject } from "./project-helpers";
 
 // Workfront and Dynamics file an entry against a calendar day, and the server
@@ -31,6 +31,7 @@ test("pushing entries carries the browser's timezone so the work date is local",
     start: "18:30",
     stop: "19:30",
   });
+  await goToListView(page);
 
   // Intercept rather than let it out: the adapter would try to reach a real
   // Workfront host. The assertion is on what the client sends.

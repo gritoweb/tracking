@@ -1,6 +1,11 @@
 import { expect, type Page, type Locator } from "@playwright/test";
 import { E2E_PROJECT } from "./project-helpers";
 
+// The Timer tab lands on Calendar; the entry list (rows, "Entry actions", checkboxes) only renders in List.
+export async function goToListView(page: Page) {
+  await page.getByRole("tab", { name: "List" }).click();
+}
+
 // The Add-entry dialog's Start/Stop fields are TimeOfDayInputs (free-text,
 // committed on blur/Enter), not native <input type="time"> — fill then press
 // Enter, and wait for the Duration line to confirm the commit registered.

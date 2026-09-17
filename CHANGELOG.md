@@ -1,5 +1,29 @@
 # Changelog
 
+## 2026-09-17 (8)
+### Changed
+- **The e2e suite is green again and twice as fast** (125 tests, 8 min at one worker, down from 27
+  failures in 16 min). The 24 failures were outdated tests, not app bugs, and they shared five causes:
+  the Timer tab now opens on Calendar rather than the list (fixed once in a `goToListView` helper used
+  by seven specs), Start stays disabled until a project is chosen (specs now pick the project first,
+  through the existing `pickProjectInBar`), the default status seed is seven columns so hardcoded
+  names collided (specs read the seed or generate a unique name), comments live behind the panel's
+  Comments tab, and the due-date popover and the toolbar-less description editor only exist once
+  opened (a checklist is typed as `[] text`). `e2e/mcp.spec.ts` no longer pins the production origin.
+### Removed
+- **The "untracked gap" calendar blocks left the documentation too.** The feature was deleted end to
+  end in `2619575` (2026-09-11) but `CLAUDE.md`, `DESIGN.md`, `PRODUCT.md`, `docs/ARCHITECTURE.md` and
+  `docs/USER_GUIDE.md` still described it, and a spec still asserted the toggle — which is how a
+  removed feature reads as a regression two weeks later. Mentions removed, spec deleted, and a single
+  historical note left in `CLAUDE.md` pointing at the commit.
+### Fixed
+- `e2e/auto-assign-colors.spec.ts` waits up to 30s for the recolor toast: it round-trips through
+  Workers AI, which is slow enough under a full-suite run to fail an implicit 5s expectation while
+  passing in isolation.
+
+Verified: `npx playwright test e2e/tier2-features.spec.ts e2e/auto-assign-colors.spec.ts --workers=1`
+→ 5 passed, exit 0. `npx tsc -b` exit 0.
+
 ## 2026-09-17 (7)
 ### Fixed
 - **The assignee-cleanup code from `2026-09-17 (4)` only landed now.** That commit carried the

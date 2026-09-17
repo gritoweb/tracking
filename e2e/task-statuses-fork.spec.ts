@@ -6,6 +6,11 @@ import { createProject } from "./project-helpers";
 // a project reads the global set until it's customized, at which point it forks its own
 // copy — the global set, and every other project, stay untouched.
 
+// A name guaranteed not to collide with any seeded default, so a seed change can't break this file.
+function uniqueStatusName() {
+  return `Custom ${Date.now()}`;
+}
+
 async function statuses(page: import("@playwright/test").Page, projectId?: string) {
   const url = projectId ? `/api/task-statuses?projectId=${projectId}` : "/api/task-statuses";
   return (await page.request.get(url)).json() as Promise<
@@ -48,16 +53,17 @@ test("a project reads the global set until it forks its own, then only that proj
   expect(refork.map((s: { id: string }) => s.id)).toEqual(forked.map((s: { id: string }) => s.id));
 
   const backlog = forked.find((s: { name: string }) => s.name === "Backlog");
+  const newName = uniqueStatusName();
   const renamed = await page.request.put(`/api/task-statuses/${backlog.id}`, {
-    data: { name: "Pendente" },
+    data: { name: newName },
     headers: { origin },
   });
   expect(renamed.ok()).toBeTruthy();
 
   // The fork changed; the global set and the other, still-unforked project didn't.
-  expect((await statuses(page, project.id)).map((s) => s.name)).toContain("Pendente");
-  expect((await statuses(page)).map((s) => s.name)).not.toContain("Pendente");
-  expect((await statuses(page, other.id)).map((s) => s.name)).not.toContain("Pendente");
+  expect((await statuses(page, project.id)).map((s) => s.name)).toContain(newName);
+  expect((await statuses(page)).map((s) => s.name)).not.toContain(newName);
+  expect((await statuses(page, other.id)).map((s) => s.name)).not.toContain(newName);
 });
 
 test("renaming a column from a project's board forks it there without touching other projects (UI)", async ({
@@ -72,12 +78,13 @@ test("renaming a column from a project's board forks it there without touching o
   // Scope the board to just this project — the rail's own filter.
   await page.getByRole("button", { name: /^ERP Migration \d+$/ }).click();
 
+  const newName = uniqueStatusName();
   await page.getByRole("button", { name: "Configure Backlog" }).click();
   await page.getByRole("menuitem", { name: "Rename" }).click();
-  await page.getByLabel("Status name").fill("Pendente");
+  await page.getByLabel("Status name").fill(newName);
   await page.keyboard.press("Enter");
 
-  await expect(page.getByRole("region", { name: "Pendente" })).toBeVisible();
+  await expect(page.getByRole("region", { name: newName })).toBeVisible();
 
   // Global default and the sibling project's own (still unforked) board are untouched.
   const global = await statuses(page);
@@ -99,7 +106,7 @@ test("a new status with no colour gets the next one not already in that set", as
   const before = await statuses(page, project.id);
   const created = await (
     await page.request.post("/api/task-statuses", {
-      data: { name: "QA", category: "active", projectId: project.id },
+      data: { name: uniqueStatusName(), category: "active", projectId: project.id },
       headers: { origin },
     })
   ).json();

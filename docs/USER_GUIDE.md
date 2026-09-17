@@ -47,7 +47,7 @@ There are five ways to get time into your timesheet:
 - **Manual entry** — **Add Entry** on the Timer page for time you've already spent; pick start/end or a duration.
 - **AI Quick Add** — describe the entry in plain language ("45 min standup for Acme this morning, billable") and the app parses it into a real entry, matched against your actual projects and tasks. It warns you when it isn't sure about a match.
 - **Timesheet grid** — the Timesheet view is a weekly grid: one row per project/task combination, type hours directly into day cells.
-- **Calendar click-to-track** — with Google Calendar connected, click a "ghost" event or an untracked gap block on the calendar to convert it into an entry.
+- **Calendar click-to-track** — with Google Calendar connected, click a "ghost" event on the calendar to convert it into an entry.
 
 Entries support **description, project, task, tags, billable flag**, and inline editing after the fact. In the list, click a description, a duration, or a time range to edit it in place — each saves on Enter or blur and shows a small check when it lands. A running entry's start time and date are editable the same way (its stop shows "Still running"). Durations accept `1h 30m`, `1:30`, `90m`, or a plain number of minutes; anything unrecognized keeps the field open and marked rather than discarding what you typed. Deleting is undoable from the toast — for a single entry, a selection, or a whole repeated-description group. The description is plain free text — no suggestions drop down while you type. To repeat the last thing you tracked, use **Continue** in the timer bar (or on an entry row), which restores its description, project, task, billable flag and tags. Bulk edit/delete is available from the entry list.
 
@@ -56,7 +56,7 @@ Entries support **description, project, task, tags, billable flag**, and inline 
 The Timer tab hosts five interchangeable views behind one shared header (date navigation, weekends toggle, zoom):
 
 - **List** — entries grouped by day, with day totals.
-- **Calendar** — a Toggl-style FullCalendar grid (week / 5-day / day / month). Real entries render as colored blocks; unconfirmed Google Calendar events show as dashed "ghosts"; **untracked gaps** between entries show as clickable "Track hh:mm–hh:mm" blocks (toggle with the gaps switch).
+- **Calendar** — a Toggl-style FullCalendar grid (week / 5-day / day / month). Real entries render as colored blocks and unconfirmed Google Calendar events show as dashed "ghosts".
 - **Split** — calendar + list side by side (large screens).
 - **Timesheet** — the weekly hours grid.
 - **Planner** — plan your week ahead of time (see below).

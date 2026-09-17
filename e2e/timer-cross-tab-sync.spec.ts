@@ -1,6 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { signUp } from "./auth";
-import { chooseProject, createProject } from "./project-helpers";
+import { createProject, pickProjectInBar } from "./project-helpers";
 
 /** A fresh workspace with a project already loaded in the page, since Start asks for one. */
 async function signUpWithProject(page: Page) {
@@ -27,9 +27,9 @@ async function openSecondTab(page: Page) {
 }
 
 async function startTimer(page: Page, description: string) {
+  await pickProjectInBar(page);
   await page.getByPlaceholder("What are you working on?").fill(description);
   await page.getByRole("button", { name: "Start timer", exact: true }).click();
-  await chooseProject(page);
   await expect(page.getByRole("button", { name: "Stop timer", exact: true })).toBeVisible();
 }
 

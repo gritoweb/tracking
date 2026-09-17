@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { signUp } from "./auth";
-import { addManualEntry } from "./entry-helpers";
+import { addManualEntry, goToListView } from "./entry-helpers";
 import { createProject } from "./project-helpers";
 
 test.describe("entry delete", () => {
@@ -8,6 +8,7 @@ test.describe("entry delete", () => {
     await signUp(page);
     await createProject(page);
     await page.reload();
+    await goToListView(page);
   });
 
   test("deletes an entry via its row menu (with exit animation)", async ({ page }) => {

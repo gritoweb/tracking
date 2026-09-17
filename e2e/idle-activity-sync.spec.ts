@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { signUp } from "./auth";
-import { chooseProject, createProject } from "./project-helpers";
+import { createProject, pickProjectInBar } from "./project-helpers";
 
 declare global {
   interface Window {
@@ -34,9 +34,9 @@ test("activity heartbeat reaches the user's other sessions", async ({ page }) =>
   );
 
   // Heartbeats are gated on a running timer — an idle workspace stays silent.
+  await pickProjectInBar(page);
   await page.getByPlaceholder("What are you working on?").fill("Relay test entry");
   await page.getByRole("button", { name: "Start" }).click();
-  await chooseProject(page);
   await expect(page.getByRole("button", { name: "Stop" })).toBeVisible();
 
   // Real user input (not synthetic dispatch) so the window listener fires — and

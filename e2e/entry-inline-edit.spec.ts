@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { signUp } from "./auth";
-import { addManualEntry } from "./entry-helpers";
+import { addManualEntry, goToListView } from "./entry-helpers";
 import { createProject } from "./project-helpers";
 
 /**
@@ -17,6 +17,7 @@ test.describe("entry list inline editing", () => {
     await signUp(page);
     await createProject(page);
     await page.reload();
+    await goToListView(page);
   });
 
   test("renaming in place keeps the same row and acknowledges the save", async ({ page }) => {

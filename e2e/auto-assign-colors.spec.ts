@@ -18,7 +18,7 @@ test("auto-assign colors: toggle + recolor existing projects", async ({ page }) 
   // Enable the preference, then apply to existing.
   await page.getByRole("switch", { name: /auto-assign colors/i }).click();
   await page.getByRole("button", { name: "Apply to existing" }).click();
-  await expect(page.getByText(/Recolored 4 projects/)).toBeVisible();
+  await expect(page.getByText(/Recolored 4 projects/)).toBeVisible({ timeout: 30_000 });
 
   // Projects page: all four render and their swatches are now distinct.
   await page.goto("/projects");

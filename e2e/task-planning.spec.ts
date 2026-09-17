@@ -240,7 +240,10 @@ test("a task carries notes, editable through the detail panel (D5)", async ({ pa
   const panel = page.getByRole("dialog", { name: "Reconcile Q3 invoices" });
   await expect(panel).toBeVisible();
   await expect(panel.getByLabel("Task name")).toHaveValue("Reconcile Q3 invoices");
-  await expect(panel.getByRole("button", { name: "Clear due date" })).toBeVisible();
+  // "Clear due date" lives inside the due-date popover, portaled outside the dialog — open it first.
+  await panel.getByRole("button", { name: /^Due .* — change$/ }).click();
+  await expect(page.getByRole("button", { name: "Clear due date" })).toBeVisible();
+  await page.keyboard.press("Escape");
 
   // Every field autosaves on blur — there is no batched "Save changes" anymore.
   await panel.getByLabel("Description").fill("Check the August credit note before sending.");
@@ -307,8 +310,8 @@ test("checking off a checklist item in the description marks it done (D8)", asyn
   const panel = page.getByRole("dialog", { name: "Launch checklist" });
   const editor = panel.getByRole("textbox", { name: "Description" });
   await editor.click();
-  await panel.getByRole("button", { name: "Checklist" }).click();
-  await page.keyboard.type("Ship to staging");
+  // No toolbar — a checklist item is typed as its own markdown-style input rule.
+  await page.keyboard.type("[] Ship to staging");
   await editor.blur();
   await page.waitForTimeout(500);
 

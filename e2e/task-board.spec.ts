@@ -244,7 +244,8 @@ test("the board keeps one open and one completed column, and one default", async
   });
   const after = await statuses(page);
   expect(after.filter((s) => s.isDefault)).toHaveLength(1);
-  expect(byName(after, "Pendente").isDefault).toBe(true);
+  // Heir is the first remaining OPEN column by sort_order, not the workspace's original default.
+  expect(byName(after, "On hold").isDefault).toBe(true);
 });
 
 test("recategorising a column carries the tasks already in it across the done line", async ({ page }) => {
@@ -283,8 +284,9 @@ test("recategorising a column carries the tasks already in it across the done li
 test("two live statuses may not share a name", async ({ page }) => {
   await signUp(page);
   const { origin } = await originHeaders(page);
+  // Case-insensitive clash against a live default name, derived from DEFAULT_ORDER.
   const clash = await page.request.post("/api/task-statuses", {
-    data: { name: "to do", color: "#ef4444", category: "active" },
+    data: { name: DEFAULT_ORDER[0].toLowerCase(), color: "#ef4444", category: "active" },
     headers: { origin },
   });
   expect(clash.status()).toBe(409);
