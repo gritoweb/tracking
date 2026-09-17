@@ -1,5 +1,34 @@
 # Changelog
 
+## 2026-09-17 (6)
+### Changed
+- **`pnpm lint` is now `eslint . --max-warnings 0`, and the six warnings it used to carry are gone.**
+  Four were `react-refresh/only-export-components`: `badgeVariants`, `buttonVariants` and
+  `tabsListVariants` moved to sibling `*-variants.ts` modules and `EMPTY_FILTERS`/`ReportFilters`/
+  `BillableFilter` to `components/reports/report-filters.ts`, so a file exports components or
+  constants, never both. The other two were `react-hooks/exhaustive-deps` on the running timer and
+  were restructured rather than silenced: `TimerBar`'s description debounce reads the latest entry and
+  mutation through refs (which also stops a websocket-driven tag/billable sync from restarting the
+  debounce), and `useTimer`'s tick effect now tests `runningEntry?.id`, exactly what its dependency
+  array already listed.
+- **The design-system lint rules are composed from arrays**, with four groups declared in
+  `packages/eslint-config/base.js`: the five existing motion/layer/z-index checks stay `error`, and
+  the three new groups (empty `.catch`, discarded `onError`, raw hex/Tailwind palette colour, resting
+  shadow, arbitrary pixel size, hand-copied focus ring) are declared but switched off until the
+  codebase is swept — today's baseline is 52 / 29 / 47 hits. Composition matters because ESLint flat
+  config *replaces* rather than merges a rule id where two configs overlap: reusing
+  `no-restricted-syntax` for the new checks silently dropped the five existing ones, so each file
+  scope has to spread its own full set. Colour exemptions cover the palette and brand sources, the
+  email templates (no `oklch()` in mail clients) and the extension's background worker (Chrome's
+  badge API takes a literal).
+- **CI runs on the branches that exist.** `.github/workflows/e2e.yml` triggered on `push` to `main`,
+  a branch this repository no longer has, so nothing ran on any push; it now triggers on `master` and
+  `refactor` plus pull requests, and a `quality` job (`install` → `tsc -b` → `lint` → `build`) gates
+  the e2e job through `needs`.
+
+Verified: `npx tsc -b` exit 0 and `pnpm lint` exit 0 with `--max-warnings 0`. The timer specs still
+have to run against the restructured effects before this lot closes.
+
 ## 2026-09-17 (5)
 ### Docs
 - **The hosted Workers Builds pipeline fails for a different reason than this file recorded on

@@ -123,14 +123,23 @@ export function TimerBar() {
     }
   }
 
+  // Read at fire time, not closed over, so the debounce effect's deps can stay id-only.
+  const runningEntryRef = useRef(runningEntry);
+  const updateEntryRef = useRef(updateEntry);
+  useEffect(() => {
+    runningEntryRef.current = runningEntry;
+    updateEntryRef.current = updateEntry;
+  });
+
   // Debounced description update while running. A rejected save used to be
   // completely silent — the bar kept showing text the server never stored, and
   // the user found out when the stopped entry turned up blank.
   useEffect(() => {
-    if (!runningEntry || description === runningEntry.description) return;
+    const entry = runningEntryRef.current;
+    if (!entry || description === entry.description) return;
     const t = setTimeout(() => {
-      updateEntry.mutate(
-        { id: runningEntry.id, data: { description } },
+      updateEntryRef.current.mutate(
+        { id: entry.id, data: { description } },
         {
           onError: () =>
             toast.error("Couldn't save the description", {

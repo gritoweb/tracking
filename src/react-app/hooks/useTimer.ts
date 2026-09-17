@@ -434,7 +434,7 @@ export function useTimerLifecycle(draft?: StartTimerInput) {
 
   // ─── Tick loop + tab title ───────────────────────────────────────────────
   useEffect(() => {
-    if (!runningEntry || !localStartTime) {
+    if (runningEntry?.id == null || !localStartTime) {
       document.title = "Time Tracker";
       return;
     }

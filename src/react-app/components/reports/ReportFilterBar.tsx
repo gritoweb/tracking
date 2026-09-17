@@ -19,29 +19,11 @@ import { MultiSelect, type MultiSelectOption } from "./MultiSelect";
 import { useAllClients, useAllProjects, useTags } from "@/hooks/useProjects";
 import { useAllTasks } from "@/hooks/useTasks";
 import { useWorkspaceMembers } from "@/hooks/useWorkspaceRole";
-
-export type BillableFilter = "all" | "billable" | "nonbillable";
-
-export interface ReportFilters {
-  clientIds: string[];
-  projectIds: string[];
-  taskIds: string[];
-  tagIds: string[];
-  /** Owner/admin only; the server ignores it for a member and keeps their own hours (D3). */
-  userIds: string[];
-  billable: BillableFilter;
-  search: string;
-}
-
-export const EMPTY_FILTERS: ReportFilters = {
-  clientIds: [],
-  projectIds: [],
-  taskIds: [],
-  tagIds: [],
-  userIds: [],
-  billable: "all",
-  search: "",
-};
+import {
+  EMPTY_FILTERS,
+  type BillableFilter,
+  type ReportFilters,
+} from "@/components/reports/report-filters";
 
 interface ReportFilterBarProps {
   filters: ReportFilters;

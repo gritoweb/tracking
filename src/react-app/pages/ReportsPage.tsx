@@ -12,11 +12,11 @@ import { SummaryTree } from "@/components/reports/SummaryTree";
 import { RoundingControl } from "@/components/reports/RoundingControl";
 import { SavedReportsMenu } from "@/components/reports/SavedReportsMenu";
 import type { ReportConfig } from "@/hooks/useSavedReports";
+import { ReportFilterBar } from "@/components/reports/ReportFilterBar";
 import {
-  ReportFilterBar,
   EMPTY_FILTERS,
   type ReportFilters,
-} from "@/components/reports/ReportFilterBar";
+} from "@/components/reports/report-filters";
 import { WeeklyBarChart } from "@/components/reports/WeeklyBarChart";
 import { DetailedTable, type DetailedEntry } from "@/components/reports/DetailedTable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";

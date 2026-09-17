@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { api, type ReportParams } from "@/lib/api";
-import type { ReportFilters } from "@/components/reports/ReportFilterBar";
+import type { ReportFilters } from "@/components/reports/report-filters";
 
 interface DailyData {
   date: string;

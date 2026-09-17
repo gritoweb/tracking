@@ -2,11 +2,39 @@ name: E2E Tests
 
 on:
   push:
-    branches: [main]
+    branches: [master, refactor]
   pull_request:
 
 jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: npx tsc -b
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Build
+        run: pnpm build
+
+      # Vitest coverage steps go here once that suite exists.
+
   e2e:
+    needs: quality
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

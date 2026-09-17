@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
-import type { ReportFilters } from "@/components/reports/ReportFilterBar";
+import type { ReportFilters } from "@/components/reports/report-filters";
 import type { Rounding, GroupDimension, SubGroupDimension } from "@/hooks/useReports";
 
 // The full report view captured by a saved report.

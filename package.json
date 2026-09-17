@@ -120,7 +120,7 @@
 		"versions:upload": "pnpm build && wrangler versions upload",
 		"dev": "vite",
 		"email:dev": "email dev --dir src/worker/emails --port 3333",
-		"lint": "eslint .",
+		"lint": "eslint . --max-warnings 0",
 		"preview": "pnpm run build && vite preview",
 		"test:e2e": "playwright test",
 		"seed:demo": "node scripts/seed-feature-demo.mjs"
