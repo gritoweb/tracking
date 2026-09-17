@@ -5,6 +5,7 @@ import {
   UpdateRecurringEntrySchema,
 } from "@shared/schemas";
 import { findActiveProject, PROJECT_REQUIRED_ERROR } from "../lib/projects";
+import { resolveEntryBillable } from "@shared/billable";
 
 const RECURRING_SELECT = `
   SELECT r.*, p.name AS project_name, p.color AS project_color, t.name AS task_name
@@ -81,7 +82,7 @@ export const recurringRouter = new Hono<{
         d.projectId,
         d.taskId ?? null,
         JSON.stringify(d.tags),
-        d.billable ? 1 : 0,
+        resolveEntryBillable(d.billable) ? 1 : 0,
         d.durationSeconds,
         [...new Set(d.daysOfWeek)].sort((a, b) => a - b).join(","),
         d.timeUtcMinutes,

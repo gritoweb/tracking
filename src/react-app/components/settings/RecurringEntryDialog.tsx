@@ -22,6 +22,7 @@ import {
   hhmmToMinutes,
   dayLabel,
 } from "@/lib/recurrence";
+import { DEFAULT_ENTRY_BILLABLE } from "@shared/billable";
 import type { RecurringEntry } from "@shared/schemas";
 
 interface RecurringEntryDialogProps {
@@ -46,7 +47,7 @@ export function RecurringEntryDialog({ open, onClose, editing }: RecurringEntryD
   const [projectId, setProjectId] = useState<string | null>(editing?.projectId ?? null);
   const [taskId, setTaskId] = useState<string | null>(editing?.taskId ?? null);
   const [tags, setTags] = useState<string[]>(editing?.tags ?? []);
-  const [billable, setBillable] = useState(editing?.billable ?? false);
+  const [billable, setBillable] = useState(editing?.billable ?? DEFAULT_ENTRY_BILLABLE);
   const [durationMin, setDurationMin] = useState(
     editing ? Math.round(editing.durationSeconds / 60) : 30
   );

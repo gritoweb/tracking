@@ -10,6 +10,7 @@ import { api } from "@/lib/api";
 import { formatSeconds, formatDurationShort } from "@/lib/dateUtils";
 import { saveTimerState, clearTimerState, loadTimerState } from "@/lib/idb";
 import { compareLocalDates, todayLocalDate } from "@shared/task-recurrence";
+import { DEFAULT_ENTRY_BILLABLE } from "@shared/billable";
 import type { TimeEntry, Task } from "@shared/schemas";
 
 /**
@@ -33,8 +34,7 @@ function rangeContains(key: readonly unknown[], start: string): boolean {
  * What the timer bar would start. Shared by `startTimer` and the Alt+Shift+S
  * hotkey so the button and the shortcut it advertises can never diverge.
  *
- * `billable` is deliberately optional: omitted means "inherit from the project"
- * server-side, which is not the same as an explicit `false`.
+ * `billable` is deliberately optional: omitted resolves to billable, not the same as an explicit `false`.
  */
 export interface StartTimerInput {
   description?: string;
@@ -96,10 +96,7 @@ export function useTimer() {
         projectId: partial.projectId ?? null,
         taskId: partial.taskId ?? null,
         start: new Date().toISOString(),
-        // Passed through undefined rather than coerced to false: the server
-        // reads "unspecified" as "inherit this project's billable flag"
-        // (resolveBillable in routes/time-entries.ts). Coercing here is how
-        // every API-started timer used to come out non-billable.
+        // Passed through undefined, not coerced: the server defaults unspecified to billable.
         billable: partial.billable,
         tags: partial.tags ?? [],
       }) as Promise<TimeEntry>;
@@ -126,7 +123,7 @@ export function useTimer() {
         start: new Date(now).toISOString(),
         stop: null,
         duration: null,
-        billable: partial.billable ?? false,
+        billable: partial.billable ?? DEFAULT_ENTRY_BILLABLE,
         tags: partial.tags ?? [],
         syncStatus: null,
         externalId: null,
@@ -498,7 +495,7 @@ export function useTimerLifecycle(draft?: StartTimerInput) {
               start: new Date(saved.startedAt).toISOString(),
               stop: null,
               duration: null,
-              billable: false,
+              billable: DEFAULT_ENTRY_BILLABLE,
               tags: [],
               syncStatus: null,
               externalId: null,
@@ -523,8 +520,8 @@ export function useTimerLifecycle(draft?: StartTimerInput) {
   // elements by default, so this shortcut did nothing in the description input
   // — the field the user is in every time they are about to start a timer.
   // And `getDraft` is what it starts: calling `startTimer()` bare began a
-  // blank, project-less, non-billable entry, then the bar's running-entry sync
-  // overwrote the typed description and picked project from that empty entry.
+  // blank, project-less entry, then the bar's running-entry sync overwrote the
+  // typed description and picked project from that empty entry.
   // The advertised shortcut destroyed the work it was meant to commit.
   useHotkeys(
     "alt+shift+s",

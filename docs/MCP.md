@@ -114,7 +114,7 @@ reach — 7 on a read key, 13 on read+write.
 
 | Tool | Scope | Notes |
 |---|---|---|
-| `list_projects` | read | Ids, client, billable default, rate, budget, tracked total; `needsClient` marks one that can't take time yet |
+| `list_projects` | read | Ids, client, whether the project itself is billable, rate, budget, tracked total; `needsClient` marks one that can't take time yet |
 | `list_clients` | read | With project counts |
 | `get_time_summary` | read | Totals over a range, grouped by project/client/task/tag; a member's key counts only their own time |
 | `list_time_entries` | read | Individual entries, optional description search; a member's key lists only their own |

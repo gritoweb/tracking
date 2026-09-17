@@ -19,6 +19,7 @@ import { TaskPicker } from "./TaskPicker";
 import { TagPicker } from "./TagPicker";
 import { useAiQuickEntry } from "@/hooks/useAi";
 import { useCreateEntry } from "@/hooks/useEntries";
+import { DEFAULT_ENTRY_BILLABLE } from "@shared/billable";
 import type { AiQuickEntryResult } from "@shared/schemas";
 
 interface AiQuickAddDialogProps {
@@ -47,7 +48,7 @@ export function AiQuickAddDialog({ open, onClose }: AiQuickAddDialogProps) {
   const [projectId, setProjectId] = useState<string | null>(null);
   const [taskId, setTaskId] = useState<string | null>(null);
   const [tags, setTags] = useState<string[]>([]);
-  const [billable, setBillable] = useState(false);
+  const [billable, setBillable] = useState(DEFAULT_ENTRY_BILLABLE);
   const [startIso, setStartIso] = useState("");
   const [stopBaseIso, setStopBaseIso] = useState("");
   const [startTime, setStartTime] = useState("");

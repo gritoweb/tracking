@@ -10,6 +10,7 @@ import {
   connectionsWithAutoTrack,
 } from "./calendar-connections";
 import type { ExternalEvent } from "./calendar-providers";
+import { resolveEntryBillable } from "@shared/billable";
 
 /** Insert this person's entries for events they haven't confirmed in [since, until]. Returns count. */
 async function insertEvents(
@@ -37,8 +38,7 @@ async function insertEvents(
   const fresh = events.filter((e) => !confirmed.has(e.calendarEventId));
   if (!fresh.length) return 0;
 
-  // Project match from the event title, so meetings land on the right
-  // engagement with its billable default.
+  // Project match from the event title, so meetings land on the right engagement.
   let inferred = new Map<string, InferredEventProject>();
   try {
     inferred = await inferEventProjects(db, env.AI, workspaceId, fresh.map((e) => e.title));
@@ -71,7 +71,7 @@ async function insertEvents(
         e.stop,
         e.stop,
         e.start,
-        match.billable ? 1 : 0,
+        resolveEntryBillable(match.billable) ? 1 : 0,
         e.calendarEventId,
         now,
         now

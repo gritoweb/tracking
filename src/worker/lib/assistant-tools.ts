@@ -11,6 +11,7 @@ import { broadcast, getEntryById } from "../db/queries";
 import { loadGroundingProjects, resolveGrounding, inferEventProjects } from "./ai";
 import { rememberFact, searchMemories } from "./assistant-memory";
 import { canWriteEntry, getMemberRole } from "./permissions";
+import { resolveEntryBillable } from "@shared/billable";
 
 export interface AssistantToolContext {
   env: Env;
@@ -34,15 +35,15 @@ async function resolveProject(
   env: Env,
   workspaceId: string,
   projectName: string | null | undefined
-): Promise<{ projectId: string | null; projectName: string | null; billable: boolean; warning?: string }> {
-  if (!projectName) return { projectId: null, projectName: null, billable: false };
+): Promise<{ projectId: string | null; projectName: string | null; warning?: string }> {
+  if (!projectName) return { projectId: null, projectName: null };
   const projects = await loadGroundingProjects(env.DB, workspaceId);
   const r = resolveGrounding(projectName, null, projects);
   if (!r.projectMatched) {
-    return { projectId: null, projectName: null, billable: false, warning: r.warnings[0] };
+    return { projectId: null, projectName: null, warning: r.warnings[0] };
   }
   const matched = projects.find((p) => p.id === r.projectId)!;
-  return { projectId: matched.id, projectName: matched.name, billable: matched.billable };
+  return { projectId: matched.id, projectName: matched.name };
 }
 
 export function buildAssistantTools(ctx: AssistantToolContext): ToolSet {
@@ -62,7 +63,7 @@ export function buildAssistantTools(ctx: AssistantToolContext): ToolSet {
         billable: z
           .boolean()
           .nullish()
-          .describe("Override billable; defaults to the project's default"),
+          .describe("Override billable; every entry is billable by default"),
       }),
       execute: async ({ description, projectName, billable }) => {
         const now = new Date().toISOString();
@@ -91,7 +92,7 @@ export function buildAssistantTools(ctx: AssistantToolContext): ToolSet {
             proj.projectId,
             description,
             now,
-            (billable ?? proj.billable) ? 1 : 0,
+            resolveEntryBillable(billable) ? 1 : 0,
             now,
             now
           )
@@ -102,7 +103,7 @@ export function buildAssistantTools(ctx: AssistantToolContext): ToolSet {
           ok: true,
           startedAt: now,
           project: proj.projectName,
-          billable: (billable ?? proj.billable) ? true : false,
+          billable: resolveEntryBillable(billable),
         };
       },
     }),
@@ -174,7 +175,7 @@ export function buildAssistantTools(ctx: AssistantToolContext): ToolSet {
             start,
             stop,
             duration,
-            (billable ?? proj.billable) ? 1 : 0,
+            resolveEntryBillable(billable) ? 1 : 0,
             now,
             now
           )
@@ -204,10 +205,9 @@ export function buildAssistantTools(ctx: AssistantToolContext): ToolSet {
         if (Date.parse(stop) <= Date.parse(start)) {
           return { ok: false, reason: "Stop must be after start." };
         }
-        let project: { projectId: string | null; projectName: string | null; billable: boolean } = {
+        let project: { projectId: string | null; projectName: string | null } = {
           projectId: null,
           projectName: null,
-          billable: false,
         };
         if (projectName) {
           project = await resolveProject(env, workspaceId, projectName);
@@ -215,7 +215,7 @@ export function buildAssistantTools(ctx: AssistantToolContext): ToolSet {
           try {
             const match = (await inferEventProjects(db, env.AI, workspaceId, [title])).get(title.trim());
             if (match?.projectId) {
-              project = { projectId: match.projectId, projectName: match.projectName, billable: match.billable };
+              project = { projectId: match.projectId, projectName: match.projectName };
             }
           } catch {
             // best-effort
@@ -231,7 +231,7 @@ export function buildAssistantTools(ctx: AssistantToolContext): ToolSet {
                (id, workspace_id, user_id, project_id, task_id, description, start, stop, duration, billable, calendar_event_id, created_at, updated_at)
              VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, NULL, ?, ?)`
           )
-          .bind(id, workspaceId, userId, project.projectId, title, start, stop, duration, project.billable ? 1 : 0, now, now)
+          .bind(id, workspaceId, userId, project.projectId, title, start, stop, duration, resolveEntryBillable() ? 1 : 0, now, now)
           .run();
         const entry = await getEntryById(db, id, workspaceId);
         await broadcast(env, workspaceId, "entries:changed", entry, null, userId);
@@ -275,7 +275,7 @@ export function buildAssistantTools(ctx: AssistantToolContext): ToolSet {
     }),
 
     listProjects: tool({
-      description: "List the workspace's active projects and their billable defaults.",
+      description: "List the workspace's active projects and whether each one is itself billable.",
       inputSchema: z.object({}),
       execute: async () => {
         const projects = await loadGroundingProjects(db, workspaceId);

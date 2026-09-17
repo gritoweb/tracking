@@ -307,7 +307,7 @@ export const CreateTaskSchema = z.object({
   /** Omitted means the workspace's default status. */
   statusId: z.string().optional(),
   /** Every id must be a member of the task's workspace — the server validates, never trusts. */
-  assigneeIds: z.array(z.string()).optional(),
+  assigneeIds: z.array(z.string()).max(50).optional(),
 });
 
 export const UpdateTaskSchema = z.object({
@@ -330,7 +330,7 @@ export const UpdateTaskSchema = z.object({
   /** Also rewrites `active`/`completed_at` from the target's category. */
   statusId: z.string().optional(),
   /** Replaces the whole assignee set — the client always sends the full list. */
-  assigneeIds: z.array(z.string()).optional(),
+  assigneeIds: z.array(z.string()).max(50).optional(),
   /** Top-level tasks only — a subtask always follows its parent's project. */
   projectId: z.string().optional(),
 });
@@ -383,7 +383,7 @@ export const CreateFavoriteSchema = z.object({
   projectId: z.string().nullable().optional(),
   taskId: z.string().nullable().optional(),
   tags: z.array(z.string().max(100)).max(50).default([]),
-  billable: z.boolean().default(false),
+  billable: z.boolean().default(true),
 });
 
 // ─── Recurring entries ───────────────────────────────────────────────────────
@@ -415,7 +415,7 @@ export const CreateRecurringEntrySchema = z.object({
   projectId: z.string().min(1, "Choose a project"),
   taskId: z.string().nullable().optional(),
   tags: z.array(z.string().max(100)).max(50).default([]),
-  billable: z.boolean().default(false),
+  billable: z.boolean().default(true),
   durationSeconds: z.number().int().min(60).max(86_400),
   daysOfWeek: z.array(z.number().int().min(0).max(6)).min(1),
   timeUtcMinutes: z.number().int().min(0).max(1439),

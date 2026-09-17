@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,8 +36,6 @@ import { SessionsCard } from "@/components/settings/SessionsCard";
 import { ConnectedAccountsCard } from "@/components/settings/ConnectedAccountsCard";
 import { PasskeysCard } from "@/components/settings/PasskeysCard";
 import { DangerZoneCard } from "@/components/settings/DangerZoneCard";
-
-import { getDefaultBillable, setDefaultBillable } from "@/lib/billable";
 import { Kbd } from "@/components/ui/kbd";
 const TABS = ["general", "tracking", "workspace", "account"] as const;
 type Tab = (typeof TABS)[number];
@@ -49,7 +46,6 @@ export function SettingsPage() {
   const { data: entries = [] } = useEntries(365);
 
   // — Preferences state
-  const [defaultBillable, setDefaultBillableState] = useState<boolean>(getDefaultBillable);
   const timeFormat = useUIStore((s) => s.timeFormat);
   const setTimeFormatStore = useUIStore((s) => s.setTimeFormat);
   const currency = useUIStore((s) => s.currency);
@@ -69,11 +65,6 @@ export function SettingsPage() {
 
   const handleExportAll = () => {
     exportToCSV(entries, "all-time-entries");
-  };
-
-  const handleDefaultBillableChange = (checked: boolean) => {
-    setDefaultBillableState(checked);
-    setDefaultBillable(checked);
   };
 
   const handleTimeFormatChange = (value: "24h" | "12h") => {
@@ -225,23 +216,6 @@ export function SettingsPage() {
           <CardTitle className="text-base">Preferences</CardTitle>
         </CardHeader>
         <CardContent className="space-y-5">
-          {/* Default billable */}
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <Label htmlFor="pref-billable">Default billable</Label>
-              <p className="mt-1 text-xs leading-normal text-muted-foreground">
-                New timers start billable unless the project says otherwise
-              </p>
-            </div>
-            <Switch
-              id="pref-billable"
-              checked={defaultBillable}
-              onCheckedChange={handleDefaultBillableChange}
-            />
-          </div>
-
-          <Separator />
-
           {/* Time display format */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>

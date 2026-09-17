@@ -23,25 +23,7 @@ import {
 } from "../db/queries";
 import { getMemberRole, canManageWorkspace, canWriteEntry, entryScopeUserId } from "../lib/permissions";
 import { findActiveProject, PROJECT_REQUIRED_ERROR } from "../lib/projects";
-
-
-/**
- * Decide an entry's billable flag when the caller didn't state one.
- *
- * `billable` is the only column reports read to compute both billable seconds
- * and invoiced amount (`reports.ts`), and nothing derives it from the project at
- * read time. While `CreateTimeEntrySchema` defaulted it to `false`, every entry
- * created without an explicit flag — the timer bar, the extension, the AI
- * quick-add — landed non-billable no matter which project it was logged
- * against, so a workspace could track a full week on a billable retainer and
- * report zero revenue.
- *
- * An explicit `true`/`false` from the caller always wins; this only fills the
- * gap from the project, which every entry now has (D3).
- */
-function resolveBillable(explicit: boolean | undefined, projectBillable: boolean): boolean {
-  return explicit ?? projectBillable;
-}
+import { resolveEntryBillable } from "@shared/billable";
 
 /** Ids (already workspace-scoped) the caller may not change: someone else's entry for a member, or anyone else's running timer. */
 async function forbiddenEntryIds(
@@ -200,7 +182,7 @@ export const timeEntriesRouter = new Hono<{
 
     const project = await findActiveProject(c.env.DB, workspaceId, data.projectId);
     if (!project) return c.json({ error: PROJECT_REQUIRED_ERROR }, 400);
-    const billable = resolveBillable(data.billable, project.billable);
+    const billable = resolveEntryBillable(data.billable);
 
     // Stop the caller's running timer; a teammate's keeps going.
     if (!data.stop) {

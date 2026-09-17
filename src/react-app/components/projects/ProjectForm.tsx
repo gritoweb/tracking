@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -62,7 +61,6 @@ export function ProjectForm({ project, open, onClose }: ProjectFormProps) {
   );
   // Rates, budgets, dates and integrations are set by owners/admins; the server ignores them from a member (D3).
   const { canManage } = useWorkspaceRole();
-  const [billable, setBillable] = useState(project?.billable ?? false);
   const [rate, setRate] = useState<string>(project?.rate?.toString() ?? "");
   const [startDate, setStartDate] = useState(project?.startDate ?? "");
   const [endDate, setEndDate] = useState(project?.endDate ?? "");
@@ -101,7 +99,8 @@ export function ProjectForm({ project, open, onClose }: ProjectFormProps) {
       name,
       color,
       clientId,
-      billable,
+      // Unused by any entry path now (see docs/ARCHITECTURE.md) — just preserve it.
+      billable: project?.billable ?? true,
       rate: rate ? parseFloat(rate) : null,
       startDate: startDate || null,
       endDate: endDate || null,
@@ -201,31 +200,24 @@ export function ProjectForm({ project, open, onClose }: ProjectFormProps) {
           </div>
           )}
 
-          {/* Billable + rate + estimated hours */}
+          {/* Rate + estimated hours */}
+          {canManage && (
           <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Switch id="billable" checked={billable} onCheckedChange={setBillable} />
-                <Label htmlFor="billable">Billable</Label>
-              </div>
-              {billable && canManage && (
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">Rate</span>
-                  <Input
-                    type="number"
-                    value={rate}
-                    onChange={(e) => setRate(e.target.value)}
-                    placeholder="0.00"
-                    className="w-24 text-sm"
-                    min={0}
-                    step={0.01}
-                  />
-                  <span className="text-sm text-muted-foreground">/h</span>
-                </div>
-              )}
+            <div className="flex items-center gap-3">
+              <Label htmlFor="project-rate" className="shrink-0 text-sm text-muted-foreground">Rate</Label>
+              <Input
+                id="project-rate"
+                type="number"
+                value={rate}
+                onChange={(e) => setRate(e.target.value)}
+                placeholder="0.00"
+                className="w-24 text-sm"
+                min={0}
+                step={0.01}
+              />
+              <span className="text-sm text-muted-foreground">/h</span>
             </div>
 
-            {canManage && (
             <div className="flex items-center gap-3">
               <Label className="shrink-0 text-sm text-muted-foreground">Estimated hours</Label>
               <Input
@@ -238,8 +230,8 @@ export function ProjectForm({ project, open, onClose }: ProjectFormProps) {
                 step={0.5}
               />
             </div>
-            )}
           </div>
+          )}
 
           {/* Integration */}
           {canManage && integrations.length > 0 && (

@@ -25,6 +25,7 @@ import { createProject, findActiveProject, memberProjectInput } from "../lib/pro
 import { createTask, moveTaskStatus } from "../routes/tasks";
 import { actorDisplayName, notifyAssigneesOfStatusChange, notifyNewAssignees } from "../lib/notifications";
 import { CreateClientSchema, CreateProjectSchema, CreateTaskSchema } from "@shared/schemas";
+import { resolveEntryBillable } from "@shared/billable";
 import type { ApiKeyScope } from "../lib/api-keys";
 
 /** Cap on rows any single tool returns, so one call can't blow the context window. */
@@ -170,7 +171,7 @@ export function buildMcpServer(ctx: McpContext): McpServer {
     {
       title: "List projects",
       description:
-        "Every active project in the workspace with its client, billable default, hourly rate, time budget and total tracked time. Call this first when a question names a project or client. `needsClient: true` marks a project that cannot take time until a person links its client in the app.",
+        "Every active project in the workspace with its client, whether the project itself is billable, hourly rate, time budget and total tracked time. Call this first when a question names a project or client. `needsClient: true` marks a project that cannot take time until a person links its client in the app.",
       inputSchema: {},
       annotations: READ_ONLY,
     },
@@ -545,7 +546,7 @@ export function buildMcpServer(ctx: McpContext): McpServer {
       if (!project) {
         return text(`No active project with id ${data.projectId} in this workspace. Call list_projects and ask the person which project this task belongs to.`);
       }
-      const result = await createTask(db, workspaceId, data, await scopeUserId());
+      const result = await createTask(db, workspaceId, data, await scopeUserId(), userId);
       if ("error" in result) return text(result.error);
       if (data.assigneeIds?.length) {
         await notifyNewAssignees(
@@ -595,12 +596,9 @@ export function buildMcpServer(ctx: McpContext): McpServer {
       const now = new Date().toISOString();
       const id = crypto.randomUUID();
 
-      // Billable follows the project's default, matching resolveBillable on the
-      // REST path — a timer started from a chat window must not land
-      // non-billable when the same work started in the app wouldn't.
       const project = await findActiveProject(db, workspaceId, projectId);
       if (!project) return text(`No active project with id ${projectId} in this workspace, or it has no client yet. Call list_projects and ask the person which project to use — don't choose one for them.`);
-      const billable = project.billable;
+      const billable = resolveEntryBillable();
 
       // Stops only the key holder's running timer; a teammate's keeps going.
       await db
@@ -680,7 +678,7 @@ export function buildMcpServer(ctx: McpContext): McpServer {
         billable: z
           .boolean()
           .optional()
-          .describe("Omit to inherit the project's billable default"),
+          .describe("Omit to log the entry as billable, the default for every entry"),
       },
       // Deliberately NOT idempotent: a second identical call logs a second
       // entry, which is sometimes exactly what the user means.
@@ -696,7 +694,7 @@ export function buildMcpServer(ctx: McpContext): McpServer {
 
       const project = await findActiveProject(db, workspaceId, projectId);
       if (!project) return text(`No active project with id ${projectId} in this workspace, or it has no client yet. Call list_projects and ask the person which project to use — don't choose one for them.`);
-      const resolvedBillable = billable ?? project.billable;
+      const resolvedBillable = resolveEntryBillable(billable);
 
       const now = new Date().toISOString();
       await db

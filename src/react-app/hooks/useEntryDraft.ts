@@ -6,6 +6,7 @@ import {
   formatSeconds,
   parseTimeInput,
 } from "@/lib/dateUtils";
+import { resolveEntryBillable } from "@shared/billable";
 
 export interface EntryDraft {
   description: string;
@@ -52,7 +53,7 @@ export function useEntryDraft(init: EntryDraftInit) {
     projectId: init.projectId ?? null,
     taskId: init.taskId ?? null,
     tags: init.tags ?? [],
-    billable: init.billable ?? false,
+    billable: resolveEntryBillable(init.billable),
     start: init.start ?? null,
     stop: init.stop ?? null,
   });
@@ -82,7 +83,7 @@ export function useEntryDraft(init: EntryDraftInit) {
       projectId: next.projectId ?? null,
       taskId: next.taskId ?? null,
       tags: next.tags ?? [],
-      billable: next.billable ?? false,
+      billable: resolveEntryBillable(next.billable),
       start: next.start ?? null,
       stop: next.stop ?? null,
     });

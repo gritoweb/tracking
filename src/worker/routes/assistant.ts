@@ -7,6 +7,7 @@ import {
 } from "@shared/schemas";
 import { computeNudges } from "../lib/assistant";
 import { inferEventProjects } from "../lib/ai";
+import { resolveEntryBillable } from "@shared/billable";
 import { listMemories, deleteMemory, clearMemories } from "../lib/assistant-memory";
 import { findActiveProject } from "../lib/projects";
 import { broadcast } from "../db/queries";
@@ -46,18 +47,19 @@ export const assistantRouter = new Hono<{
         created: false,
         projectId: null,
         projectName: null,
-        billable: false,
+        billable: resolveEntryBillable(),
       } satisfies AssistantTrackEventResult);
     }
 
-    let project: { id: string; name: string; billable: boolean } | null = null;
+    let project: { id: string; name: string } | null = null;
     if (projectId) {
-      project = await findActiveProject(c.env.DB, workspaceId, projectId);
+      const active = await findActiveProject(c.env.DB, workspaceId, projectId);
+      project = active ? { id: active.id, name: active.name } : null;
     } else {
       try {
         const match = (await inferEventProjects(c.env.DB, c.env.AI, workspaceId, [title])).get(title.trim());
         if (match?.projectId) {
-          project = { id: match.projectId, name: match.projectName, billable: match.billable };
+          project = { id: match.projectId, name: match.projectName };
         }
       } catch {
         // Best-effort only.
@@ -88,7 +90,7 @@ export const assistantRouter = new Hono<{
         start,
         stop,
         duration,
-        project.billable ? 1 : 0,
+        resolveEntryBillable() ? 1 : 0,
         calendarEventId,
         now,
         now
@@ -102,7 +104,7 @@ export const assistantRouter = new Hono<{
       created: true,
       projectId: project.id,
       projectName: project.name,
-      billable: project.billable,
+      billable: resolveEntryBillable(),
     } satisfies AssistantTrackEventResult);
   })
   // ─── Memory management (what the assistant has remembered about the user) ─────────────

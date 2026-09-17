@@ -41,7 +41,7 @@ export function buildQuickEntrySystemPrompt(
           const tasks = p.tasks.length
             ? ` (tasks: ${p.tasks.map((t) => `"${t.name}"`).join(", ")})`
             : "";
-          return `- "${p.name}" [${p.billable ? "billable" : "non-billable"} by default]${tasks}`;
+          return `- "${p.name}"${tasks}`;
         })
         .join("\n")
     : "(no active projects)";
@@ -54,7 +54,7 @@ Rules:
 - If the text states a duration (e.g. "2h") without an explicit end time, pick a specific start and stop within the described period that spans that duration.
 - If there is truly no end time or duration implied (work still in progress), set "stop" to null.
 - For "projectName" and "taskName", choose ONLY an exact name from the list below, or null if nothing matches well. Never invent a name that isn't listed.
-- "billable" should follow the matched project's default shown below. Only diverge from that default if the text explicitly says otherwise (e.g. "internal", "non-billable", "unpaid").
+- "billable" is true by default. Set it to false only if the text explicitly says otherwise (e.g. "internal", "non-billable", "unpaid").
 - "confidence" reflects how sure you are about the project/task match and time resolution.
 
 Known active projects:
@@ -248,7 +248,7 @@ export interface InferredEventProject {
 
 /**
  * Best-effort: match calendar event titles to known projects so materialized
- * entries land pre-categorized with the project's billable default. Grounded
+ * entries land pre-categorized with the right project. Grounded
  * the same way as quick-entry (model may only pick listed names, fuzzy-resolved
  * with the same ambiguity guards). Any failure or non-match yields no entry in
  * the map — callers create the entry without a project, never block on AI.
@@ -310,7 +310,7 @@ ${projects.map((p) => `- "${p.name}"`).join("\n")}`;
       resolved.set(title, {
         projectId: project.id,
         projectName: project.name,
-        billable: project.billable,
+        billable: true,
       });
     }
   }
@@ -374,9 +374,7 @@ export async function runDayDraftEnrichment(
   if (!candidates.length) return out;
 
   const projectLines = projects.length
-    ? projects
-        .map((p) => `- "${p.name}" [${p.billable ? "billable" : "non-billable"} by default]`)
-        .join("\n")
+    ? projects.map((p) => `- "${p.name}"`).join("\n")
     : "(no active projects)";
 
   const system = `You write a consultant's timesheet entries for one day from signals captured while they worked, so they can confirm the day instead of reconstructing it from memory.
@@ -384,7 +382,7 @@ export async function runDayDraftEnrichment(
 For each numbered slot below, write:
 - "description": ONE specific sentence in past tense naming the actual work, as the person would write it themselves. Draw only on the slot's own signal and the day's context. No filler ("worked on tasks", "various activities"), no pleading ("possibly", "may have"), no time or duration (the entry already carries those). Under 120 characters.
 - "projectName": the ONE project the slot belongs to, chosen ONLY as an exact name from the list below, or null. A match must be evident from the signal — a client or project name, an engagement code, an obvious abbreviation. Generic slots ("1:1", "Lunch", "Admin", an unexplained gap) are null. Prefer null over a guess: a wrong project is worse than none.
-- "billable": true/false only when the signal makes it explicit, otherwise null to inherit the project's default.
+- "billable": true/false only when the signal makes it explicit (e.g. "internal", "non-billable", "unpaid"), otherwise null — it defaults to true.
 
 Never invent work that no signal supports. For a slot whose signal says only that time is unaccounted for, describe it as untracked work on the neighbouring task rather than inventing a new one.
 

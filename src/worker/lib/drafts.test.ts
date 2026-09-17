@@ -1,5 +1,29 @@
 import { describe, expect, it } from "vitest";
-import { scaleDurations } from "./drafts";
+import { resolveDraftBillable, scaleDurations } from "./drafts";
+import type { DraftEnrichment } from "./ai";
+
+function enrichment(billable: boolean | null): DraftEnrichment {
+  return { description: "", projectId: null, projectName: null, billable };
+}
+
+describe("resolveDraftBillable", () => {
+  it("defaults to billable when neither the AI nor the candidate say anything", () => {
+    expect(resolveDraftBillable(undefined, { billable: null })).toBe(true);
+  });
+
+  it("an explicit AI signal wins over the deterministic candidate", () => {
+    expect(resolveDraftBillable(enrichment(false), { billable: true })).toBe(false);
+    expect(resolveDraftBillable(enrichment(true), { billable: false })).toBe(true);
+  });
+
+  it("falls back to the deterministic candidate when the AI is silent", () => {
+    expect(resolveDraftBillable(enrichment(null), { billable: false })).toBe(false);
+  });
+
+  it("falls back to billable when both the AI and the candidate are silent", () => {
+    expect(resolveDraftBillable(enrichment(null), { billable: null })).toBe(true);
+  });
+});
 
 describe("scaleDurations", () => {
   it("scales every duration proportionally to hit the target total", () => {

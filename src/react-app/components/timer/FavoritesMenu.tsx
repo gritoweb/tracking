@@ -13,6 +13,7 @@ import { ColorDot } from "@/components/ColorDot";
 import { useFavorites, useCreateFavorite, useDeleteFavorite } from "@/hooks/useFavorites";
 import { useTimer } from "@/hooks/useTimer";
 import { cn } from "@/lib/utils";
+import { DEFAULT_ENTRY_BILLABLE } from "@shared/billable";
 import type { Favorite } from "@shared/schemas";
 
 interface FavoritesMenuProps {
@@ -55,7 +56,7 @@ export function FavoritesMenu({ current }: FavoritesMenuProps) {
       projectId: current.projectId,
       taskId: current.taskId,
       tags: current.tags ?? [],
-      billable: current.billable ?? false,
+      billable: current.billable ?? DEFAULT_ENTRY_BILLABLE,
     });
   };
 

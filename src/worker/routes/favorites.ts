@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { CreateFavoriteSchema } from "@shared/schemas";
+import { resolveEntryBillable } from "@shared/billable";
 
 // Joins in the project/task display fields so the favorites bar can render a
 // colored chip without a second round-trip.
@@ -66,7 +67,7 @@ export const favoritesRouter = new Hono<{
         data.projectId ?? null,
         data.taskId ?? null,
         JSON.stringify(data.tags),
-        data.billable ? 1 : 0,
+        resolveEntryBillable(data.billable) ? 1 : 0,
         now
       )
       .run();

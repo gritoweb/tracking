@@ -23,7 +23,9 @@ import {
   loadGroundingProjects,
   runDayDraftEnrichment,
   type DraftEnrichmentCandidate,
+  type DraftEnrichment,
 } from "./ai";
+import { resolveEntryBillable } from "@shared/billable";
 
 /** Ignore uncovered stretches shorter than this — a coffee is not lost time. */
 const MIN_GAP_MS = 30 * 60_000;
@@ -55,6 +57,14 @@ interface Candidate {
   reason: string;
   /** What the model is told about this slot. */
   signal: string;
+}
+
+/** Precedence for a draft's billable flag: AI signal, then the deterministic candidate, then true. */
+export function resolveDraftBillable(
+  ai: DraftEnrichment | undefined,
+  candidate: Pick<Candidate, "billable">
+): boolean {
+  return resolveEntryBillable(ai?.billable ?? candidate.billable ?? undefined);
 }
 
 interface Interval {
@@ -444,7 +454,6 @@ export async function generateDrafts(
   );
 
   // ── Persist ───────────────────────────────────────────────────────────────
-  const projectBillable = new Map(projects.map((p) => [p.id, p.billable]));
   const now = new Date().toISOString();
   const stmt = env.DB.prepare(
     `INSERT OR IGNORE INTO draft_entries
@@ -457,10 +466,7 @@ export async function generateDrafts(
   const rows = capped.map((c, index) => {
     const ai = enrichment.get(index);
     const projectId = ai?.projectId ?? c.projectId;
-    // Billing follows the same precedence as everywhere else in the app: an
-    // explicit signal wins, otherwise inherit the project's default.
-    const billable =
-      ai?.billable ?? c.billable ?? (projectId ? (projectBillable.get(projectId) ?? false) : false);
+    const billable = resolveDraftBillable(ai, c);
     return stmt.bind(
       crypto.randomUUID(),
       workspaceId,

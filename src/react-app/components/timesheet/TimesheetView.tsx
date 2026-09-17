@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils";
 import { weekGrid } from "@/lib/weekGridColumns";
 import { toCreatePayload } from "@/lib/entryUtils";
 import { AddTimesheetRowDialog } from "./AddTimesheetRowDialog";
+import { DEFAULT_ENTRY_BILLABLE } from "@shared/billable";
 import type { TimeEntry } from "@shared/schemas";
 
 const TIMESHEET_LOCKED_HELP_ID = "timesheet-locked-cell-help";
@@ -185,7 +186,7 @@ export function TimesheetView({ weekStart }: TimesheetViewProps) {
         taskId: row.taskId,
         start: start.toISOString(),
         stop: stop.toISOString(),
-        billable: false,
+        billable: DEFAULT_ENTRY_BILLABLE,
         tags: [],
       });
     }

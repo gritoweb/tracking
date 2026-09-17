@@ -16,11 +16,10 @@ import { NotificationBell } from "@/components/layout/NotificationBell";
 import { useTimerStore } from "@/stores/timerStore";
 import { useUIStore } from "@/stores/uiStore";
 import { useTimer, useTimerLifecycle, type StartTimerInput } from "@/hooks/useTimer";
-import { useProjects } from "@/hooks/useProjects";
 import { useUpdateEntry } from "@/hooks/useEntries";
 import { useTagColors } from "@/hooks/useProjects";
 import { BillableToggle } from "./BillableToggle";
-import { getDefaultBillable } from "@/lib/billable";
+import { DEFAULT_ENTRY_BILLABLE } from "@shared/billable";
 import { cn } from "@/lib/utils";
 
 export function TimerBar() {
@@ -43,13 +42,9 @@ export function TimerBar() {
   // entry). The bar has no tag *picker* — chips are removable but only ever
   // added via suggestions/favorites; full editing lives in the entry sheet.
   const [tags, setTags] = useState<string[]>([]);
-  // Whether this hour is invoiceable. `billable` is the only column reports read
-  // to compute revenue, and until this control existed the bar had no way to say
-  // — so every timer started here was written non-billable regardless of the
-  // project. Seeded from the project on selection, overridable by the user.
-  const [billable, setBillable] = useState(getDefaultBillable);
+  // Every entry is born billable; only the user's own toggle turns it off.
+  const [billable, setBillable] = useState(DEFAULT_ENTRY_BILLABLE);
   const tagColor = useTagColors();
-  const { data: projects = [] } = useProjects();
   const descRef = useRef<HTMLInputElement>(null);
 
   // A start without a project (the button, Alt+Shift+S, a favourite, a nudge) waits here until one is picked (D3).
@@ -85,7 +80,7 @@ export function TimerBar() {
   const tagsKey = (runningEntry?.tags ?? []).join("\0");
   const [syncedTagsKey, setSyncedTagsKey] = useState(tagsKey);
   const [syncedBillable, setSyncedBillable] = useState(
-    runningEntry?.billable ?? false
+    runningEntry?.billable ?? DEFAULT_ENTRY_BILLABLE
   );
   if (syncedEntryId !== (runningEntry?.id ?? null)) {
     setSyncedEntryId(runningEntry?.id ?? null);
@@ -96,10 +91,8 @@ export function TimerBar() {
     setProjectId(runningEntry?.projectId ?? useUIStore.getState().lastProjectId);
     setTaskId(runningEntry?.taskId ?? null);
     setTags(runningEntry?.tags ?? []);
-    // On stop (runningEntry → null) the bar resets to the user's preference,
-    // not to a hard false — otherwise "Default billable" silently applied to
-    // the first timer of a session and nothing after it.
-    setBillable(runningEntry?.billable ?? getDefaultBillable());
+    // On stop (runningEntry → null) the bar resets to billable — every entry is born billable.
+    setBillable(runningEntry?.billable ?? DEFAULT_ENTRY_BILLABLE);
   } else if (runningEntry) {
     // Same entry, but its project/task may have been reassigned elsewhere
     // (e.g. from the entries list). Keep the bar's pickers in sync. Description
@@ -304,27 +297,17 @@ export function TimerBar() {
             setProjectId(id);
             useUIStore.getState().setLastProjectId(id);
             setTaskId(null);
-            // Picking a project answers "is this invoiceable?" for the user —
-            // that's what the project's own billable flag is for. An explicit
-            // toggle afterwards still wins; this only sets the starting point,
-            // and matches what the server does for callers that say nothing.
-            // Precedence: an explicit toggle beats the project's flag, which
-            // beats the user's "Default billable" preference. Clearing the
-            // project falls back to that preference rather than hard false.
-            const next = id
-              ? (projects.find((p) => p.id === id)?.billable ?? getDefaultBillable())
-              : getDefaultBillable();
-            setBillable(next);
+            // Billable is its own toggle now — the project no longer sets it.
             if (runningEntry) {
               updateEntry.mutate({
                 id: runningEntry.id,
-                data: { projectId: id, taskId: null, billable: next },
+                data: { projectId: id, taskId: null },
               });
             } else if (pendingStart) {
               startTimer({
                 description: pendingStart.description ?? description,
                 tags: pendingStart.tags ?? tags,
-                billable: pendingStart.billable ?? next,
+                billable: pendingStart.billable ?? billable,
                 projectId: id,
                 taskId: null,
               });

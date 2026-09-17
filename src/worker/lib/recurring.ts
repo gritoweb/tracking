@@ -4,6 +4,7 @@
 
 import { broadcast, upsertTags } from "../db/queries";
 import { findActiveProject } from "./projects";
+import { resolveEntryBillable } from "@shared/billable";
 
 export async function runRecurring(env: Env): Promise<void> {
   const now = new Date();
@@ -78,7 +79,7 @@ export async function runRecurring(env: Env): Promise<void> {
           startIso,
           stopIso,
           duration,
-          row.billable ? 1 : 0,
+          resolveEntryBillable(Boolean(row.billable)) ? 1 : 0,
           nowIso,
           nowIso
         )
