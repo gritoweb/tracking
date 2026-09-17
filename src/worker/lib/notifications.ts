@@ -1,4 +1,5 @@
 import type { Notification } from "@shared/schemas";
+import { currentMemberIds } from "./permissions";
 
 type Row = Record<string, unknown>;
 
@@ -78,15 +79,8 @@ export async function notifyMentions(
   mentionedUserIds: string[],
   template: NotificationTemplate
 ): Promise<void> {
-  if (!mentionedUserIds.length) return;
-  const placeholders = mentionedUserIds.map(() => "?").join(",");
-  const { results } = await env.DB.prepare(
-    `SELECT userId FROM "member" WHERE organizationId = ? AND userId IN (${placeholders})`
-  )
-    .bind(workspaceId, ...mentionedUserIds)
-    .all<{ userId: string }>();
-
-  await Promise.all(results.map((r) => notifyUser(env, workspaceId, r.userId, template)));
+  const targets = await currentMemberIds(env.DB, workspaceId, mentionedUserIds);
+  await Promise.all(targets.map((userId) => notifyUser(env, workspaceId, userId, template)));
 }
 
 /** Being added as an assignee notifies you — on creation or later — except when you added yourself. */
@@ -99,7 +93,8 @@ export async function notifyNewAssignees(
   actorName: string,
   newAssigneeIds: string[]
 ): Promise<void> {
-  const targets = newAssigneeIds.filter((id) => id !== actorId);
+  const candidates = newAssigneeIds.filter((id) => id !== actorId);
+  const targets = await currentMemberIds(env.DB, workspaceId, candidates);
   await Promise.all(
     targets.map((userId) =>
       notifyUser(env, workspaceId, userId, {
@@ -123,9 +118,11 @@ export async function notifyAssigneesOfStatusChange(
   statusName: string
 ): Promise<void> {
   const { results } = await env.DB.prepare(
-    `SELECT user_id AS userId FROM task_assignees WHERE task_id = ?`
+    `SELECT ta.user_id AS userId FROM task_assignees ta
+       JOIN "member" m ON m.organizationId = ? AND m.userId = ta.user_id
+      WHERE ta.task_id = ?`
   )
-    .bind(taskId)
+    .bind(workspaceId, taskId)
     .all<{ userId: string }>();
 
   const targets = results.filter((r) => r.userId !== actorId);

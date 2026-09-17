@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { entryScopeUserId, getMemberRole } from "../lib/permissions";
+import { currentMemberIds, entryScopeUserId, getMemberRole } from "../lib/permissions";
 import { zValidator } from "@hono/zod-validator";
 import {
   CreateTaskCommentSchema,
@@ -74,17 +74,6 @@ function formatComment(row: Row) {
   };
 }
 
-/** Drops any id that isn't currently a member — a mention (or assignee) is never trusted from the client (D6/D8). */
-async function validMemberIds(db: D1Database, workspaceId: string, ids: string[]): Promise<string[]> {
-  const unique = [...new Set(ids)];
-  if (!unique.length) return [];
-  const { results } = await db
-    .prepare(`SELECT userId FROM "member" WHERE organizationId = ? AND userId IN (${unique.map(() => "?").join(",")})`)
-    .bind(workspaceId, ...unique)
-    .all<{ userId: string }>();
-  return results.map((r) => r.userId);
-}
-
 /**
  * `tracked_seconds` **includes every subtask's tracked time**.
  *
@@ -108,7 +97,10 @@ function taskSelect(scoped: boolean): string {
     (SELECT COUNT(*) FROM tasks c WHERE c.parent_id = tk.id) AS subtask_total,
     (SELECT COUNT(*) FROM tasks c WHERE c.parent_id = tk.id AND c.active = 0) AS subtask_done,
     (SELECT json_group_array(json_object('userId', ta.user_id, 'name', COALESCE(u.name, u.email), 'image', u.image))
-       FROM task_assignees ta JOIN "user" u ON u.id = ta.user_id WHERE ta.task_id = tk.id) AS assignees_json
+       FROM task_assignees ta JOIN "user" u ON u.id = ta.user_id
+      WHERE ta.task_id = tk.id
+        AND EXISTS (SELECT 1 FROM "member" m WHERE m.organizationId = tk.workspace_id AND m.userId = ta.user_id)
+    ) AS assignees_json
   FROM tasks tk
   LEFT JOIN projects p ON p.id = tk.project_id AND p.workspace_id = tk.workspace_id
   LEFT JOIN task_statuses s ON s.id = tk.status_id AND s.workspace_id = tk.workspace_id
@@ -242,7 +234,7 @@ async function resolveParent(
 
 /** Replaces a task's whole assignee set; ids that aren't workspace members are dropped, never trusted (D6). */
 async function setAssignees(db: D1Database, workspaceId: string, taskId: string, assigneeIds: string[]) {
-  const validIds = await validMemberIds(db, workspaceId, assigneeIds);
+  const validIds = await currentMemberIds(db, workspaceId, assigneeIds);
 
   const statements = [db.prepare(`DELETE FROM task_assignees WHERE task_id = ?`).bind(taskId)];
   for (const userId of validIds) {
@@ -322,7 +314,9 @@ export const tasksRouter = new Hono<{
     if (!includeInactive) { where += ` AND tk.active = 1`; }
     if (assignee) {
       const assigneeId = assignee === "me" ? c.get("userId") : assignee;
-      where += ` AND EXISTS (SELECT 1 FROM task_assignees ta WHERE ta.task_id = tk.id AND ta.user_id = ?)`;
+      where += ` AND EXISTS (SELECT 1 FROM task_assignees ta
+        JOIN "member" m ON m.organizationId = tk.workspace_id AND m.userId = ta.user_id
+        WHERE ta.task_id = tk.id AND ta.user_id = ?)`;
       bindings.push(assigneeId);
     }
 
@@ -752,7 +746,7 @@ export const tasksRouter = new Hono<{
           .bind(attachmentId, taskId, workspaceId).first<Row>()
       : null;
     // Who's tagged (persisted, shown on the comment) is not who's notified — see below.
-    const mentions = await validMemberIds(c.env.DB, workspaceId, mentionedUserIds);
+    const mentions = await currentMemberIds(c.env.DB, workspaceId, mentionedUserIds);
     // A self-mention is never a notification.
     const notifyTargets = mentions.filter((m) => m !== userId);
 
@@ -800,7 +794,7 @@ export const tasksRouter = new Hono<{
     if (existing.user_id !== userId) return c.json({ error: "Only the author can edit this comment" }, 403);
 
     const { body, mentionedUserIds = [], attachmentId } = c.req.valid("json");
-    const mentions = await validMemberIds(c.env.DB, workspaceId, mentionedUserIds);
+    const mentions = await currentMemberIds(c.env.DB, workspaceId, mentionedUserIds);
     const attachment = attachmentId
       ? await c.env.DB.prepare(`SELECT id FROM task_attachments WHERE id = ? AND task_id = ? AND workspace_id = ?`)
           .bind(attachmentId, taskId, workspaceId).first<Row>()

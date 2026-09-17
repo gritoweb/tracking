@@ -1,5 +1,5 @@
 import { betterAuth } from "better-auth";
-import { createAuthMiddleware } from "better-auth/api";
+import { createAuthMiddleware, isAPIError } from "better-auth/api";
 import { bearer, organization, admin, emailOTP, magicLink } from "better-auth/plugins";
 import { passkey } from "@better-auth/passkey";
 import { WorkspaceInvitationEmail } from "./emails/workspace-invitation";
@@ -17,6 +17,7 @@ import {
   signInEmailFromRequest,
 } from "./lib/invite-only";
 import { ensureStatuses } from "./lib/task-statuses";
+import { removeMemberFromTasks } from "./lib/task-assignees";
 
 function randomSlug(): string {
   return crypto.randomUUID().replace(/-/g, "").slice(0, 12);
@@ -108,6 +109,15 @@ export function createAuth(env: Env, baseURL: string) {
         if (!email || (await accountExists(env, email))) return;
         if (!(await canCreateAccount(env, email))) throw inviteOnlyError();
       }),
+      // leaveOrganization never calls organizationHooks.afterRemoveMember (better-auth 1.6.23 source), so catch it here instead.
+      after: createAuthMiddleware(async (ctx) => {
+        if (ctx.path !== "/organization/leave") return;
+        const left = ctx.context.returned;
+        if (!left || isAPIError(left) || typeof left !== "object") return;
+        const { organizationId, userId } = left as { organizationId?: unknown; userId?: unknown };
+        if (typeof organizationId !== "string" || typeof userId !== "string") return;
+        await removeMemberFromTasks(env, organizationId, userId);
+      }),
     },
     databaseHooks: {
       user: {
@@ -174,6 +184,10 @@ export function createAuth(env: Env, baseURL: string) {
               .prepare(`UPDATE "user" SET last_active_organization_id = ? WHERE id = ?`)
               .bind(organization.id, user.id)
               .run();
+          },
+          // Owner/admin removal path; the voluntary-leave counterpart is the top-level `hooks.after` above.
+          afterRemoveMember: async ({ organization, member }) => {
+            await removeMemberFromTasks(env, organization.id, member.userId);
           },
         },
         // Only a proven owner of the address may join; relaxed in dev so e2e password users can accept.

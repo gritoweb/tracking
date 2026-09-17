@@ -54,4 +54,15 @@ export async function isManager(db: D1Database, workspaceId: string, userId: str
   return canManageWorkspace(await getMemberRole(db, workspaceId, userId));
 }
 
+/** Drops any id that isn't currently a member (D6) — an assignee/mention is never trusted from the client. */
+export async function currentMemberIds(db: D1Database, workspaceId: string, ids: string[]): Promise<string[]> {
+  const unique = [...new Set(ids)];
+  if (!unique.length) return [];
+  const { results } = await db
+    .prepare(`SELECT userId FROM "member" WHERE organizationId = ? AND userId IN (${unique.map(() => "?").join(",")})`)
+    .bind(workspaceId, ...unique)
+    .all<{ userId: string }>();
+  return results.map((r) => r.userId);
+}
+
 export const MANAGER_ONLY_ERROR = "Only workspace owners and admins can do this";
