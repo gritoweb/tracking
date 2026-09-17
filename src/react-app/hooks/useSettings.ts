@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { toastApiError } from "@/lib/toastApiError";
 import { useUIStore } from "@/stores/uiStore";
 import type { Settings, UpdateSettings } from "@shared/schemas";
 
@@ -100,7 +101,7 @@ export function useUpdateSettings() {
       setShowWeekends(settings.showWeekends);
       setAutoAssignColors(settings.autoAssignColors);
     },
-    onError: () => toast.error("Failed to save settings"),
+    onError: (error) => toastApiError(error, "Failed to save settings"),
   });
 }
 

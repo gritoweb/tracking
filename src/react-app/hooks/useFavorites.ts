@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { toastApiError } from "@/lib/toastApiError";
 import type { Favorite, CreateFavorite } from "@shared/schemas";
 
 export function useFavorites() {
@@ -20,7 +21,7 @@ export function useCreateFavorite() {
       queryClient.invalidateQueries({ queryKey: ["favorites"] });
       toast.success("Saved to favorites");
     },
-    onError: () => toast.error("Failed to save favorite"),
+    onError: (error) => toastApiError(error, "Failed to save favorite"),
   });
 }
 
@@ -32,6 +33,6 @@ export function useDeleteFavorite() {
       queryClient.invalidateQueries({ queryKey: ["favorites"] });
       toast.success("Removed favorite");
     },
-    onError: () => toast.error("Failed to remove favorite"),
+    onError: (error) => toastApiError(error, "Failed to remove favorite"),
   });
 }

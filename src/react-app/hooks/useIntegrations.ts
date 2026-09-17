@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { toastApiError } from "@/lib/toastApiError";
 import type {
   CreateIntegration,
   Integration,
@@ -24,7 +25,7 @@ export function useCreateIntegration() {
       queryClient.invalidateQueries({ queryKey: ["integrations"] });
       toast.success("Integration added");
     },
-    onError: () => toast.error("Failed to add integration"),
+    onError: (error) => toastApiError(error, "Failed to add integration"),
   });
 }
 
@@ -37,7 +38,7 @@ export function useUpdateIntegration() {
       queryClient.invalidateQueries({ queryKey: ["integrations"] });
       toast.success("Integration updated");
     },
-    onError: () => toast.error("Failed to update integration"),
+    onError: (error) => toastApiError(error, "Failed to update integration"),
   });
 }
 
@@ -50,7 +51,7 @@ export function useDeleteIntegration() {
       queryClient.invalidateQueries({ queryKey: ["projects"] });
       toast.success("Integration removed");
     },
-    onError: () => toast.error("Failed to remove integration"),
+    onError: (error) => toastApiError(error, "Failed to remove integration"),
   });
 }
 
@@ -89,6 +90,6 @@ export function usePushEntries() {
       }
       queryClient.invalidateQueries({ queryKey: ["time-entries"] });
     },
-    onError: () => toast.error("Failed to push entries"),
+    onError: (error) => toastApiError(error, "Failed to push entries"),
   });
 }

@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { toastApiError } from "@/lib/toastApiError";
 import { useUIStore } from "@/stores/uiStore";
 import { formatDueDate } from "@/lib/taskUtils";
 import {
@@ -45,7 +46,7 @@ export function useCreateTask() {
       queryClient.invalidateQueries({ queryKey: ["projects"] }); // updates trackedSeconds
       toast.success(`Task "${task.name}" created`);
     },
-    onError: () => toast.error("Failed to create task"),
+    onError: (error) => toastApiError(error, "Failed to create task"),
   });
 }
 
@@ -208,7 +209,7 @@ export function useUploadTaskAttachment() {
     onSuccess: (_result, { taskId }) => {
       queryClient.invalidateQueries({ queryKey: ["task-attachments", taskId] });
     },
-    onError: () => toast.error("Failed to upload image"),
+    onError: (error) => toastApiError(error, "Failed to upload image"),
   });
 }
 
@@ -219,7 +220,7 @@ export function useDeleteTaskAttachment() {
     onSuccess: (_result, { taskId }) => {
       queryClient.invalidateQueries({ queryKey: ["task-attachments", taskId] });
     },
-    onError: () => toast.error("Failed to delete attachment"),
+    onError: (error) => toastApiError(error, "Failed to delete attachment"),
   });
 }
 
@@ -231,6 +232,6 @@ export function useDeleteTask() {
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
       toast.success("Task deleted");
     },
-    onError: () => toast.error("Failed to delete task"),
+    onError: (error) => toastApiError(error, "Failed to delete task"),
   });
 }

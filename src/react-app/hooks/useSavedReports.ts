@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { toastApiError } from "@/lib/toastApiError";
 import type { ReportFilters } from "@/components/reports/report-filters";
 import type { Rounding, GroupDimension, SubGroupDimension } from "@/hooks/useReports";
 
@@ -42,7 +43,7 @@ export function useCreateSavedReport() {
       queryClient.invalidateQueries({ queryKey: ["saved-reports"] });
       toast.success("Report saved");
     },
-    onError: () => toast.error("Failed to save report"),
+    onError: (error) => toastApiError(error, "Failed to save report"),
   });
 }
 
@@ -54,6 +55,6 @@ export function useDeleteSavedReport() {
       queryClient.invalidateQueries({ queryKey: ["saved-reports"] });
       toast.success("Report deleted");
     },
-    onError: () => toast.error("Failed to delete report"),
+    onError: (error) => toastApiError(error, "Failed to delete report"),
   });
 }

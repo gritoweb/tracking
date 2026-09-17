@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { toastApiError } from "@/lib/toastApiError";
 import type { ApiKey, ApiKeyScope } from "@shared/schemas";
 
 export function useApiKeys() {
@@ -20,7 +21,7 @@ export function useCreateApiKey() {
   return useMutation({
     mutationFn: (body: { name: string; scope: ApiKeyScope }) => api.apiKeys.create(body),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["api-keys"] }),
-    onError: () => toast.error("Couldn't create the key"),
+    onError: (error) => toastApiError(error, "Couldn't create the key"),
   });
 }
 
@@ -32,6 +33,6 @@ export function useRevokeApiKey() {
       queryClient.invalidateQueries({ queryKey: ["api-keys"] });
       toast.success("Key revoked");
     },
-    onError: () => toast.error("Couldn't revoke the key"),
+    onError: (error) => toastApiError(error, "Couldn't revoke the key"),
   });
 }

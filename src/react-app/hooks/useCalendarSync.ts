@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api, type CalendarProviderId } from "@/lib/api";
+import { toastApiError } from "@/lib/toastApiError";
 export type { ExternalEvent } from "@/lib/calendarMapping";
 
 /** Per-provider calendar connection status for the Settings card. */
@@ -44,7 +45,7 @@ export function useSetAutoTrack() {
       queryClient.invalidateQueries({ queryKey: ["calendar", "status"] });
       toast.success(enabled ? "Auto-tracking calendar events" : "Auto-track turned off");
     },
-    onError: () => toast.error("Failed to update auto-track"),
+    onError: (error) => toastApiError(error, "Failed to update auto-track"),
   });
 }
 
@@ -62,6 +63,6 @@ export function useConvertCalendarRange() {
           : "No new calendar events to add"
       );
     },
-    onError: () => toast.error("Couldn't convert calendar events"),
+    onError: (error) => toastApiError(error, "Couldn't convert calendar events"),
   });
 }

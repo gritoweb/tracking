@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { toastApiError } from "@/lib/toastApiError";
 import { useAssistantStore } from "@/stores/assistantStore";
 import type {
   AssistantMemory,
@@ -72,7 +73,7 @@ export function useDeleteAssistantMemory() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["assistant-memory"] });
     },
-    onError: () => toast.error("Couldn't update the assistant's memory — try again."),
+    onError: (error) => toastApiError(error, "Couldn't update the assistant's memory — try again."),
   });
 }
 

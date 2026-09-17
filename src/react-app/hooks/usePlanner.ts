@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { toastApiError } from "@/lib/toastApiError";
 import type { Allocation, UpsertAllocation, BulkUpsertAllocations } from "@shared/schemas";
 
 // Planned allocations for a [since, until) range of local YYYY-MM-DD dates.
@@ -88,6 +89,6 @@ export function useBulkUpsertAllocations() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["planner-allocations"] });
     },
-    onError: () => toast.error("Failed to save plan"),
+    onError: (error) => toastApiError(error, "Failed to save plan"),
   });
 }

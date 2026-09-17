@@ -7,6 +7,7 @@ import { useUIStore } from "@/stores/uiStore";
 import { invalidateEntryDerived } from "@/hooks/useEntries";
 import { useProjects } from "@/hooks/useProjects";
 import { api } from "@/lib/api";
+import { toastApiError } from "@/lib/toastApiError";
 import { formatSeconds, formatDurationShort } from "@/lib/dateUtils";
 import { saveTimerState, clearTimerState, loadTimerState } from "@/lib/idb";
 import { compareLocalDates, todayLocalDate } from "@shared/task-recurrence";
@@ -271,9 +272,7 @@ export function useTimer() {
       invalidateEntryDerived(queryClient);
       announceStopped(entry);
     },
-    onError: () => {
-      toast.error("Failed to stop timer — please try again");
-    },
+    onError: (error) => toastApiError(error, "Failed to stop timer — please try again"),
   });
 
   // ─── Stop at a specific time (used to trim idle time) ─────────────────────
@@ -291,9 +290,7 @@ export function useTimer() {
       invalidateEntryDerived(queryClient);
       announceStopped(entry);
     },
-    onError: () => {
-      toast.error("Failed to stop timer — please try again");
-    },
+    onError: (error) => toastApiError(error, "Failed to stop timer — please try again"),
   });
 
   // ─── Discard timer ───────────────────────────────────────────────────────
@@ -307,7 +304,7 @@ export function useTimer() {
       // left behind lingered until the next focus refetch.
       invalidateEntryDerived(queryClient);
     },
-    onError: () => toast.error("Failed to discard timer"),
+    onError: (error) => toastApiError(error, "Failed to discard timer"),
   });
 
   // ─── Edit elapsed ────────────────────────────────────────────────────────

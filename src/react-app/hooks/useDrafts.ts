@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { toastApiError } from "@/lib/toastApiError";
 import { useCalendarStatus } from "@/hooks/useCalendarSync";
 import type { DraftEntry } from "@shared/schemas";
 
@@ -73,7 +74,7 @@ export function useGenerateDrafts(localDate: string) {
         );
       }
     },
-    onError: () => toast.error("Couldn't draft the day"),
+    onError: (error) => toastApiError(error, "Couldn't draft the day"),
   });
 }
 
@@ -83,7 +84,7 @@ export function useUpdateDraft(localDate: string) {
     mutationFn: ({ id, data }: { id: string; data: Record<string, unknown> }) =>
       api.drafts.update(id, data),
     onSuccess: () => invalidateDay(queryClient, localDate),
-    onError: () => toast.error("Couldn't update the draft"),
+    onError: (error) => toastApiError(error, "Couldn't update the draft"),
   });
 }
 
@@ -120,7 +121,7 @@ export function useDiscardDay(localDate: string) {
       invalidateDay(queryClient, localDate);
       if (deleted > 0) toast.success(`Discarded ${deleted} drafts`);
     },
-    onError: () => toast.error("Couldn't discard the drafts"),
+    onError: (error) => toastApiError(error, "Couldn't discard the drafts"),
   });
 }
 

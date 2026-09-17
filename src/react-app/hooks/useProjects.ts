@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { toastApiError } from "@/lib/toastApiError";
 import type {
   Project,
   ProjectPacing,
@@ -60,7 +61,7 @@ export function useCreateProject() {
       queryClient.invalidateQueries({ queryKey: ["projects"] });
       toast.success("Project created");
     },
-    onError: () => toast.error("Failed to create project"),
+    onError: (error) => toastApiError(error, "Failed to create project"),
   });
 }
 
@@ -80,7 +81,7 @@ export function useUpdateProject() {
       ) as Promise<Project>,
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: ["projects"] }),
-    onError: () => toast.error("Failed to update project"),
+    onError: (error) => toastApiError(error, "Failed to update project"),
   });
 }
 
@@ -92,7 +93,7 @@ export function useDeleteProject() {
       queryClient.invalidateQueries({ queryKey: ["projects"] });
       toast.success("Project archived");
     },
-    onError: () => toast.error("Failed to archive project"),
+    onError: (error) => toastApiError(error, "Failed to archive project"),
   });
 }
 
@@ -111,7 +112,7 @@ export function useRecolorProjects() {
           : "No projects to recolor"
       );
     },
-    onError: () => toast.error("Failed to recolor projects"),
+    onError: (error) => toastApiError(error, "Failed to recolor projects"),
   });
 }
 
@@ -149,7 +150,7 @@ export function useCreateClient() {
       queryClient.invalidateQueries({ queryKey: ["clients"] });
       toast.success("Client created");
     },
-    onError: () => toast.error("Failed to create client"),
+    onError: (error) => toastApiError(error, "Failed to create client"),
   });
 }
 
@@ -160,7 +161,7 @@ export function useUpdateClient() {
       api.clients.update(id, data as Record<string, unknown>) as Promise<Client>,
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: ["clients"] }),
-    onError: () => toast.error("Failed to update client"),
+    onError: (error) => toastApiError(error, "Failed to update client"),
   });
 }
 
@@ -172,7 +173,7 @@ export function useDeleteClient() {
       queryClient.invalidateQueries({ queryKey: ["clients"] });
       toast.success("Client archived");
     },
-    onError: () => toast.error("Failed to archive client"),
+    onError: (error) => toastApiError(error, "Failed to archive client"),
   });
 }
 
@@ -198,7 +199,7 @@ export function useCreateTag() {
   return useMutation({
     mutationFn: (name: string) => api.tags.create(name),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["tags"] }),
-    onError: () => toast.error("Failed to create tag"),
+    onError: (error) => toastApiError(error, "Failed to create tag"),
   });
 }
 
@@ -208,6 +209,6 @@ export function useUpdateTag() {
     mutationFn: ({ id, color }: { id: string; color: string }) =>
       api.tags.update(id, { color }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["tags"] }),
-    onError: () => toast.error("Failed to update tag color"),
+    onError: (error) => toastApiError(error, "Failed to update tag color"),
   });
 }

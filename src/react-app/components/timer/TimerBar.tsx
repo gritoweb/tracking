@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect } from "react";
-import { toast } from "sonner";
 import { Trash2, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { toastApiError } from "@/lib/toastApiError";
 import { TimerControl } from "./TimerControl";
 import { FavoritesMenu } from "./FavoritesMenu";
 import { ResumeLastButton } from "./ResumeLastButton";
@@ -134,10 +134,8 @@ export function TimerBar() {
       updateEntryRef.current.mutate(
         { id: entry.id, data: { description } },
         {
-          onError: () =>
-            toast.error("Couldn't save the description", {
-              description: "It hasn't been stored on this entry yet.",
-            }),
+          onError: (error) =>
+            toastApiError(error, "Couldn't save the description — it hasn't been stored on this entry yet."),
         }
       );
     }, 800);
@@ -185,11 +183,9 @@ export function TimerBar() {
           // Without this the chip vanished from the bar while the tag stayed on
           // the entry — the bar and the server silently disagreeing about what
           // is being tracked, with nothing on screen to say so.
-          onError: () => {
+          onError: (error) => {
             setTags(previous);
-            toast.error(`Couldn't remove the tag "${name}"`, {
-              description: "It's still on this entry. Try again.",
-            });
+            toastApiError(error, `Couldn't remove the tag "${name}" — it's still on this entry.`);
           },
         }
       );

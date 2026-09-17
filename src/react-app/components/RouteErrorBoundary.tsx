@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
+import { reportClientError } from "@/lib/errorReporter";
 
 interface RouteErrorBoundaryProps {
   /** Center on a standalone full-height surface (use outside the app shell). */
@@ -51,6 +52,7 @@ export function RouteErrorBoundary({ fullScreen = false }: RouteErrorBoundaryPro
 
   useEffect(() => {
     console.error("Route error:", error);
+    reportClientError(error, { kind: "route" });
   }, [error]);
 
   const details = stack ? `${message}\n\n${stack}` : message;

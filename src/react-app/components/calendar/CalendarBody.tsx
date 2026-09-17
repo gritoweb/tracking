@@ -12,6 +12,7 @@ import {
 } from "date-fns";
 import { CalendarPlus, AlertTriangle, Pencil, Copy, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { toastApiError } from "@/lib/toastApiError";
 import { CalendarView, type CalendarViewType } from "./CalendarView";
 import { CalendarCreateDialog } from "./CalendarCreateDialog";
 import { EntryForm, type EditableEntry } from "@/components/entries/EntryForm";
@@ -226,9 +227,9 @@ export function CalendarBody({
     updateEntry.mutate(
       { id: arg.event.id, data: { start: start.toISOString(), stop: end.toISOString() } },
       {
-        onError: () => {
+        onError: (error) => {
           arg.revert();
-          toast.error("Couldn't update entry");
+          toastApiError(error, "Couldn't update entry");
         },
       }
     );
@@ -275,7 +276,7 @@ export function CalendarBody({
             action: { label: "Undo", onClick: () => deleteEntry.mutate(entry.id) },
           });
         },
-        onError: () => toast.error("Couldn't log that task"),
+        onError: (error) => toastApiError(error, "Couldn't log that task"),
       }
     );
   };
@@ -335,13 +336,13 @@ export function CalendarBody({
         start: entry.start,
         stop: entry.stop,
       },
-      { onError: () => toast.error("Couldn't duplicate entry") }
+      { onError: (error) => toastApiError(error, "Couldn't duplicate entry") }
     );
   };
 
   const handleDeleteEntry = (entry: EditableEntry) => {
     deleteEntry.mutate(entry.id, {
-      onError: () => toast.error("Couldn't delete entry"),
+      onError: (error) => toastApiError(error, "Couldn't delete entry"),
     });
   };
 

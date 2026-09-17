@@ -27,6 +27,7 @@ import { adminRouter } from "./routes/admin";
 import { apiKeysRouter } from "./routes/api-keys";
 import { websocketRouter } from "./routes/websocket";
 import { notificationsRouter } from "./routes/notifications";
+import { clientErrorsRouter } from "./routes/client-errors";
 import { createAuth } from "./auth";
 import { runAutoTrack } from "./lib/calendar-autotrack";
 import { runRecurring } from "./lib/recurring";
@@ -59,6 +60,8 @@ const outboundRateLimit = rateLimit(import.meta.env.DEV ? 1000 : 30, 60_000);
 // tighter than the other limits: the endpoint mails a real inbox, so an
 // authenticated caller shouldn't be able to use it as a flooding primitive.
 const emailRateLimit = rateLimit(import.meta.env.DEV ? 1000 : 5, 60_000);
+// A crash report per crash, not per retry loop — a runaway boundary shouldn't flood the logs.
+const clientErrorsRateLimit = rateLimit(import.meta.env.DEV ? 1000 : 10, 60_000);
 
 const app = new Hono<{ Bindings: Env }>()
   .use("*", corsMiddleware)
@@ -108,6 +111,7 @@ const app = new Hono<{ Bindings: Env }>()
   .use("/api/settings/digest/send", emailRateLimit)
   .use("/api/integrations/*", outboundRateLimit)
   .use("/api/calendar/convert", outboundRateLimit)
+  .use("/api/client-errors", clientErrorsRateLimit)
   .route("/api/time_entries", timeEntriesRouter)
   .route("/api/projects", projectsRouter)
   .route("/api/clients", clientsRouter)
@@ -130,7 +134,8 @@ const app = new Hono<{ Bindings: Env }>()
   .route("/api/keys", apiKeysRouter)
   .route("/api/me", meRouter)
   .route("/api/ws", websocketRouter)
-  .route("/api/notifications", notificationsRouter);
+  .route("/api/notifications", notificationsRouter)
+  .route("/api/client-errors", clientErrorsRouter);
 
 export type AppType = typeof app;
 
