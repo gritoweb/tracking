@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { canDeleteAttachment, getMemberRole } from "../lib/permissions";
 
 type Row = Record<string, unknown>;
 
@@ -41,11 +42,17 @@ export const attachmentsRouter = new Hono<{
   })
   .delete("/:id", async (c) => {
     const workspaceId = c.get("workspaceId");
+    const userId = c.get("userId");
     const id = c.req.param("id");
     const row = await c.env.DB.prepare(
-      `SELECT r2_key FROM task_attachments WHERE id = ? AND workspace_id = ?`
+      `SELECT r2_key, user_id FROM task_attachments WHERE id = ? AND workspace_id = ?`
     ).bind(id, workspaceId).first<Row>();
     if (!row) return c.json({ error: "Not found" }, 404);
+
+    const role = await getMemberRole(c.env.DB, workspaceId, userId);
+    if (!canDeleteAttachment(role, (row.user_id as string | null) ?? null, userId)) {
+      return c.json({ error: "Only the uploader or a workspace manager can delete this attachment" }, 403);
+    }
 
     await c.env.DB.prepare(`DELETE FROM task_attachments WHERE id = ?`).bind(id).run();
     c.executionCtx.waitUntil(c.env.ATTACHMENTS.delete(row.r2_key as string));

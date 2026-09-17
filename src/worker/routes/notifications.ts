@@ -9,39 +9,46 @@ export const notificationsRouter = new Hono<{
   Variables: { workspaceId: string; userId: string };
 }>()
   .get("/", async (c) => {
+    const workspaceId = c.get("workspaceId");
     const userId = c.get("userId");
     const { results } = await c.env.DB.prepare(
-      `SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 50`
-    ).bind(userId).all<Row>();
+      `SELECT * FROM notifications WHERE user_id = ? AND workspace_id = ? ORDER BY created_at DESC LIMIT 50`
+    ).bind(userId, workspaceId).all<Row>();
     const unread = await c.env.DB.prepare(
-      `SELECT COUNT(*) AS n FROM notifications WHERE user_id = ? AND is_read = 0`
-    ).bind(userId).first<{ n: number }>();
+      `SELECT COUNT(*) AS n FROM notifications WHERE user_id = ? AND workspace_id = ? AND is_read = 0`
+    ).bind(userId, workspaceId).first<{ n: number }>();
     return c.json({ notifications: results.map(formatNotification), unreadCount: unread?.n ?? 0 });
   })
   .patch("/:id/read", async (c) => {
+    const workspaceId = c.get("workspaceId");
     const userId = c.get("userId");
     await c.env.DB.prepare(
-      `UPDATE notifications SET is_read = 1 WHERE id = ? AND user_id = ?`
-    ).bind(c.req.param("id"), userId).run();
+      `UPDATE notifications SET is_read = 1 WHERE id = ? AND user_id = ? AND workspace_id = ?`
+    ).bind(c.req.param("id"), userId, workspaceId).run();
     return c.json({ ok: true });
   })
   .patch("/read-all", async (c) => {
+    const workspaceId = c.get("workspaceId");
     const userId = c.get("userId");
     await c.env.DB.prepare(
-      `UPDATE notifications SET is_read = 1 WHERE user_id = ? AND is_read = 0`
-    ).bind(userId).run();
+      `UPDATE notifications SET is_read = 1 WHERE user_id = ? AND workspace_id = ? AND is_read = 0`
+    ).bind(userId, workspaceId).run();
     return c.json({ ok: true });
   })
   .delete("/:id", async (c) => {
+    const workspaceId = c.get("workspaceId");
     const userId = c.get("userId");
     await c.env.DB.prepare(
-      `DELETE FROM notifications WHERE id = ? AND user_id = ?`
-    ).bind(c.req.param("id"), userId).run();
+      `DELETE FROM notifications WHERE id = ? AND user_id = ? AND workspace_id = ?`
+    ).bind(c.req.param("id"), userId, workspaceId).run();
     return c.json({ ok: true });
   })
   .delete("/", async (c) => {
+    const workspaceId = c.get("workspaceId");
     const userId = c.get("userId");
-    await c.env.DB.prepare(`DELETE FROM notifications WHERE user_id = ?`).bind(userId).run();
+    await c.env.DB.prepare(
+      `DELETE FROM notifications WHERE user_id = ? AND workspace_id = ?`
+    ).bind(userId, workspaceId).run();
     return c.json({ ok: true });
   })
   // A user's own live inbox — separate Durable Object from the workspace's TimerRoom.

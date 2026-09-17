@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { currentMemberIds, entryScopeUserId, getMemberRole } from "../lib/permissions";
+import { canDeleteTask, currentMemberIds, entryScopeUserId, getMemberRole } from "../lib/permissions";
 import { zValidator } from "@hono/zod-validator";
 import {
   CreateTaskCommentSchema,
@@ -16,7 +16,7 @@ import {
   resolveStatus,
   syncFromCategory,
 } from "../lib/task-statuses";
-import { processImage, sniffImage } from "../lib/image";
+import { ImageDecodeError, processImage, sniffImage } from "../lib/image";
 import { formatAttachment } from "./attachments";
 import { actorDisplayName, notifyAssigneesOfStatusChange, notifyMentions, notifyNewAssignees } from "../lib/notifications";
 import type { CreateTask, TaskStatus, TaskStatusCategory } from "@shared/schemas";
@@ -125,7 +125,8 @@ export async function createTask(
   db: D1Database,
   workspaceId: string,
   data: CreateTask,
-  scopeUserId: string | null
+  scopeUserId: string | null,
+  createdBy: string
 ): Promise<{ task: ReturnType<typeof formatTask> } | { error: string }> {
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
@@ -156,8 +157,8 @@ export async function createTask(
     `INSERT INTO tasks
        (id, workspace_id, project_id, name, description, active, estimated_seconds,
         due_date, priority, sort_order, board_order, status_id, completed_at,
-        parent_id, recur_rule, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        parent_id, recur_rule, created_by, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).bind(
     id,
     workspaceId,
@@ -174,6 +175,7 @@ export async function createTask(
     born.completedAt,
     parentId,
     recurRule,
+    createdBy,
     now
   ).run();
 
@@ -230,6 +232,15 @@ async function resolveParent(
     .first<Row>();
   if (!row || row.parent_id) return undefined;
   return { id: row.id as string, projectId: row.project_id as string };
+}
+
+/** A task plus its direct subtasks, resolved to a real id list — SQLite's `IN (a, (SELECT …))` is scalar and only matches the subquery's first row. */
+export async function taskAndSubtaskIds(db: D1Database, workspaceId: string, taskId: string): Promise<string[]> {
+  const { results } = await db
+    .prepare(`SELECT id FROM tasks WHERE workspace_id = ? AND (id = ? OR parent_id = ?)`)
+    .bind(workspaceId, taskId, taskId)
+    .all<{ id: string }>();
+  return results.map((r) => r.id);
 }
 
 /** Replaces a task's whole assignee set; ids that aren't workspace members are dropped, never trusted (D6). */
@@ -334,7 +345,7 @@ export const tasksRouter = new Hono<{
     const workspaceId = c.get("workspaceId");
     const userId = c.get("userId");
     const data = c.req.valid("json");
-    const result = await createTask(c.env.DB, workspaceId, data, await taskScope(c));
+    const result = await createTask(c.env.DB, workspaceId, data, await taskScope(c), userId);
     if ("error" in result) return c.json({ error: result.error }, 400);
 
     if (data.assigneeIds?.length) {
@@ -646,17 +657,31 @@ export const tasksRouter = new Hono<{
   // ─── Delete ───────────────────────────────────────────────────────────────
   .delete("/:id", async (c) => {
     const workspaceId = c.get("workspaceId");
+    const userId = c.get("userId");
     const id = c.req.param("id");
+
+    const existing = await c.env.DB.prepare(
+      `SELECT created_by FROM tasks WHERE id = ? AND workspace_id = ?`
+    ).bind(id, workspaceId).first<Row>();
+    if (!existing) return c.json({ error: "Not found" }, 404);
+
+    const role = await getMemberRole(c.env.DB, workspaceId, userId);
+    if (!canDeleteTask(role, (existing.created_by as string | null) ?? null, userId)) {
+      return c.json({ error: "Only the task's author or a workspace manager can delete it" }, 403);
+    }
+
+    const ids = await taskAndSubtaskIds(c.env.DB, workspaceId, id);
+    const placeholders = ids.map(() => "?").join(",");
     const { results: attachments } = await c.env.DB.prepare(
-      `SELECT r2_key FROM task_attachments WHERE workspace_id = ? AND task_id IN (?, (SELECT id FROM tasks WHERE parent_id = ? AND workspace_id = ?))`
-    ).bind(workspaceId, id, id, workspaceId).all<Row>();
+      `SELECT r2_key FROM task_attachments WHERE workspace_id = ? AND task_id IN (${placeholders})`
+    ).bind(workspaceId, ...ids).all<Row>();
 
     // Explicit, not left to ON DELETE CASCADE: D1 does not guarantee
     // `PRAGMA foreign_keys` is on, and an orphaned subtask is invisible — it
     // renders nowhere and still counts toward its project's tracked total.
     await c.env.DB.batch([
-      c.env.DB.prepare(`DELETE FROM task_attachments WHERE workspace_id = ? AND task_id IN (?, (SELECT id FROM tasks WHERE parent_id = ? AND workspace_id = ?))`).bind(workspaceId, id, id, workspaceId),
-      c.env.DB.prepare(`DELETE FROM task_comments WHERE workspace_id = ? AND task_id IN (?, (SELECT id FROM tasks WHERE parent_id = ? AND workspace_id = ?))`).bind(workspaceId, id, id, workspaceId),
+      c.env.DB.prepare(`DELETE FROM task_attachments WHERE workspace_id = ? AND task_id IN (${placeholders})`).bind(workspaceId, ...ids),
+      c.env.DB.prepare(`DELETE FROM task_comments WHERE workspace_id = ? AND task_id IN (${placeholders})`).bind(workspaceId, ...ids),
       c.env.DB.prepare(`DELETE FROM tasks WHERE parent_id = ? AND workspace_id = ?`).bind(id, workspaceId),
       c.env.DB.prepare(`DELETE FROM tasks WHERE id = ? AND workspace_id = ?`).bind(id, workspaceId),
     ]);
@@ -697,7 +722,13 @@ export const tasksRouter = new Hono<{
     const kind = sniffImage(bytes);
     if (!kind) return c.json({ error: "Only PNG, JPEG, WebP and GIF images are accepted" }, 400);
 
-    const processed = processImage(bytes, kind);
+    let processed;
+    try {
+      processed = processImage(bytes, kind);
+    } catch (e) {
+      if (e instanceof ImageDecodeError) return c.json({ error: e.message }, 400);
+      throw e;
+    }
     const now = new Date();
     const key = `${workspaceId}/${now.getUTCFullYear()}/${String(now.getUTCMonth() + 1).padStart(2, "0")}/${crypto.randomUUID()}`;
     await c.env.ATTACHMENTS.put(key, processed.bytes, {

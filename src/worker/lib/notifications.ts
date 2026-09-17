@@ -20,17 +20,13 @@ async function pushLive(env: Env, userId: string, notification: Notification): P
   try {
     const id = env.NOTIFICATION_ROOM.idFromName(userId);
     const stub = env.NOTIFICATION_ROOM.get(id);
-    const res = await stub.fetch(
+    await stub.fetch(
       new Request("http://do/notify", {
         method: "POST",
         body: JSON.stringify({ event: "notification:new", data: notification }),
         headers: { "Content-Type": "application/json" },
       })
     );
-    // `sent: 0` means no open socket for this user right now — the bell's poll still catches it,
-    // but this is the fastest way to tell "nobody was connected" apart from "the push itself broke".
-    const { sent } = (await res.json()) as { sent: number };
-    console.log("notification pushed live", { userId, type: notification.type, sent });
   } catch (e) {
     // Non-critical — the bell's own poll is the backstop — but must be visible in Workers Logs.
     console.warn("notification push failed", { userId, error: String(e) });
@@ -50,6 +46,14 @@ export interface NotificationTemplate {
   link?: string | null;
 }
 
+const NOTIFICATION_BODY_MAX = 140;
+
+/** A notification is a pointer to the real content, never a copy of it — truncated so an edited/deleted source can't leave a stale full copy behind. */
+export function notificationExcerpt(text: string, max = NOTIFICATION_BODY_MAX): string {
+  const trimmed = text.trim();
+  return trimmed.length > max ? `${trimmed.slice(0, max - 1)}…` : trimmed;
+}
+
 /** Writes the row and pushes it live in one call — every notification goes through this. */
 export async function notifyUser(
   env: Env,
@@ -62,11 +66,24 @@ export async function notifyUser(
     `INSERT INTO notifications (id, workspace_id, user_id, type, title, body, link)
      VALUES (?, ?, ?, ?, ?, ?, ?)`
   )
-    .bind(id, workspaceId, userId, template.type, template.title, template.body, template.link ?? null)
+    .bind(id, workspaceId, userId, template.type, template.title, notificationExcerpt(template.body), template.link ?? null)
     .run();
 
   const row = await env.DB.prepare(`SELECT * FROM notifications WHERE id = ?`).bind(id).first<Row>();
   if (row) await pushLive(env, userId, formatNotification(row));
+}
+
+const NOTIFICATION_RETENTION_DAYS = 90;
+
+/** Daily cron sweep — a notification is a pointer to content, not a permanent record. */
+export async function pruneNotifications(env: Env): Promise<void> {
+  try {
+    await env.DB.prepare(`DELETE FROM notifications WHERE created_at < datetime('now', ?)`)
+      .bind(`-${NOTIFICATION_RETENTION_DAYS} days`)
+      .run();
+  } catch (e) {
+    console.warn("notification retention sweep failed", { error: String(e) });
+  }
 }
 
 /**

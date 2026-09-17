@@ -31,6 +31,7 @@ import { createAuth } from "./auth";
 import { runAutoTrack } from "./lib/calendar-autotrack";
 import { runRecurring } from "./lib/recurring";
 import { runDigests } from "./lib/digest";
+import { pruneNotifications } from "./lib/notifications";
 import { routeAgentRequest } from "agents";
 import { createMcpHandler } from "agents/mcp";
 import { buildMcpServer } from "./mcp/server";
@@ -235,6 +236,6 @@ export default {
   // has arrived. Each sweep swallows its own per-workspace/per-user errors, so
   // one broken connection can't stop the others.
   scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext) {
-    ctx.waitUntil(Promise.all([runAutoTrack(env), runRecurring(env), runDigests(env)]));
+    ctx.waitUntil(Promise.all([runAutoTrack(env), runRecurring(env), runDigests(env), pruneNotifications(env)]));
   },
 } satisfies ExportedHandler<Env>;

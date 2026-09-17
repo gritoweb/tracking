@@ -50,6 +50,26 @@ export function entryScopeUserId(role: WorkspaceRole | null, userId: string): st
   return canManageWorkspace(role) ? null : userId;
 }
 
+/** Unlike `canEditEntry`, a missing author falls back to manager-only — the column is new and nothing backfills it. */
+export function canDeleteTask(
+  role: WorkspaceRole | null,
+  createdBy: string | null,
+  requestingUserId: string
+): boolean {
+  if (canManageWorkspace(role)) return true;
+  return createdBy !== null && createdBy === requestingUserId;
+}
+
+/** Same author-or-manager rule as `canDeleteTask`, for a single attachment's uploader. */
+export function canDeleteAttachment(
+  role: WorkspaceRole | null,
+  uploaderId: string | null,
+  requestingUserId: string
+): boolean {
+  if (canManageWorkspace(role)) return true;
+  return uploaderId !== null && uploaderId === requestingUserId;
+}
+
 export async function isManager(db: D1Database, workspaceId: string, userId: string): Promise<boolean> {
   return canManageWorkspace(await getMemberRole(db, workspaceId, userId));
 }

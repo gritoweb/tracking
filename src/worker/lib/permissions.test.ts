@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  canDeleteAttachment,
+  canDeleteTask,
   canEditEntry,
   canManageWorkspace,
   canWriteEntry,
@@ -85,6 +87,43 @@ describe("isManager", () => {
   it("is false for a plain member", async () => {
     const { db } = createD1Stub({ first: () => ({ role: "member" }) });
     expect(await isManager(db, "workspace-1", "user-1")).toBe(false);
+  });
+});
+
+describe("canDeleteTask", () => {
+  it("lets a manager delete anyone's task", () => {
+    expect(canDeleteTask("owner", "someone-else", "me")).toBe(true);
+    expect(canDeleteTask("admin", null, "me")).toBe(true);
+  });
+
+  it("lets the author delete their own task", () => {
+    expect(canDeleteTask("member", "me", "me")).toBe(true);
+  });
+
+  it("refuses a plain member who isn't the author", () => {
+    expect(canDeleteTask("member", "someone-else", "me")).toBe(false);
+  });
+
+  it("refuses a plain member on a task with no recorded author, unlike canEditEntry's null case", () => {
+    expect(canDeleteTask("member", null, "me")).toBe(false);
+  });
+});
+
+describe("canDeleteAttachment", () => {
+  it("lets a manager delete anyone's attachment", () => {
+    expect(canDeleteAttachment("owner", "someone-else", "me")).toBe(true);
+  });
+
+  it("lets the uploader delete their own attachment", () => {
+    expect(canDeleteAttachment("member", "me", "me")).toBe(true);
+  });
+
+  it("refuses a plain member who isn't the uploader", () => {
+    expect(canDeleteAttachment("member", "someone-else", "me")).toBe(false);
+  });
+
+  it("refuses a plain member on an attachment with no recorded uploader", () => {
+    expect(canDeleteAttachment("member", null, "me")).toBe(false);
   });
 });
 
