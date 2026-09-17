@@ -1,5 +1,28 @@
 # Changelog
 
+## 2026-09-17 (7)
+### Fixed
+- **The assignee-cleanup code from `2026-09-17 (4)` only landed now.** That commit carried the
+  changelog entry and nothing else: an agent had run `git stash` to measure a baseline and was stopped
+  before restoring it, so `src/worker/lib/task-assignees.ts`, the `auth.ts` hooks, the membership
+  checks, migration `0044` and the new spec were all sitting in `stash@{0}` while the commit looked
+  complete. Recovered from the stash and shipped. The process fix is in `plano.md`: an agent never
+  touches git, and every commit is checked with `git show --stat`.
+### Changed
+- **The Playwright suite runs with `workers: 1`** — two workers crash Vite's HMR mid-run (`buttonVariants
+  is not exported`), which poisons the results — and the task panel specs were rewritten for the panel
+  as it is today: the assignee trigger is "Add assignee"/"Edit assignees", the stray `Escape` that used
+  to close the whole sheet is gone, and attachments are exercised through
+  `POST /api/tasks/:id/attachments` plus the read-only gallery (`Open <file>` / `Delete <file>`),
+  because the panel no longer has a file input. A new spec pastes a real image into the description
+  editor and asserts it reaches the gallery.
+
+Verified: `npx tsc -b` exit 0, `pnpm lint` exit 0, `e2e/workspace-member-removal.spec.ts` +
+`e2e/task-detail-panel.spec.ts` 8/8 green (51.6s, one worker, one dev server). Full-suite triage:
+`--workers=2` 97/28, `--workers=1` 98/27; every failure classified in `plano.md` §F9 — 24 are outdated
+specs with five root causes, three are flakes, two became new items (P0-8 missing calendar gap blocks,
+P0-9 stop-timer from the task card).
+
 ## 2026-09-17 (6)
 ### Changed
 - **`pnpm lint` is now `eslint . --max-warnings 0`, and the six warnings it used to carry are gone.**
