@@ -103,10 +103,10 @@ describe("api.me (via appFetch)", () => {
     await expect(api.me()).rejects.toMatchObject({ message: "Duplicate tag name" });
   });
 
-  it("queues a mutating request and rejects with a queued ApiError when the network is unreachable", async () => {
+  it("queues a time-entry mutation and rejects with a queued ApiError when the network is unreachable", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
     await expect(
-      api.tags.update("t1", { color: "#ffffff" })
+      api.timeEntries.update("e1", { description: "offline edit" })
     ).rejects.toMatchObject({
       name: "ApiError",
       message: "Offline — saved locally, will sync when you reconnect",
@@ -114,10 +114,17 @@ describe("api.me (via appFetch)", () => {
       queued: true,
     });
     expect(addPendingMutation).toHaveBeenCalledWith({
-      method: "PATCH",
-      url: "/api/tags/t1",
-      body: { color: "#ffffff" },
+      method: "PUT",
+      url: "/api/time_entries/e1",
+      body: { description: "offline edit" },
     });
+  });
+
+  // Comments/statuses/attachments have side effects a blind replay must not repeat.
+  it("does not queue a non-time-entry mutation on network failure — it just rejects", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
+    await expect(api.tags.update("t1", { color: "#ffffff" })).rejects.toBeInstanceOf(TypeError);
+    expect(addPendingMutation).not.toHaveBeenCalled();
   });
 
   it("does not queue a GET on network failure — it just rejects", async () => {

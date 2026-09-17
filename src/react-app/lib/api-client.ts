@@ -153,8 +153,8 @@ function zodIssueMessage(value: unknown): string | null {
   return typeof first?.message === "string" && first.message ? first.message : null;
 }
 
-/** Prefer a zod issue, then the server's `{ error }` text, then the raw body. */
-function errorMessage(raw: string, statusText: string): string {
+/** Prefer a zod issue, then the server's `{ error }` text, then the raw body. Exported for useOfflineSync's own error toasts on a replayed write. */
+export function errorMessage(raw: string, statusText: string): string {
   if (!raw) return statusText;
   try {
     const parsed = JSON.parse(raw) as { error?: unknown };
@@ -167,6 +167,9 @@ function errorMessage(raw: string, statusText: string): string {
   }
   return raw.slice(0, 300) || statusText;
 }
+
+// Comments/statuses/attachments have side effects a blind replay must not repeat — only time-entry writes queue.
+const QUEUEABLE_PATH = /^\/time_entries(\/|$)/;
 
 /** The one place every request goes through: credentials, the client-id header, the offline queue and `ApiError` mapping. */
 async function appFetch(path: string, init?: RequestInit): Promise<Response> {
@@ -188,8 +191,14 @@ async function appFetch(path: string, init?: RequestInit): Promise<Response> {
   } catch (err) {
     // Queue mutating requests when the network is unavailable so they can be
     // replayed by useOfflineSync once connectivity is restored.
-    if (err instanceof TypeError && MUTABLE_METHODS.has(method) && !isFormData) {
+    if (
+      err instanceof TypeError &&
+      MUTABLE_METHODS.has(method) &&
+      !isFormData &&
+      QUEUEABLE_PATH.test(path)
+    ) {
       const body = init?.body ? JSON.parse(init.body as string) : undefined;
+      // No Idempotency-Key: nothing server-side can cheaply dedupe it yet, so sending one would be a lie.
       await addPendingMutation({
         method: method as "POST" | "PUT" | "PATCH" | "DELETE",
         url: `${API_BASE}${path}`,

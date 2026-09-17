@@ -14,6 +14,7 @@ interface PendingMutation {
   url: string;
   body?: unknown;
   createdAt: number;
+  attempts: number;
 }
 
 interface TimeTrackerDB {
@@ -61,12 +62,13 @@ export async function clearTimerState(): Promise<void> {
 }
 
 export async function addPendingMutation(
-  mutation: Omit<PendingMutation, "id" | "createdAt">
+  mutation: Omit<PendingMutation, "id" | "createdAt" | "attempts">
 ): Promise<void> {
   const db = await getDB();
   await db.add("pending_mutations", {
     ...mutation,
     createdAt: Date.now(),
+    attempts: 0,
   } as PendingMutation);
 }
 
@@ -78,6 +80,16 @@ export async function getPendingMutations(): Promise<PendingMutation[]> {
 export async function deletePendingMutation(id: number): Promise<void> {
   const db = await getDB();
   await db.delete("pending_mutations", id);
+}
+
+/** Bumps a replay's failure count and returns the new total; a missing row (raced delete) counts as exhausted. */
+export async function incrementPendingMutationAttempts(id: number): Promise<number> {
+  const db = await getDB();
+  const mutation = await db.get("pending_mutations", id);
+  if (!mutation) return Number.MAX_SAFE_INTEGER;
+  const attempts = (mutation.attempts ?? 0) + 1;
+  await db.put("pending_mutations", { ...mutation, attempts });
+  return attempts;
 }
 
 export type { TimerState, PendingMutation };

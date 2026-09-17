@@ -33,7 +33,8 @@ function assertSecret(secret: string | undefined): asserts secret is string {
   }
 }
 
-async function deriveKey(secret: string, salt: Uint8Array): Promise<CryptoKey> {
+// The generic is load-bearing: under the SPA's DOM lib a bare Uint8Array widens to ArrayBufferLike and stops matching BufferSource.
+async function deriveKey(secret: string, salt: Uint8Array<ArrayBuffer>): Promise<CryptoKey> {
   const baseKey = await crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(secret),

@@ -103,11 +103,11 @@ export function useDiscardDraft(localDate: string) {
       );
       return { previous };
     },
-    onError: (_err, _id, context) => {
+    onError: (err, _id, context) => {
       if (context?.previous) {
         queryClient.setQueryData(["drafts", localDate], context.previous);
       }
-      toast.error("Couldn't discard the draft");
+      toastApiError(err, "Couldn't discard the draft");
     },
     onSettled: () => invalidateDay(queryClient, localDate),
   });

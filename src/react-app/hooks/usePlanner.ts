@@ -1,5 +1,4 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
 import { api } from "@/lib/api-client";
 import { toastApiError } from "@/lib/toastApiError";
 import type { Allocation, UpsertAllocation, BulkUpsertAllocations } from "@shared/schemas";
@@ -68,9 +67,9 @@ export function useUpsertAllocation() {
       });
       return { prev };
     },
-    onError: (_err, _vars, ctx) => {
+    onError: (err, _vars, ctx) => {
       ctx?.prev.forEach(([key, data]) => queryClient.setQueryData(key, data));
-      toast.error("Failed to save plan");
+      toastApiError(err, "Failed to save plan");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["planner-allocations"] });

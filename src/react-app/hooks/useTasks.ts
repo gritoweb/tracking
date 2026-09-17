@@ -88,11 +88,11 @@ export function useUpdateTask() {
       );
       return { snapshot };
     },
-    onError: (_err, _vars, context) => {
+    onError: (err, _vars, context) => {
       for (const [key, data] of context?.snapshot ?? []) {
         queryClient.setQueryData(key, data);
       }
-      toast.error("Failed to update task");
+      toastApiError(err, "Failed to update task");
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ["tasks"] }),
   });
@@ -131,11 +131,11 @@ export function useMoveTask() {
       );
       return { snapshot };
     },
-    onError: (_err, _vars, context) => {
+    onError: (err, _vars, context) => {
       for (const [key, data] of context?.snapshot ?? []) {
         queryClient.setQueryData(key, data);
       }
-      toast.error("Failed to move task");
+      toastApiError(err, "Failed to move task");
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ["tasks"] }),
   });

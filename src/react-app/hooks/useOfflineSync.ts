@@ -3,7 +3,13 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   getPendingMutations,
   deletePendingMutation,
+  incrementPendingMutationAttempts,
 } from "@/lib/idb";
+import { ApiError, errorMessage } from "@/lib/api-client";
+import { toastApiError } from "@/lib/toastApiError";
+
+// Bounded so a persistently failing server doesn't retry a write forever.
+export const MAX_REPLAY_ATTEMPTS = 5;
 
 export function useOfflineSync() {
   const queryClient = useQueryClient();
@@ -26,21 +32,50 @@ export function useOfflineSync() {
   return { isOnline };
 }
 
-async function drainQueue() {
+/** Exported for direct unit testing of the queue's per-status rules, separate from the online/offline effect wiring. */
+export async function drainQueue() {
   const mutations = await getPendingMutations();
   for (const mutation of mutations) {
+    let res: Response;
     try {
-      const res = await fetch(mutation.url, {
+      res = await fetch(mutation.url, {
         method: mutation.method,
         body: mutation.body ? JSON.stringify(mutation.body) : undefined,
         headers: { "Content-Type": "application/json" },
       });
-      if (res.ok && mutation.id !== undefined) {
-        await deletePendingMutation(mutation.id);
-      }
-    } catch {
-      // Still offline — stop trying
-      break;
+    } catch (err) {
+      // Only a network TypeError means "still offline" — anything else is this mutation's own problem.
+      if (err instanceof TypeError) break;
+      if (mutation.id !== undefined) await deletePendingMutation(mutation.id);
+      toastApiError(err, "Couldn't sync a change made while offline");
+      continue;
+    }
+
+    if (res.ok) {
+      if (mutation.id !== undefined) await deletePendingMutation(mutation.id);
+      continue;
+    }
+
+    if (res.status >= 400 && res.status < 500) {
+      // The server refused the same body once; replaying it again can't change that.
+      const raw = await res.text().catch(() => "");
+      if (mutation.id !== undefined) await deletePendingMutation(mutation.id);
+      toastApiError(
+        new ApiError(errorMessage(raw, res.statusText), res.status),
+        "Couldn't sync a change made while offline"
+      );
+      continue;
+    }
+
+    // 5xx: worth another try, but not forever.
+    if (mutation.id === undefined) continue;
+    const attempts = await incrementPendingMutationAttempts(mutation.id);
+    if (attempts >= MAX_REPLAY_ATTEMPTS) {
+      await deletePendingMutation(mutation.id);
+      toastApiError(
+        new Error(`Sync retry limit reached (HTTP ${res.status})`),
+        "Gave up syncing a change made while offline"
+      );
     }
   }
 }

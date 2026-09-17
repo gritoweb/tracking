@@ -104,10 +104,12 @@ function DescriptionField({
   task,
   onSave,
   onUploadImage,
+  onDeleteImage,
 }: {
   task: Task;
   onSave: (doc: JSONContent) => void;
-  onUploadImage: (file: File) => Promise<{ url: string }>;
+  onUploadImage: (file: File) => Promise<{ url: string; id: string }>;
+  onDeleteImage: (id: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [overflowing, setOverflowing] = useState(false);
@@ -134,6 +136,7 @@ function DescriptionField({
           content={parseDescription(task.description)}
           onBlur={onSave}
           onUploadImage={onUploadImage}
+          onDeleteImage={onDeleteImage}
           placeholder="Context, links, acceptance criteria — anything that isn't the name."
         />
       </div>
@@ -243,7 +246,7 @@ export function TaskSheet({ open, onClose, task, onRequestDelete }: TaskSheetPro
 
   // The only way an image reaches this task: pasted/dropped into the description or a
   // comment. The "Attachments" section below is a read-only gallery of what lands here.
-  const uploadImage = async (file: File): Promise<{ url: string }> => {
+  const uploadImage = async (file: File): Promise<{ url: string; id: string }> => {
     if (!ACCEPTED_TYPES.includes(file.type)) {
       toast.error("Only PNG, JPEG, WebP and GIF images are accepted");
       throw new Error("unsupported type");
@@ -253,8 +256,11 @@ export function TaskSheet({ open, onClose, task, onRequestDelete }: TaskSheetPro
       throw new Error("too large");
     }
     const attachment = await uploadAttachment.mutateAsync({ taskId: task.id, file });
-    return { url: attachment.url };
+    return { url: attachment.url, id: attachment.id };
   };
+
+  // Only fires when an upload's insertion spot vanished mid-flight, leaving an orphan in R2 (RichTextEditor).
+  const deleteOrphanedImage = (id: string) => deleteAttachment.mutate({ taskId: task.id, id });
 
   return (
     <>
@@ -504,7 +510,13 @@ export function TaskSheet({ open, onClose, task, onRequestDelete }: TaskSheetPro
 
             <div className="space-y-1.5 border-t pt-4">
               <Label className="text-base font-semibold">Description</Label>
-              <DescriptionField key={task.id} task={task} onSave={saveDescription} onUploadImage={uploadImage} />
+              <DescriptionField
+                key={task.id}
+                task={task}
+                onSave={saveDescription}
+                onUploadImage={uploadImage}
+                onDeleteImage={deleteOrphanedImage}
+              />
             </div>
 
             {!isSubtask && (
