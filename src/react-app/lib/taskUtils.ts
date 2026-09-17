@@ -39,6 +39,7 @@ export const PRIORITIES = [1, 2, 3, 4] as const;
 
 /** Projects bucketed under their client, clients alphabetical; client-less projects come last. */
 export interface ProjectClientGroup {
+  clientId: string | null;
   clientName: string | null;
   projects: Project[];
 }
@@ -51,7 +52,11 @@ export function groupProjectsByClient(projects: Project[]): ProjectClientGroup[]
   }
   return [...byClient.entries()]
     .sort(([a], [b]) => (a === "" ? 1 : b === "" ? -1 : a.localeCompare(b)))
-    .map(([clientName, group]) => ({ clientName: clientName || null, projects: group }));
+    .map(([clientName, group]) => ({
+      clientId: group[0]?.clientId ?? null,
+      clientName: clientName || null,
+      projects: group,
+    }));
 }
 
 // ─── Status categories ───────────────────────────────────────────────────────
@@ -244,6 +249,58 @@ export function comparePlanned(a: Task, b: Task): number {
   }
   if (a.priority !== b.priority) return a.priority - b.priority;
   return a.sortOrder - b.sortOrder;
+}
+
+// ─── Status/sort filters (List and Board share these) ───────────────────────
+
+export type StatusFilter = "all" | "active" | "done";
+export type SortBy = "name" | "estimate" | "tracked" | "recent" | "plan";
+export type GroupBy = "project" | "status" | "due" | "none";
+
+export const SORTERS: Record<SortBy, (a: Task, b: Task) => number> = {
+  plan: comparePlanned,
+  name: (a, b) => a.name.localeCompare(b.name),
+  estimate: (a, b) => (b.estimatedSeconds ?? 0) - (a.estimatedSeconds ?? 0),
+  tracked: (a, b) => b.trackedSeconds - a.trackedSeconds,
+  recent: (a, b) => b.createdAt.localeCompare(a.createdAt),
+};
+
+export interface TaskCluster {
+  key: string;
+  /** Empty string means "don't render a sub-header" — the flat, ungrouped case. */
+  label: string;
+  tasks: Task[];
+}
+
+/**
+ * Buckets an already-sorted list into labeled clusters, order preserved by
+ * first appearance. Used by the Board to sub-group a column's own cards —
+ * a lighter version of the List's own section grouping, since a column
+ * already carries its own status.
+ */
+export function clusterTasks(tasks: Task[], groupBy: GroupBy, today: string): TaskCluster[] {
+  if (groupBy === "status" || groupBy === "none" || !tasks.length) {
+    return tasks.length ? [{ key: "all", label: "", tasks }] : [];
+  }
+  const order: string[] = [];
+  const map = new Map<string, TaskCluster>();
+  for (const task of tasks) {
+    const key = groupBy === "project" ? task.projectId ?? "none" : task.dueDate ?? "none";
+    const label =
+      groupBy === "project"
+        ? task.projectName ?? "No project"
+        : task.dueDate
+          ? formatDueHeading(task.dueDate, today)
+          : "No due date";
+    let cluster = map.get(key);
+    if (!cluster) {
+      cluster = { key, label, tasks: [] };
+      map.set(key, cluster);
+      order.push(key);
+    }
+    cluster.tasks.push(task);
+  }
+  return order.map((key) => map.get(key)!);
 }
 
 /**

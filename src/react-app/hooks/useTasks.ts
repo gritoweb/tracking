@@ -8,7 +8,7 @@ import {
   nextOccurrence,
   todayLocalDate,
 } from "@shared/task-recurrence";
-import type { Task, CreateTask, TaskStatus, UpdateTask } from "@shared/schemas";
+import type { Task, CreateTask, TaskStatus, UpdateTask, TaskAttachment } from "@shared/schemas";
 
 // The API hides inactive (done) tasks unless asked, so every list here opts in:
 // the Tasks page offers an All/Active/Done filter and a "Done" group, and without
@@ -52,12 +52,12 @@ export function useCreateTask() {
 export function useUpdateTask() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: UpdateTask }) =>
+    mutationFn: ({ id, data }: { id: string; data: UpdateTask; optimisticAssignees?: Task["assignees"] }) =>
       api.tasks.update(id, data as Record<string, unknown>) as Promise<Task>,
     // Patch the cached lists first so a checkbox, a due chip or a drag settles
     // on the frame it was clicked. Every task list shares the ["tasks"] prefix,
     // so one pass covers the page, the rail and the in-project list.
-    onMutate: async ({ id, data }) => {
+    onMutate: async ({ id, data, optimisticAssignees }) => {
       await queryClient.cancelQueries({ queryKey: ["tasks"] });
       const snapshot = queryClient.getQueriesData<Task[]>({ queryKey: ["tasks"] });
       queryClient.setQueriesData<Task[]>({ queryKey: ["tasks"] }, (old) =>
@@ -70,9 +70,12 @@ export function useUpdateTask() {
               ...(data.dueDate !== undefined ? { dueDate: data.dueDate } : {}),
               ...(data.priority !== undefined ? { priority: data.priority } : {}),
               ...(data.sortOrder !== undefined ? { sortOrder: data.sortOrder } : {}),
+              ...(data.statusId !== undefined ? { statusId: data.statusId } : {}),
               ...(data.estimatedSeconds !== undefined
                 ? { estimatedSeconds: data.estimatedSeconds }
                 : {}),
+              // Resolved client-side (the mutation only sends ids) — undefined skips the patch entirely.
+              ...(optimisticAssignees !== undefined ? { assignees: optimisticAssignees } : {}),
             };
           }
           // Ticking a parent ticks its children server-side; mirror that here or
@@ -186,6 +189,38 @@ export function useCompleteTask() {
       }
     );
   };
+}
+
+export function useTaskAttachments(taskId: string | null) {
+  return useQuery({
+    queryKey: ["task-attachments", taskId],
+    queryFn: () => api.tasks.attachments.list(taskId!) as Promise<TaskAttachment[]>,
+    enabled: !!taskId,
+    staleTime: 30_000,
+  });
+}
+
+export function useUploadTaskAttachment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ taskId, file }: { taskId: string; file: File }) =>
+      api.tasks.attachments.upload(taskId, file) as Promise<TaskAttachment>,
+    onSuccess: (_result, { taskId }) => {
+      queryClient.invalidateQueries({ queryKey: ["task-attachments", taskId] });
+    },
+    onError: () => toast.error("Failed to upload image"),
+  });
+}
+
+export function useDeleteTaskAttachment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id }: { taskId: string; id: string }) => api.tasks.attachments.delete(id),
+    onSuccess: (_result, { taskId }) => {
+      queryClient.invalidateQueries({ queryKey: ["task-attachments", taskId] });
+    },
+    onError: () => toast.error("Failed to delete attachment"),
+  });
 }
 
 export function useDeleteTask() {

@@ -8,7 +8,9 @@ import {
 import { isManager, MANAGER_ONLY_ERROR } from "../lib/permissions";
 import { broadcast, requestOrigin } from "../db/queries";
 import {
+  ensureProjectFork,
   listStatuses,
+  nextStatusColor,
   nextStatusOrder,
   resolveStatus,
 } from "../lib/task-statuses";
@@ -26,13 +28,20 @@ async function taskCount(db: D1Database, workspaceId: string, statusId: string) 
   return row?.n ?? 0;
 }
 
-async function nameTaken(db: D1Database, workspaceId: string, name: string, exceptId?: string) {
+async function nameTaken(
+  db: D1Database,
+  workspaceId: string,
+  projectId: string | null,
+  name: string,
+  exceptId?: string
+) {
   const row = await db
     .prepare(
       `SELECT id FROM task_statuses
-        WHERE workspace_id = ? AND archived = 0 AND lower(name) = lower(?) AND id != ?`
+        WHERE workspace_id = ? AND ${projectId ? "project_id = ?" : "project_id IS NULL"}
+          AND archived = 0 AND lower(name) = lower(?) AND id != ?`
     )
-    .bind(workspaceId, name.trim(), exceptId ?? "")
+    .bind(...(projectId ? [workspaceId, projectId] : [workspaceId]), name.trim(), exceptId ?? "")
     .first<Row>();
   return Boolean(row);
 }
@@ -41,25 +50,51 @@ export const taskStatusesRouter = new Hono<{
   Bindings: Env;
   Variables: { workspaceId: string; userId: string };
 }>()
-  // ─── List — any member; only writes are manager-only ────────────────────────
+  // ─── List — a project's effective set (its own fork, else the workspace global) ─────
   .get("/", async (c) => {
-    return c.json(await listStatuses(c.env.DB, c.get("workspaceId")));
+    const projectId = c.req.query("projectId") || null;
+    return c.json(await listStatuses(c.env.DB, c.get("workspaceId"), projectId));
   })
-  // ─── Create ───────────────────────────────────────────────────────────────
+  // ─── Fork the global set for a project — idempotent, a no-op if already forked ──────
+  .post("/fork", async (c) => {
+    const workspaceId = c.get("workspaceId");
+    if (!(await isManager(c.env.DB, workspaceId, c.get("userId")))) {
+      return c.json({ error: MANAGER_ONLY_ERROR }, 403);
+    }
+    const { projectId } = await c.req.json<{ projectId?: string }>();
+    if (!projectId) return c.json({ error: "projectId is required" }, 400);
+    const forked = await ensureProjectFork(c.env.DB, workspaceId, projectId);
+    return c.json(forked);
+  })
+  // ─── Create — global by default; with projectId, forks that project first if needed ──
   .post("/", zValidator("json", CreateTaskStatusSchema), async (c) => {
     const workspaceId = c.get("workspaceId");
     if (!(await isManager(c.env.DB, workspaceId, c.get("userId")))) {
       return c.json({ error: MANAGER_ONLY_ERROR }, 403);
     }
-    const { name, color, category } = c.req.valid("json");
-    if (await nameTaken(c.env.DB, workspaceId, name)) return c.json({ error: NAME_TAKEN }, 409);
+    const { name, color, category, projectId = null } = c.req.valid("json");
+    if (projectId) await ensureProjectFork(c.env.DB, workspaceId, projectId);
+    if (await nameTaken(c.env.DB, workspaceId, projectId, name)) {
+      return c.json({ error: NAME_TAKEN }, 409);
+    }
+
+    // No colour chosen: the next one not already in this set — same rule as a new project or tag.
+    const resolvedColor = color ?? nextStatusColor(await listStatuses(c.env.DB, workspaceId, projectId));
 
     const id = crypto.randomUUID();
     await c.env.DB.prepare(
-      `INSERT INTO task_statuses (id, workspace_id, name, color, category, sort_order, is_default)
-       VALUES (?, ?, ?, ?, ?, ?, 0)`
+      `INSERT INTO task_statuses (id, workspace_id, project_id, name, color, category, sort_order, is_default)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 0)`
     )
-      .bind(id, workspaceId, name.trim(), color, category, await nextStatusOrder(c.env.DB, workspaceId))
+      .bind(
+        id,
+        workspaceId,
+        projectId,
+        name.trim(),
+        resolvedColor,
+        category,
+        await nextStatusOrder(c.env.DB, workspaceId, projectId)
+      )
       .run();
 
     c.executionCtx.waitUntil(
@@ -79,11 +114,11 @@ export const taskStatusesRouter = new Hono<{
     const existing = await resolveStatus(c.env.DB, workspaceId, id);
     if (!existing) return c.json({ error: "Not found" }, 404);
 
-    if (data.name && (await nameTaken(c.env.DB, workspaceId, data.name, id))) {
+    if (data.name && (await nameTaken(c.env.DB, workspaceId, existing.projectId, data.name, id))) {
       return c.json({ error: NAME_TAKEN }, 409);
     }
 
-    const live = await listStatuses(c.env.DB, workspaceId);
+    const live = await listStatuses(c.env.DB, workspaceId, existing.projectId);
     const nextCategory = data.category ?? existing.category;
 
     // Keep at least one open and one completed column, or a task has nowhere to go.
@@ -112,12 +147,13 @@ export const taskStatusesRouter = new Hono<{
     if (data.isDefault !== undefined) set("is_default", data.isDefault ? 1 : 0);
 
     const writes: D1PreparedStatement[] = [];
-    // Exactly one default per workspace: claiming it takes it from whoever held it.
+    // Exactly one default per set (global, or a given project's own fork): claiming it takes it from whoever held it.
     if (data.isDefault === true) {
       writes.push(
         c.env.DB.prepare(
-          `UPDATE task_statuses SET is_default = 0 WHERE workspace_id = ? AND id != ?`
-        ).bind(workspaceId, id)
+          `UPDATE task_statuses SET is_default = 0
+             WHERE workspace_id = ? AND ${existing.projectId ? "project_id = ?" : "project_id IS NULL"} AND id != ?`
+        ).bind(...(existing.projectId ? [workspaceId, existing.projectId] : [workspaceId]), id)
       );
     }
     if (fields.length) {
@@ -164,7 +200,7 @@ export const taskStatusesRouter = new Hono<{
     const existing = await resolveStatus(c.env.DB, workspaceId, id);
     if (!existing) return c.json({ error: "Not found" }, 404);
 
-    const live = await listStatuses(c.env.DB, workspaceId);
+    const live = await listStatuses(c.env.DB, workspaceId, existing.projectId);
     const others = live.filter((s) => s.id !== id);
     if (!others.length) return c.json({ error: "A workspace needs at least one status" }, 400);
     if (existing.category === "completed" && !others.some((s) => s.category === "completed")) {

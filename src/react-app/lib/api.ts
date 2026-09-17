@@ -254,11 +254,52 @@ export const api = {
       request<unknown>(`/tasks/${id}/move`, { method: "PATCH", body: JSON.stringify(body) }),
     delete: (id: string) =>
       request<unknown>(`/tasks/${id}`, { method: "DELETE" }),
+    attachments: {
+      list: (taskId: string) => request<unknown[]>(`/tasks/${taskId}/attachments`),
+      // Own fetch, not request(): a FormData body needs the browser's own multipart Content-Type.
+      upload: async (taskId: string, file: File) => {
+        const body = new FormData();
+        body.append("file", file);
+        const res = await fetch(`${API_BASE}/tasks/${taskId}/attachments`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "X-Client-Id": CLIENT_ID },
+          body,
+        });
+        if (!res.ok) {
+          const raw = await res.text().catch(() => "");
+          throw new ApiError(errorMessage(raw, res.statusText), res.status);
+        }
+        return res.json() as Promise<unknown>;
+      },
+      delete: (id: string) => request<unknown>(`/attachments/${id}`, { method: "DELETE" }),
+    },
+    /** Flat, single-level — no reply/thread. */
+    comments: {
+      list: (taskId: string) => request<unknown[]>(`/tasks/${taskId}/comments`),
+      create: (taskId: string, body: Record<string, unknown>) =>
+        request<unknown>(`/tasks/${taskId}/comments`, { method: "POST", body: JSON.stringify(body) }),
+      update: (taskId: string, commentId: string, body: Record<string, unknown>) =>
+        request<unknown>(`/tasks/${taskId}/comments/${commentId}`, { method: "PATCH", body: JSON.stringify(body) }),
+      delete: (taskId: string, commentId: string) =>
+        request<unknown>(`/tasks/${taskId}/comments/${commentId}`, { method: "DELETE" }),
+    },
+  },
+
+  // ─── Notifications (the header bell) ──────────────────────────────────────
+  notifications: {
+    list: () => request<{ notifications: unknown[]; unreadCount: number }>("/notifications"),
+    markRead: (id: string) => request<{ ok: boolean }>(`/notifications/${id}/read`, { method: "PATCH" }),
+    markAllRead: () => request<{ ok: boolean }>("/notifications/read-all", { method: "PATCH" }),
+    delete: (id: string) => request<{ ok: boolean }>(`/notifications/${id}`, { method: "DELETE" }),
+    clearAll: () => request<{ ok: boolean }>("/notifications", { method: "DELETE" }),
   },
 
   // ─── Task statuses (the board's columns) ──────────────────────────────────
   taskStatuses: {
-    list: () => request<unknown[]>("/task-statuses"),
+    /** `projectId` omitted (or falsy) returns the workspace's global default set. */
+    list: (projectId?: string | null) =>
+      request<unknown[]>(`/task-statuses${projectId ? `?projectId=${projectId}` : ""}`),
     create: (body: Record<string, unknown>) =>
       request<unknown>("/task-statuses", { method: "POST", body: JSON.stringify(body) }),
     update: (id: string, body: Record<string, unknown>) =>
@@ -268,6 +309,12 @@ export const api = {
       request<{ ok: boolean; moved: number }>(`/task-statuses/${id}/archive`, {
         method: "POST",
         body: JSON.stringify(body),
+      }),
+    /** Clones the global set into a project's own fork — idempotent. */
+    fork: (projectId: string) =>
+      request<unknown[]>("/task-statuses/fork", {
+        method: "POST",
+        body: JSON.stringify({ projectId }),
       }),
   },
 

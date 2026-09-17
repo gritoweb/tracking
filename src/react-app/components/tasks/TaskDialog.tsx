@@ -20,8 +20,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ProjectPicker } from "@/components/entries/ProjectPicker";
+import { MultiSelect } from "@/components/reports/MultiSelect";
 import { useCreateTask, useUpdateTask } from "@/hooks/useTasks";
 import { useTaskStatuses } from "@/hooks/useTaskStatuses";
+import { useWorkspaceMembers } from "@/hooks/useWorkspaceRole";
 import { ColorDot } from "@/components/ColorDot";
 import { parseTimeInput, formatTimeInput } from "@/lib/dateUtils";
 import {
@@ -77,17 +79,19 @@ export function TaskDialog({
 }: TaskDialogProps) {
   const createTask = useCreateTask();
   const updateTask = useUpdateTask();
-  const { data: statuses = [] } = useTaskStatuses();
+  const { data: members = [], isPending: membersLoading } = useWorkspaceMembers(open);
   const editing = Boolean(task);
 
   const [name, setName] = useState(task?.name ?? "");
   const [description, setDescription] = useState(task?.description ?? "");
   const [projectId, setProjectId] = useState<string | null>(task?.projectId ?? defaultProjectId);
+  const { data: statuses = [] } = useTaskStatuses(projectId);
   const [estimate, setEstimate] = useState(formatTimeInput(task?.estimatedSeconds ?? null));
   const [dueDate, setDueDate] = useState<string | null>(task?.dueDate ?? defaultDueDate);
   const [priority, setPriority] = useState(task?.priority ?? 4);
   const [repeat, setRepeat] = useState(repeatValue(task?.recurRule ?? null));
   const [statusId, setStatusId] = useState<string | null>(task?.statusId ?? defaultStatusId);
+  const [assigneeIds, setAssigneeIds] = useState<string[]>(task?.assignees.map((a) => a.userId) ?? []);
 
   // The dialog stays mounted between openings; reseed when it opens on another
   // task (or switches between create and edit).
@@ -102,6 +106,7 @@ export function TaskDialog({
     setPriority(task?.priority ?? 4);
     setRepeat(repeatValue(task?.recurRule ?? null));
     setStatusId(task?.statusId ?? defaultStatusId);
+    setAssigneeIds(task?.assignees.map((a) => a.userId) ?? []);
   }
 
   const reset = () => {
@@ -114,6 +119,7 @@ export function TaskDialog({
     setPriority(4);
     setRepeat("none");
     setStatusId(defaultStatusId);
+    setAssigneeIds([]);
   };
 
   /**
@@ -156,7 +162,7 @@ export function TaskDialog({
       updateTask.mutate({ id: task.id, data: fields }, { onSuccess: handleClose });
     } else {
       createTask.mutate(
-        { ...fields, projectId, ...(statusId ? { statusId } : {}) },
+        { ...fields, projectId, ...(statusId ? { statusId } : {}), assigneeIds },
         { onSuccess: handleClose }
       );
     }
@@ -209,7 +215,7 @@ export function TaskDialog({
             <div className="space-y-1.5">
               <Label>Project</Label>
               <div>
-                <ProjectPicker value={projectId} onChange={setProjectId} className="border" />
+                <ProjectPicker value={projectId} onChange={setProjectId} className="rounded-md" />
               </div>
             </div>
           )}
@@ -291,6 +297,18 @@ export function TaskDialog({
                 </Button>
               )}
             </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Assignees</Label>
+            <MultiSelect
+              label="Assignees"
+              closeOnSelect
+              options={members.map((m) => ({ value: m.userId, label: m.name, image: m.image }))}
+              value={assigneeIds}
+              onChange={setAssigneeIds}
+              loading={membersLoading}
+            />
           </div>
 
           {!isSubtask && (

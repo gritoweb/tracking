@@ -13,6 +13,7 @@ import { PageFallback } from "./PageFallback";
 import { Toaster } from "@/components/ui/sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useWebSocket } from "@/hooks/useWebSocket";
+import { useNotificationSocket } from "@/hooks/useNotificationSocket";
 import { useOfflineSync } from "@/hooks/useOfflineSync";
 import { useHydrateSettings } from "@/hooks/useSettings";
 import { useUIStore } from "@/stores/uiStore";
@@ -35,6 +36,7 @@ const LogTaskTimeSheet = lazyWithReload(() =>
 
 export function AppShell() {
   useWebSocket();
+  useNotificationSocket();
   useHydrateSettings();
   const { isOnline } = useOfflineSync();
   const location = useLocation();

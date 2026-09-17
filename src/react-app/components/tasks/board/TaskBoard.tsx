@@ -24,7 +24,15 @@ import { useTaskStatuses } from "@/hooks/useTaskStatuses";
 import { useWorkspaceRole } from "@/hooks/useWorkspaceRole";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { usePanScroll } from "@/hooks/usePanScroll";
-import { matchesDueFilter, midpointOrder, type DueFilter } from "@/lib/taskUtils";
+import {
+  matchesDueFilter,
+  midpointOrder,
+  SORTERS,
+  type DueFilter,
+  type GroupBy,
+  type SortBy,
+  type StatusFilter,
+} from "@/lib/taskUtils";
 import { todayLocalDate } from "@shared/task-recurrence";
 import type { Task } from "@shared/schemas";
 
@@ -35,6 +43,10 @@ interface TaskBoardProps {
   /** Board-level project filter; `null` means every project. */
   projectId: string | null;
   dueFilter: DueFilter;
+  status: StatusFilter;
+  sortBy: SortBy;
+  /** "status" and "none" render flat — the columns already group by status. */
+  groupBy: GroupBy;
   onOpenTask: (task: Task) => void;
 }
 
@@ -48,8 +60,16 @@ function columnIdOf(id: string, columns: Map<string, Task[]>): string | undefine
 }
 
 /** The kanban view. Top-level tasks only — a subtask rides its parent's card as a `2/5` chip. */
-export function TaskBoard({ tasks, projectId, dueFilter, onOpenTask }: TaskBoardProps) {
-  const { data: statuses = [], isLoading } = useTaskStatuses();
+export function TaskBoard({
+  tasks,
+  projectId,
+  dueFilter,
+  status,
+  sortBy,
+  groupBy,
+  onOpenTask,
+}: TaskBoardProps) {
+  const { data: statuses = [], isLoading } = useTaskStatuses(projectId);
   const { canManage } = useWorkspaceRole();
   const move = useMoveTask();
   const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
@@ -69,18 +89,25 @@ export function TaskBoard({ tasks, projectId, dueFilter, onOpenTask }: TaskBoard
       (t) =>
         !t.parentId &&
         (!projectId || t.projectId === projectId) &&
-        matchesDueFilter(t, dueFilter, today)
+        matchesDueFilter(t, dueFilter, today) &&
+        (status === "all" ? true : status === "active" ? t.active : !t.active)
     );
     const map = new Map<string, Task[]>();
-    for (const status of statuses) map.set(status.id, []);
+    for (const s of statuses) map.set(s.id, []);
     for (const task of visible) {
       const bucket = task.statusId ? map.get(task.statusId) : undefined;
-      // A status archived out from under a task lands it in the first column, not nowhere.
-      (bucket ?? map.get(statuses[0]?.id ?? "") ?? []).push(task);
+      // The task's own status isn't one of the columns on screen — either archived out
+      // from under it, or (viewing "All tasks" unfiltered) it belongs to a project whose
+      // fork has its own columns instead of the global set shown here. Either way, the
+      // nearest same-category column beats losing the card off the board entirely.
+      const fallback = statuses.find((s) => s.category === task.statusCategory) ?? statuses[0];
+      (bucket ?? map.get(fallback?.id ?? "") ?? []).push(task);
     }
-    for (const list of map.values()) list.sort((a, b) => a.boardOrder - b.boardOrder);
+    // "Plan order" is the manual drag sequence; any other sort reorders the display only.
+    const compare = sortBy === "plan" ? (a: Task, b: Task) => a.boardOrder - b.boardOrder : SORTERS[sortBy];
+    for (const list of map.values()) list.sort(compare);
     return map;
-  }, [tasks, statuses, projectId, dueFilter, today]);
+  }, [tasks, statuses, projectId, dueFilter, status, sortBy, today]);
 
   // Live-reshuffled while dragging (two separate SortableContexts can't do this alone); server truth otherwise.
   const [liveColumns, setLiveColumns] = useState<Map<string, Task[]> | null>(null);
@@ -219,10 +246,11 @@ export function TaskBoard({ tasks, projectId, dueFilter, onOpenTask }: TaskBoard
             tasks={columns.get(status.id) ?? []}
             canManage={canManage}
             defaultProjectId={projectId}
+            groupBy={groupBy}
             onOpenTask={onOpenTask}
           />
         ))}
-        {canManage && <AddStatusColumn statuses={statuses} />}
+        {canManage && <AddStatusColumn statuses={statuses} projectId={projectId} />}
       </div>
 
       {/* The overlay is what actually follows the pointer; the card in the column

@@ -41,12 +41,14 @@ interface StatusColumnMenuProps {
   /** Every live column, in board order — reordering and the archive target read it. */
   statuses: TaskStatus[];
   taskCount: number;
+  /** The board's own project scope — editing a column shown as the global fallback forks it for this project first. */
+  projectId: string | null;
 }
 
 /** Configuring a column. Every rule enforced here is refused server-side too — this just says why sooner. */
-export function StatusColumnMenu({ status, statuses, taskCount }: StatusColumnMenuProps) {
-  const update = useUpdateTaskStatus();
-  const archive = useArchiveTaskStatus();
+export function StatusColumnMenu({ status, statuses, taskCount, projectId }: StatusColumnMenuProps) {
+  const update = useUpdateTaskStatus(projectId);
+  const archive = useArchiveTaskStatus(projectId);
   const [renaming, setRenaming] = useState(false);
   const [name, setName] = useState(status.name);
   const [archiveOpen, setArchiveOpen] = useState(false);

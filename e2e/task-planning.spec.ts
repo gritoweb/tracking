@@ -72,6 +72,42 @@ test("quick-add parses a due date and a priority out of the line", async ({ page
   expect(added.priority).toBe(1);
 });
 
+test("quick-add's due date and assignee pickers set the task without opening the panel", async ({ page }) => {
+  const { project, origin } = await seed(page);
+  await page.request.post("/api/tasks", {
+    data: { name: "Cutover plan", projectId: project.id },
+    headers: { origin },
+  });
+
+  await page.goto("/tasks");
+  await page.getByRole("radio", { name: "List" }).click();
+  await page.waitForTimeout(800);
+
+  const field = page.getByRole("textbox", { name: "Add a task" }).first();
+  await field.fill("send kickoff email");
+  // Scoped to the quick-add row itself — "Set due date" also matches the existing task row's own chip.
+  const row = field.locator("xpath=ancestor::div[contains(@class,'items-center')][1]");
+
+  await row.getByRole("button", { name: "Set due date" }).click();
+  await page.getByRole("button", { name: /^Today,/ }).click();
+  await expect(row.getByRole("button", { name: "Due Today — change" })).toBeVisible();
+
+  await row.getByRole("button", { name: "Add assignee" }).click();
+  await page.getByPlaceholder("Search assignees...").fill("Test User");
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Escape");
+
+  await field.press("Enter");
+  await page.waitForTimeout(1200);
+
+  const tasks = await (await page.request.get("/api/tasks")).json();
+  const added = tasks.find((t: { name: string }) => t.name === "send kickoff email");
+  expect(added).toBeTruthy();
+  expect(added.dueDate).toBe(localDate(0));
+  expect(added.assignees).toHaveLength(1);
+  expect(added.assignees[0].name).toBe("Test User");
+});
+
 test("completing a repeating task creates the next occurrence", async ({ page }) => {
   const { project, origin } = await seed(page);
   await page.request.post("/api/tasks", {
@@ -183,7 +219,7 @@ test("the Due filter narrows the List, overdue included under Today", async ({ p
   await expect(page.getByText("Phase 2 discovery")).toHaveCount(0);
 });
 
-test("a task carries notes, editable through the task dialog", async ({ page }) => {
+test("a task carries notes, editable through the detail panel (D5)", async ({ page }) => {
   const { project, origin } = await seed(page);
   await page.request.post("/api/tasks", {
     data: { name: "Reconcile Q3 invoices", projectId: project.id, dueDate: localDate(0) },
@@ -199,21 +235,88 @@ test("a task carries notes, editable through the task dialog", async ({ page }) 
   await row.getByRole("button", { name: /More actions/ }).click();
   await page.getByRole("menuitem", { name: "Edit task…" }).click();
 
-  const dialog = page.getByRole("dialog", { name: "Edit task" });
-  await expect(dialog).toBeVisible();
-  // The form opens on the task's real values, not on empty defaults.
-  await expect(dialog.getByLabel("Name")).toHaveValue("Reconcile Q3 invoices");
-  // Clear sits inside the dialog beside the date, not pushed off its edge.
-  await expect(dialog.getByRole("button", { name: "Clear due date" })).toBeVisible();
+  // The card opens a side panel now (D5), not a centered "Edit task" dialog — same
+  // role, but titled by the task's own name, so the same panel does view and edit.
+  const panel = page.getByRole("dialog", { name: "Reconcile Q3 invoices" });
+  await expect(panel).toBeVisible();
+  await expect(panel.getByLabel("Task name")).toHaveValue("Reconcile Q3 invoices");
+  await expect(panel.getByRole("button", { name: "Clear due date" })).toBeVisible();
 
-  await dialog.getByLabel("Notes").fill("Check the August credit note before sending.");
-  await dialog.getByRole("button", { name: "Save changes" }).click();
-  await expect(dialog).not.toBeVisible();
-  await page.waitForTimeout(1000);
+  // Every field autosaves on blur — there is no batched "Save changes" anymore.
+  await panel.getByLabel("Description").fill("Check the August credit note before sending.");
+  await panel.getByLabel("Description").blur();
+  await page.waitForTimeout(500);
+  await page.keyboard.press("Escape");
+  await expect(panel).not.toBeVisible();
 
   // Notes render as a second line on the row.
   await expect(page.getByText("Check the August credit note before sending.")).toBeVisible();
 
+  // Stored as the rich-text editor's own doc (D8), not the raw string — the row's plain-text
+  // preview above proves the round trip, this proves the stored shape carries the same text.
   const tasks = await (await page.request.get("/api/tasks")).json();
-  expect(tasks[0].description).toBe("Check the August credit note before sending.");
+  const doc = JSON.parse(tasks[0].description);
+  expect(doc.type).toBe("doc");
+  expect(JSON.stringify(doc)).toContain("Check the August credit note before sending.");
+});
+
+test("a legacy plain-text description still loads and edits in the rich-text panel (D8)", async ({
+  page,
+}) => {
+  const { project, origin } = await seed(page);
+  const created = await page.request.post("/api/tasks", {
+    data: { name: "Reconcile Q3 invoices", projectId: project.id },
+    headers: { origin },
+  });
+  const task = await created.json();
+  // A description written before the rich-text editor existed — a bare string, not JSON.
+  await page.request.put(`/api/tasks/${task.id}`, {
+    data: { description: "Legacy plain-text note" },
+    headers: { origin },
+  });
+
+  await page.goto(`/tasks/${task.id}`);
+  const panel = page.getByRole("dialog", { name: "Reconcile Q3 invoices" });
+  await expect(panel).toBeVisible();
+  await expect(panel.getByText("Legacy plain-text note")).toBeVisible();
+
+  // Bold it — the description is now genuinely rich, and still round-trips through the API.
+  const editor = panel.getByRole("textbox", { name: "Description" });
+  await editor.click();
+  await page.keyboard.press("ControlOrMeta+A");
+  await page.keyboard.press("ControlOrMeta+B");
+  await editor.blur();
+  await page.waitForTimeout(500);
+
+  const after = await (await page.request.get(`/api/tasks?includeInactive=true`)).json();
+  const updated = after.find((t: { id: string }) => t.id === task.id);
+  const doc = JSON.parse(updated.description);
+  expect(JSON.stringify(doc)).toContain('"bold"');
+  expect(JSON.stringify(doc)).toContain("Legacy plain-text note");
+});
+
+test("checking off a checklist item in the description marks it done (D8)", async ({ page }) => {
+  const { project, origin } = await seed(page);
+  const created = await page.request.post("/api/tasks", {
+    data: { name: "Launch checklist", projectId: project.id },
+    headers: { origin },
+  });
+  const task = await created.json();
+
+  await page.goto(`/tasks/${task.id}`);
+  const panel = page.getByRole("dialog", { name: "Launch checklist" });
+  const editor = panel.getByRole("textbox", { name: "Description" });
+  await editor.click();
+  await panel.getByRole("button", { name: "Checklist" }).click();
+  await page.keyboard.type("Ship to staging");
+  await editor.blur();
+  await page.waitForTimeout(500);
+
+  await panel.getByRole("checkbox").click();
+  await editor.blur();
+  await page.waitForTimeout(500);
+
+  const tasks = await (await page.request.get("/api/tasks")).json();
+  const doc = JSON.parse(tasks[0].description);
+  expect(JSON.stringify(doc)).toContain('"checked":true');
 });

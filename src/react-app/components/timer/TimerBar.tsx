@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { ProjectPicker } from "@/components/entries/ProjectPicker";
 import { TaskPicker } from "@/components/entries/TaskPicker";
 import { AssistantButton } from "@/components/assistant/AssistantButton";
+import { NotificationBell } from "@/components/layout/NotificationBell";
 import { useTimerStore } from "@/stores/timerStore";
 import { useUIStore } from "@/stores/uiStore";
 import { useTimer, useTimerLifecycle, type StartTimerInput } from "@/hooks/useTimer";
@@ -278,49 +279,71 @@ export function TimerBar() {
           grow into the leftover keeps chips and controls on one line down to
           768px, and the same 7rem as `min-w` stops them collapsing into
           unreadable slivers when they genuinely don't fit. */}
-      <ProjectPicker
-        value={projectId}
-        open={projectPickerOpen}
-        holdOpen={Boolean(pendingStart)}
-        onOpenChange={(open) => {
-          setProjectPickerOpen(open);
-          if (!open) setPendingStart(null);
-        }}
-        onChange={(id) => {
-          setProjectId(id);
-          useUIStore.getState().setLastProjectId(id);
-          setTaskId(null);
-          // Picking a project answers "is this invoiceable?" for the user —
-          // that's what the project's own billable flag is for. An explicit
-          // toggle afterwards still wins; this only sets the starting point,
-          // and matches what the server does for callers that say nothing.
-          // Precedence: an explicit toggle beats the project's flag, which
-          // beats the user's "Default billable" preference. Clearing the
-          // project falls back to that preference rather than hard false.
-          const next = id
-            ? (projects.find((p) => p.id === id)?.billable ?? getDefaultBillable())
-            : getDefaultBillable();
-          setBillable(next);
-          if (runningEntry) {
-            updateEntry.mutate({
-              id: runningEntry.id,
-              data: { projectId: id, taskId: null, billable: next },
-            });
-          } else if (pendingStart) {
-            startTimer({
-              description: pendingStart.description ?? description,
-              tags: pendingStart.tags ?? tags,
-              billable: pendingStart.billable ?? next,
-              projectId: id,
-              taskId: null,
-            });
-            setPendingStart(null);
-          }
-        }}
-        compact
-        className="tt-touch shrink max-xl:min-w-28 max-xl:grow max-xl:basis-28"
-      />
-
+      {/* The clear button used to float loose next to the picker, unrelated to it at a
+          glance — one pill now houses both, so "this button clears that chip" reads
+          without having to notice they're separate elements. */}
+      <div className="tt-touch flex shrink items-center rounded-full max-xl:min-w-28 max-xl:grow max-xl:basis-28">
+        <ProjectPicker
+          value={projectId}
+          open={projectPickerOpen}
+          holdOpen={Boolean(pendingStart)}
+          onOpenChange={(open) => {
+            setProjectPickerOpen(open);
+            if (!open) setPendingStart(null);
+          }}
+          onChange={(id) => {
+            setProjectId(id);
+            useUIStore.getState().setLastProjectId(id);
+            setTaskId(null);
+            // Picking a project answers "is this invoiceable?" for the user —
+            // that's what the project's own billable flag is for. An explicit
+            // toggle afterwards still wins; this only sets the starting point,
+            // and matches what the server does for callers that say nothing.
+            // Precedence: an explicit toggle beats the project's flag, which
+            // beats the user's "Default billable" preference. Clearing the
+            // project falls back to that preference rather than hard false.
+            const next = id
+              ? (projects.find((p) => p.id === id)?.billable ?? getDefaultBillable())
+              : getDefaultBillable();
+            setBillable(next);
+            if (runningEntry) {
+              updateEntry.mutate({
+                id: runningEntry.id,
+                data: { projectId: id, taskId: null, billable: next },
+              });
+            } else if (pendingStart) {
+              startTimer({
+                description: pendingStart.description ?? description,
+                tags: pendingStart.tags ?? tags,
+                billable: pendingStart.billable ?? next,
+                projectId: id,
+                taskId: null,
+              });
+              setPendingStart(null);
+            }
+          }}
+          compact
+          className={cn("min-w-0 flex-1", isRunning || !projectId ? "rounded-full" : "rounded-l-full rounded-r-none")}
+        />
+        {/* The picker itself never offers "no project" — every entry needs one (D3) — but the
+            bar pre-fills the last one used while idle, and there was no way back to a blank slate. */}
+        {!isRunning && projectId && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            aria-label="Clear project"
+            onClick={() => {
+              setProjectId(null);
+              setTaskId(null);
+              useUIStore.getState().setLastProjectId(null);
+            }}
+            className="shrink-0 rounded-l-none rounded-r-full text-muted-foreground"
+          >
+            <X className="h-3.5 w-3.5" />
+          </Button>
+        )}
+      </div>
 
       {/* Task picker — only when a project is selected */}
       <TaskPicker
@@ -333,7 +356,10 @@ export function TimerBar() {
           }
         }}
         compact
-        className="tt-touch shrink max-xl:min-w-28 max-xl:grow max-xl:basis-28"
+        // Empty, it's an icon and a chevron — nothing to grow for. Forcing 7rem on it
+        // anyway was the actual space hog on a tablet-width screen; only claim room
+        // once there's a task name that needs it.
+        className={cn("tt-touch shrink", taskId ? "max-xl:min-w-28 max-xl:grow max-xl:basis-28" : "shrink-0")}
       />
 
       {/* Billable toggle. Last in the draft sequence — description, then what
@@ -410,6 +436,7 @@ export function TimerBar() {
           startDisabled={!projectId}
         />
 
+        <NotificationBell />
         <AssistantButton />
       </div>
 

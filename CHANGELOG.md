@@ -1,5 +1,152 @@
 # Changelog
 
+## 2026-09-17 (3)
+### Fixed
+- **A task whose comment carries an image could never be deleted, and neither could that image.**
+  Migration `0043` added `task_comments.attachment_id REFERENCES task_attachments(id)` with no
+  `ON DELETE` action, and D1 enforces foreign keys (`PRAGMA foreign_keys` returns `1`), so deleting a
+  referenced attachment — alone, or as the first statement of the task-delete batch — failed with
+  `FOREIGN KEY constraint failed` and rolled the whole batch back. `0043` now declares
+  `ON DELETE SET NULL`; the comment stays and loses its image. Fixed in the migration itself because
+  it had not reached the remote database yet — after that, changing the constraint would take a
+  table rebuild.
+
+Verified: in-memory SQLite with the real `0040`/`0042`/`0043` — before, both deletes failed with
+`FOREIGN KEY constraint failed (19)`; after, the attachment delete nulls `attachment_id` and the
+task batch removes task, attachments and comments. Local D1 rebuilt to the same schema (21 comments
+preserved). `pnpm check` exit 0, `pnpm lint` 0 errors.
+
+## 2026-09-17 (2)
+### Added
+- **D8 — flat, single-level task comments**, no reply/thread (same shape as a WhatsApp group chat):
+  `task_comments` (migration `0042`), nested under `/api/tasks/:id/comments`
+  (`GET`/`POST`/`PATCH`/`DELETE`, author-only edit/delete). `TaskComments.tsx` in the detail panel;
+  `@mention` is a structured picker (reuses the same `MultiSelect` as assignees) rather than parsing
+  free text, and only ever notifies — it never creates a thread of its own.
+- **Per-user notification bell**, a genuinely separate concern from the workspace's `TimerRoom`: a
+  new `NotificationRoom` Durable Object (one instance per user, `wrangler.jsonc` migration `v5`),
+  its own `notifications` table (migration `0042`), `lib/notifications.ts` (`notifyUser`/
+  `notifyMentions` — fail-closed: a mention only reaches someone still a workspace member right
+  now), and `routes/notifications.ts` (`GET` list + unread count, mark-one/mark-all read, and its
+  own `/ws` upgrade). Client side: `NotificationBell.tsx` next to the Assistant launcher, polling
+  every 60s (paused while the tab is hidden) with `useNotificationSocket` as a live-push backstop —
+  two independent delivery paths on purpose, so a socket bug never means a lost notification.
+- **Quick-add gets a due date and an assignee**, inline, without opening the panel — reuses the
+  same `Calendar`/`Popover` and `MultiSelect` pattern already proven on `TaskCard`/`TaskRow`. The
+  Board's own "+ Add a task" card (`stacked`) got a real redesign to go with it: a white
+  (`bg-popover`) bordered card, each field — name, project, due date, assignee — on its own row
+  with an icon and label, instead of icons crammed onto the name's input line. The List/subtask
+  quick-add keeps the original compact one-line form, where that density is still the point.
+- **Task description is rich text with a markable checklist** (tiptap — `@tiptap/react` +
+  `starter-kit` + `extension-task-list`/`extension-task-item`, headless and styled to this app's
+  own tokens in `index.css` `.tt-richtext`, not tiptap's default look). Bold, a heading level,
+  bullet lists, and a checklist; autosaves on blur like every other field. `parseDescription`/
+  `serializeDescription` (`lib/richText.ts`) read a **legacy plain-text description as-is** and
+  wrap it as a single paragraph — no migration, no data loss for anything written before this
+  shipped. `descriptionToPlainText` feeds the existing clamped one-line preview on the board card
+  and the list row, unchanged.
+### Fixed
+- The board's status-column tint (`tt-swatch-column`) now rounds all four corners instead of only
+  the top, and the "Add a task" row moved *inside* the tinted card, right after the last one — it
+  used to sit outside, in plain grey, floating at the column's full height below a short list.
+
+Verified: `pnpm check` exit 0, `pnpm lint` 0 errors. `task-board` + `task-detail-panel` +
+`task-planning` + `task-statuses-fork` + new `task-comments.spec.ts` (4 tests: post/edit/delete
+through the panel, cross-member authorization, live @mention → bell delivery, fail-closed on a
+non-member id) all green, including 3 new `task-planning` cases for the rich-text description
+(bold + round-trip, legacy plain-text back-compat, checklist toggle) and the quick-add pickers.
+
+## 2026-09-17
+### Added
+- **Per-project status override on top of the workspace's global default** (`task_statuses.project_id`,
+  migration `0041`). A project reads the global 5 columns until someone customizes its board —
+  renames, recolors, recategorizes, reorders, archives, or adds a column while that project is
+  selected — at which point `ensureProjectFork` clones the global set into rows scoped to that
+  project (idempotent) and every edit lands on the fork instead, leaving the global set and every
+  other project untouched. The fork is invisible to the UI: `StatusColumnMenu`/`AddStatusColumn`
+  call the same mutations as always; `useUpdateTaskStatus`/`useArchiveTaskStatus`
+  (`hooks/useTaskStatuses.ts`) detect a global row is being edited under a project scope and
+  fork-then-redirect before issuing the write. A new status with no color chosen gets the next one
+  not already in its set (`nextUnusedColor`, the same rule a new project or tag gets) — `color` is
+  now optional on `CreateTaskStatusSchema`. The unfiltered "All tasks" board still shows the global
+  columns; a task whose own status belongs to a project fork not on screen buckets into the nearest
+  column of the same category instead of vanishing (`TaskBoard.tsx` `serverColumns`).
+- **Board gets List's own filters**: Status (All/Active/Done) and Sort now show in both layouts;
+  Group (Project/Due date/None — Status is List-only, since the Board's columns already are that
+  grouping) now also renders on the Board, sub-grouping each column's cards under a small header
+  (`clusterTasks`, `taskUtils.ts`) — tracked as its own `boardGroupBy` state, defaulting to `none`
+  so the Board doesn't gain a default grouping on top of its columns that wasn't there before.
+- **Status color derived from a formula, not five hardcoded hex values.** `.tt-swatch-column`
+  (`index.css`), a weaker sibling of the existing `.tt-swatch-tint` chip formula, tints a column's
+  background and a card's status pill from the status's own color via `color-mix(in oklab, ...)` —
+  6% light / 10% dark, tuned against the reference hexes Luis gave. A column only wears its color
+  once it holds a task (`tasks.length > 0`), matching the ClickUp reference instead of tinting five
+  empty columns permanently. The tint (and the "Add a task" row) now hugs the actual card content
+  height instead of stretching to the column's full flex height or pinning to its bottom edge.
+- **Inline editing on the Board card** (`TaskCard.tsx`): status (reusing `TaskStatusChip`, now a
+  tinted pill on both Board and List), priority, and due date are all clickable directly on the
+  card — previously the only way to change status on the Board was dragging to another column, and
+  priority/due date needed the detail panel.
+- **A "…" menu on the Tasks page's project rail** (`TaskProjectRail.tsx`): Edit/Archive on each
+  project row and each client heading, reusing `ProjectForm`/`ClientForm` and the same
+  `DropdownMenu` + `MoreHorizontal` pattern `ProjectList.tsx`/`ClientList.tsx` already use, gated by
+  `canManage`. Timer/Calendar's own project picker is untouched — scoped to `/tasks` only.
+- Board's empty-column placeholder ("Drop a task here") is gone — the droppable region already
+  covers the whole column, so it did nothing functional; only "+ Add a task" remains, matching the
+  ClickUp reference.
+- The `DragOverlay` ghost card that follows the cursor while dragging is now pinned to the real
+  card's width (`w-[272px]`) — it rendered in a portal outside the column, so without an explicit
+  width it sized to its own content and looked oversized.
+### Fixed
+- **A brand-new signup's very first session never got a workspace attached**
+  (`session.activeOrganizationId` stayed `undefined`), so anything reading it — the D6 assignee
+  picker (`getFullOrganization`) — showed zero members until the user logged in again. Root cause:
+  the workspace is created in `databaseHooks.user.create.after`, but Better Auth's own
+  `createOrganization` only marks the new org active `if (ctx.context.session)` — never true for
+  that pre-session caller — and the session is minted before `user.create.after`'s effects are
+  guaranteed visible to it, so even backfilling `user.last_active_organization_id` there (which
+  `organizationHooks.afterCreateOrganization` now also does, for every *later* session) can't win
+  that race for the first one. The real fix is `useWorkspaceMembers` (`useWorkspaceRole.ts`) no
+  longer trusting `session.activeOrganizationId` at all — it resolves the workspace via `/api/me`
+  instead, which every other endpoint already does through `resolveWorkspace`'s own per-request
+  logic, so it's never stale.
+- The already-uncommitted `optimisticAssignees` fix for "assignee picker needs closing the panel
+  to see it stick" is confirmed working end-to-end (it was blocked on the bug above during
+  verification) — see the new e2e coverage below.
+
+Verified: `pnpm check` exit 0, `pnpm lint` 0 errors. `task-board` + `task-detail-panel` +
+`task-planning` + `task-log-time` 28/28, plus new `task-statuses-fork.spec.ts` (3 tests: fork
+isolation, auto-color, and the UI-driven rename-forks-transparently path) and a new
+`task-detail-panel` test driving the assignee `MultiSelect` picker itself rather than the API, both
+green. Manually verified the fork/color/isolation behavior against the running dev server with
+curl before writing the e2e tests.
+
+## 2026-09-16 (4)
+### Added
+- **D5 — task detail panel.** Clicking a task on the board or in the list now opens a right-side
+  `TaskSheet` instead of the create dialog: every field (name, description, status, priority, due
+  date, assignees, attachments, subtasks, tracked time) autosaves on change/blur, no batched "Save
+  changes". Description limit raised 5,000 → 20,000 chars (plain text). Route `/tasks/:id` opens
+  the panel directly and is shareable; closing it navigates back to `/tasks`. Full-screen on
+  mobile, capped width from `sm` up.
+- **D6 — one or more assignees per task**, chosen from the workspace's own members
+  (`task_assignees` table, migration `0039`). Avatars on the board card and the list row, an
+  Assignees field in both the create dialog and the detail panel, and an "Assigned to me" toggle
+  on the Tasks header (board and list alike).
+- **D7 — image attachments on a task**, stored in R2 (`ATTACHMENTS` binding, key
+  `workspaceId/YYYY/MM/uuid`, migration `0040`). Attach by button, drag-and-drop or paste; PNG/JPEG/
+  WebP resized (long edge capped at 2000px) and re-encoded to webp with `@cf-wasm/photon` — a WASM
+  library that runs inside the Worker itself, so no paid Cloudflare Images product and no native
+  `sharp` (which can't run in a Worker isolate at all). GIF passes through untouched to keep its
+  animation. 10 MB max per file, type sniffed from content. Download is workspace-scoped
+  (`GET /api/attachments/:id`); deleting a task or an attachment removes the R2 object too.
+
+Verified: `pnpm check` exit 0, `pnpm lint` 0 errors, `task-board` + `task-planning` +
+`task-log-time` + the new `task-detail-panel` 24/24 (serial run — task-board's two owner/member
+tests are known-flaky in parallel, per the Network-connection-lost errors already documented for
+this dev setup, not a regression). One old test (`task-planning`'s "editable through the task
+dialog") was rewritten for the new panel; no other spec referenced the retired "Edit task" dialog.
+
 ## 2026-09-16 (3)
 ### Added
 - **Dragging empty board background pans it sideways**, instead of the browser starting a text

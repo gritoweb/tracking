@@ -235,6 +235,13 @@ export function useWebSocket() {
           }
           break;
         }
+        case "task-comments:changed": {
+          const taskId = (msg.data as { taskId?: string } | null)?.taskId;
+          if (!isOwnEcho && taskId) {
+            queryClient.invalidateQueries({ queryKey: ["task-comments", taskId] });
+          }
+          break;
+        }
       }
     }
 

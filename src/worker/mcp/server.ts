@@ -22,7 +22,9 @@ import { appUrl } from "../lib/app-url";
 import { generateDrafts, listDrafts } from "../lib/drafts";
 import { createClient, isActiveClient } from "../lib/clients";
 import { createProject, findActiveProject, memberProjectInput } from "../lib/projects";
-import { CreateClientSchema, CreateProjectSchema } from "@shared/schemas";
+import { createTask, moveTaskStatus } from "../routes/tasks";
+import { actorDisplayName, notifyAssigneesOfStatusChange, notifyNewAssignees } from "../lib/notifications";
+import { CreateClientSchema, CreateProjectSchema, CreateTaskSchema } from "@shared/schemas";
 import type { ApiKeyScope } from "../lib/api-keys";
 
 /** Cap on rows any single tool returns, so one call can't blow the context window. */
@@ -47,7 +49,7 @@ const MUTATES = {
 // The wire identifier — stable, lowercase, and NOT for display. Clients key
 // their config off it, so it must not change with the display name.
 const SERVER_NAME = "timetracker";
-const SERVER_VERSION = "1.2.0";
+const SERVER_VERSION = "1.4.0";
 
 
 /**
@@ -526,6 +528,54 @@ export function buildMcpServer(ctx: McpContext): McpServer {
       const manager = (await scopeUserId()) === null;
       const project = await createProject(db, workspaceId, manager ? data : memberProjectInput(data));
       return json(project);
+    }
+  );
+
+  server.registerTool(
+    "create_task",
+    {
+      title: "Create a task",
+      description:
+        "Add a task to a project's plan — the thing to be done, separate from tracked time. Only when the person asked for this task. Use list_projects for the projectId; never guess it. `assigneeIds` must already be workspace members — ask the person who, rather than guessing.",
+      inputSchema: CreateTaskSchema.shape,
+      annotations: MUTATES,
+    },
+    async (data) => {
+      const project = await findActiveProject(db, workspaceId, data.projectId);
+      if (!project) {
+        return text(`No active project with id ${data.projectId} in this workspace. Call list_projects and ask the person which project this task belongs to.`);
+      }
+      const result = await createTask(db, workspaceId, data, await scopeUserId());
+      if ("error" in result) return text(result.error);
+      if (data.assigneeIds?.length) {
+        await notifyNewAssignees(
+          env, workspaceId, result.task.id, result.task.name, userId,
+          await actorDisplayName(db, userId), data.assigneeIds
+        );
+      }
+      return json(result.task);
+    }
+  );
+
+  server.registerTool(
+    "move_task",
+    {
+      title: "Move a task to a different status",
+      description:
+        "Change which column/status a task is in — the same as dragging its card on the board. Use list_projects then the app (or a prior list_time_entries-style lookup) to get the taskId; never guess it. Notifies the task's assignees, except whoever's key is making this call.",
+      inputSchema: { taskId: z.string(), statusId: z.string() },
+      annotations: MUTATES,
+    },
+    async ({ taskId, statusId }) => {
+      const result = await moveTaskStatus(db, workspaceId, taskId, statusId, await scopeUserId());
+      if ("error" in result) return text(result.error);
+      if (result.task.statusId !== result.previousStatusId) {
+        await notifyAssigneesOfStatusChange(
+          env, workspaceId, taskId, result.task.name, userId,
+          await actorDisplayName(db, userId), result.task.statusName ?? "a new status"
+        );
+      }
+      return json(result.task);
     }
   );
 

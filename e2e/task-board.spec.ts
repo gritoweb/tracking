@@ -6,7 +6,7 @@ import type { Task, TaskStatus } from "../src/shared/schemas";
 
 // Configurable task statuses and the board built on them (D4).
 
-const DEFAULT_ORDER = ["Backlog", "To do", "In progress", "Feedback", "Done"];
+const DEFAULT_ORDER = ["Backlog", "On hold", "Pendente", "Em progresso", "QA", "Client review", "Closed"];
 
 async function statuses(page: Page): Promise<TaskStatus[]> {
   return (await page.request.get("/api/task-statuses")).json();
@@ -22,7 +22,7 @@ function byName(list: TaskStatus[], name: string) {
   return found;
 }
 
-test("a new workspace gets the five default statuses, and a new task lands in the default one", async ({ page }) => {
+test("a new workspace gets the seven default statuses, and a new task lands in the default one", async ({ page }) => {
   await signUp(page);
   const origin = new URL(page.url()).origin;
   const project = await createProject(page, { name: "ERP Migration", color: "#e11d48" });
@@ -30,17 +30,17 @@ test("a new workspace gets the five default statuses, and a new task lands in th
   const live = await statuses(page);
   expect(live.map((s) => s.name)).toEqual(DEFAULT_ORDER);
   expect(live.map((s) => s.category)).toEqual([
-    "not_started", "not_started", "active", "active", "completed",
+    "not_started", "active", "not_started", "active", "active", "active", "completed",
   ]);
-  // Capture lands in "To do", not in the first column — see lib/task-statuses.ts.
-  expect(live.filter((s) => s.isDefault).map((s) => s.name)).toEqual(["To do"]);
+  // Capture lands in "Pendente", not in the first column — see lib/task-statuses.ts.
+  expect(live.filter((s) => s.isDefault).map((s) => s.name)).toEqual(["Pendente"]);
 
   await page.request.post("/api/tasks", {
     data: { name: "Cutover plan", projectId: project.id },
     headers: { origin },
   });
   const [task] = await tasks(page);
-  expect(task.statusName).toBe("To do");
+  expect(task.statusName).toBe("Pendente");
   expect(task.statusCategory).toBe("not_started");
   expect(task.active).toBe(true);
 });
@@ -60,27 +60,27 @@ test("moving to a completed status closes the task, and moving back reopens it",
 
   // An active-category column leaves the task open.
   await page.request.patch(`/api/tasks/${created.id}/move`, {
-    data: { statusId: byName(live, "In progress").id, boardOrder: 1 },
+    data: { statusId: byName(live, "Em progresso").id, boardOrder: 1 },
     headers: { origin },
   });
   let [task] = await tasks(page);
-  expect(task.statusName).toBe("In progress");
+  expect(task.statusName).toBe("Em progresso");
   expect(task.active).toBe(true);
   expect(task.completedAt).toBeNull();
 
   // A completed-category column closes it — the mirror, written in one place.
   await page.request.patch(`/api/tasks/${created.id}/move`, {
-    data: { statusId: byName(live, "Done").id, boardOrder: 1 },
+    data: { statusId: byName(live, "Closed").id, boardOrder: 1 },
     headers: { origin },
   });
   [task] = await tasks(page);
-  expect(task.statusName).toBe("Done");
+  expect(task.statusName).toBe("Closed");
   expect(task.active).toBe(false);
   expect(task.completedAt).not.toBeNull();
 
   // Dragging it out reopens it.
   await page.request.patch(`/api/tasks/${created.id}/move`, {
-    data: { statusId: byName(live, "To do").id, boardOrder: 1 },
+    data: { statusId: byName(live, "Pendente").id, boardOrder: 1 },
     headers: { origin },
   });
   [task] = await tasks(page);
@@ -93,7 +93,7 @@ test("moving to a completed status closes the task, and moving back reopens it",
     headers: { origin },
   });
   [task] = await tasks(page);
-  expect(task.statusName).toBe("Done");
+  expect(task.statusName).toBe("Closed");
   expect(task.active).toBe(false);
 });
 
@@ -114,13 +114,13 @@ test("subtasks follow their parent across the done line, column and all", async 
 
   const live = await statuses(page);
   await page.request.patch(`/api/tasks/${parent.id}/move`, {
-    data: { statusId: byName(live, "Done").id, boardOrder: 1 },
+    data: { statusId: byName(live, "Closed").id, boardOrder: 1 },
     headers: { origin },
   });
 
   const all = await tasks(page);
   const child = all.find((t) => t.parentId === parent.id)!;
-  expect(child.statusName).toBe("Done");
+  expect(child.statusName).toBe("Closed");
   expect(child.active).toBe(false);
 });
 
@@ -139,7 +139,7 @@ test("a member can move cards but cannot configure statuses", async ({ browser }
 
   // Ordinary work: moving a card is not a manager action.
   const moved = await member.request.patch(`/api/tasks/${task.id}/move`, {
-    data: { statusId: byName(live, "In progress").id, boardOrder: 1 },
+    data: { statusId: byName(live, "Em progresso").id, boardOrder: 1 },
     headers: memberHeaders,
   });
   expect(moved.ok()).toBeTruthy();
@@ -172,7 +172,7 @@ test("archiving a status that still holds tasks has to say where they go", async
   const origin = new URL(page.url()).origin;
   const project = await createProject(page, { name: "ERP Migration", color: "#e11d48" });
   const live = await statuses(page);
-  const feedback = byName(live, "Feedback");
+  const feedback = byName(live, "QA");
 
   const task = await (
     await page.request.post("/api/tasks", {
@@ -180,7 +180,7 @@ test("archiving a status that still holds tasks has to say where they go", async
       headers: { origin },
     })
   ).json();
-  expect((await tasks(page))[0].statusName).toBe("Feedback");
+  expect((await tasks(page))[0].statusName).toBe("QA");
 
   const refused = await page.request.post(`/api/task-statuses/${feedback.id}/archive`, {
     data: {},
@@ -190,15 +190,17 @@ test("archiving a status that still holds tasks has to say where they go", async
   expect((await refused.json()).taskCount).toBe(1);
 
   const ok = await page.request.post(`/api/task-statuses/${feedback.id}/archive`, {
-    data: { moveTo: byName(live, "To do").id },
+    data: { moveTo: byName(live, "Pendente").id },
     headers: { origin },
   });
   expect(ok.ok()).toBeTruthy();
   expect((await ok.json()).moved).toBe(1);
 
-  expect((await statuses(page)).map((s) => s.name)).toEqual(["Backlog", "To do", "In progress", "Done"]);
+  expect((await statuses(page)).map((s) => s.name)).toEqual([
+    "Backlog", "On hold", "Pendente", "Em progresso", "Client review", "Closed",
+  ]);
   const after = (await tasks(page)).find((t) => t.id === task.id)!;
-  expect(after.statusName).toBe("To do");
+  expect(after.statusName).toBe("Pendente");
   expect(after.active).toBe(true);
 });
 
@@ -206,7 +208,7 @@ test("the board keeps one open and one completed column, and one default", async
   await signUp(page);
   const origin = new URL(page.url()).origin;
   const live = await statuses(page);
-  const done = byName(live, "Done");
+  const done = byName(live, "Closed");
 
   // Done is the only completed column, so it can be neither archived nor reopened.
   const archived = await page.request.post(`/api/task-statuses/${done.id}/archive`, {
@@ -242,7 +244,7 @@ test("the board keeps one open and one completed column, and one default", async
   });
   const after = await statuses(page);
   expect(after.filter((s) => s.isDefault)).toHaveLength(1);
-  expect(byName(after, "To do").isDefault).toBe(true);
+  expect(byName(after, "Pendente").isDefault).toBe(true);
 });
 
 test("recategorising a column carries the tasks already in it across the done line", async ({ page }) => {
@@ -250,14 +252,14 @@ test("recategorising a column carries the tasks already in it across the done li
   const origin = new URL(page.url()).origin;
   const project = await createProject(page, { name: "ERP Migration", color: "#e11d48" });
   const live = await statuses(page);
-  const feedback = byName(live, "Feedback");
+  const feedback = byName(live, "QA");
 
   await page.request.post("/api/tasks", {
     data: { name: "Cutover plan", projectId: project.id, statusId: feedback.id },
     headers: { origin },
   });
 
-  // "Feedback" turns out to mean "shipped, awaiting sign-off" in this workspace.
+  // "QA" turns out to mean "shipped, awaiting sign-off" in this workspace.
   const res = await page.request.put(`/api/task-statuses/${feedback.id}`, {
     data: { category: "completed" },
     headers: { origin },
@@ -327,15 +329,53 @@ test("the Board tab shows a column per status and a card can be moved with the k
     await expect(page.getByRole("region", { name })).toBeVisible();
   }
   // It starts in the default column, not the first one.
-  await expect(page.getByRole("region", { name: "To do" }).getByText("Cutover plan")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Pendente" }).getByText("Cutover plan")).toBeVisible();
 
   await dragWithKeyboard(page, "Cutover plan", "ArrowRight");
-  await expect(page.getByRole("region", { name: "In progress" }).getByText("Cutover plan")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Em progresso" }).getByText("Cutover plan")).toBeVisible();
 
   await expect
     .poll(async () => (await tasks(page))[0].statusName, { timeout: 8000 })
-    .toBe("In progress");
+    .toBe("Em progresso");
   expect((await tasks(page))[0].active).toBe(true);
+});
+
+test("the board column's open Add-a-task card has working due-date and assignee fields", async ({
+  page,
+}) => {
+  await signUp(page);
+  await createProject(page, { name: "ERP Migration", color: "#e11d48" });
+
+  await page.goto("/tasks");
+  await page.getByRole("radio", { name: "Board" }).click();
+  await page.getByRole("region", { name: "Pendente" }).getByRole("button", { name: "Add a task" }).click();
+
+  const nameField = page.getByPlaceholder("Task name");
+  await nameField.fill("Draft the SOW");
+  // Scoped to the open card itself — the compact quick-add rows elsewhere in the app share these labels.
+  const card = nameField.locator("xpath=ancestor::div[contains(@class,'rounded-container')][1]");
+
+  // Each field opens its own picker on click — this used to do nothing at all.
+  await card.getByRole("button", { name: "Due date" }).click();
+  await expect(page.getByRole("button", { name: /^Today,/ })).toBeVisible();
+  await page.getByRole("button", { name: /^Today,/ }).click();
+  await expect(card.getByRole("button", { name: "Today" })).toBeVisible();
+
+  await card.getByRole("button", { name: "Assignee" }).click();
+  await expect(page.getByPlaceholder("Search assignees...")).toBeVisible();
+  await page.getByPlaceholder("Search assignees...").fill("Test User");
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Escape");
+  await expect(card.getByText("Test User")).toBeVisible();
+
+  await card.getByRole("button", { name: "Add" }).click();
+  await page.waitForTimeout(800);
+
+  const created = await tasks(page);
+  const added = created.find((t: { name: string }) => t.name === "Draft the SOW");
+  expect(added).toBeTruthy();
+  expect(added.dueDate).toBeTruthy();
+  expect(added.assignees).toHaveLength(1);
 });
 
 test("a member sees the board but none of its configuration", async ({ browser }) => {
@@ -348,16 +388,16 @@ test("a member sees the board but none of its configuration", async ({ browser }
 
   await member.goto("/tasks");
   await member.getByRole("radio", { name: "Board" }).click();
-  await expect(member.getByRole("region", { name: "To do" })).toBeVisible();
-  await expect(member.getByRole("region", { name: "To do" }).getByText("Cutover plan")).toBeVisible();
+  await expect(member.getByRole("region", { name: "Pendente" })).toBeVisible();
+  await expect(member.getByRole("region", { name: "Pendente" }).getByText("Cutover plan")).toBeVisible();
 
   // The screen hides only what the server already refuses.
-  await expect(member.getByRole("button", { name: "Configure To do" })).toHaveCount(0);
+  await expect(member.getByRole("button", { name: "Configure Pendente" })).toHaveCount(0);
   await expect(member.getByRole("button", { name: "Add status" })).toHaveCount(0);
 
   await owner.goto("/tasks");
   await owner.getByRole("radio", { name: "Board" }).click();
-  await expect(owner.getByRole("button", { name: "Configure To do" })).toBeVisible();
+  await expect(owner.getByRole("button", { name: "Configure Pendente" })).toBeVisible();
   await expect(owner.getByRole("button", { name: "Add status" })).toBeVisible();
 
   await owner.context().close();
@@ -374,16 +414,16 @@ test("a move by one person reaches the other's board without a reload", async ({
 
   await member.goto("/tasks");
   await member.getByRole("radio", { name: "Board" }).click();
-  await expect(member.getByRole("region", { name: "To do" }).getByText("Cutover plan")).toBeVisible();
+  await expect(member.getByRole("region", { name: "Pendente" }).getByText("Cutover plan")).toBeVisible();
 
   await owner.goto("/tasks");
   await owner.getByRole("radio", { name: "Board" }).click();
-  await expect(owner.getByRole("region", { name: "To do" }).getByText("Cutover plan")).toBeVisible();
+  await expect(owner.getByRole("region", { name: "Pendente" }).getByText("Cutover plan")).toBeVisible();
   await dragWithKeyboard(owner, "Cutover plan", "ArrowRight");
 
   // `tasks:changed` carries no payload, so the other board refetches rather than reading it.
   await expect(
-    member.getByRole("region", { name: "In progress" }).getByText("Cutover plan")
+    member.getByRole("region", { name: "Em progresso" }).getByText("Cutover plan")
   ).toBeVisible({ timeout: 10_000 });
 
   await owner.context().close();
@@ -398,8 +438,8 @@ test("the list's Group: Status follows the real columns, in board order", async 
 
   for (const [name, status] of [
     ["Write the runbook", "Backlog"],
-    ["Cutover plan", "In progress"],
-    ["Sign-off", "Done"],
+    ["Cutover plan", "Em progresso"],
+    ["Sign-off", "Closed"],
   ] as const) {
     await page.request.post("/api/tasks", {
       data: { name, projectId: project.id, statusId: byName(live, status).id },
@@ -414,5 +454,5 @@ test("the list's Group: Status follows the real columns, in board order", async 
 
   // Column order, not alphabetical.
   const headings = page.locator("main h2:visible");
-  await expect(headings).toHaveText(["Backlog", "In progress", "Done"]);
+  await expect(headings).toHaveText(["Backlog", "Em progresso", "Closed"]);
 });

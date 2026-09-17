@@ -47,6 +47,13 @@
       "database_id": "ce30b90c-f188-44f6-bffb-c4e8102a6f84"
     }
   ],
+  // Task attachments (D7); real bucket only gets created on deploy day, like the D1 migrations above.
+  "r2_buckets": [
+    {
+      "binding": "ATTACHMENTS",
+      "bucket_name": "tracking-attachments"
+    }
+  ],
   "durable_objects": {
     "bindings": [
       {
@@ -60,6 +67,12 @@
       {
         "name": "CHAT_AGENT",
         "class_name": "ChatAgent"
+      },
+      // One instance per user — delivers their own notifications, separate from the
+      // per-workspace TimerRoom (which stays about timers/entries/tasks only).
+      {
+        "name": "NOTIFICATION_ROOM",
+        "class_name": "NotificationRoom"
       }
     ]
   },
@@ -123,6 +136,10 @@
     {
       "tag": "v4",
       "deleted_classes": ["TimerRoomDO"]
+    },
+    {
+      "tag": "v5",
+      "new_sqlite_classes": ["NotificationRoom"]
     }
   ],
   "routes": [

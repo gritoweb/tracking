@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { Plus, ListChecks, SearchX } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Plus, ListChecks, SearchX, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -17,32 +18,35 @@ import { ColorDot } from "@/components/ColorDot";
 import { TaskRow } from "./TaskRow";
 import { QuickAddTask } from "./QuickAddTask";
 import { TaskDialog } from "./TaskDialog";
+import { TaskSheet } from "./TaskSheet";
 import { TaskBoard } from "./board/TaskBoard";
 import { TaskProjectRail } from "./TaskProjectRail";
 import { useAllTasks, useDeleteTask, useUpdateTask } from "@/hooks/useTasks";
+import { useProjects } from "@/hooks/useProjects";
 import { useTaskStatuses } from "@/hooks/useTaskStatuses";
+import { useAuth } from "@/hooks/useAuth";
 import { useUIStore } from "@/stores/uiStore";
 import { useMediaQuery, BELOW_MD } from "@/hooks/useMediaQuery";
 import { formatDurationShort } from "@/lib/dateUtils";
 import { cn } from "@/lib/utils";
 import {
-  comparePlanned,
   formatDueHeading,
   matchesDueFilter,
   midpointOrder,
   nest,
   withSubtasks,
   DUE_FILTER_LABEL,
+  SORTERS,
   type DueFilter,
+  type GroupBy,
+  type SortBy,
+  type StatusFilter,
   type TaskNode,
 } from "@/lib/taskUtils";
 import { todayLocalDate } from "@shared/task-recurrence";
 import type { Task } from "@shared/schemas";
 
 type Layout = "board" | "list";
-type StatusFilter = "all" | "active" | "done";
-type GroupBy = "project" | "status" | "due" | "none";
-type SortBy = "name" | "estimate" | "tracked" | "recent" | "plan";
 
 const LAYOUT_OPTIONS = [
   { value: "board" as const, label: "Board" },
@@ -62,14 +66,6 @@ interface Section {
   reorderable?: boolean;
 }
 
-const SORTERS: Record<SortBy, (a: Task, b: Task) => number> = {
-  plan: comparePlanned,
-  name: (a, b) => a.name.localeCompare(b.name),
-  estimate: (a, b) => (b.estimatedSeconds ?? 0) - (a.estimatedSeconds ?? 0),
-  tracked: (a, b) => b.trackedSeconds - a.trackedSeconds,
-  recent: (a, b) => b.createdAt.localeCompare(a.createdAt),
-};
-
 /** Tracked total for a node and everything under it, without double-counting. */
 function nodeSeconds(node: TaskNode) {
   // `trackedSeconds` on a parent already rolls its children up (TASK_SELECT),
@@ -77,38 +73,88 @@ function nodeSeconds(node: TaskNode) {
   return node.task.trackedSeconds;
 }
 
-export function TaskBoardList() {
+interface TaskBoardListProps {
+  /** From the `/tasks/:id` route — opens that task's detail sheet on mount (D5). */
+  openTaskId?: string | null;
+}
+
+export function TaskBoardList({ openTaskId = null }: TaskBoardListProps) {
   const { data: tasks = [], isLoading } = useAllTasks();
-  const { data: statuses = [] } = useTaskStatuses();
   const deleteTask = useDeleteTask();
   const updateTask = useUpdateTask();
   const openTaskLogTime = useUIStore((s) => s.openTaskLogTime);
   const narrow = useMediaQuery(BELOW_MD);
+  const { user } = useAuth();
+  const navigate = useNavigate();
 
   const [layout, setLayout] = useState<Layout>("board");
   // Due date is a filter, not a view: it narrows either layout, it isn't a third one.
   const [dueFilter, setDueFilter] = useState<DueFilter>("all");
+  const [assignedToMe, setAssignedToMe] = useState(false);
   const [status, setStatus] = useState<StatusFilter>("all");
   const [groupBy, setGroupBy] = useState<GroupBy>("project");
+  // The Board already groups by status via its columns — a second default grouping
+  // on top of that is exactly the clutter this page is trying to shed, so it starts
+  // flat. List keeps its own "project" default, tracked separately.
+  const [boardGroupBy, setBoardGroupBy] = useState<GroupBy>("none");
   const [sortBy, setSortBy] = useState<SortBy>("plan");
   const [addOpen, setAddOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Task | null>(null);
+  const [syncedOpenTaskId, setSyncedOpenTaskId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Task | null>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [subtaskParent, setSubtaskParent] = useState<string | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
-  // The rail's own scope: filters both layouts alike.
-  const [railProjectId, setRailProjectId] = useState<string | null>(null);
+  // The rail's own scope: filters both layouts alike. Mutually exclusive with the client
+  // filter below — picking one clears the other, same as picking "All tasks" clears both.
+  const [railProjectId, setRailProjectIdRaw] = useState<string | null>(null);
+  const [railClientId, setRailClientIdRaw] = useState<string | null>(null);
+  const setRailProjectId = (id: string | null) => {
+    setRailProjectIdRaw(id);
+    setRailClientIdRaw(null);
+  };
+  const setRailClientId = (id: string | null) => {
+    setRailClientIdRaw(id);
+    setRailProjectIdRaw(null);
+  };
+  const { data: projects = [] } = useProjects();
+  const clientProjectIds = useMemo(
+    () => new Set(projects.filter((p) => p.clientId === railClientId).map((p) => p.id)),
+    [projects, railClientId]
+  );
+  // A client has no status fork of its own — falls back to the workspace's global set.
+  const { data: statuses = [] } = useTaskStatuses(railClientId ? null : railProjectId);
+
+  // Adjusted during render, not an effect: the `/tasks/:id` route needs the sheet open on the
+  // very first paint the matching task is available, same idiom TaskDialog/TaskSheet use to
+  // reseed on a prop change.
+  if (openTaskId && openTaskId !== syncedOpenTaskId) {
+    const match = tasks.find((t) => t.id === openTaskId);
+    if (match) {
+      setSyncedOpenTaskId(openTaskId);
+      setEditTarget(match);
+    }
+  }
 
   const today = todayLocalDate();
   const hasAnyTask = tasks.length > 0;
   const defaultDueDate = dueFilter === "today" ? today : null;
 
-  // The Board filters the same way internally, from the unfiltered list (`tasks={tasks}` below).
-  const scopedTasks = useMemo(
-    () => (railProjectId ? tasks.filter((t) => t.projectId === railProjectId) : tasks),
-    [tasks, railProjectId]
-  );
+  // Assignee filter applies before the Board does its own project/due filtering internally.
+  const assigneeFilteredTasks = useMemo(() => {
+    if (!assignedToMe || !user) return tasks;
+    return withSubtasks(
+      tasks.filter((t) => t.assignees.some((a) => a.userId === user.id)),
+      tasks
+    );
+  }, [tasks, assignedToMe, user]);
+
+  // The Board filters the same way internally, from `assigneeFilteredTasks` below.
+  const scopedTasks = useMemo(() => {
+    if (railProjectId) return assigneeFilteredTasks.filter((t) => t.projectId === railProjectId);
+    if (railClientId) return assigneeFilteredTasks.filter((t) => clientProjectIds.has(t.projectId));
+    return assigneeFilteredTasks;
+  }, [assigneeFilteredTasks, railProjectId, railClientId, clientProjectIds]);
 
   const sections = useMemo<Section[]>(() => {
     if (layout === "board") return [];
@@ -324,6 +370,7 @@ export function TaskBoardList() {
             <QuickAddTask
               autoFocus
               parentId={node.task.id}
+              defaultProjectId={node.task.projectId}
               placeholder="Add a subtask"
               onDone={() => setSubtaskParent(null)}
             />
@@ -341,7 +388,13 @@ export function TaskBoardList() {
         narrow ? "flex-col" : "flex-row"
       )}
     >
-      <TaskProjectRail tasks={tasks} projectId={railProjectId} onChange={setRailProjectId} />
+      <TaskProjectRail
+        tasks={assigneeFilteredTasks}
+        projectId={railProjectId}
+        onChange={setRailProjectId}
+        clientId={railClientId}
+        onClientChange={setRailClientId}
+      />
 
       {/* min-w-0: without it the board's wide columns stretch this flex item past the viewport. */}
       <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
@@ -365,47 +418,57 @@ export function TaskBoardList() {
           </SelectContent>
         </Select>
 
-        {/* Grouping/status/sort only mean anything in List. */}
-        {layout === "list" && (
-          <>
-            <div className="mx-1 h-5 w-px bg-border" aria-hidden />
-            <Select value={status} onValueChange={(v) => setStatus(v as StatusFilter)}>
-              <SelectTrigger size="sm" className="w-28" aria-label="Filter by status">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="done">Done</SelectItem>
-              </SelectContent>
-            </Select>
+        <Button
+          variant={assignedToMe ? "secondary" : "outline"}
+          size="sm"
+          className="gap-1.5"
+          aria-pressed={assignedToMe}
+          onClick={() => setAssignedToMe((v) => !v)}
+        >
+          <User className="h-3.5 w-3.5" />
+          Assigned to me
+        </Button>
 
-            <Select value={groupBy} onValueChange={(v) => setGroupBy(v as GroupBy)}>
-              <SelectTrigger size="sm" className="w-36" aria-label="Group by">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="project">Group: Project</SelectItem>
-                <SelectItem value="due">Group: Due date</SelectItem>
-                <SelectItem value="status">Group: Status</SelectItem>
-                <SelectItem value="none">Group: None</SelectItem>
-              </SelectContent>
-            </Select>
+        <div className="mx-1 h-5 w-px bg-border" aria-hidden />
 
-            <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortBy)}>
-              <SelectTrigger size="sm" className="w-36" aria-label="Sort by">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="plan">Sort: Plan order</SelectItem>
-                <SelectItem value="recent">Sort: Recent</SelectItem>
-                <SelectItem value="name">Sort: Name</SelectItem>
-                <SelectItem value="estimate">Sort: Estimate</SelectItem>
-                <SelectItem value="tracked">Sort: Tracked</SelectItem>
-              </SelectContent>
-            </Select>
-          </>
-        )}
+        <Select value={status} onValueChange={(v) => setStatus(v as StatusFilter)}>
+          <SelectTrigger size="sm" className="w-28" aria-label="Filter by status">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All</SelectItem>
+            <SelectItem value="active">Active</SelectItem>
+            <SelectItem value="done">Done</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select
+          value={layout === "board" ? boardGroupBy : groupBy}
+          onValueChange={(v) => (layout === "board" ? setBoardGroupBy : setGroupBy)(v as GroupBy)}
+        >
+          <SelectTrigger size="sm" className="w-36" aria-label="Group by">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="project">Group: Project</SelectItem>
+            <SelectItem value="due">Group: Due date</SelectItem>
+            {layout === "list" && <SelectItem value="status">Group: Status</SelectItem>}
+            <SelectItem value="none">Group: None</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortBy)}>
+          <SelectTrigger size="sm" className="w-36" aria-label="Sort by">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="plan">Sort: Plan order</SelectItem>
+            <SelectItem value="recent">Sort: Recent</SelectItem>
+            <SelectItem value="name">Sort: Name</SelectItem>
+            <SelectItem value="estimate">Sort: Estimate</SelectItem>
+            <SelectItem value="tracked">Sort: Tracked</SelectItem>
+          </SelectContent>
+        </Select>
 
         {hasAnyTask && (
           <Button size="sm" className="gap-1.5" onClick={() => setAddOpen(true)}>
@@ -431,9 +494,12 @@ export function TaskBoardList() {
         >
           {layout === "board" ? (
             <TaskBoard
-              tasks={tasks}
+              tasks={assigneeFilteredTasks}
               projectId={railProjectId}
               dueFilter={dueFilter}
+              status={status}
+              sortBy={sortBy}
+              groupBy={boardGroupBy}
               onOpenTask={setEditTarget}
             />
           ) : (
@@ -484,10 +550,15 @@ export function TaskBoardList() {
         defaultDueDate={defaultDueDate}
       />
 
-      <TaskDialog
+      <TaskSheet
         open={!!editTarget}
-        task={editTarget}
-        onClose={() => setEditTarget(null)}
+        // Reads the live row, not the click's snapshot — otherwise a save never visually reflects back into the sheet.
+        task={editTarget && (tasks.find((t) => t.id === editTarget.id) ?? editTarget)}
+        onClose={() => {
+          setEditTarget(null);
+          if (openTaskId) navigate("/tasks");
+        }}
+        onRequestDelete={setDeleteTarget}
       />
 
       <ConfirmDialog

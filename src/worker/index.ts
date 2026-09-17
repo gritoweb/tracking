@@ -10,6 +10,7 @@ import { projectsRouter } from "./routes/projects";
 import { clientsRouter } from "./routes/clients";
 import { tagsRouter } from "./routes/tags";
 import { tasksRouter } from "./routes/tasks";
+import { attachmentsRouter } from "./routes/attachments";
 import { taskStatusesRouter } from "./routes/task-statuses";
 import { favoritesRouter } from "./routes/favorites";
 import { recurringRouter } from "./routes/recurring";
@@ -25,6 +26,7 @@ import { assistantRouter } from "./routes/assistant";
 import { adminRouter } from "./routes/admin";
 import { apiKeysRouter } from "./routes/api-keys";
 import { websocketRouter } from "./routes/websocket";
+import { notificationsRouter } from "./routes/notifications";
 import { createAuth } from "./auth";
 import { runAutoTrack } from "./lib/calendar-autotrack";
 import { runRecurring } from "./lib/recurring";
@@ -35,6 +37,7 @@ import { buildMcpServer } from "./mcp/server";
 import { resolveApiKey, touchApiKey } from "./lib/api-keys";
 export { TimerRoom } from "./durable-objects/TimerRoom";
 export { ChatAgent } from "./durable-objects/ChatAgent";
+export { NotificationRoom } from "./durable-objects/NotificationRoom";
 
 // 10 attempts per minute on auth endpoints. Relaxed in the Vite dev server
 // (which is what `pnpm dev` and the CI e2e run use) so the Playwright suite's
@@ -109,6 +112,7 @@ const app = new Hono<{ Bindings: Env }>()
   .route("/api/clients", clientsRouter)
   .route("/api/tags", tagsRouter)
   .route("/api/tasks", tasksRouter)
+  .route("/api/attachments", attachmentsRouter)
   .route("/api/task-statuses", taskStatusesRouter)
   .route("/api/favorites", favoritesRouter)
   .route("/api/recurring", recurringRouter)
@@ -124,7 +128,8 @@ const app = new Hono<{ Bindings: Env }>()
   .route("/api/admin", adminRouter)
   .route("/api/keys", apiKeysRouter)
   .route("/api/me", meRouter)
-  .route("/api/ws", websocketRouter);
+  .route("/api/ws", websocketRouter)
+  .route("/api/notifications", notificationsRouter);
 
 export type AppType = typeof app;
 

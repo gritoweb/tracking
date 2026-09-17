@@ -12,6 +12,7 @@ import {
   CalendarDays,
   Flag,
   Plus,
+  UserPlus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,8 +33,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ProjectBadge } from "@/components/ProjectBadge";
+import { UserAvatar } from "@/components/layout/UserAvatar";
+import { MultiSelect } from "@/components/reports/MultiSelect";
 import { TaskStatusChip } from "./TaskStatusChip";
 import { useUpdateTask, useCompleteTask } from "@/hooks/useTasks";
+import { useWorkspaceMembers } from "@/hooks/useWorkspaceRole";
 import { useTimer } from "@/hooks/useTimer";
 import { useTimerStore } from "@/stores/timerStore";
 import { useUIStore } from "@/stores/uiStore";
@@ -48,6 +52,7 @@ import {
   localDateToDate,
 } from "@/lib/taskUtils";
 import { describeRecurRule } from "@shared/task-recurrence";
+import { descriptionToPlainText } from "@/lib/richText";
 import { cn } from "@/lib/utils";
 import type { Task } from "@shared/schemas";
 
@@ -118,6 +123,7 @@ export function TaskRow({
   dragging = false,
 }: TaskRowProps) {
   const updateTask = useUpdateTask();
+  const { data: members = [], isPending: membersLoading } = useWorkspaceMembers(true);
   const completeTask = useCompleteTask();
   const { startTimer, stopTimer } = useTimer();
   const runningEntry = useTimerStore((s) => s.runningEntry);
@@ -131,6 +137,13 @@ export function TaskRow({
   const [dueOpen, setDueOpen] = useState(false);
 
   const running = runningEntry?.taskId === task.id;
+
+  const saveAssignees = (assigneeIds: string[]) => {
+    const optimisticAssignees = members
+      .filter((m) => assigneeIds.includes(m.userId))
+      .map((m) => ({ userId: m.userId, name: m.name, image: m.image }));
+    updateTask.mutate({ id: task.id, data: { assigneeIds }, optimisticAssignees });
+  };
 
   const saveName = () => {
     const trimmed = name.trim();
@@ -160,6 +173,7 @@ export function TaskRow({
     : null;
 
   const tone = dueTone(task.dueDate);
+  const plainDescription = descriptionToPlainText(task.description);
   const repeats = describeRecurRule(task.recurRule);
   const hasChildren = task.subtaskTotal > 0;
 
@@ -317,8 +331,8 @@ export function TaskRow({
             what the task is about, never enough to turn the list into prose.
             The full text is in the dialog and in the tooltip. */}
         {task.description && (
-          <p className="mt-0.5 line-clamp-1 text-micro text-muted-foreground" title={task.description}>
-            {task.description}
+          <p className="mt-0.5 line-clamp-1 text-micro text-muted-foreground" title={plainDescription}>
+            {plainDescription}
           </p>
         )}
 
@@ -440,6 +454,38 @@ export function TaskRow({
       {showProject && !nested && task.projectName && (
         <ProjectBadge name={task.projectName} color={task.projectColor} />
       )}
+
+      <MultiSelect
+        label="Assignees"
+        closeOnSelect
+        options={members.map((m) => ({ value: m.userId, label: m.name, image: m.image }))}
+        value={task.assignees.map((a) => a.userId)}
+        onChange={saveAssignees}
+        loading={membersLoading}
+        trigger={
+          task.assignees.length > 0 ? (
+            <button
+              type="button"
+              aria-label="Edit assignees"
+              title={task.assignees.map((a) => a.name).join(", ")}
+              className="flex shrink-0 -space-x-1.5 rounded-full focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            >
+              {task.assignees.slice(0, 3).map((a) => (
+                <UserAvatar key={a.userId} name={a.name} image={a.image} className="h-5 w-5 border-2 border-background text-micro" />
+              ))}
+            </button>
+          ) : (
+            <button
+              type="button"
+              aria-label="Add assignee"
+              title="Add assignee"
+              className="tt-reveal flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-dashed border-muted-foreground/50 text-muted-foreground/50 hover:border-muted-foreground hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            >
+              <UserPlus className="h-3 w-3" />
+            </button>
+          )
+        }
+      />
 
       {/* ─── Actions ───────────────────────────────────────────────────────── */}
       <div className="flex shrink-0 items-center gap-0.5">

@@ -185,6 +185,8 @@ export const TaskStatusCategorySchema = z.enum(["not_started", "active", "comple
 export const TaskStatusSchema = z.object({
   id: z.string(),
   workspaceId: z.string(),
+  /** Null is the workspace's global default; set means this column is a fork specific to that project. */
+  projectId: z.string().nullable(),
   name: z.string(),
   color: z.string(),
   category: TaskStatusCategorySchema,
@@ -197,8 +199,11 @@ export const TaskStatusSchema = z.object({
 
 export const CreateTaskStatusSchema = z.object({
   name: z.string().min(1).max(64),
-  color: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Expected a #rrggbb color"),
+  // Omitted means "assign the next colour not already in use" — same rule as a new project or tag.
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Expected a #rrggbb color").optional(),
   category: TaskStatusCategorySchema,
+  /** Present + a project not yet forked from the global set forks it first, then adds this column to the fork. */
+  projectId: z.string().optional(),
 });
 
 export const UpdateTaskStatusSchema = z.object({
@@ -234,6 +239,25 @@ export const RecurRuleSchema = z
   .max(64)
   .refine((v) => parseRecurRule(v) !== null, "Unrecognised repeat rule");
 
+// D6: who a task is assigned to — own object so a card renders name/avatar without a second round trip.
+export const TaskAssigneeSchema = z.object({
+  userId: z.string(),
+  name: z.string(),
+  image: z.string().nullable(),
+});
+
+// D7: an image attached to a task; `url` is the Worker-proxied download route, never the raw R2 key.
+export const TaskAttachmentSchema = z.object({
+  id: z.string(),
+  filename: z.string(),
+  contentType: z.string(),
+  size: z.number(),
+  width: z.number().nullable(),
+  height: z.number().nullable(),
+  url: z.string(),
+  createdAt: z.string(),
+});
+
 export const TaskSchema = z.object({
   id: z.string(),
   workspaceId: z.string(),
@@ -263,12 +287,17 @@ export const TaskSchema = z.object({
   recurRule: z.string().nullable(),
   subtaskTotal: z.number(),
   subtaskDone: z.number(),
+  /** One or more workspace members (D6). Empty on an unassigned task. */
+  assignees: z.array(TaskAssigneeSchema),
   createdAt: z.string(),
 });
 
+// 20,000 chars, plain text — our own call; ClickUp doesn't publish a limit to copy (D5).
+const TASK_DESCRIPTION_MAX = 20000;
+
 export const CreateTaskSchema = z.object({
   name: z.string().min(1).max(255),
-  description: z.string().max(5000).nullable().optional(),
+  description: z.string().max(TASK_DESCRIPTION_MAX).nullable().optional(),
   projectId: z.string(),
   estimatedSeconds: z.number().nullable().optional(),
   dueDate: LocalDateSchema.nullable().optional(),
@@ -277,11 +306,13 @@ export const CreateTaskSchema = z.object({
   recurRule: RecurRuleSchema.nullable().optional(),
   /** Omitted means the workspace's default status. */
   statusId: z.string().optional(),
+  /** Every id must be a member of the task's workspace — the server validates, never trusts. */
+  assigneeIds: z.array(z.string()).optional(),
 });
 
 export const UpdateTaskSchema = z.object({
   name: z.string().min(1).max(255).optional(),
-  description: z.string().max(5000).nullable().optional(),
+  description: z.string().max(TASK_DESCRIPTION_MAX).nullable().optional(),
   active: z.boolean().optional(),
   estimatedSeconds: z.number().nullable().optional(),
   dueDate: LocalDateSchema.nullable().optional(),
@@ -298,6 +329,10 @@ export const UpdateTaskSchema = z.object({
   completedOn: LocalDateSchema.optional(),
   /** Also rewrites `active`/`completed_at` from the target's category. */
   statusId: z.string().optional(),
+  /** Replaces the whole assignee set — the client always sends the full list. */
+  assigneeIds: z.array(z.string()).optional(),
+  /** Top-level tasks only — a subtask always follows its parent's project. */
+  projectId: z.string().optional(),
 });
 
 /** What a drag on the board sends: the column it landed in and where in it. */
@@ -674,6 +709,53 @@ export type Allocation = z.infer<typeof AllocationSchema>;
 export type UpsertAllocation = z.infer<typeof UpsertAllocationSchema>;
 export type BulkUpsertAllocations = z.infer<typeof BulkUpsertAllocationsSchema>;
 
+// ─── Notifications ───────────────────────────────────────────────────────────
+
+export const NotificationSchema = z.object({
+  id: z.string(),
+  type: z.string(),
+  title: z.string(),
+  body: z.string(),
+  link: z.string().nullable(),
+  isRead: z.boolean(),
+  createdAt: z.string(),
+});
+
+export type Notification = z.infer<typeof NotificationSchema>;
+
+// ─── Task comments — flat, single level, no reply/thread ──────────────────────
+
+export const TaskCommentSchema = z.object({
+  id: z.string(),
+  taskId: z.string(),
+  userId: z.string(),
+  userName: z.string(),
+  userImage: z.string().nullable(),
+  body: z.string(),
+  mentionedUserIds: z.array(z.string()),
+  attachmentId: z.string().nullable(),
+  attachmentUrl: z.string().nullable(),
+  attachmentFilename: z.string().nullable(),
+  createdAt: z.string(),
+  editedAt: z.string().nullable(),
+});
+
+export const CreateTaskCommentSchema = z.object({
+  body: z.string().min(1).max(4000),
+  mentionedUserIds: z.array(z.string()).max(50).optional(),
+  attachmentId: z.string().nullable().optional(),
+});
+
+export const UpdateTaskCommentSchema = z.object({
+  body: z.string().min(1).max(4000),
+  mentionedUserIds: z.array(z.string()).max(50).optional(),
+  attachmentId: z.string().nullable().optional(),
+});
+
+export type TaskComment = z.infer<typeof TaskCommentSchema>;
+export type CreateTaskComment = z.infer<typeof CreateTaskCommentSchema>;
+export type UpdateTaskComment = z.infer<typeof UpdateTaskCommentSchema>;
+
 // ─── API keys ────────────────────────────────────────────────────────────────
 
 // The credential an outside program presents instead of a browser session —
@@ -898,6 +980,8 @@ export type Workspace = z.infer<typeof WorkspaceSchema>;
 export type Client = z.infer<typeof ClientSchema>;
 export type Project = z.infer<typeof ProjectSchema>;
 export type Task = z.infer<typeof TaskSchema>;
+export type TaskAssignee = z.infer<typeof TaskAssigneeSchema>;
+export type TaskAttachment = z.infer<typeof TaskAttachmentSchema>;
 export type Tag = z.infer<typeof TagSchema>;
 export type UpdateTag = z.infer<typeof UpdateTagSchema>;
 export type Favorite = z.infer<typeof FavoriteSchema>;

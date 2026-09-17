@@ -167,9 +167,13 @@ export function createAuth(env: Env, baseURL: string) {
         // Only an ADMIN_EMAILS account opens workspaces; the server-side bootstrap in user.create.after is exempt.
         allowUserToCreateOrganization: (user) => isAdminEmail(env, user.email),
         organizationHooks: {
-          // Seeds the five default task statuses; ensureStatuses repairs one that somehow missed this.
-          afterCreateOrganization: async ({ organization }) => {
+          // Seeds the five default task statuses, and marks the org active for its creator — see CHANGELOG.
+          afterCreateOrganization: async ({ organization, user }) => {
             await ensureStatuses(env.DB, organization.id);
+            await env.DB
+              .prepare(`UPDATE "user" SET last_active_organization_id = ? WHERE id = ?`)
+              .bind(organization.id, user.id)
+              .run();
           },
         },
         // Only a proven owner of the address may join; relaxed in dev so e2e password users can accept.

@@ -79,6 +79,11 @@
      comments too and will emit a dead utility for it.) */
   --text-micro: 0.625rem;
 
+  /* Display — one step above Title, for a panel's own name where it *is* the header
+     (the task detail sheet), not a page heading sitting above other chrome. */
+  --text-display: 2.5rem;
+  --text-display--line-height: 1.25;
+
   /* Layering. The values are the ones already in use (10/20/50) — this names
      the three tiers that existed by convention so a new surface picks a
      meaning rather than a number, and so the order is greppable in one place.
@@ -285,6 +290,10 @@
      50% light (was 52% before the ramp moved down), 64% dark — these sit under
      it with margin, so the token is unchanged. See .tt-swatch-tint. */
   --swatch-ink-mix: 46%;
+  /* Full-surface tint (a whole status column, not a small chip) — much weaker
+     than --swatch-ink-mix's 13% chip tint, since a whole panel of saturated
+     color reads as "selected" rather than "labeled". See .tt-swatch-column. */
+  --swatch-column-mix: 6%;
   /* Brand red used as TEXT (active nav item, running pill, the billable "$").
      --primary is tuned as a fill behind white, and fails AA as small text: 3.59:1
      on its own /10 tint in light, 4.27:1 in dark, 4.45:1 for the billable glyph.
@@ -354,6 +363,8 @@
   --ring: oklch(0.7 0.14 265);
   /* Dark ink is light, so more of the swatch survives before contrast suffers. */
   --swatch-ink-mix: 55%;
+  /* Dark ground needs more percent for the same visible full-surface tint. */
+  --swatch-column-mix: 10%;
   --primary-ink: oklch(0.76 0.19 27.33);
   /* Dark ground inverts which end is "muted": the soft mark goes darker than
      the card, not lighter. Same role, same hue discipline as light. */
@@ -388,6 +399,11 @@
 .tt-swatch-tint {
   background-color: color-mix(in oklab, var(--swatch) 13%, transparent);
   color: color-mix(in oklab, var(--swatch) var(--swatch-ink-mix), var(--foreground));
+}
+
+/* Background only, at the weaker full-surface mix — a status column, not a chip. */
+.tt-swatch-column {
+  background-color: color-mix(in oklab, var(--swatch) var(--swatch-column-mix), transparent);
 }
 
 /* ─── Reveal-on-hover ───────────────────────────────────────────────────────
@@ -434,6 +450,90 @@
    so step it toward ink. Measured ceiling 80% in both themes. */
 .tt-on-tint-muted {
   color: color-mix(in oklab, var(--muted-foreground) 70%, var(--foreground));
+}
+
+/* Task description editor (tiptap ships unstyled) — plain prose at the app's own tokens. */
+.tt-richtext p {
+  margin: 0;
+}
+.tt-richtext p + p {
+  margin-top: 0.5em;
+}
+.tt-richtext h2 {
+  margin: 0.75em 0 0.25em;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+.tt-richtext h2:first-child {
+  margin-top: 0;
+}
+.tt-richtext ul:not([data-type="taskList"]) {
+  margin: 0.25em 0;
+  padding-left: 1.25em;
+  list-style: disc;
+}
+.tt-richtext p.is-editor-empty:first-child::before {
+  float: left;
+  height: 0;
+  color: var(--muted-foreground);
+  content: attr(data-placeholder);
+  pointer-events: none;
+}
+/* Checklist — a real checkbox input, not a bullet; a struck-through label marks it done. */
+.tt-richtext ul[data-type="taskList"] {
+  margin: 0.25em 0;
+  padding-left: 0;
+  list-style: none;
+}
+.tt-richtext ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5em;
+}
+.tt-richtext ul[data-type="taskList"] li > label {
+  margin-top: 0.2em;
+}
+.tt-richtext ul[data-type="taskList"] li > div {
+  flex: 1;
+  min-width: 0;
+}
+.tt-richtext ul[data-type="taskList"] li[data-checked="true"] > div {
+  color: var(--muted-foreground);
+  text-decoration: line-through;
+}
+/* The browser's native checkbox has no shape opinion — give it the same square-ish
+   mark used by the task row and subtask checkboxes, not a third shape in the app. */
+.tt-richtext ul[data-type="taskList"] input[type="checkbox"] {
+  appearance: none;
+  width: 1rem;
+  height: 1rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--background);
+  cursor: pointer;
+  display: grid;
+  place-content: center;
+  transition: background-color var(--transition-duration-fast) var(--ease-out-quart), border-color var(--transition-duration-fast) var(--ease-out-quart);
+}
+.tt-richtext ul[data-type="taskList"] input[type="checkbox"]:hover {
+  border-color: var(--primary);
+}
+.tt-richtext ul[data-type="taskList"] input[type="checkbox"]:checked {
+  background-color: var(--primary);
+  border-color: var(--primary);
+}
+.tt-richtext ul[data-type="taskList"] input[type="checkbox"]:checked::after {
+  content: "";
+  width: 0.25rem;
+  height: 0.45rem;
+  border: solid var(--primary-foreground);
+  border-width: 0 2px 2px 0;
+  transform: translateY(-1px) rotate(45deg);
+}
+.tt-richtext img {
+  max-width: 100%;
+  border-radius: var(--radius-md);
+  margin: 0.5em 0;
 }
 
 /* Print: let the fixed app shell expand so the whole report flows onto pages. */

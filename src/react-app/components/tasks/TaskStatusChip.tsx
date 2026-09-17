@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,7 +19,7 @@ interface TaskStatusChipProps {
 
 /** A task's column, in the list — the chip is the control, same as the due chip. */
 export function TaskStatusChip({ task, className }: TaskStatusChipProps) {
-  const { data: statuses = [] } = useTaskStatuses();
+  const { data: statuses = [] } = useTaskStatuses(task.projectId);
   const updateTask = useUpdateTask();
 
   if (!task.statusId || !statuses.length) return null;
@@ -29,9 +30,10 @@ export function TaskStatusChip({ task, className }: TaskStatusChipProps) {
         <button
           type="button"
           aria-label={`Status: ${task.statusName ?? "none"} — change`}
+          style={{ "--swatch": task.statusColor } as CSSProperties}
           className={cn(
-            "flex shrink-0 items-center gap-1.5 rounded px-1 text-xs text-muted-foreground",
-            "transition-colors duration-fast ease-out-quart hover:bg-muted hover:text-foreground",
+            "flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-xs tt-swatch-tint",
+            "transition-colors duration-fast ease-out-quart hover:brightness-95",
             "focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
             className
           )}

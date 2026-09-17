@@ -18,11 +18,13 @@ import type { TaskStatus, TaskStatusCategory } from "@shared/schemas";
 
 interface AddStatusColumnProps {
   statuses: TaskStatus[];
+  /** The board's own project scope — adding a column while viewing a not-yet-customized project forks it first. */
+  projectId: string | null;
 }
 
 /** The `+` at the end of the board — an inline panel, not a dialog, same as `QuickAddTask`. */
-export function AddStatusColumn({ statuses }: AddStatusColumnProps) {
-  const create = useCreateTaskStatus();
+export function AddStatusColumn({ statuses, projectId }: AddStatusColumnProps) {
+  const create = useCreateTaskStatus(projectId);
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [category, setCategory] = useState<TaskStatusCategory>("active");

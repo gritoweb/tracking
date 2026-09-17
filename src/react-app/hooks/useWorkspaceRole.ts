@@ -23,25 +23,33 @@ export interface WorkspaceMember {
   userId: string;
   name: string;
   email: string;
+  image: string | null;
 }
 
-/** Members of the active workspace, for the owner/admin-only Person filter. */
+/** Members of the active workspace (D3 Person filter, D6 assignee picker) — via `/api/me`, not `session.activeOrganizationId`, which a brand-new signup's first session never gets seeded with (see CHANGELOG). */
 export function useWorkspaceMembers(enabled: boolean) {
-  const { session } = useAuth();
-  const organizationId = session?.activeOrganizationId ?? undefined;
+  const { user } = useAuth();
+  const me = useQuery({
+    queryKey: ["me", user?.id],
+    queryFn: () => api.me(),
+    enabled: enabled && Boolean(user),
+    staleTime: 60_000,
+  });
+  const workspaceId = me.data?.workspaceId;
   return useQuery({
-    queryKey: ["workspace-members", organizationId ?? "active"],
+    queryKey: ["workspace-members", workspaceId ?? "pending"],
     queryFn: async (): Promise<WorkspaceMember[]> => {
       const { data } = await authClient.organization.getFullOrganization({
-        query: { organizationId },
+        query: { organizationId: workspaceId },
       });
       return (data?.members ?? []).map((m) => ({
         userId: m.userId,
         name: m.user?.name || m.user?.email || "Unknown",
         email: m.user?.email ?? "",
+        image: m.user?.image ?? null,
       }));
     },
-    enabled,
+    enabled: enabled && Boolean(workspaceId),
     staleTime: 60_000,
   });
 }

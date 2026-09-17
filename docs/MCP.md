@@ -123,6 +123,8 @@ reach — 7 on a read key, 13 on read+write.
 | `list_drafts` | read | Proposals awaiting review, with why each was proposed |
 | `create_client` | read+write | New client, only when the person asked for it; **not** idempotent — check `list_clients` first |
 | `create_project` | read+write | New project under an active client (required, never invented); a member's rate and budget are dropped; **not** idempotent |
+| `create_task` | read+write | New task under an active project (required, never invented); `assigneeIds` must already be workspace members; **not** idempotent |
+| `move_task` | read+write | Changes a task's status/column; notifies its assignees except the caller; idempotent — moving to the same status is a no-op |
 | `start_timer` | read+write | Needs a `projectId`; stops your own running timer first, as the app does |
 | `stop_timer` | read+write | Idempotent — a second call is a no-op |
 | `log_time` | read+write | A completed entry; needs a `projectId`; **not** idempotent by design |
