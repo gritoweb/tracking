@@ -14,6 +14,8 @@ const TINY_PNG = Buffer.from(
   "base64"
 );
 
+const REJECTED_MESSAGE = "Only PNG, JPEG, WebP and GIF images are accepted";
+
 test("visiting /tasks/:id opens that task's detail panel directly (D5)", async ({ page }) => {
   await signUp(page);
   const project = await createProject(page, { name: "ERP Migration", color: "#e11d48" });
@@ -95,11 +97,9 @@ test("picking an assignee updates the panel and the board card without closing a
   const panel = page.getByRole("dialog", { name: "Cutover plan" });
   await expect(panel).toBeVisible();
 
-  // Driving the picker itself — not the API — is the exact interaction that used to require
-  // closing and reopening the panel to see stick.
-  await panel.getByRole("button", { name: "Assignees" }).click();
+  // `.first()`: the subtasks quick-add below has its own same-named assignee button.
+  await panel.getByRole("button", { name: "Add assignee" }).first().click();
   await page.getByRole("option", { name: "Test User" }).click();
-  await page.keyboard.press("Escape"); // closes the picker popover, not the panel
 
   await expect(panel).toBeVisible();
   await expect(panel.getByText("Test User")).toBeVisible();
@@ -120,22 +120,21 @@ test("attaching, viewing and deleting an image on a task (D7)", async ({ page })
   });
   const task = await created.json();
 
+  // The panel's gallery is read-only; the upload door is the description editor's own API call.
+  const uploaded = await page.request.post(`/api/tasks/${task.id}/attachments`, {
+    multipart: { file: { name: "screenshot.png", mimeType: "image/png", buffer: TINY_PNG } },
+  });
+  expect(uploaded.status(), await uploaded.text()).toBe(201);
+
   await page.goto(`/tasks/${task.id}`);
   const panel = page.getByRole("dialog", { name: "Cutover plan" });
   await expect(panel).toBeVisible();
 
-  await panel.locator('input[type="file"]').setInputFiles({
-    name: "screenshot.png",
-    mimeType: "image/png",
-    buffer: TINY_PNG,
-  });
-
   const thumbnail = panel.getByRole("button", { name: /Open screenshot.png/ });
-  await expect(thumbnail).toBeVisible({ timeout: 10_000 });
+  await expect(thumbnail).toBeVisible();
 
   // The download route serves it back, workspace-scoped.
-  const img = panel.locator("img").first();
-  const src = await img.getAttribute("src");
+  const src = await thumbnail.locator("img").getAttribute("src");
   const res = await page.request.get(src!);
   expect(res.status()).toBe(200);
   expect(res.headers()["content-type"]).toContain("image/");
@@ -153,13 +152,36 @@ test("a non-image file is rejected before it reaches R2 (D7)", async ({ page }) 
   });
   const task = await created.json();
 
+  const res = await page.request.post(`/api/tasks/${task.id}/attachments`, {
+    multipart: { file: { name: "notes.txt", mimeType: "text/plain", buffer: Buffer.from("not an image") } },
+  });
+  expect(res.status()).toBe(400);
+  expect((await res.json()).error).toBe(REJECTED_MESSAGE);
+});
+
+test("pasting an image into the description uploads it and shows it in the gallery (D7)", async ({ page }) => {
+  await signUp(page);
+  const project = await createProject(page, { name: "ERP Migration", color: "#e11d48" });
+  const created = await page.request.post("/api/tasks", {
+    data: { name: "Cutover plan", projectId: project.id },
+  });
+  const task = await created.json();
+
   await page.goto(`/tasks/${task.id}`);
   const panel = page.getByRole("dialog", { name: "Cutover plan" });
+  await panel.getByRole("textbox", { name: "Description" }).click();
 
-  await panel.locator('input[type="file"]').setInputFiles({
-    name: "notes.txt",
-    mimeType: "text/plain",
-    buffer: Buffer.from("not an image"),
-  });
-  await expect(panel.getByText("Only PNG, JPEG, WebP and GIF images are accepted")).toBeVisible();
+  // Synthetic ClipboardEvent + DataTransfer: the same shape RichTextEditor's handlePaste reads off a real OS paste.
+  await page.evaluate((base64) => {
+    const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+    const file = new File([bytes], "pasted.png", { type: "image/png" });
+    const dataTransfer = new DataTransfer();
+    dataTransfer.items.add(file);
+    const event = new ClipboardEvent("paste", { bubbles: true, cancelable: true });
+    Object.defineProperty(event, "clipboardData", { value: dataTransfer });
+    document.activeElement?.dispatchEvent(event);
+  }, TINY_PNG.toString("base64"));
+
+  const thumbnail = panel.getByRole("button", { name: /Open pasted.png/ });
+  await expect(thumbnail).toBeVisible({ timeout: 10_000 });
 });
