@@ -32,6 +32,25 @@ test("visiting /tasks/:id opens that task's detail panel directly (D5)", async (
   await expect(page).toHaveURL(/\/tasks$/);
 });
 
+test("the panel header has actions on the left and close on the right, matching EntryFormSheet (F13)", async ({ page }) => {
+  await signUp(page);
+  const project = await createProject(page, { name: "ERP Migration", color: "#e11d48" });
+  await page.request.post("/api/tasks", {
+    data: { name: "Cutover plan", projectId: project.id },
+  });
+
+  await page.goto("/tasks");
+  await page.getByText("Cutover plan").click();
+  const panel = page.getByRole("dialog", { name: "Cutover plan" });
+  await expect(panel).toBeVisible();
+
+  const actionsBox = await panel.getByRole("button", { name: "Task actions" }).boundingBox();
+  const closeBox = await panel.getByRole("button", { name: "Close" }).boundingBox();
+  expect(actionsBox).not.toBeNull();
+  expect(closeBox).not.toBeNull();
+  expect(closeBox!.x).toBeGreaterThan(actionsBox!.x);
+});
+
 test("an assigned task shows the avatar on the card, in the panel, and under Assigned to me (D6)", async ({
   browser,
 }) => {

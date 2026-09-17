@@ -1,43 +1,24 @@
 import { test, expect } from "@playwright/test";
 import { signUp } from "./auth";
-import { createProject } from "./project-helpers";
+import { createProject, pickProjectInBar } from "./project-helpers";
 
-// `billable` is the only column reports read to compute billable hours and
-// invoiced amount, and nothing derives it from the project at read time. The
-// timer bar had no billable control and `handleStart` sent no flag, so every
-// timer started here was written `billable = 0` — a workspace could track a full
-// week against a billable retainer and report zero revenue.
+// Every entry is born billable now; only the toggle turns it off, and nothing derives it from the project.
 test.describe("billable time survives the timer bar", () => {
-  test("a timer on a billable project starts billable, and the toggle overrides it", async ({
+  test("a timer started on a project marked non-billable still starts billable", async ({
     page,
   }) => {
     await signUp(page);
     const origin = new URL(page.url()).origin;
-    const billableProject = await createProject(page, {
-      name: "Retainer",
-      color: "#e11d48",
-      billable: true,
-    });
-    await createProject(page, {
-      name: "Internal",
-      color: "#2563eb",
-      billable: false,
-      clientId: billableProject.clientId,
-    });
+    await createProject(page, { name: "Internal", color: "#2563eb", billable: false });
 
     await page.goto("/");
     await page.waitForSelector('header[aria-label="Timer controls"]');
+    await pickProjectInBar(page, "Internal");
 
-    // Nothing picked yet: non-billable, and the control says so.
     const toggle = page.getByRole("button", { name: "Billable", exact: true });
-    await expect(toggle).toHaveAttribute("aria-pressed", "false");
-
-    // Picking a billable project answers the question for the user.
-    await page.getByRole("button", { name: "Select project" }).click();
-    await page.getByRole("option", { name: /Retainer/ }).click();
     await expect(toggle).toHaveAttribute("aria-pressed", "true");
 
-    await page.getByPlaceholder("What are you working on?").fill("Discovery call");
+    await page.getByPlaceholder("What are you working on?").fill("Support call");
     await page.keyboard.press("Escape");
     await page.getByRole("button", { name: "Start timer" }).click();
     await expect(page.getByRole("button", { name: "Stop timer" })).toBeVisible();
@@ -50,10 +31,29 @@ test.describe("billable time survives the timer bar", () => {
         return running[0]?.billable;
       })
       .toBe(true);
+  });
 
-    // An explicit toggle beats the project's default, on the live entry.
+  test("toggling billable off before starting persists as false on the created entry", async ({
+    page,
+  }) => {
+    await signUp(page);
+    const origin = new URL(page.url()).origin;
+    await createProject(page, { name: "Retainer", color: "#e11d48" });
+
+    await page.goto("/");
+    await page.waitForSelector('header[aria-label="Timer controls"]');
+    await pickProjectInBar(page, "Retainer");
+
+    const toggle = page.getByRole("button", { name: "Billable", exact: true });
+    await expect(toggle).toHaveAttribute("aria-pressed", "true");
     await toggle.click();
     await expect(toggle).toHaveAttribute("aria-pressed", "false");
+
+    await page.getByPlaceholder("What are you working on?").fill("Internal sync");
+    await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: "Start timer" }).click();
+    await expect(page.getByRole("button", { name: "Stop timer" })).toBeVisible();
+
     await expect
       .poll(async () => {
         const running = await (
@@ -62,28 +62,13 @@ test.describe("billable time survives the timer bar", () => {
         return running[0]?.billable;
       })
       .toBe(false);
-
-    // Switching to a non-billable project re-seeds from that project.
-    await page.getByRole("button", { name: /^Project:/ }).click();
-    await page.getByRole("option", { name: /Internal/ }).click();
-    await expect(toggle).toHaveAttribute("aria-pressed", "false");
-    await page.getByRole("button", { name: /^Project:/ }).click();
-    await page.getByRole("option", { name: /Retainer/ }).click();
-    await expect(toggle).toHaveAttribute("aria-pressed", "true");
-
-    expect(billableProject.billable).toBe(true);
   });
 
-  test("an entry created without a billable flag inherits the project's", async ({ page }) => {
+  test("POST /api/time_entries without a billable field comes back true", async ({ page }) => {
     await signUp(page);
     const origin = new URL(page.url()).origin;
-    const project = await createProject(page, {
-      name: "Retainer",
-      color: "#e11d48",
-      billable: true,
-    });
+    const project = await createProject(page, { name: "Retainer", color: "#e11d48" });
 
-    // The extension, the AI quick-add and any API caller take this path.
     const omitted = await (
       await page.request.post("/api/time_entries", {
         data: {
@@ -97,7 +82,7 @@ test.describe("billable time survives the timer bar", () => {
     ).json();
     expect(omitted.billable).toBe(true);
 
-    // An explicit false still wins — inheritance only fills the gap.
+    // An explicit false still wins.
     const explicit = await (
       await page.request.post("/api/time_entries", {
         data: {
@@ -123,27 +108,39 @@ test.describe("billable time survives the timer bar", () => {
     });
     expect(orphan.status()).toBe(400);
   });
-});
 
-// Settings → Preferences → "Default billable" wrote to localStorage and was
-// read by nothing: the switch was inert and the user guide documented a
-// preference that never affected a single entry.
-test("the Default billable preference actually applies", async ({ page }) => {
-  await signUp(page);
-  await createProject(page, { name: "Internal", color: "#2563eb", billable: false });
+  test("editing an existing entry's billable flag still works", async ({ page }) => {
+    await signUp(page);
+    const origin = new URL(page.url()).origin;
+    const project = await createProject(page, { name: "Retainer", color: "#e11d48" });
 
-  await page.goto("/settings?tab=general");
-  await page.getByLabel("Default billable").click();
-  await expect(page.getByLabel("Default billable")).toBeChecked();
+    const created = await (
+      await page.request.post("/api/time_entries", {
+        data: {
+          description: "Billable by default",
+          projectId: project.id,
+          start: new Date(Date.now() - 3600_000).toISOString(),
+          stop: new Date(Date.now() - 1800_000).toISOString(),
+        },
+        headers: { origin },
+      })
+    ).json();
+    expect(created.billable).toBe(true);
 
-  await page.goto("/");
-  await page.waitForSelector('header[aria-label="Timer controls"]');
-  const toggle = page.getByRole("button", { name: "Billable", exact: true });
-  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+    const updated = await (
+      await page.request.put(`/api/time_entries/${created.id}`, {
+        data: { billable: false },
+        headers: { origin },
+      })
+    ).json();
+    expect(updated.billable).toBe(false);
 
-  // A project that says non-billable still wins over the preference. There is
-  // no clearing it afterwards: every entry needs a project (D3).
-  await page.getByRole("button", { name: "Select project" }).click();
-  await page.getByRole("option", { name: /Internal/ }).click();
-  await expect(toggle).toHaveAttribute("aria-pressed", "false");
+    const revert = await (
+      await page.request.put(`/api/time_entries/${created.id}`, {
+        data: { billable: true },
+        headers: { origin },
+      })
+    ).json();
+    expect(revert.billable).toBe(true);
+  });
 });

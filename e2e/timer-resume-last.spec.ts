@@ -42,8 +42,8 @@ test("the idle bar can continue the last thing tracked", async ({ page }) => {
   await expect(page.getByPlaceholder("What are you working on?")).toHaveValue(
     "Discovery workshop prep"
   );
-  // The whole combo comes back, billable included — that entry inherited
-  // billable from the project, and continuing it must not quietly drop it.
+  // The whole combo comes back, billable included — that entry was born
+  // billable, and continuing it must not quietly drop it.
   await expect
     .poll(async () => {
       const running = await (

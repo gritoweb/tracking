@@ -8,8 +8,8 @@ import { createProject } from "./project-helpers";
 //     by default — and that field is where the user is every time they are about
 //     to start a timer;
 //   • when it did fire, `startTimer()` was called with no arguments, so it began
-//     a blank, project-less, non-billable entry and the running-entry sync then
-//     wiped the typed description and picked project off the screen.
+//     a blank, project-less entry and the running-entry sync then wiped the
+//     typed description and picked project off the screen.
 test("Alt+Shift+S starts the staged draft, from inside the description field", async ({
   page,
 }) => {
