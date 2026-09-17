@@ -1,5 +1,5 @@
 import { toast } from "sonner";
-import { ApiError } from "@/lib/api";
+import { ApiError } from "@/lib/api-client";
 import { reportClientError } from "@/lib/errorReporter";
 
 /** Shows the server's own `ApiError` message when there is one; `queued` is informational, not a failure. */

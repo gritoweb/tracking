@@ -1,17 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { api } from "@/lib/api";
+import { api } from "@/lib/api-client";
 import { toastApiError } from "@/lib/toastApiError";
-import type {
-  CreateIntegration,
-  Integration,
-  UpdateIntegration,
-} from "@shared/schemas";
+import type { CreateIntegration, UpdateIntegration } from "@shared/schemas";
 
 export function useIntegrations() {
   return useQuery({
     queryKey: ["integrations"],
-    queryFn: () => api.integrations.list() as Promise<Integration[]>,
+    queryFn: () => api.integrations.list(),
     staleTime: 5 * 60_000,
   });
 }
@@ -19,8 +15,7 @@ export function useIntegrations() {
 export function useCreateIntegration() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: CreateIntegration) =>
-      api.integrations.create(data as unknown as Record<string, unknown>) as Promise<Integration>,
+    mutationFn: (data: CreateIntegration) => api.integrations.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["integrations"] });
       toast.success("Integration added");
@@ -33,7 +28,7 @@ export function useUpdateIntegration() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: UpdateIntegration }) =>
-      api.integrations.update(id, data as unknown as Record<string, unknown>) as Promise<Integration>,
+      api.integrations.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["integrations"] });
       toast.success("Integration updated");

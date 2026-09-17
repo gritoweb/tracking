@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { api } from "@/lib/api";
+import { api } from "@/lib/api-client";
 import { toastApiError } from "@/lib/toastApiError";
 import { useUIStore } from "@/stores/uiStore";
 import { formatDueDate } from "@/lib/taskUtils";
@@ -9,7 +9,7 @@ import {
   nextOccurrence,
   todayLocalDate,
 } from "@shared/task-recurrence";
-import type { Task, CreateTask, TaskStatus, UpdateTask, TaskAttachment } from "@shared/schemas";
+import type { Task, CreateTask, TaskStatus, UpdateTask } from "@shared/schemas";
 
 // The API hides inactive (done) tasks unless asked, so every list here opts in:
 // the Tasks page offers an All/Active/Done filter and a "Done" group, and without
@@ -22,7 +22,7 @@ export function useTasks(projectId?: string | null) {
       api.tasks.list({
         ...(projectId ? { projectId } : {}),
         includeInactive: "true",
-      }) as Promise<Task[]>,
+      }),
     staleTime: 30_000,
     enabled: projectId !== undefined, // allow null (returns all) but not skip entirely
   });
@@ -31,7 +31,7 @@ export function useTasks(projectId?: string | null) {
 export function useAllTasks() {
   return useQuery({
     queryKey: ["tasks", "all", "withDone"],
-    queryFn: () => api.tasks.list({ includeInactive: "true" }) as Promise<Task[]>,
+    queryFn: () => api.tasks.list({ includeInactive: "true" }),
     staleTime: 30_000,
   });
 }
@@ -39,8 +39,7 @@ export function useAllTasks() {
 export function useCreateTask() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: CreateTask) =>
-      api.tasks.create(data as Record<string, unknown>) as Promise<Task>,
+    mutationFn: (data: CreateTask) => api.tasks.create(data),
     onSuccess: (task) => {
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
       queryClient.invalidateQueries({ queryKey: ["projects"] }); // updates trackedSeconds
@@ -54,7 +53,7 @@ export function useUpdateTask() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: UpdateTask; optimisticAssignees?: Task["assignees"] }) =>
-      api.tasks.update(id, data as Record<string, unknown>) as Promise<Task>,
+      api.tasks.update(id, data),
     // Patch the cached lists first so a checkbox, a due chip or a drag settles
     // on the frame it was clicked. Every task list shares the ["tasks"] prefix,
     // so one pass covers the page, the rail and the in-project list.
@@ -108,7 +107,7 @@ export function useMoveTask() {
         statusId: status.id,
         boardOrder,
         completedOn: todayLocalDate(),
-      }) as Promise<Task>,
+      }),
     onMutate: async ({ id, status, boardOrder }) => {
       await queryClient.cancelQueries({ queryKey: ["tasks"] });
       const snapshot = queryClient.getQueriesData<Task[]>({ queryKey: ["tasks"] });
@@ -195,7 +194,7 @@ export function useCompleteTask() {
 export function useTaskAttachments(taskId: string | null) {
   return useQuery({
     queryKey: ["task-attachments", taskId],
-    queryFn: () => api.tasks.attachments.list(taskId!) as Promise<TaskAttachment[]>,
+    queryFn: () => api.tasks.attachments.list(taskId!),
     enabled: !!taskId,
     staleTime: 30_000,
   });
@@ -205,7 +204,7 @@ export function useUploadTaskAttachment() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ taskId, file }: { taskId: string; file: File }) =>
-      api.tasks.attachments.upload(taskId, file) as Promise<TaskAttachment>,
+      api.tasks.attachments.upload(taskId, file),
     onSuccess: (_result, { taskId }) => {
       queryClient.invalidateQueries({ queryKey: ["task-attachments", taskId] });
     },

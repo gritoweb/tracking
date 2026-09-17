@@ -6,7 +6,7 @@ import { useTimerStore } from "@/stores/timerStore";
 import { useUIStore } from "@/stores/uiStore";
 import { invalidateEntryDerived } from "@/hooks/useEntries";
 import { useProjects } from "@/hooks/useProjects";
-import { api } from "@/lib/api";
+import { api } from "@/lib/api-client";
 import { toastApiError } from "@/lib/toastApiError";
 import { formatSeconds, formatDurationShort } from "@/lib/dateUtils";
 import { saveTimerState, clearTimerState, loadTimerState } from "@/lib/idb";
@@ -90,17 +90,18 @@ export function useTimer() {
   );
 
   // ─── Start timer ─────────────────────────────────────────────────────────
+  // A project is required (D3) — `startTimer` below is the only caller, and already refuses without one.
   const startMutation = useMutation({
-    mutationFn: async (partial: StartTimerInput) => {
+    mutationFn: async (partial: StartTimerInput & { projectId: string }) => {
       return api.timeEntries.create({
         description: partial.description ?? "",
-        projectId: partial.projectId ?? null,
+        projectId: partial.projectId,
         taskId: partial.taskId ?? null,
         start: new Date().toISOString(),
         // Passed through undefined, not coerced: the server defaults unspecified to billable.
         billable: partial.billable,
         tags: partial.tags ?? [],
-      }) as Promise<TimeEntry>;
+      });
     },
     onMutate: async (partial) => {
       // Release the just-stopped pin: once a new timer runs, ordering should be
@@ -226,10 +227,8 @@ export function useTimer() {
         action: {
           label: "Mark done",
           onClick: () => {
-            void (api.tasks.update(target.id, {
-              active: false,
-              completedOn: todayLocalDate(),
-            }) as Promise<unknown>)
+            void api.tasks
+              .update(target.id, { active: false, completedOn: todayLocalDate() })
               .then(() => queryClient.invalidateQueries({ queryKey: ["tasks"] }))
               .catch(() => toast.error("Failed to update task"));
           },
@@ -243,7 +242,7 @@ export function useTimer() {
   // which is enough closure for the common case. The one thing worth interrupting
   // for is an entry that landed with no project — for a consultant that's an
   // unbillable hour, and nothing else in the UI would ever point it out.
-  const announceStopped = useCallback((entry: TimeEntry | undefined) => {
+  const announceStopped = useCallback((entry: TimeEntry | null | undefined) => {
     if (!entry) return;
     useUIStore.getState().flashEntry(entry.id);
     if (!entry.projectId) {
@@ -262,7 +261,7 @@ export function useTimer() {
   // ─── Stop timer ──────────────────────────────────────────────────────────
   const stopMutation = useMutation({
     mutationFn: (id: string) =>
-      api.timeEntries.stop(id) as Promise<TimeEntry>,
+      api.timeEntries.stop(id),
     onMutate: () => {
       patchStopInCache(new Date().toISOString());
       clearTimer();
@@ -279,7 +278,7 @@ export function useTimer() {
   const stopAtMutation = useMutation({
     mutationFn: (iso: string) => {
       if (!runningEntry) throw new Error("No running timer");
-      return api.timeEntries.update(runningEntry.id, { stop: iso }) as Promise<TimeEntry>;
+      return api.timeEntries.update(runningEntry.id, { stop: iso });
     },
     onMutate: (iso) => {
       patchStopInCache(iso);
@@ -318,7 +317,7 @@ export function useTimer() {
       const newStart = Date.now() - seconds * 1000;
       return api.timeEntries.update(runningEntry.id, {
         start: new Date(newStart).toISOString(),
-      }) as Promise<TimeEntry>;
+      });
     },
     onMutate: async (seconds) => {
       if (!runningEntry) return;
@@ -452,7 +451,7 @@ export function useTimerLifecycle(draft?: StartTimerInput) {
       const saved = await loadTimerState();
       if (cancelled) return;
       try {
-        const current = (await api.timeEntries.current()) as TimeEntry | null;
+        const current = await api.timeEntries.current();
         if (cancelled) return;
         if (current) {
           // Running entry on server — restore regardless of IDB state

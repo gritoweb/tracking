@@ -1,20 +1,35 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { z } from "zod";
 import { toast } from "sonner";
-import { api } from "@/lib/api";
+import { api } from "@/lib/api-client";
 import { toastApiError } from "@/lib/toastApiError";
-import type { ReportFilters } from "@/components/reports/report-filters";
-import type { Rounding, GroupDimension, SubGroupDimension } from "@/hooks/useReports";
+import { GroupDimensionSchema, SubGroupDimensionSchema } from "@shared/schemas";
 
-// The full report view captured by a saved report.
-export interface ReportConfig {
-  range: { since: string; until: string; label: string };
-  filters: ReportFilters;
-  rounding: Rounding;
-  group: GroupDimension;
-  subGroup: SubGroupDimension;
+// The wire `config` is untyped JSON (SavedReportSchema); proven into this app's own shape by parsing it.
+const ReportFiltersSchema = z.object({
+  clientIds: z.array(z.string()),
+  projectIds: z.array(z.string()),
+  taskIds: z.array(z.string()),
+  tagIds: z.array(z.string()),
+  userIds: z.array(z.string()),
+  billable: z.enum(["all", "billable", "nonbillable"]),
+  search: z.string(),
+});
+
+const ReportConfigSchema = z.object({
+  range: z.object({ since: z.string(), until: z.string(), label: z.string() }),
+  filters: ReportFiltersSchema,
+  rounding: z.object({
+    mode: z.enum(["off", "nearest", "up", "down"]),
+    minutes: z.number(),
+  }),
+  group: GroupDimensionSchema,
+  subGroup: SubGroupDimensionSchema,
   /** Keeps a client-facing report free of money when it's reopened next month. */
-  hideAmounts?: boolean;
-}
+  hideAmounts: z.boolean().optional(),
+});
+
+export type ReportConfig = z.infer<typeof ReportConfigSchema>;
 
 export interface SavedReport {
   id: string;
@@ -27,7 +42,10 @@ export interface SavedReport {
 export function useSavedReports() {
   return useQuery({
     queryKey: ["saved-reports"],
-    queryFn: () => api.savedReports.list() as Promise<SavedReport[]>,
+    queryFn: async (): Promise<SavedReport[]> => {
+      const rows = await api.savedReports.list();
+      return rows.map((r) => ({ ...r, config: ReportConfigSchema.parse(r.config) }));
+    },
     staleTime: 5 * 60_000,
   });
 }
@@ -35,10 +53,11 @@ export function useSavedReports() {
 export function useCreateSavedReport() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: { name: string; config: ReportConfig }) =>
-      api.savedReports.create(
-        body as unknown as { name: string; config: Record<string, unknown> }
-      ) as Promise<SavedReport>,
+    mutationFn: async (body: { name: string; config: ReportConfig }): Promise<SavedReport> => {
+      // Fresh literal spread satisfies the wire's Record<string, unknown> without a cast.
+      const row = await api.savedReports.create({ ...body, config: { ...body.config } });
+      return { ...row, config: ReportConfigSchema.parse(row.config) };
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["saved-reports"] });
       toast.success("Report saved");

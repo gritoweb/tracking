@@ -1,35 +1,31 @@
 import { useQuery } from "@tanstack/react-query";
-import { api, type ReportParams } from "@/lib/api";
+import { api, type ReportParams } from "@/lib/api-client";
 import type { ReportFilters } from "@/components/reports/report-filters";
+import type {
+  ReportBreakdownRow,
+  ReportDailyRow,
+  ReportSummary,
+  ReportWeeklyDay,
+  ReportWeekly,
+  ReportGroupRow,
+  GroupedReport,
+  GroupDimension,
+  SubGroupDimension,
+} from "@shared/schemas";
 
-interface DailyData {
-  date: string;
-  totalSeconds: number;
-  billableSeconds: number;
-  entryCount: number;
-}
-
-export interface BreakdownRow {
-  id: string | null;
-  name: string;
-  color?: string;
-  entryCount: number;
-  totalSeconds: number;
-  billableSeconds: number;
-  billableAmount: number;
-}
-
-export interface ReportSummary {
-  totalSeconds: number;
-  billableSeconds: number;
-  billableAmount: number;
-  entryCount: number;
-  byProject: BreakdownRow[];
-  byClient: BreakdownRow[];
-  byTask: BreakdownRow[];
-  byTag: BreakdownRow[];
-  daily: DailyData[];
-}
+// Re-exported under the names components already import (canonical shape now lives in @shared/schemas).
+export type {
+  ReportBreakdownRow as BreakdownRow,
+  ReportSummary,
+  ReportWeeklyDay as WeeklyDay,
+  ReportWeekly as WeeklyData,
+  ReportGroupRow as GroupRow,
+  GroupedReport,
+  GroupDimension,
+  SubGroupDimension,
+};
+// Kept for symmetry with the others, though nothing outside this file reads it directly.
+export type DailyData = ReportDailyRow;
 
 export type RoundMode = "off" | "nearest" | "up" | "down";
 
@@ -72,8 +68,7 @@ export function useReportSummary(
   const { params, key } = queryParams(filters, rounding);
   return useQuery({
     queryKey: ["reports", "summary", since, until, key],
-    queryFn: () =>
-      api.reports.summary({ since, until, groupBy: "day", ...params }) as Promise<ReportSummary>,
+    queryFn: () => api.reports.summary({ since, until, groupBy: "day", ...params }),
     enabled: Boolean(since && until),
   });
 }
@@ -92,18 +87,6 @@ export function useReportDetailed(
   });
 }
 
-export interface WeeklyDay {
-  date: string;
-  totalSeconds: number;
-  billableSeconds: number;
-  entryCount: number;
-}
-
-export interface WeeklyData {
-  week: string;
-  days: WeeklyDay[];
-}
-
 export function useReportWeekly(
   since: string,
   until: string,
@@ -113,34 +96,9 @@ export function useReportWeekly(
   const { params, key } = queryParams(filters, rounding);
   return useQuery({
     queryKey: ["reports", "weekly", since, until, key],
-    queryFn: () =>
-      api.reports.weekly({ since, until, ...params }) as Promise<WeeklyData[]>,
+    queryFn: () => api.reports.weekly({ since, until, ...params }),
     enabled: Boolean(since && until),
   });
-}
-
-export type GroupDimension = "project" | "client" | "task" | "tag" | "user";
-export type SubGroupDimension = "none" | GroupDimension;
-
-export interface GroupRow {
-  id: string | null;
-  name: string;
-  color: string | null;
-  entryCount: number;
-  totalSeconds: number;
-  billableSeconds: number;
-  billableAmount: number;
-  subGroups?: GroupRow[];
-}
-
-export interface GroupedReport {
-  group: GroupDimension;
-  subGroup: SubGroupDimension;
-  totalSeconds: number;
-  billableSeconds: number;
-  billableAmount: number;
-  entryCount: number;
-  groups: GroupRow[];
 }
 
 export function useReportGrouped(
@@ -155,8 +113,7 @@ export function useReportGrouped(
   const { params, key } = queryParams(filters, rounding);
   return useQuery({
     queryKey: ["reports", "grouped", since, until, group, subGroup, key],
-    queryFn: () =>
-      api.reports.grouped({ since, until, group, subGroup, ...params }) as Promise<GroupedReport>,
+    queryFn: () => api.reports.grouped({ since, until, group, subGroup, ...params }),
     enabled: Boolean(since && until) && enabled,
   });
 }

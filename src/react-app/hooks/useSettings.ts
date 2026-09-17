@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { api } from "@/lib/api";
+import { api } from "@/lib/api-client";
 import { toastApiError } from "@/lib/toastApiError";
 import { useUIStore } from "@/stores/uiStore";
 import type { Settings, UpdateSettings } from "@shared/schemas";

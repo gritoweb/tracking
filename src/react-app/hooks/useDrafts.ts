@@ -1,9 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { api } from "@/lib/api";
+import { api } from "@/lib/api-client";
 import { toastApiError } from "@/lib/toastApiError";
 import { useCalendarStatus } from "@/hooks/useCalendarSync";
-import type { DraftEntry } from "@shared/schemas";
+import type { DraftEntry, UpdateDraft } from "@shared/schemas";
 
 /**
  * Drafted entries for one local day.
@@ -81,7 +81,7 @@ export function useGenerateDrafts(localDate: string) {
 export function useUpdateDraft(localDate: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Record<string, unknown> }) =>
+    mutationFn: ({ id, data }: { id: string; data: UpdateDraft }) =>
       api.drafts.update(id, data),
     onSuccess: () => invalidateDay(queryClient, localDate),
     onError: (error) => toastApiError(error, "Couldn't update the draft"),

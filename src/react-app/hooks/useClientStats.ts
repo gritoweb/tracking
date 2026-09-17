@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { api } from "@/lib/api-client";
 import type { ClientStats } from "@shared/schemas";
 
 /**
@@ -12,7 +12,7 @@ import type { ClientStats } from "@shared/schemas";
 export function useClientStats(since: string, until: string) {
   const query = useQuery({
     queryKey: ["client-stats", since, until],
-    queryFn: () => api.clients.stats({ since, until }) as Promise<ClientStats[]>,
+    queryFn: () => api.clients.stats({ since, until }),
     staleTime: 30_000,
   });
 

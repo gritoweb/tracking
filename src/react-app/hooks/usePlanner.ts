@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { api } from "@/lib/api";
+import { api } from "@/lib/api-client";
 import { toastApiError } from "@/lib/toastApiError";
 import type { Allocation, UpsertAllocation, BulkUpsertAllocations } from "@shared/schemas";
 
@@ -10,8 +10,7 @@ import type { Allocation, UpsertAllocation, BulkUpsertAllocations } from "@share
 export function useAllocationsRange(sinceDate: string, untilDate: string) {
   return useQuery({
     queryKey: ["planner-allocations", sinceDate, untilDate],
-    queryFn: () =>
-      api.planner.list({ since: sinceDate, until: untilDate }) as Promise<Allocation[]>,
+    queryFn: () => api.planner.list({ since: sinceDate, until: untilDate }),
   });
 }
 
@@ -84,8 +83,7 @@ export function useUpsertAllocation() {
 export function useBulkUpsertAllocations() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: BulkUpsertAllocations) =>
-      api.planner.bulkUpsert(body as unknown as { allocations: Record<string, unknown>[] }),
+    mutationFn: (body: BulkUpsertAllocations) => api.planner.bulkUpsert(body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["planner-allocations"] });
     },

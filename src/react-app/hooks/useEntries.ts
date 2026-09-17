@@ -6,16 +6,11 @@ import {
   type QueryKey,
 } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError } from "@/lib/api-client";
 import { useTimerStore } from "@/stores/timerStore";
 import { useUIStore } from "@/stores/uiStore";
 import { formatDayHeader, localDayKey } from "@/lib/dateUtils";
-import type {
-  TimeEntry,
-  CreateTimeEntry,
-  UpdateTimeEntry,
-  EntrySuggestion,
-} from "@shared/schemas";
+import type { TimeEntry, CreateTimeEntry, UpdateTimeEntry } from "@shared/schemas";
 import { startOfDay, subDays, endOfDay, parseISO } from "date-fns";
 import { useDayRollover } from "@/hooks/useDayRollover";
 
@@ -30,7 +25,7 @@ export function useEntries(days = 30) {
 
   return useQuery({
     queryKey: ["time-entries", since, until],
-    queryFn: () => api.timeEntries.list({ since, until }) as Promise<TimeEntry[]>,
+    queryFn: () => api.timeEntries.list({ since, until }),
   });
 }
 
@@ -47,7 +42,7 @@ export function useEntriesRange(
   return useQuery({
     queryKey: ["time-entries", sinceIso, untilIso],
     queryFn: () =>
-      api.timeEntries.list({ since: sinceIso, until: untilIso }) as Promise<TimeEntry[]>,
+      api.timeEntries.list({ since: sinceIso, until: untilIso }),
     enabled: options?.enabled ?? true,
   });
 }
@@ -59,7 +54,7 @@ export function useEntriesRange(
 export function useEntrySuggestions() {
   return useQuery({
     queryKey: ["entry-suggestions"],
-    queryFn: () => api.timeEntries.suggestions() as Promise<EntrySuggestion[]>,
+    queryFn: () => api.timeEntries.suggestions(),
     staleTime: 5 * 60 * 1000,
   });
 }
@@ -324,7 +319,7 @@ export function useCreateEntry() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (data: CreateTimeEntry) =>
-      api.timeEntries.create(data as unknown as Record<string, unknown>) as Promise<TimeEntry>,
+      api.timeEntries.create(data),
     onSuccess: () => {
       toast.success("Entry added");
       invalidateEntryDerived(queryClient, true);
@@ -340,7 +335,7 @@ export function useUpdateEntry() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: UpdateTimeEntry }) =>
-      api.timeEntries.update(id, data as Record<string, unknown>) as Promise<TimeEntry>,
+      api.timeEntries.update(id, data),
     // Optimistically patch the cached entry so inline edits (duration, description,
     // project, billable) land instantly instead of after the round-trip.
     onMutate: async ({ id, data }) => {

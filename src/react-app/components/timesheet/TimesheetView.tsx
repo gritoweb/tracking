@@ -14,7 +14,7 @@ import {
   useUpdateEntry,
   useDeleteEntry,
 } from "@/hooks/useEntries";
-import { api } from "@/lib/api";
+import { api } from "@/lib/api-client";
 import {
   formatDurationShort,
   formatTimeInput,
@@ -196,11 +196,15 @@ export function TimesheetView({ weekStart }: TimesheetViewProps) {
     setCopying(true);
     try {
       const prevStart = addDays(weekStart, -7);
-      const prev = (await api.timeEntries.list({
+      const prev = await api.timeEntries.list({
         since: prevStart.toISOString(),
         until: weekStart.toISOString(),
-      })) as TimeEntry[];
-      const completed = prev.filter((e) => e.stop && e.duration && e.duration > 0 && e.projectId);
+      });
+      // Type guard narrows projectId/stop to non-null so the payload below needs no cast.
+      const completed = prev.filter(
+        (e): e is TimeEntry & { projectId: string; stop: string; duration: number } =>
+          Boolean(e.stop && e.duration && e.duration > 0 && e.projectId)
+      );
       if (completed.length === 0) {
         toast.info("No entries to copy from last week");
         return;
@@ -208,19 +212,19 @@ export function TimesheetView({ weekStart }: TimesheetViewProps) {
       // Keep the created ids so a mis-click doesn't leave 20+ entries to delete
       // by hand. Single and bulk delete both offer Undo; a one-click bulk *write*
       // was the only mutation of this size without it.
-      const created = (await Promise.all(
+      const created = await Promise.all(
         completed.map((e) =>
           api.timeEntries.create({
             description: e.description,
             projectId: e.projectId,
             taskId: e.taskId,
             start: addDays(new Date(e.start), 7).toISOString(),
-            stop: addDays(new Date(e.stop!), 7).toISOString(),
+            stop: addDays(new Date(e.stop), 7).toISOString(),
             billable: e.billable,
             tags: e.tags ?? [],
-          } as unknown as Record<string, unknown>)
+          })
         )
-      )) as TimeEntry[];
+      );
       queryClient.invalidateQueries({ queryKey: ["time-entries"] });
       queryClient.invalidateQueries({ queryKey: ["reports"] });
       toast.success(

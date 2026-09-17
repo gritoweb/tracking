@@ -18,7 +18,7 @@ import {
   type ReportFilters,
 } from "@/components/reports/report-filters";
 import { WeeklyBarChart } from "@/components/reports/WeeklyBarChart";
-import { DetailedTable, type DetailedEntry } from "@/components/reports/DetailedTable";
+import { DetailedTable } from "@/components/reports/DetailedTable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
@@ -132,7 +132,7 @@ export function ReportsPage() {
   );
 
   const handleExport = (format: ExportFormat) => {
-    const entries = detailed as DetailedEntry[];
+    const entries = detailed;
     const name = `time-entries-${range.label.replace(/\s/g, "-")}`;
     const options = { includeAmount: !hideAmounts };
     if (format === "csv") exportToCSV(entries, name, options);
@@ -319,7 +319,7 @@ export function ReportsPage() {
                   ))}
                 </div>
               ) : (
-                <DetailedTable entries={detailed as DetailedEntry[]} hideAmounts={hideAmounts} />
+                <DetailedTable entries={detailed} hideAmounts={hideAmounts} />
               )}
             </TabsContent>
           </Tabs>

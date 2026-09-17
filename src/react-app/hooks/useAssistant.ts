@@ -1,14 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { api } from "@/lib/api";
+import { api } from "@/lib/api-client";
 import { toastApiError } from "@/lib/toastApiError";
 import { useAssistantStore } from "@/stores/assistantStore";
-import type {
-  AssistantMemory,
-  AssistantNudge,
-  AssistantTrackEventRequest,
-  AssistantTrackEventResult,
-} from "@shared/schemas";
+import type { AssistantTrackEventRequest } from "@shared/schemas";
 
 /**
  * The assistant's proactive nudges, minus the ones the user dismissed. Polled on a slow
@@ -19,8 +14,7 @@ export function useAssistantNudges() {
   const dismissed = useAssistantStore((s) => s.dismissed);
   const query = useQuery({
     queryKey: ["assistant-nudges"],
-    queryFn: () =>
-      api.assistant.nudges(new Date().getTimezoneOffset()) as Promise<AssistantNudge[]>,
+    queryFn: () => api.assistant.nudges(new Date().getTimezoneOffset()),
     staleTime: 4 * 60_000,
     refetchInterval: 5 * 60_000,
   });
@@ -36,10 +30,7 @@ export function useAssistantNudges() {
 export function useTrackNudgeEvent() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: AssistantTrackEventRequest) =>
-      api.assistant.trackEvent(
-        body as unknown as Record<string, unknown>
-      ) as Promise<AssistantTrackEventResult>,
+    mutationFn: (body: AssistantTrackEventRequest) => api.assistant.trackEvent(body),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["time-entries"] });
       queryClient.invalidateQueries({ queryKey: ["reports"] });
@@ -60,7 +51,7 @@ export function useTrackNudgeEvent() {
 export function useAssistantMemory() {
   return useQuery({
     queryKey: ["assistant-memory"],
-    queryFn: () => api.assistant.memory() as Promise<AssistantMemory[]>,
+    queryFn: () => api.assistant.memory(),
     staleTime: 60_000,
   });
 }

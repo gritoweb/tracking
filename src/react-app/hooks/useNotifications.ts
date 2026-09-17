@@ -1,12 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
-import type { Notification } from "@shared/schemas";
+import { api } from "@/lib/api-client";
 
 /** The bell's own list — polls every 60s (paused while the tab is hidden), the live socket just makes it feel instant. */
 export function useNotifications() {
   return useQuery({
     queryKey: ["notifications"],
-    queryFn: () => api.notifications.list() as Promise<{ notifications: Notification[]; unreadCount: number }>,
+    queryFn: () => api.notifications.list(),
     refetchInterval: 60_000,
   });
 }

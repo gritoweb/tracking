@@ -1,13 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { api } from "@/lib/api";
+import { api } from "@/lib/api-client";
 import { toastApiError } from "@/lib/toastApiError";
-import type { ApiKey, ApiKeyScope } from "@shared/schemas";
+import type { ApiKeyScope } from "@shared/schemas";
 
 export function useApiKeys() {
   return useQuery({
     queryKey: ["api-keys"],
-    queryFn: () => api.apiKeys.list() as Promise<ApiKey[]>,
+    queryFn: () => api.apiKeys.list(),
     staleTime: 60_000,
   });
 }

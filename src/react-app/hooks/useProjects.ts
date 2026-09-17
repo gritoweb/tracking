@@ -1,12 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { api } from "@/lib/api";
+import { api } from "@/lib/api-client";
 import { toastApiError } from "@/lib/toastApiError";
 import type {
-  Project,
-  ProjectPacing,
-  Client,
   CreateProject,
+  UpdateProject,
   CreateClient,
   UpdateClient,
 } from "@shared/schemas";
@@ -14,7 +12,7 @@ import type {
 export function useProjects() {
   return useQuery({
     queryKey: ["projects"],
-    queryFn: () => api.projects.list() as Promise<Project[]>,
+    queryFn: () => api.projects.list(),
     staleTime: 5 * 60_000,
   });
 }
@@ -31,7 +29,7 @@ export function useAllProjects(range?: { since: string; until: string }) {
       api.projects.list({
         includeArchived: "true",
         ...(range ? { since: range.since, until: range.until } : {}),
-      }) as Promise<Project[]>,
+      }),
     staleTime: 5 * 60_000,
   });
 }
@@ -47,7 +45,7 @@ export function useAllProjects(range?: { since: string; until: string }) {
 export function useProjectPacing() {
   return useQuery({
     queryKey: ["projects", "pacing"],
-    queryFn: () => api.projects.pacing() as Promise<ProjectPacing[]>,
+    queryFn: () => api.projects.pacing(),
     staleTime: 5 * 60_000,
   });
 }
@@ -55,8 +53,7 @@ export function useProjectPacing() {
 export function useCreateProject() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: CreateProject) =>
-      api.projects.create(data as Record<string, unknown>) as Promise<Project>,
+    mutationFn: (data: CreateProject) => api.projects.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["projects"] });
       toast.success("Project created");
@@ -68,17 +65,8 @@ export function useCreateProject() {
 export function useUpdateProject() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({
-      id,
-      data,
-    }: {
-      id: string;
-      data: Partial<CreateProject & { active: boolean }>;
-    }) =>
-      api.projects.update(
-        id,
-        data as Record<string, unknown>
-      ) as Promise<Project>,
+    mutationFn: ({ id, data }: { id: string; data: UpdateProject }) =>
+      api.projects.update(id, data),
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: ["projects"] }),
     onError: (error) => toastApiError(error, "Failed to update project"),
@@ -119,7 +107,7 @@ export function useRecolorProjects() {
 export function useClients() {
   return useQuery({
     queryKey: ["clients"],
-    queryFn: () => api.clients.list() as Promise<Client[]>,
+    queryFn: () => api.clients.list(),
     staleTime: 5 * 60_000,
   });
 }
@@ -127,8 +115,7 @@ export function useClients() {
 export function useAllClients() {
   return useQuery({
     queryKey: ["clients", "all"],
-    queryFn: () =>
-      api.clients.list({ includeArchived: "true" }) as Promise<Client[]>,
+    queryFn: () => api.clients.list({ includeArchived: "true" }),
     staleTime: 5 * 60_000,
   });
 }
@@ -136,7 +123,7 @@ export function useAllClients() {
 export function useClient(id: string | undefined) {
   return useQuery({
     queryKey: ["clients", id],
-    queryFn: () => api.clients.get(id as string) as Promise<Client>,
+    queryFn: () => api.clients.get(id as string),
     enabled: !!id,
   });
 }
@@ -144,8 +131,7 @@ export function useClient(id: string | undefined) {
 export function useCreateClient() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: CreateClient) =>
-      api.clients.create(data as Record<string, unknown>) as Promise<Client>,
+    mutationFn: (data: CreateClient) => api.clients.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["clients"] });
       toast.success("Client created");
@@ -158,7 +144,7 @@ export function useUpdateClient() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: UpdateClient }) =>
-      api.clients.update(id, data as Record<string, unknown>) as Promise<Client>,
+      api.clients.update(id, data),
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: ["clients"] }),
     onError: (error) => toastApiError(error, "Failed to update client"),
@@ -180,8 +166,7 @@ export function useDeleteClient() {
 export function useTags() {
   return useQuery({
     queryKey: ["tags"],
-    queryFn: () =>
-      api.tags.list() as Promise<{ id: string; name: string; color: string }[]>,
+    queryFn: () => api.tags.list(),
     staleTime: 5 * 60_000,
   });
 }

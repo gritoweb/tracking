@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { ApiError, api } from "./api";
+import { ApiError, api } from "./api-client";
+
+// idb's openDB needs a real IndexedDB, which neither vitest environment provides.
+const addPendingMutation = vi.fn();
+vi.mock("@/lib/idb", () => ({ addPendingMutation: (...args: unknown[]) => addPendingMutation(...args) }));
 
 // Real @hono/zod-validator rejection shape (`c.json(schema.safeParse(...), 400)`), built with the project's own zod.
 function realZodRejectionBody(message: string): string {
@@ -27,9 +31,13 @@ function mockFetchOnce(response: Partial<Response>) {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  addPendingMutation.mockClear();
 });
 
-describe("api.me (via request)", () => {
+// `api.me()` is the thinnest endpoint — exercising it is exercising `appFetch`
+// itself, the one place every request goes through (credentials, the client-id
+// header, the offline queue and `ApiError` mapping).
+describe("api.me (via appFetch)", () => {
   it("resolves with the parsed JSON body on success", async () => {
     mockFetchOnce({ json: async () => ({ userId: "u1", workspaceId: "w1", role: "owner", canManage: true }) });
     await expect(api.me()).resolves.toEqual({
@@ -93,6 +101,28 @@ describe("api.me (via request)", () => {
       text: async () => JSON.stringify({ error: "Duplicate tag name" }),
     });
     await expect(api.me()).rejects.toMatchObject({ message: "Duplicate tag name" });
+  });
+
+  it("queues a mutating request and rejects with a queued ApiError when the network is unreachable", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
+    await expect(
+      api.tags.update("t1", { color: "#ffffff" })
+    ).rejects.toMatchObject({
+      name: "ApiError",
+      message: "Offline — saved locally, will sync when you reconnect",
+      status: 0,
+      queued: true,
+    });
+    expect(addPendingMutation).toHaveBeenCalledWith({
+      method: "PATCH",
+      url: "/api/tags/t1",
+      body: { color: "#ffffff" },
+    });
+  });
+
+  it("does not queue a GET on network failure — it just rejects", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
+    await expect(api.me()).rejects.toBeInstanceOf(TypeError);
   });
 });
 

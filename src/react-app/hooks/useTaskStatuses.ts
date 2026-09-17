@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { api } from "@/lib/api";
+import { api } from "@/lib/api-client";
 import type { CreateTaskStatus, TaskStatus, UpdateTaskStatus } from "@shared/schemas";
 
 /**
@@ -12,7 +12,7 @@ import type { CreateTaskStatus, TaskStatus, UpdateTaskStatus } from "@shared/sch
 export function useTaskStatuses(projectId?: string | null) {
   return useQuery({
     queryKey: ["task-statuses", projectId ?? "global"],
-    queryFn: () => api.taskStatuses.list(projectId) as Promise<TaskStatus[]>,
+    queryFn: () => api.taskStatuses.list(projectId),
     staleTime: 5 * 60_000,
   });
 }
@@ -31,10 +31,7 @@ export function useCreateTaskStatus(projectId?: string | null) {
   const invalidate = useStatusInvalidation();
   return useMutation({
     mutationFn: (data: CreateTaskStatus) =>
-      api.taskStatuses.create({
-        ...data,
-        ...(projectId ? { projectId } : {}),
-      } as unknown as Record<string, unknown>) as Promise<TaskStatus>,
+      api.taskStatuses.create({ ...data, ...(projectId ? { projectId } : {}) }),
     onSuccess: (status) => {
       invalidate();
       toast.success(`Status "${status.name}" added`);
@@ -58,7 +55,7 @@ async function forkedTargetId(
   const current = queryClient.getQueryData<TaskStatus[]>(["task-statuses", projectId]);
   const editing = current?.find((s) => s.id === id);
   if (!editing || editing.projectId) return id; // already project-owned, or unknown — leave as-is
-  const forked = (await api.taskStatuses.fork(projectId)) as TaskStatus[];
+  const forked = await api.taskStatuses.fork(projectId);
   return forked.find((s) => s.name === editing.name)?.id ?? id;
 }
 
@@ -68,7 +65,7 @@ export function useUpdateTaskStatus(projectId?: string | null) {
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: UpdateTaskStatus }) => {
       const targetId = await forkedTargetId(queryClient, projectId, id);
-      return api.taskStatuses.update(targetId, data as unknown as Record<string, unknown>) as Promise<TaskStatus>;
+      return api.taskStatuses.update(targetId, data);
     },
     onSuccess: () => invalidate(),
     onError: (error: Error) => toast.error(error.message || "Failed to update status"),

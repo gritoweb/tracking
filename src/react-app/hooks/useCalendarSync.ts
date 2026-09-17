@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { api, type CalendarProviderId } from "@/lib/api";
+import { api, type CalendarProviderId } from "@/lib/api-client";
 import { toastApiError } from "@/lib/toastApiError";
 export type { ExternalEvent } from "@/lib/calendarMapping";
 

@@ -46,27 +46,10 @@ import {
 } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { toast } from "sonner";
+import type { ReportDetailedEntry } from "@shared/schemas";
 
-export interface DetailedEntry {
-  id: string;
-  description: string;
-  projectId: string | null;
-  projectName: string | null;
-  projectColor: string | null;
-  clientName: string | null;
-  taskId: string | null;
-  taskName: string | null;
-  userId: string | null;
-  userName: string | null;
-  userEmail: string | null;
-  userImage: string | null;
-  start: string;
-  stop: string | null;
-  duration: number | null;
-  billable: boolean;
-  amount: number;
-  tags: string[];
-}
+// Pinned on the worker's own response — see routes/reports.ts `/detailed`.
+export type DetailedEntry = ReportDetailedEntry;
 
 type ColumnKey =
   | "description"

@@ -1,13 +1,67 @@
 import { addPendingMutation } from "@/lib/idb";
 import type {
   Settings,
+  UpdateSettings,
   AssistantMemory,
+  AssistantTrackEventRequest,
+  AssistantTrackEventResult,
+  AssistantNudge,
   ProjectPacing,
   DraftEntry,
+  UpdateDraft,
+  ConfirmDrafts,
   GenerateDraftsResult,
   ApiKey,
-  ApiKeyScope,
+  CreateApiKey,
   CreatedApiKey,
+  TimeEntry,
+  EntrySuggestion,
+  CreateTimeEntry,
+  UpdateTimeEntry,
+  BulkUpdateTimeEntries,
+  Project,
+  CreateProject,
+  UpdateProject,
+  Task,
+  CreateTask,
+  UpdateTask,
+  MoveTask,
+  TaskAttachment,
+  TaskComment,
+  CreateTaskComment,
+  UpdateTaskComment,
+  Notification,
+  TaskStatus,
+  CreateTaskStatus,
+  UpdateTaskStatus,
+  ArchiveTaskStatus,
+  Client,
+  CreateClient,
+  UpdateClient,
+  ClientStats,
+  Tag,
+  Favorite,
+  CreateFavorite,
+  RecurringEntry,
+  CreateRecurringEntry,
+  UpdateRecurringEntry,
+  Integration,
+  CreateIntegration,
+  UpdateIntegration,
+  PushResult,
+  AiQuickEntryRequest,
+  AiQuickEntryResult,
+  AiSummaryRequest,
+  AiSummaryResult,
+  Allocation,
+  UpsertAllocation,
+  BulkUpsertAllocations,
+  SavedReport,
+  CreateSavedReport,
+  ReportSummary,
+  GroupedReport,
+  ReportWeekly,
+  ReportDetailedEntry,
 } from "@shared/schemas";
 
 export type CalendarProviderId = "google" | "microsoft";
@@ -114,35 +168,48 @@ function errorMessage(raw: string, statusText: string): string {
   return raw.slice(0, 300) || statusText;
 }
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const method = (options?.method ?? "GET").toUpperCase();
+/** The one place every request goes through: credentials, the client-id header, the offline queue and `ApiError` mapping. */
+async function appFetch(path: string, init?: RequestInit): Promise<Response> {
+  const method = (init?.method ?? "GET").toUpperCase();
+  const isFormData = init?.body instanceof FormData; // needs its own multipart boundary and can't be queued as JSON offline
+
+  let res: Response;
   try {
-    const res = await fetch(`${API_BASE}${path}`, {
+    res = await fetch(`${API_BASE}${path}`, {
       credentials: "include",
-      ...options,
+      ...init,
       // After the spread, so a caller's `headers` can't drop the client id.
       headers: {
-        "Content-Type": "application/json",
+        ...(isFormData ? {} : { "Content-Type": "application/json" }),
         "X-Client-Id": CLIENT_ID,
-        ...(options?.headers as Record<string, string> | undefined),
+        ...(init?.headers as Record<string, string> | undefined),
       },
     });
-    if (!res.ok) {
-      const raw = await res.text().catch(() => "");
-      throw new ApiError(errorMessage(raw, res.statusText), res.status);
-    }
-    if (res.status === 204) return undefined as T;
-    return res.json() as Promise<T>;
   } catch (err) {
     // Queue mutating requests when the network is unavailable so they can be
     // replayed by useOfflineSync once connectivity is restored.
-    if (err instanceof TypeError && MUTABLE_METHODS.has(method)) {
-      const body = options?.body ? JSON.parse(options.body as string) : undefined;
-      await addPendingMutation({ method: method as "POST" | "PUT" | "PATCH" | "DELETE", url: `${API_BASE}${path}`, body });
+    if (err instanceof TypeError && MUTABLE_METHODS.has(method) && !isFormData) {
+      const body = init?.body ? JSON.parse(init.body as string) : undefined;
+      await addPendingMutation({
+        method: method as "POST" | "PUT" | "PATCH" | "DELETE",
+        url: `${API_BASE}${path}`,
+        body,
+      });
       throw new ApiError("Offline — saved locally, will sync when you reconnect", 0, true);
     }
     throw err;
   }
+  if (!res.ok) {
+    const raw = await res.text().catch(() => "");
+    throw new ApiError(errorMessage(raw, res.statusText), res.status);
+  }
+  return res;
+}
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await appFetch(path, init);
+  if (res.status === 204) return undefined as T;
+  return (await res.json()) as T;
 }
 
 // Report filters: comma-joined ID lists (or undefined when no selection).
@@ -173,6 +240,14 @@ function reportQuery(params: Record<string, string | undefined>): string {
   ).toString();
 }
 
+function queryString(params?: Record<string, string | undefined>): string {
+  if (!params) return "";
+  const qs = new URLSearchParams(
+    Object.entries(params).filter(([, v]) => v !== undefined) as [string, string][]
+  ).toString();
+  return qs ? `?${qs}` : "";
+}
+
 export interface WorkspaceMe {
   userId: string;
   workspaceId: string;
@@ -184,48 +259,40 @@ export const api = {
   me: () => request<WorkspaceMe>("/me"),
   // ─── Time entries ──────────────────────────────────────────────────────────
   timeEntries: {
-    list: (params: { since?: string; until?: string }) => {
-      const qs = new URLSearchParams(
-        Object.fromEntries(
-          Object.entries(params).filter(([, v]) => v !== undefined) as [string, string][]
-        )
-      );
-      return request<unknown[]>(`/time_entries?${qs}`);
-    },
-    current: () => request<unknown | null>("/time_entries/current"),
-    suggestions: () => request<unknown[]>("/time_entries/suggestions"),
-    create: (body: Record<string, unknown>) =>
-      request<unknown>("/time_entries", { method: "POST", body: JSON.stringify(body) }),
-    update: (id: string, body: Record<string, unknown>) =>
-      request<unknown>(`/time_entries/${id}`, { method: "PUT", body: JSON.stringify(body) }),
+    list: (params: { since?: string; until?: string }) =>
+      request<TimeEntry[]>(`/time_entries${queryString(params)}`),
+    current: () => request<TimeEntry | null>("/time_entries/current"),
+    suggestions: () => request<EntrySuggestion[]>("/time_entries/suggestions"),
+    create: (body: CreateTimeEntry) =>
+      request<TimeEntry>("/time_entries", { method: "POST", body: JSON.stringify(body) }),
+    update: (id: string, body: UpdateTimeEntry) =>
+      request<TimeEntry>(`/time_entries/${id}`, { method: "PUT", body: JSON.stringify(body) }),
     stop: (id: string) =>
-      request<unknown>(`/time_entries/${id}/stop`, { method: "PATCH" }),
+      request<TimeEntry | null>(`/time_entries/${id}/stop`, { method: "PATCH" }),
     delete: (id: string) =>
-      request<unknown>(`/time_entries/${id}`, { method: "DELETE" }),
-    bulkUpdate: (body: { ids: string[]; patch: Record<string, unknown> }) =>
-      request<unknown>("/time_entries/bulk", { method: "PATCH", body: JSON.stringify(body) }),
+      request<{ ok: boolean }>(`/time_entries/${id}`, { method: "DELETE" }),
+    bulkUpdate: (body: BulkUpdateTimeEntries) =>
+      request<{ ok: boolean; updated: number }>("/time_entries/bulk", {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      }),
     bulkDelete: (ids: string[]) =>
-      request<unknown>("/time_entries/bulk", { method: "DELETE", body: JSON.stringify({ ids }) }),
+      request<{ ok: boolean; deleted: number }>("/time_entries/bulk", {
+        method: "DELETE",
+        body: JSON.stringify({ ids }),
+      }),
   },
 
   // ─── Projects ─────────────────────────────────────────────────────────────
   projects: {
-    list: (params?: { includeArchived?: string; since?: string; until?: string }) => {
-      const qs = params
-        ? new URLSearchParams(
-            Object.fromEntries(
-              Object.entries(params).filter(([, v]) => v !== undefined) as [string, string][]
-            )
-          ).toString()
-        : "";
-      return request<unknown[]>(`/projects${qs ? `?${qs}` : ""}`);
-    },
-    create: (body: Record<string, unknown>) =>
-      request<unknown>("/projects", { method: "POST", body: JSON.stringify(body) }),
-    update: (id: string, body: Record<string, unknown>) =>
-      request<unknown>(`/projects/${id}`, { method: "PUT", body: JSON.stringify(body) }),
+    list: (params?: { includeArchived?: string; since?: string; until?: string }) =>
+      request<Project[]>(`/projects${queryString(params)}`),
+    create: (body: CreateProject) =>
+      request<Project>("/projects", { method: "POST", body: JSON.stringify(body) }),
+    update: (id: string, body: UpdateProject) =>
+      request<Project>(`/projects/${id}`, { method: "PUT", body: JSON.stringify(body) }),
     delete: (id: string) =>
-      request<unknown>(`/projects/${id}`, { method: "DELETE" }),
+      request<{ ok: boolean }>(`/projects/${id}`, { method: "DELETE" }),
     pacing: () => request<ProjectPacing[]>("/projects/pacing"),
     recolor: () =>
       request<{ recolored: number; usedAI: boolean }>("/projects/recolor", {
@@ -235,61 +302,52 @@ export const api = {
 
   // ─── Tasks ────────────────────────────────────────────────────────────────
   tasks: {
-    list: (params?: { projectId?: string; includeInactive?: string }) => {
-      const qs = params
-        ? new URLSearchParams(
-            Object.fromEntries(
-              Object.entries(params).filter(([, v]) => v !== undefined) as [string, string][]
-            )
-          ).toString()
-        : "";
-      return request<unknown[]>(`/tasks${qs ? `?${qs}` : ""}`);
-    },
-    create: (body: Record<string, unknown>) =>
-      request<unknown>("/tasks", { method: "POST", body: JSON.stringify(body) }),
-    update: (id: string, body: Record<string, unknown>) =>
-      request<unknown>(`/tasks/${id}`, { method: "PUT", body: JSON.stringify(body) }),
+    list: (params?: { projectId?: string; includeInactive?: string }) =>
+      request<Task[]>(`/tasks${queryString(params)}`),
+    create: (body: CreateTask) =>
+      request<Task>("/tasks", { method: "POST", body: JSON.stringify(body) }),
+    update: (id: string, body: UpdateTask) =>
+      request<Task>(`/tasks/${id}`, { method: "PUT", body: JSON.stringify(body) }),
     /** A board drop: the column and the position inside it, in one write. */
-    move: (id: string, body: Record<string, unknown>) =>
-      request<unknown>(`/tasks/${id}/move`, { method: "PATCH", body: JSON.stringify(body) }),
+    move: (id: string, body: MoveTask) =>
+      request<Task>(`/tasks/${id}/move`, { method: "PATCH", body: JSON.stringify(body) }),
     delete: (id: string) =>
-      request<unknown>(`/tasks/${id}`, { method: "DELETE" }),
+      request<{ ok: boolean }>(`/tasks/${id}`, { method: "DELETE" }),
     attachments: {
-      list: (taskId: string) => request<unknown[]>(`/tasks/${taskId}/attachments`),
-      // Own fetch, not request(): a FormData body needs the browser's own multipart Content-Type.
-      upload: async (taskId: string, file: File) => {
+      list: (taskId: string) => request<TaskAttachment[]>(`/tasks/${taskId}/attachments`),
+      // Own call, not request<T>(): a FormData body needs appFetch's raw Response, not its JSON assumption.
+      upload: async (taskId: string, file: File): Promise<TaskAttachment> => {
         const body = new FormData();
         body.append("file", file);
-        const res = await fetch(`${API_BASE}/tasks/${taskId}/attachments`, {
-          method: "POST",
-          credentials: "include",
-          headers: { "X-Client-Id": CLIENT_ID },
-          body,
-        });
-        if (!res.ok) {
-          const raw = await res.text().catch(() => "");
-          throw new ApiError(errorMessage(raw, res.statusText), res.status);
-        }
-        return res.json() as Promise<unknown>;
+        const res = await appFetch(`/tasks/${taskId}/attachments`, { method: "POST", body });
+        return (await res.json()) as TaskAttachment;
       },
-      delete: (id: string) => request<unknown>(`/attachments/${id}`, { method: "DELETE" }),
+      delete: (id: string) => request<{ ok: boolean }>(`/attachments/${id}`, { method: "DELETE" }),
     },
     /** Flat, single-level — no reply/thread. */
     comments: {
-      list: (taskId: string) => request<unknown[]>(`/tasks/${taskId}/comments`),
-      create: (taskId: string, body: Record<string, unknown>) =>
-        request<unknown>(`/tasks/${taskId}/comments`, { method: "POST", body: JSON.stringify(body) }),
-      update: (taskId: string, commentId: string, body: Record<string, unknown>) =>
-        request<unknown>(`/tasks/${taskId}/comments/${commentId}`, { method: "PATCH", body: JSON.stringify(body) }),
+      list: (taskId: string) => request<TaskComment[]>(`/tasks/${taskId}/comments`),
+      create: (taskId: string, body: CreateTaskComment) =>
+        request<TaskComment>(`/tasks/${taskId}/comments`, {
+          method: "POST",
+          body: JSON.stringify(body),
+        }),
+      update: (taskId: string, commentId: string, body: UpdateTaskComment) =>
+        request<TaskComment>(`/tasks/${taskId}/comments/${commentId}`, {
+          method: "PATCH",
+          body: JSON.stringify(body),
+        }),
       delete: (taskId: string, commentId: string) =>
-        request<unknown>(`/tasks/${taskId}/comments/${commentId}`, { method: "DELETE" }),
+        request<{ ok: boolean }>(`/tasks/${taskId}/comments/${commentId}`, { method: "DELETE" }),
     },
   },
 
   // ─── Notifications (the header bell) ──────────────────────────────────────
   notifications: {
-    list: () => request<{ notifications: unknown[]; unreadCount: number }>("/notifications"),
-    markRead: (id: string) => request<{ ok: boolean }>(`/notifications/${id}/read`, { method: "PATCH" }),
+    list: () =>
+      request<{ notifications: Notification[]; unreadCount: number }>("/notifications"),
+    markRead: (id: string) =>
+      request<{ ok: boolean }>(`/notifications/${id}/read`, { method: "PATCH" }),
     markAllRead: () => request<{ ok: boolean }>("/notifications/read-all", { method: "PATCH" }),
     delete: (id: string) => request<{ ok: boolean }>(`/notifications/${id}`, { method: "DELETE" }),
     clearAll: () => request<{ ok: boolean }>("/notifications", { method: "DELETE" }),
@@ -299,20 +357,20 @@ export const api = {
   taskStatuses: {
     /** `projectId` omitted (or falsy) returns the workspace's global default set. */
     list: (projectId?: string | null) =>
-      request<unknown[]>(`/task-statuses${projectId ? `?projectId=${projectId}` : ""}`),
-    create: (body: Record<string, unknown>) =>
-      request<unknown>("/task-statuses", { method: "POST", body: JSON.stringify(body) }),
-    update: (id: string, body: Record<string, unknown>) =>
-      request<unknown>(`/task-statuses/${id}`, { method: "PUT", body: JSON.stringify(body) }),
+      request<TaskStatus[]>(`/task-statuses${projectId ? `?projectId=${projectId}` : ""}`),
+    create: (body: CreateTaskStatus) =>
+      request<TaskStatus>("/task-statuses", { method: "POST", body: JSON.stringify(body) }),
+    update: (id: string, body: UpdateTaskStatus) =>
+      request<TaskStatus>(`/task-statuses/${id}`, { method: "PUT", body: JSON.stringify(body) }),
     /** Archive, never delete. `moveTo` is required when the status still holds tasks. */
-    archive: (id: string, body: { moveTo?: string }) =>
+    archive: (id: string, body: ArchiveTaskStatus) =>
       request<{ ok: boolean; moved: number }>(`/task-statuses/${id}/archive`, {
         method: "POST",
         body: JSON.stringify(body),
       }),
     /** Clones the global set into a project's own fork — idempotent. */
     fork: (projectId: string) =>
-      request<unknown[]>("/task-statuses/fork", {
+      request<TaskStatus[]>("/task-statuses/fork", {
         method: "POST",
         body: JSON.stringify({ projectId }),
       }),
@@ -320,32 +378,24 @@ export const api = {
 
   // ─── Clients ──────────────────────────────────────────────────────────────
   clients: {
-    list: (params?: { includeArchived?: string; since?: string; until?: string }) => {
-      const qs = params
-        ? new URLSearchParams(
-            Object.fromEntries(
-              Object.entries(params).filter(([, v]) => v !== undefined) as [string, string][]
-            )
-          ).toString()
-        : "";
-      return request<unknown[]>(`/clients${qs ? `?${qs}` : ""}`);
-    },
+    list: (params?: { includeArchived?: string; since?: string; until?: string }) =>
+      request<Client[]>(`/clients${queryString(params)}`),
     stats: (params: { since: string; until: string }) =>
-      request<unknown[]>(`/clients/stats?${new URLSearchParams(params).toString()}`),
-    get: (id: string) => request<unknown>(`/clients/${id}`),
-    create: (body: Record<string, unknown>) =>
-      request<unknown>("/clients", { method: "POST", body: JSON.stringify(body) }),
-    update: (id: string, body: Record<string, unknown>) =>
-      request<unknown>(`/clients/${id}`, { method: "PUT", body: JSON.stringify(body) }),
+      request<ClientStats[]>(`/clients/stats?${new URLSearchParams(params).toString()}`),
+    get: (id: string) => request<Client>(`/clients/${id}`),
+    create: (body: CreateClient) =>
+      request<Client>("/clients", { method: "POST", body: JSON.stringify(body) }),
+    update: (id: string, body: UpdateClient) =>
+      request<Client>(`/clients/${id}`, { method: "PUT", body: JSON.stringify(body) }),
     delete: (id: string) =>
-      request<unknown>(`/clients/${id}`, { method: "DELETE" }),
+      request<{ ok: boolean }>(`/clients/${id}`, { method: "DELETE" }),
   },
 
   // ─── Tags ─────────────────────────────────────────────────────────────────
   tags: {
-    list: () => request<unknown[]>("/tags"),
+    list: () => request<Tag[]>("/tags"),
     create: (name: string) =>
-      request<{ id: string; name: string; color: string }>("/tags", {
+      request<Tag>("/tags", {
         method: "POST",
         body: JSON.stringify({ name }),
       }),
@@ -358,43 +408,43 @@ export const api = {
 
   // ─── Favorites ────────────────────────────────────────────────────────────
   favorites: {
-    list: () => request<unknown[]>("/favorites"),
-    create: (body: Record<string, unknown>) =>
-      request<unknown>("/favorites", { method: "POST", body: JSON.stringify(body) }),
+    list: () => request<Favorite[]>("/favorites"),
+    create: (body: CreateFavorite) =>
+      request<Favorite>("/favorites", { method: "POST", body: JSON.stringify(body) }),
     delete: (id: string) =>
-      request<unknown>(`/favorites/${id}`, { method: "DELETE" }),
+      request<{ ok: boolean }>(`/favorites/${id}`, { method: "DELETE" }),
   },
 
   // ─── Recurring entries ────────────────────────────────────────────────────
   recurring: {
-    list: () => request<unknown[]>("/recurring"),
-    create: (body: Record<string, unknown>) =>
-      request<unknown>("/recurring", { method: "POST", body: JSON.stringify(body) }),
-    update: (id: string, body: Record<string, unknown>) =>
-      request<unknown>(`/recurring/${id}`, { method: "PUT", body: JSON.stringify(body) }),
+    list: () => request<RecurringEntry[]>("/recurring"),
+    create: (body: CreateRecurringEntry) =>
+      request<RecurringEntry>("/recurring", { method: "POST", body: JSON.stringify(body) }),
+    update: (id: string, body: UpdateRecurringEntry) =>
+      request<RecurringEntry>(`/recurring/${id}`, { method: "PUT", body: JSON.stringify(body) }),
     delete: (id: string) =>
-      request<unknown>(`/recurring/${id}`, { method: "DELETE" }),
+      request<{ ok: boolean }>(`/recurring/${id}`, { method: "DELETE" }),
   },
 
   // ─── Integrations ────────────────────────────────────────────────────────
   integrations: {
-    list: () => request<unknown[]>("/integrations"),
-    create: (body: Record<string, unknown>) =>
-      request<unknown>("/integrations", { method: "POST", body: JSON.stringify(body) }),
-    update: (id: string, body: Record<string, unknown>) =>
-      request<unknown>(`/integrations/${id}`, { method: "PUT", body: JSON.stringify(body) }),
+    list: () => request<Integration[]>("/integrations"),
+    create: (body: CreateIntegration) =>
+      request<Integration>("/integrations", { method: "POST", body: JSON.stringify(body) }),
+    update: (id: string, body: UpdateIntegration) =>
+      request<Integration>(`/integrations/${id}`, { method: "PUT", body: JSON.stringify(body) }),
     delete: (id: string) =>
-      request<unknown>(`/integrations/${id}`, { method: "DELETE" }),
+      request<{ ok: boolean }>(`/integrations/${id}`, { method: "DELETE" }),
     test: (id: string) =>
       request<{ ok: boolean; error?: string }>(`/integrations/${id}/test`, { method: "POST" }),
     push: (body: { entryIds: string[]; comment?: string; timezone?: string }) =>
-      request<{ results: { id: string; ok: boolean; externalId?: string; error?: string }[] }>(
-        "/integrations/push",
-        { method: "POST", body: JSON.stringify(body) }
-      ),
+      request<{ results: PushResult[] }>("/integrations/push", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
   },
 
-  // ─── Calendar sync (Google) ────────────────────────────────────────────────
+  // ─── Calendar sync (Google / Microsoft) ────────────────────────────────────
   calendar: {
     // One row per calendar provider the server supports — a workspace can hold
     // a work calendar and a personal one at the same time.
@@ -423,22 +473,22 @@ export const api = {
 
   // ─── AI ───────────────────────────────────────────────────────────────────
   ai: {
-    quickEntry: (body: Record<string, unknown>) =>
-      request<unknown>("/ai/quick-entry", { method: "POST", body: JSON.stringify(body) }),
-    summary: (body: Record<string, unknown>) =>
-      request<unknown>("/ai/summary", { method: "POST", body: JSON.stringify(body) }),
+    quickEntry: (body: AiQuickEntryRequest) =>
+      request<AiQuickEntryResult>("/ai/quick-entry", { method: "POST", body: JSON.stringify(body) }),
+    summary: (body: AiSummaryRequest) =>
+      request<AiSummaryResult>("/ai/summary", { method: "POST", body: JSON.stringify(body) }),
   },
 
   // ─── Assistant ─────────────────────────────────────────────────────
   assistant: {
     nudges: (timezoneOffsetMinutes: number) =>
-      request<unknown[]>(
+      request<AssistantNudge[]>(
         `/assistant/nudges?timezoneOffsetMinutes=${timezoneOffsetMinutes}`
       ),
     // Chat moved to the ChatAgent Durable Object (streaming over WebSocket via
     // useAgentChat); there's no longer a REST chat endpoint.
-    trackEvent: (body: Record<string, unknown>) =>
-      request<unknown>("/assistant/track-event", {
+    trackEvent: (body: AssistantTrackEventRequest) =>
+      request<AssistantTrackEventResult>("/assistant/track-event", {
         method: "POST",
         body: JSON.stringify(body),
       }),
@@ -453,7 +503,7 @@ export const api = {
   apiKeys: {
     list: () => request<ApiKey[]>("/keys"),
     // The only response that ever carries the secret — it cannot be re-fetched.
-    create: (body: { name: string; scope: ApiKeyScope }) =>
+    create: (body: CreateApiKey) =>
       request<CreatedApiKey>("/keys", { method: "POST", body: JSON.stringify(body) }),
     revoke: (id: string) => request<{ ok: boolean }>(`/keys/${id}`, { method: "DELETE" }),
   },
@@ -470,24 +520,7 @@ export const api = {
   // ─── Settings ─────────────────────────────────────────────────────────────
   settings: {
     get: () => request<Settings>("/settings"),
-    update: (
-      body: Partial<
-        Pick<
-          Settings,
-          | "currency"
-          | "timeFormat"
-          | "roundMode"
-          | "roundMinutes"
-          | "weekStart"
-          | "showWeekends"
-          | "autoAssignColors"
-          | "digestDaily"
-          | "digestWeekly"
-          | "digestHour"
-          | "digestTimezoneOffsetMinutes"
-        >
-      >
-    ) =>
+    update: (body: UpdateSettings) =>
       request<Settings>("/settings", {
         method: "PATCH",
         body: JSON.stringify(body),
@@ -514,12 +547,12 @@ export const api = {
         method: "POST",
         body: JSON.stringify(body),
       }),
-    update: (id: string, body: Record<string, unknown>) =>
+    update: (id: string, body: UpdateDraft) =>
       request<DraftEntry>(`/drafts/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
     discard: (id: string) => request<{ ok: boolean }>(`/drafts/${id}`, { method: "DELETE" }),
     discardDay: (date: string) =>
       request<{ deleted: number }>(`/drafts?date=${date}`, { method: "DELETE" }),
-    confirm: (body: { ids: string[]; reportedTotalSeconds?: number | null }) =>
+    confirm: (body: ConfirmDrafts) =>
       request<{ confirmed: number; totalSeconds: number }>("/drafts/confirm", {
         method: "POST",
         body: JSON.stringify(body),
@@ -529,22 +562,23 @@ export const api = {
   // ─── Reports ──────────────────────────────────────────────────────────────
   reports: {
     summary: (params: ReportParams & { groupBy?: string }) =>
-      request<unknown>(`/reports/summary?${reportQuery(params)}`),
+      request<ReportSummary>(`/reports/summary?${reportQuery(params)}`),
     grouped: (params: ReportParams & { group?: string; subGroup?: string }) =>
-      request<unknown>(`/reports/grouped?${reportQuery(params)}`),
+      request<GroupedReport>(`/reports/grouped?${reportQuery(params)}`),
     detailed: (params: ReportParams) =>
-      request<unknown[]>(`/reports/detailed?${reportQuery(params)}`),
+      request<ReportDetailedEntry[]>(`/reports/detailed?${reportQuery(params)}`),
     weekly: (params: ReportParams) =>
-      request<unknown[]>(`/reports/weekly?${reportQuery(params)}`),
+      request<ReportWeekly[]>(`/reports/weekly?${reportQuery(params)}`),
   },
 
   // ─── Planner (planned allocations) ────────────────────────────────────────
   planner: {
     list: (params: { since: string; until: string }) =>
-      request<unknown[]>(`/planner?since=${params.since}&until=${params.until}`),
-    upsert: (body: Record<string, unknown>) =>
-      request<unknown>("/planner", { method: "PUT", body: JSON.stringify(body) }),
-    bulkUpsert: (body: { allocations: Record<string, unknown>[] }) =>
+      request<Allocation[]>(`/planner?since=${params.since}&until=${params.until}`),
+    // 204 (no body) when plannedSeconds clears the cell, an Allocation otherwise.
+    upsert: (body: UpsertAllocation) =>
+      request<Allocation | null>("/planner", { method: "PUT", body: JSON.stringify(body) }),
+    bulkUpsert: (body: BulkUpsertAllocations) =>
       request<{ upserted: number; deleted: number }>("/planner/bulk", {
         method: "POST",
         body: JSON.stringify(body),
@@ -553,10 +587,10 @@ export const api = {
 
   // ─── Saved reports ────────────────────────────────────────────────────────
   savedReports: {
-    list: () => request<unknown[]>("/saved-reports"),
-    create: (body: { name: string; config: Record<string, unknown> }) =>
-      request<unknown>("/saved-reports", { method: "POST", body: JSON.stringify(body) }),
+    list: () => request<SavedReport[]>("/saved-reports"),
+    create: (body: CreateSavedReport) =>
+      request<SavedReport>("/saved-reports", { method: "POST", body: JSON.stringify(body) }),
     delete: (id: string) =>
-      request<unknown>(`/saved-reports/${id}`, { method: "DELETE" }),
+      request<{ ok: boolean }>(`/saved-reports/${id}`, { method: "DELETE" }),
   },
 };

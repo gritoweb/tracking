@@ -15,7 +15,7 @@ import {
   useDisconnectCalendar,
   useSetAutoTrack,
 } from "@/hooks/useCalendarSync";
-import type { CalendarProviderStatus } from "@/lib/api";
+import type { CalendarProviderStatus } from "@/lib/api-client";
 
 /**
  * Calendar sync, one section per provider the server supports.

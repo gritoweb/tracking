@@ -13,13 +13,12 @@ import {
   useUpsertAllocation,
   useBulkUpsertAllocations,
 } from "@/hooks/usePlanner";
-import { api } from "@/lib/api";
+import { api } from "@/lib/api-client";
 import { formatDurationShort, formatTimeInput, parseTimeInput } from "@/lib/dateUtils";
 import { cn } from "@/lib/utils";
 import { weekGrid } from "@/lib/weekGridColumns";
 import { AddTimesheetRowDialog } from "@/components/timesheet/AddTimesheetRowDialog";
 import { PlannerImportDialog } from "./PlannerImportDialog";
-import type { Allocation } from "@shared/schemas";
 
 const PLANNER_LOCKED_HELP_ID = "planner-locked-cell-help";
 
@@ -176,10 +175,10 @@ export function PlannerView({ weekStart }: PlannerViewProps) {
     setCopying(true);
     try {
       const prevSince = format(addDays(weekStart, -7), "yyyy-MM-dd");
-      const prev = (await api.planner.list({
+      const prev = await api.planner.list({
         since: prevSince,
         until: sinceDate,
-      })) as Allocation[];
+      });
       if (prev.length === 0) {
         toast.info("No plan to copy from last week");
         return;

@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useTimerStore } from "@/stores/timerStore";
 import { ACTIVITY_EVENTS, recordRemoteActivity } from "@/lib/activitySync";
 import { invalidateEntryDerived } from "@/hooks/useEntries";
-import { CLIENT_ID, api } from "@/lib/api";
+import { CLIENT_ID, api } from "@/lib/api-client";
 import { clearTimerState } from "@/lib/idb";
 import type { TimeEntry } from "@shared/schemas";
 
@@ -62,7 +62,7 @@ export function useWebSocket() {
     async function resync() {
       invalidateEntryDerived(queryClient);
       try {
-        const current = (await api.timeEntries.current()) as TimeEntry | null;
+        const current = await api.timeEntries.current();
         if (destroyed) return;
         reconcileRunning(current);
       } catch {
