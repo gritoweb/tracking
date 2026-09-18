@@ -40,6 +40,7 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-chart-ink-soft: var(--chart-ink-soft);
+  --color-scrim: var(--scrim);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -151,6 +152,16 @@
     fade-up var(--transition-duration-base) var(--ease-out-quart) both,
     row-flash 1.4s var(--ease-out-quart) both;
 
+}
+
+/* DESIGN.md §5's ring half for a control with no border of its own (dialog/sheet close buttons). */
+@utility focus-ring {
+  @apply focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50;
+}
+
+/* Grows the hit box past the visible chip, for a control under the 24px WCAG 2.5.8 floor. */
+@utility hit-area {
+  @apply relative before:absolute before:-inset-1.5 before:content-[''];
 }
 
 @keyframes fade-in {
@@ -314,6 +325,16 @@
      channel a colour-blind reader loses — measured 2.23:1 greyscale in light,
      3.74:1 in dark, with stack position and a legend carrying the rest. */
   --chart-ink-soft: oklch(0.84 0.012 30);
+  /* Replaces dialog/sheet/alert-dialog's hard-coded `bg-black/50`; not redeclared in `.dark` since a scrim dims either theme's page the same way. */
+  --scrim: oklch(0.22 0.006 30 / 50%);
+
+  /* Named for Lote 5 to adopt via `w-(--size-x)`/`max-h-(--size-x)`; only `ui/dialog.tsx`'s `size` variant consumes one so far. */
+  --size-board-column: 17rem; /* TaskCard.tsx's `w-[272px]` — the board column itself is still `w-72` (288px) and should match this. */
+  --size-grid-label: 6.75rem; /* TimesheetView/PlannerView's duplicated `w-[108px]` row-label column. */
+  --size-grid-meta: 7.75rem; /* TimesheetView/PlannerView's duplicated `w-[124px]` row-meta column. */
+  --size-cap-60vh: 60vh; /* DetailedTable's scroll body. */
+  --size-cap-80vh: 80vh; /* TaskSheet's lightbox image. */
+  --size-cap-85vh: 85vh; /* TaskDialog's content; also `ui/dialog.tsx`'s `size="lg"`/`"full"`. */
 }
 
 .dark {

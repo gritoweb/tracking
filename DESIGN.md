@@ -316,6 +316,59 @@ A raw `z-10` / `z-20` / `z-50` fails ESLint. Sonner manages the toast layer itse
 - **Don't** pair an icon-only button's `size="icon"` with an ad-hoc height/width override; use the size token so it matches its labeled siblings.
 - **Don't** visually clone Toggl. Feature parity (calendar view, favorites, auto-track) is a gap-closing strategy — the soft-tone, red-accent identity is this product's own.
 
+## 8b. Component Catalogue
+
+**The rule: screens compose, primitives decide.** Every visual decision — colour, radius, shadow, size, state — lives in a `cva` variant inside `src/react-app/components/ui/`. A screen only arranges primitives with layout classes (`flex`, `grid`, `gap-*`, padding, widths that belong to the layout). Before building anything, look here; a "different button" is almost always a variant or a size the primitive already has. A new variant beats a new component; a new component beats a hand-rolled one.
+
+Variants live in a sibling `*-variants.ts` module so the component file exports only components (that is what keeps fast refresh and the `only-export-components` rule quiet).
+
+### Controls
+| Primitive | Variants | Use it for | Not for |
+|---|---|---|---|
+| `Button` | `variant` (default, destructive, outline, secondary, ghost, link), `size` (default, sm, lg, icon-xs, icon-sm, icon-lg) | every clickable action | a hand-rolled `<button>` with its own classes |
+| `ClearButton` | `size` (xs, sm) | the small ✕ that clears a chip or a field | deleting a record (that is `RemoveButton`) |
+| `RemoveButton` | — (`icon` prop) | the hover-revealed trash on a menu row; always visible on touch | a primary delete action |
+| `AssignButton` | `size` | "empty, click to fill" per the Dashed Rule | anything that is not an empty slot |
+| `Checkbox` | `size` (default, sm), `tone` (default, destructive, warning) | every checkbox, including tri-state select-all (`checked="indeterminate"`) | a `<button role="checkbox">` or a native `accent-*` input |
+| `Switch` | `size` | an on/off preference | a choice between more than two values |
+| `SegmentedControl` / `Tabs` | `Tabs.variant` | choosing a value or a panel (The Segmented Rule) | navigation between routes |
+
+### Fields
+| Primitive | Variants | Use it for |
+|---|---|---|
+| `Input` | `size` (default, sm) | single-line text; pill-shaped |
+| `SearchInput` | composes `Input` | a filter box with the leading search icon |
+| `Textarea` | — | multi-line text; keeps `rounded-xl` on purpose (§5) |
+| `Select` (trigger) | `size` | picking from a closed list |
+| `ColorSwatchPicker` | `size` (sm, md), `columns` | every colour choice — projects, tags, statuses. Selection is an `outline`, never a `ring` (ring means focus); the check ink comes from `getContrastColor` |
+
+### Surfaces and overlays
+| Primitive | Variants | Notes |
+|---|---|---|
+| `Card` | `tone` (default, destructive) | no border, no shadow; `destructive` is a wash, never a red border |
+| `Dialog` | `size` (sm, md, lg, full) | overlay behind it is `bg-scrim` |
+| `Sheet` | `side` | the close button is built in, top-right — do not hand-roll another |
+| `AlertDialog` / `ConfirmDialog` | — | destructive confirmations |
+| `Popover`, `DropdownMenu`, `ContextMenu`, `Tooltip` | — | overlay shadows are the only shadows in the app |
+
+### Data and status
+| Primitive | Variants | Use it for |
+|---|---|---|
+| `Badge` | `variant` | a short status or label |
+| `Avatar` / `AvatarStack` | `size` (xs, sm, md), `ring`; stack has `max` and shows `+N` | people; the stack for assignees |
+| `Progress` | `tone` (default, success, warning, destructive) | budget and estimate bars — the ladder ink → warning at 80% → destructive at 100% (§8) |
+| `Numeric` / `Duration` | `size`, `weight`, `tone` | any number in a list or column (Geist Mono, tabular); `Duration` formats through `lib/dateUtils` |
+| `LegendSwatch` | — | the colour square in chart legends |
+| `ColorDot` | — | a project/tag colour next to its name |
+| `EmptyState`, `Skeleton`, `Spinner`, `Kbd` | — | see §6 and §3 for when each applies |
+
+### Utilities (in `index.css`)
+- `focus-ring` — the house focus ring. Never copy `focus-visible:ring-[3px] …` by hand.
+- `hit-area` — expands the touch target of a small control without changing its layout.
+- `tt-reveal` / `tt-touch` — hover-revealed affordances that stay visible on touch devices.
+- Size tokens `--size-board-column`, `--size-grid-label`, `--size-grid-meta`, `--size-cap-*vh` — widths and caps that screens used to hardcode.
+- `--scrim` — the overlay behind dialogs and sheets.
+
 ## 9. Brand Mark & App Icons
 
 The brand mark is a **circled analog clock reading ~10:10** (the classic "watch ad" angle): a brand-red circle, a white ring at 90% opacity, two rounded white hands, and a center dot. It is the one place the brand red appears as a fill.

@@ -1,5 +1,6 @@
 import type { EventInput } from "@fullcalendar/core";
 import type { TimeEntry, DraftEntry } from "@shared/schemas";
+import { NEUTRAL_SWATCH } from "@shared/colors";
 import { DEFAULT_PROJECT_COLOR } from "@/components/ColorDot";
 import { hexToRgba } from "@/lib/colorUtils";
 
@@ -25,7 +26,7 @@ export interface CalendarEventExtendedProps {
   draft?: DraftEntry;
 }
 
-const GHOST_COLOR = "#94a3b8"; // slate-400 — muted, project-agnostic
+const GHOST_COLOR = NEUTRAL_SWATCH;
 
 /**
  * Map a drafted entry to a proposal block.

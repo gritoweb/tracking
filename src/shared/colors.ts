@@ -56,6 +56,9 @@ export const DISTINCT_COLORS = [
 
 export const PALETTE = new Set<string>(DISTINCT_COLORS);
 
+/** The one "no colour assigned" fallback — ghost calendar blocks, ownerless projects/tags. Not in the picker grid. */
+export const NEUTRAL_SWATCH = "#94a3b8";
+
 /** Nth colour of the distinct order, cycling. */
 export function spreadColor(index: number): string {
   const size = DISTINCT_COLORS.length;

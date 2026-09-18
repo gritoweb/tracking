@@ -1,19 +1,18 @@
 import * as React from "react"
+import type { VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
+import { cardVariants } from "@/components/ui/card-variants"
 
-function Card({ className, ...props }: React.ComponentProps<"div">) {
+function Card({
+  className,
+  tone,
+  ...props
+}: React.ComponentProps<"div"> & VariantProps<typeof cardVariants>) {
   return (
     <div
       data-slot="card"
-      className={cn(
-        // No border and no shadow: the card is separated from the page by tone
-        // alone (DESIGN.md §4). --card sits a measured step off --background in
-        // both themes, so a hairline on top of that is a second, redundant
-        // signal — and thirty of them on a Settings page is most of its noise.
-        "flex flex-col gap-6 rounded-container bg-card py-6 text-card-foreground",
-        className
-      )}
+      className={cn(cardVariants({ tone }), className)}
       {...props}
     />
   )

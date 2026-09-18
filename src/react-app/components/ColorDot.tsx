@@ -1,7 +1,8 @@
+import { NEUTRAL_SWATCH } from "@shared/colors";
 import { cn } from "@/lib/utils";
 
 /** Fallback swatch color for entities without an assigned color. */
-export const DEFAULT_PROJECT_COLOR = "#94a3b8";
+export const DEFAULT_PROJECT_COLOR = NEUTRAL_SWATCH;
 
 interface ColorDotProps {
   color?: string | null;

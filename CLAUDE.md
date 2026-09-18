@@ -120,6 +120,8 @@ Multi-tenant: every row is scoped to a `workspace_id`. Better Auth tables use ca
 
 ### Design system
 
+**Before creating a component, look in `src/react-app/components/ui/` and the catalogue in DESIGN.md §8b.** Screens compose primitives and use only layout classes; a new look is a new `cva` variant in the primitive (variants live in a sibling `*-variants.ts`), never a class string repeated in a screen. Unit tests for components run under `// @vitest-environment jsdom`, with Testing Library cleanup and the `jest-dom` matchers registered once in `src/test/setup-dom.ts` — never per file.
+
 Tailwind v4 (OKLCH tokens in `index.css`) + shadcn/ui on the **v4 CLI** (`components.json` is `style: radix-maia`, `baseColor: neutral`, plus the v4-only `rtl` / `menuColor` / `menuAccent` / `registries` keys). `index.css` imports `shadcn/tailwind.css`, which supplies the `data-open` / `data-closed` / `data-checked` / `data-active` / `data-horizontal` / `data-vertical` custom variants that v4 components are written against, so `pnpm dlx shadcn@latest add <component>` now emits code that compiles here. Four conventions worth knowing before touching UI:
 
 - **Icon buttons use the `Button` size tokens** (`icon-xs` = 24px, `icon-sm` = 32px, `icon-lg` = 40px), never `size="icon"` with an ad-hoc `h-N w-N` override — the two drift out of sync with labeled buttons of the equivalent `size="sm"`/`"lg"`. Prefer icon-only actions (with `aria-label` + `title`) over icon+label buttons in dense toolbars (Reports header, Timer header) to cut visual noise; keep the label when the button conveys current state (date range, rounding mode).
