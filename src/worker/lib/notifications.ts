@@ -1,6 +1,7 @@
 import type { Notification } from "@shared/schemas";
 import type { NotificationRow } from "../db/rows";
 import { currentMemberIds } from "./permissions";
+import { taskPath } from "@shared/task-links";
 import { sqliteUtcToIso } from "./sqlite-time";
 
 export function formatNotification(row: NotificationRow): Notification {
@@ -121,7 +122,7 @@ export async function notifyNewAssignees(
         type: "task_assigned",
         title: `${actorName} assigned you "${taskName}"`,
         body: "You're now responsible for this task",
-        link: `/tasks/${taskId}`,
+        link: taskPath(taskId),
       })
     )
   );
@@ -152,7 +153,7 @@ export async function notifyAssigneesOfStatusChange(
         type: "task_status_changed",
         title: `${actorName} moved "${taskName}"`,
         body: `Now in ${statusName}`,
-        link: `/tasks/${taskId}`,
+        link: taskPath(taskId),
       })
     )
   );

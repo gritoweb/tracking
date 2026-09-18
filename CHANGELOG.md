@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-18 (12)
+### Added
+- **Every task state has a link.** `/tasks/:id` opens the task tab and `/tasks/:id/comments` the comments tab; switching tabs, opening a card or a subtask, and closing the sheet all change the URL (`tasks/:id?/:tab?`, helpers in `shared/task-links.ts`, used by both sides). The sheet is now driven by the URL instead of local state, so a copied link reopens exactly there. A link to a task that doesn't exist or isn't visible lands on `/tasks` with a toast. A mention notification now opens the comments tab; assignment and status notifications open the task tab.
+
+Verified in a real browser (Playwright against the dev server): open `/comments` directly → Comments tab; tab clicks rewrite the URL both ways; a subtask link and its comments tab; unknown id → `/tasks` + toast; clicking a card → `/tasks/:id`; closing → `/tasks`. `tsc -b` 0, eslint 0, unit test for the link helpers.
+
 ## 2026-09-18 (11)
 ### Fixed
 - **The Assistant logs the time the person asked for.** "Start at 10" was saved as 07:00: the chat prompt told the model to send UTC and it sent `10:00Z`, which the app shows as 07:00 in UTC-3. The prompt now gives the person's offset (`isoOffset`) and asks for local time *with* it (`2026-09-18T10:00:00-03:00`), which the tool already accepted. Also: "say X on that task" means a comment (glm had overwritten a task's description), and optional fields the person didn't mention (`billable`) are no longer invented.

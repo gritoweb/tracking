@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { CollectionHeader } from "@/components/layout/CollectionHeader";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -27,16 +28,18 @@ import {
   type TaskSection,
 } from "@/lib/taskUtils";
 import { todayLocalDate } from "@shared/task-recurrence";
+import { taskPath, type TaskTab } from "@shared/task-links";
 import type { Task } from "@shared/schemas";
 
 type Layout = "board" | "list";
 
 interface TaskBoardListProps {
-  /** From the `/tasks/:id` route — opens that task's detail sheet on mount (D5). */
+  /** From the `/tasks/:id` route: the URL is what opens a task's detail sheet, so every state has a link. */
   openTaskId?: string | null;
+  openTab?: TaskTab;
 }
 
-export function TaskBoardList({ openTaskId = null }: TaskBoardListProps) {
+export function TaskBoardList({ openTaskId = null, openTab = "task" }: TaskBoardListProps) {
   const { data: tasks = [], isLoading } = useAllTasks();
   const deleteTask = useDeleteTask();
   const updateTask = useUpdateTask();
@@ -57,8 +60,6 @@ export function TaskBoardList({ openTaskId = null }: TaskBoardListProps) {
   const [boardGroupBy, setBoardGroupBy] = useState<GroupBy>("none");
   const [sortBy, setSortBy] = useState<SortBy>("plan");
   const [addOpen, setAddOpen] = useState(false);
-  const [editTarget, setEditTarget] = useState<Task | null>(null);
-  const [syncedOpenTaskId, setSyncedOpenTaskId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Task | null>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [subtaskParent, setSubtaskParent] = useState<string | null>(null);
@@ -83,16 +84,15 @@ export function TaskBoardList({ openTaskId = null }: TaskBoardListProps) {
   // A client has no status fork of its own — falls back to the workspace's global set.
   const { data: statuses = [] } = useTaskStatuses(railClientId ? null : railProjectId);
 
-  // Adjusted during render, not an effect: the `/tasks/:id` route needs the sheet open on the
-  // very first paint the matching task is available, same idiom TaskDialog/TaskSheet use to
-  // reseed on a prop change.
-  if (openTaskId && openTaskId !== syncedOpenTaskId) {
-    const match = tasks.find((t) => t.id === openTaskId);
-    if (match) {
-      setSyncedOpenTaskId(openTaskId);
-      setEditTarget(match);
-    }
-  }
+  const openTask = openTaskId ? tasks.find((t) => t.id === openTaskId) ?? null : null;
+  const openTaskNotFound = !!openTaskId && !isLoading && !openTask;
+  // A shared link to a task this person can't see (or that is gone) lands on the plain list, with the reason.
+  useEffect(() => {
+    if (!openTaskNotFound) return;
+    toast.error("That task doesn't exist or you don't have access to it");
+    navigate("/tasks", { replace: true });
+  }, [openTaskNotFound, navigate]);
+  const openSheet = (task: Task) => navigate(taskPath(task.id));
 
   const today = todayLocalDate();
   const hasAnyTask = tasks.length > 0;
@@ -227,7 +227,7 @@ export function TaskBoardList({ openTaskId = null }: TaskBoardListProps) {
               status={status}
               sortBy={sortBy}
               groupBy={boardGroupBy}
-              onOpenTask={setEditTarget}
+              onOpenTask={openSheet}
             />
           ) : (
             <TaskListView
@@ -248,7 +248,7 @@ export function TaskBoardList({ openTaskId = null }: TaskBoardListProps) {
               onOpenSubtaskAdd={openSubtaskAdd}
               onCloseSubtaskAdd={() => setSubtaskParent(null)}
               onRequestDelete={setDeleteTarget}
-              onEdit={setEditTarget}
+              onEdit={openSheet}
               onLogTime={(t) => openTaskLogTime(t.id)}
               onCreateTask={() => setAddOpen(true)}
               onClearFilters={clearFilters}
@@ -264,13 +264,11 @@ export function TaskBoardList({ openTaskId = null }: TaskBoardListProps) {
       />
 
       <TaskSheet
-        open={!!editTarget}
-        // Reads the live row, not the click's snapshot — otherwise a save never visually reflects back into the sheet.
-        task={editTarget && (tasks.find((t) => t.id === editTarget.id) ?? editTarget)}
-        onClose={() => {
-          setEditTarget(null);
-          if (openTaskId) navigate("/tasks");
-        }}
+        open={!!openTask}
+        task={openTask}
+        tab={openTab}
+        onTabChange={(tab) => openTask && navigate(taskPath(openTask.id, tab))}
+        onClose={() => navigate("/tasks")}
         onRequestDelete={setDeleteTarget}
       />
 

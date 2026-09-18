@@ -1,3 +1,4 @@
+import { taskPath, type TaskTab } from "@shared/task-links";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -38,6 +39,9 @@ interface TaskSheetProps {
   open: boolean;
   onClose: () => void;
   task: Task | null;
+  /** The active tab lives in the URL, so a copied link reopens on the same one. */
+  tab: TaskTab;
+  onTabChange: (tab: TaskTab) => void;
   onRequestDelete: (task: Task) => void;
 }
 
@@ -108,7 +112,7 @@ function DescriptionField({
  *
  * Controller: owns hooks/mutations/state; TaskSheetHeader/Properties/Subtasks/Attachments are pure views.
  */
-export function TaskSheet({ open, onClose, task, onRequestDelete }: TaskSheetProps) {
+export function TaskSheet({ open, onClose, task, tab, onTabChange, onRequestDelete }: TaskSheetProps) {
   const navigate = useNavigate();
   const updateTask = useUpdateTask();
   const completeTask = useCompleteTask();
@@ -123,7 +127,6 @@ export function TaskSheet({ open, onClose, task, onRequestDelete }: TaskSheetPro
 
   const [name, setName] = useState("");
   const [estimate, setEstimate] = useState("");
-  const [tab, setTab] = useState("task");
   const [dueOpen, setDueOpen] = useState(false);
   const [lightbox, setLightbox] = useState<TaskAttachment | null>(null);
 
@@ -133,7 +136,6 @@ export function TaskSheet({ open, onClose, task, onRequestDelete }: TaskSheetPro
     syncedId.current = task.id;
     setName(task.name);
     setEstimate(formatTimeInput(task.estimatedSeconds));
-    setTab("task");
   }, [task]);
 
   if (!task) return null;
@@ -195,7 +197,7 @@ export function TaskSheet({ open, onClose, task, onRequestDelete }: TaskSheetPro
     <>
       <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
         <SheetContent className="flex w-full flex-col gap-0 rounded-l-none p-0 sm:max-w-lg sm:rounded-l-container">
-          <Tabs value={tab} onValueChange={setTab} className="min-h-0 flex-1">
+          <Tabs value={tab} onValueChange={(v) => onTabChange(v as TaskTab)} className="min-h-0 flex-1">
             <TaskSheetHeader
               task={task}
               name={name}
@@ -250,7 +252,7 @@ export function TaskSheet({ open, onClose, task, onRequestDelete }: TaskSheetPro
                   task={task}
                   subtasks={subtasks}
                   onToggle={completeTask}
-                  onOpen={(id) => navigate(`/tasks/${id}`)}
+                  onOpen={(id) => navigate(taskPath(id))}
                   onRequestDelete={onRequestDelete}
                 />
               )}

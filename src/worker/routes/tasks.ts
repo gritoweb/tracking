@@ -11,6 +11,7 @@ import {
   UpdateTaskSchema,
 } from "@shared/schemas";
 import { nextOccurrence, normalizeRecurRule } from "@shared/task-recurrence";
+import { taskPath } from "@shared/task-links";
 import { sqliteUtcToIso, sqliteUtcToIsoOrNull } from "../lib/sqlite-time";
 import { broadcast, requestOrigin } from "../db/queries";
 import type { TaskAttachmentRow, TaskChildRow, TaskCommentRow, TaskJoinRow, TaskRow } from "../db/rows";
@@ -816,7 +817,7 @@ export const tasksRouter = new Hono<{
           type: "task_mention",
           title: `${author} mentioned you`,
           body: `${task.name}: ${body}`,
-          link: `/tasks/${taskId}`,
+          link: taskPath(taskId, "comments"),
         })
       );
     }

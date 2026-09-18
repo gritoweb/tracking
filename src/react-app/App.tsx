@@ -79,8 +79,7 @@ const router = createBrowserRouter([
           // Calendar folded into the Timer tab's view switcher — keep the old URL working.
           { path: "calendar", element: <Navigate to="/" replace /> },
           { path: "projects", element: <ProjectsPage /> },
-          { path: "tasks", element: <TasksPage /> },
-          { path: "tasks/:id", element: <TasksPage /> },
+          { path: "tasks/:id?/:tab?", element: <TasksPage /> },
           { path: "clients", element: <ClientsPage /> },
           { path: "clients/:id", element: <ClientDetailPage /> },
           { path: "reports", element: <ReportsPage /> },
