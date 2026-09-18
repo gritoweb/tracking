@@ -11,6 +11,7 @@ import {
   UpdateTaskSchema,
 } from "@shared/schemas";
 import { nextOccurrence, normalizeRecurRule } from "@shared/task-recurrence";
+import { sqliteUtcToIso, sqliteUtcToIsoOrNull } from "../lib/sqlite-time";
 import { broadcast, requestOrigin } from "../db/queries";
 import type { TaskAttachmentRow, TaskChildRow, TaskCommentRow, TaskJoinRow, TaskRow } from "../db/rows";
 import { parseJsonColumn } from "../lib/json";
@@ -73,8 +74,8 @@ function formatComment(row: TaskCommentRow): TaskComment {
     attachmentId,
     attachmentUrl: attachmentId ? `/api/attachments/${attachmentId}` : null,
     attachmentFilename: row.attachment_filename ?? null,
-    createdAt: row.created_at,
-    editedAt: row.edited_at ?? null,
+    createdAt: sqliteUtcToIso(row.created_at),
+    editedAt: sqliteUtcToIsoOrNull(row.edited_at),
   };
 }
 

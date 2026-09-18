@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-18 (10)
+### Fixed
+- **Comments and notifications no longer read as "in about 3 hours".** SQLite's `datetime('now')` is UTC with no zone marker, and the browser parsed the bare string as local time, so anyone west of UTC saw comment and notification times in the future. `lib/sqlite-time.ts` marks them UTC (`...Z`) at the API boundary for task comments (`createdAt`, `editedAt`) and notifications. Other `created_at` fields in the API have the same shape but are not shown as a time on any screen, so they are untouched.
+
+Verified: `POST /api/tasks/:id/comments` returned `createdAt: "2026-09-18 17:47:12"` against `now: 2026-09-18T17:47:12.992Z` (proves the missing marker); new unit test on the converter.
+
 ## 2026-09-18 (9)
 ### Fixed
 - **Posting a task comment no longer freezes.** The composer waited for the POST, then for a second round trip (`invalidate` → refetch) before the comment appeared, which on the remote D1 read as a hang. The comment is now inserted into the cache the instant it is sent and the box clears at once; a failure removes it, puts the text back and toasts. The row shows no edit/delete until the server confirms it.

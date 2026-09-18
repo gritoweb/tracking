@@ -1,6 +1,7 @@
 import type { Notification } from "@shared/schemas";
 import type { NotificationRow } from "../db/rows";
 import { currentMemberIds } from "./permissions";
+import { sqliteUtcToIso } from "./sqlite-time";
 
 export function formatNotification(row: NotificationRow): Notification {
   return {
@@ -10,7 +11,7 @@ export function formatNotification(row: NotificationRow): Notification {
     body: row.body,
     link: row.link ?? null,
     isRead: Boolean(row.is_read),
-    createdAt: row.created_at,
+    createdAt: sqliteUtcToIso(row.created_at),
   };
 }
 
