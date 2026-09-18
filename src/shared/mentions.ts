@@ -74,3 +74,29 @@ export function taggedPeople(body: string, people: MentionPerson[]): MentionPers
     return person ? [{ userId: person.userId, name: person.name }] : [];
   });
 }
+
+interface DocNode {
+  type?: string;
+  attrs?: { id?: unknown; label?: unknown };
+  content?: DocNode[];
+}
+
+/** Every person tagged in a description (a tiptap JSON doc; legacy plain text has none), in order, once each. */
+export function docMentions(raw: string | null | undefined): { userId: string; label: string }[] {
+  if (!raw) return [];
+  let doc: DocNode;
+  try {
+    doc = JSON.parse(raw) as DocNode;
+  } catch {
+    return [];
+  }
+  const found = new Map<string, string>();
+  const walk = (node: DocNode) => {
+    if (node.type === "mention" && typeof node.attrs?.id === "string" && !found.has(node.attrs.id)) {
+      found.set(node.attrs.id, typeof node.attrs.label === "string" ? node.attrs.label : node.attrs.id);
+    }
+    node.content?.forEach(walk);
+  };
+  walk(doc);
+  return [...found].map(([userId, label]) => ({ userId, label }));
+}

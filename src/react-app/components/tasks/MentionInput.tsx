@@ -1,14 +1,11 @@
 import { useMemo, useRef, useState } from "react";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
-import { UserAvatar } from "@/components/layout/UserAvatar";
-import { cn } from "@/lib/utils";
+import { MentionOptions } from "./MentionOptions";
+import { filterMembers } from "@/lib/mentionSearch";
 import type { WorkspaceMember } from "@/hooks/useWorkspaceRole";
 
-const MAX_SUGGESTIONS = 6;
 const TRIGGER = /(^|\s)@([^\s@]*)$/;
-
-const fold = (text: string) => text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
 
 interface Trigger {
   start: number;
@@ -29,14 +26,7 @@ export function MentionInput({ value, onValueChange, members, onPick, onKeyDown,
   const [trigger, setTrigger] = useState<Trigger | null>(null);
   const [active, setActive] = useState(0);
 
-  const matches = useMemo(() => {
-    if (!trigger) return [];
-    const q = fold(trigger.query);
-    const seen = new Set<string>();
-    return members
-      .filter((m) => (fold(m.name).includes(q) || fold(m.email).includes(q)) && !seen.has(m.userId) && seen.add(m.userId))
-      .slice(0, MAX_SUGGESTIONS);
-  }, [members, trigger]);
+  const matches = useMemo(() => (trigger ? filterMembers(members, trigger.query) : []), [members, trigger]);
   const open = trigger !== null && matches.length > 0;
 
   const readTrigger = (text: string, caret: number) => {
@@ -111,27 +101,7 @@ export function MentionInput({ value, onValueChange, members, onPick, onKeyDown,
         onOpenAutoFocus={(e) => e.preventDefault()}
         onCloseAutoFocus={(e) => e.preventDefault()}
       >
-        <ul role="listbox" aria-label="People to mention">
-          {matches.map((member, i) => (
-            <li key={member.userId} role="option" aria-selected={i === active}>
-              <button
-                type="button"
-                // mousedown, not click: the field must keep focus (and its caret) while a person is picked.
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  pick(member);
-                }}
-                className={cn(
-                  "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm",
-                  i === active ? "bg-accent text-accent-foreground" : "hover:bg-accent/60"
-                )}
-              >
-                <UserAvatar name={member.name} email={member.email} image={member.image} className="h-6 w-6" />
-                <span className="min-w-0 flex-1 truncate">{member.name}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
+        <MentionOptions items={matches} active={active} onPick={pick} />
       </PopoverContent>
     </Popover>
   );

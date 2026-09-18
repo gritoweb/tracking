@@ -492,6 +492,15 @@
   font-size: var(--text-xl);
   font-weight: 600;
 }
+/* A tagged person: the same chip the comments draw. */
+.tt-richtext .tt-mention {
+  border-radius: var(--radius-sm);
+  background-color: color-mix(in oklab, var(--primary) 10%, transparent);
+  padding: 0 0.25rem;
+  color: var(--primary-ink);
+  font-weight: 500;
+  cursor: pointer;
+}
 .tt-richtext h2:first-child {
   margin-top: 0;
 }

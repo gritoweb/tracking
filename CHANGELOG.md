@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-18 (23)
+### Added
+- **@ works in the task description and in the task name.** In the description (the TipTap editor) `@` opens the team beside the caret; picking one writes a chip (a `mention` node saved with the person's id) that stays after a reload and opens the person's profile when clicked. Saving the description notifies only people **newly** tagged (not the ones already there, not the author), with a link to the task; a mention also reads as `@Name` in the board card preview and in the MCP's plain-text description. In the task name, `@` lists the team and writes the picked name as **plain text**: a name has no tags, chips or notifications, because it is shown in cards, reports and exports. The list, the search and the profile card are shared with the comments (`MentionOptions`, `filterMembers`, `MemberProfile`). New dependencies: `@tiptap/extension-mention` and `@tiptap/suggestion` (3.31.3, same as the rest of tiptap).
+
+Verified in a real browser: `@gra` in the description listed the person, Enter wrote the chip, blur saved a `mention` node with the id, after a reload the chip was still there and a click opened the profile; in the name `@gra` + Enter wrote `... com @Grader Member` and the next Enter saved it. Route tests for who is notified from a description (new tag, already tagged, author, none), unit tests for `docMentions` and `filterMembers`. `tsc -b` 0, `pnpm lint` 0, vitest 559/559, `pnpm build` ok.
+
 ## 2026-09-18 (22)
 ### Fixed
 - **The task panel's title renders at the size the styleguide gives it.** DESIGN.md §3 defines the task sheet's title as Display (40px), but it measured **14px** on desktop. Two causes: the title was an `Input` whose base carries `md:text-sm`, and `tailwind-merge` did not know `text-display` is a font size (it read it as a colour, exactly the trap `text-micro` had), so neither `text-base` nor `md:text-sm` was ever dropped. `cn` now knows `display`; `Textarea` gains a `title` variant (bare, wraps, display step on every breakpoint) and the panel title uses it, so a long name wraps instead of clipping and Enter confirms. The description's own `h2` was 14px, *smaller* than its 18px paragraph; it is now the Title step (20px). The sheet is `max-w-xl` (576px) so a 40px title has room.

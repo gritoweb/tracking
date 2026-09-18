@@ -27,6 +27,7 @@ import { useTimer } from "@/hooks/useTimer";
 import { useTimerStore } from "@/stores/timerStore";
 import { parseTimeInput, formatTimeInput } from "@/lib/dateUtils";
 import { parseDescription, serializeDescription } from "@/lib/richText";
+import type { WorkspaceMember } from "@/hooks/useWorkspaceRole";
 import type { Task, TaskAttachment } from "@shared/schemas";
 import type { JSONContent } from "@tiptap/react";
 
@@ -54,8 +55,10 @@ function DescriptionField({
   onSave,
   onUploadImage,
   onDeleteImage,
+  members,
 }: {
   task: Task;
+  members: WorkspaceMember[];
   onSave: (doc: JSONContent) => void;
   onUploadImage: (file: File) => Promise<{ url: string; id: string }>;
   onDeleteImage: (id: string) => void;
@@ -86,6 +89,7 @@ function DescriptionField({
           onBlur={onSave}
           onUploadImage={onUploadImage}
           onDeleteImage={onDeleteImage}
+          members={members}
           placeholder="Context, links, acceptance criteria — anything that isn't the name."
         />
       </div>
@@ -204,6 +208,7 @@ export function TaskSheet({ open, onClose, task, tab, onTabChange, onRequestDele
               onNameChange={setName}
               onSaveName={saveName}
               commentsCount={comments.length}
+              members={members}
               onDeleteTask={() => {
                 onRequestDelete(task);
                 onClose();
@@ -244,6 +249,7 @@ export function TaskSheet({ open, onClose, task, tab, onTabChange, onRequestDele
                   onSave={saveDescription}
                   onUploadImage={uploadImage}
                   onDeleteImage={deleteOrphanedImage}
+                  members={members}
                 />
               </div>
 

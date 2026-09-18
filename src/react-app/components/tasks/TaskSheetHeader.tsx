@@ -1,9 +1,10 @@
 import { ClipboardList, MessageCircle, MoreHorizontal, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import { MentionInput } from "./MentionInput";
 import { SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import type { WorkspaceMember } from "@/hooks/useWorkspaceRole";
 import type { Task } from "@shared/schemas";
 
 interface TaskSheetHeaderProps {
@@ -12,11 +13,13 @@ interface TaskSheetHeaderProps {
   onNameChange: (value: string) => void;
   onSaveName: () => void;
   commentsCount: number;
+  /** "@" in the name lists these; the picked name is written into the text (a name has no tags or notifications). */
+  members: WorkspaceMember[];
   onDeleteTask: () => void;
 }
 
 /** Top action bar + tab switcher + editable title — pure view, rendered inside the sheet's own `<Tabs>`. */
-export function TaskSheetHeader({ task, name, onNameChange, onSaveName, commentsCount, onDeleteTask }: TaskSheetHeaderProps) {
+export function TaskSheetHeader({ task, name, onNameChange, onSaveName, commentsCount, members, onDeleteTask }: TaskSheetHeaderProps) {
   return (
     <>
       {/* The border is what separates this chrome strip from the tabs below it. Actions on
@@ -62,11 +65,12 @@ export function TaskSheetHeader({ task, name, onNameChange, onSaveName, comments
           both tabs, since "whose comments am I reading" matters there too. */}
       <SheetHeader className="px-6 pb-2 pt-3">
         <SheetTitle className="sr-only">{task.name}</SheetTitle>
-        <Textarea
+        <MentionInput
           variant="title"
+          members={members}
           rows={1}
           value={name}
-          onChange={(e) => onNameChange(e.target.value)}
+          onValueChange={onNameChange}
           onBlur={onSaveName}
           onKeyDown={(e) => {
             // A name is one line that wraps: Enter confirms instead of adding a break.

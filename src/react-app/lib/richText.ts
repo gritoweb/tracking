@@ -37,6 +37,7 @@ export function descriptionToPlainText(raw: string | null): string {
   const parts: string[] = [];
   const walk = (node: JSONContent) => {
     if (node.type === "text" && node.text) parts.push(node.text);
+    if (node.type === "mention") parts.push(`@${String(node.attrs?.label ?? node.attrs?.id ?? "")}`);
     node.content?.forEach(walk);
   };
   walk(doc);
