@@ -7,6 +7,8 @@ export const textareaVariants = cva(
     variants: {
       variant: {
         default: "",
+        // Sits on a surface that is already the frame (a composer under a divider): no box of its own.
+        bare: "min-h-0 rounded-none border-0 bg-transparent px-0 py-0 shadow-none focus-visible:border-0 focus-visible:ring-0 dark:bg-transparent",
         // A panel's own name (DESIGN.md §3 Display): a bare field that wraps, at the display step on every breakpoint.
         title:
           "min-h-0 resize-none rounded-none border-0 bg-transparent px-0 py-0 text-display font-semibold shadow-none focus-visible:border-0 focus-visible:ring-0 md:text-display dark:bg-transparent",

@@ -24,4 +24,9 @@ describe("Textarea", () => {
     expect(el).not.toHaveClass("text-base")
     expect(el).not.toHaveClass("md:text-sm")
   })
+
+  it("bare variant drops the box: no border, no fill, no ring", () => {
+    render(<Textarea aria-label="Comment" variant="bare" />)
+    expect(screen.getByRole("textbox")).toHaveClass("border-0", "bg-transparent", "rounded-none", "focus-visible:ring-0")
+  })
 })

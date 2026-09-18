@@ -18,7 +18,6 @@ import {
 import { useUploadTaskAttachment } from "@/hooks/useTasks";
 import { ACCEPTED_TYPES, MAX_ATTACHMENT_BYTES, imageFile } from "@/lib/taskCommentAttachments";
 import { useAuth } from "@/hooks/useAuth";
-import { cn } from "@/lib/utils";
 import { encodeMentions, type MentionPerson } from "@shared/mentions";
 import type { WorkspaceMember } from "@/hooks/useWorkspaceRole";
 import type { TaskComment } from "@shared/schemas";
@@ -109,8 +108,10 @@ export function TaskComments({ taskId, members }: { taskId: string; members: Wor
         </div>
       )}
 
-      <div className={cn("space-y-1.5 rounded-md border p-2", feed.length === 0 && "border-dashed")}>
+      {/* A divider, not a box: the field and its button sit on the panel itself. */}
+      <div className="space-y-1.5 border-t pt-3">
         <MentionInput
+          variant="bare"
           value={body}
           onValueChange={setBody}
           members={members}
