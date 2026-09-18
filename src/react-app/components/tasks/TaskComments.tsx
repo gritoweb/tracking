@@ -18,7 +18,6 @@ import {
 import { useUploadTaskAttachment } from "@/hooks/useTasks";
 import { ACCEPTED_TYPES, MAX_ATTACHMENT_BYTES, imageFile } from "@/lib/taskCommentAttachments";
 import { useAuth } from "@/hooks/useAuth";
-import { cn } from "@/lib/utils";
 import { encodeMentions, type MentionPerson } from "@shared/mentions";
 import type { WorkspaceMember } from "@/hooks/useWorkspaceRole";
 import type { TaskComment } from "@shared/schemas";
@@ -84,55 +83,54 @@ export function TaskComments({ taskId, members }: { taskId: string; members: Wor
 
   return (
     <div className="space-y-2">
-      {feed.length > 0 && (
-        <div className="divide-y rounded-md border">
-          {feed.map((item) =>
-            "comment" in item ? (
-              <CommentRow
-                key={item.comment.id}
-                comment={item.comment}
-                taskId={taskId}
-                members={members}
-                isAuthor={item.comment.userId === user?.id && !item.comment.id.startsWith(PENDING_COMMENT_PREFIX)}
-                onDelete={() => setPendingDelete(item.comment)}
-                onSave={(nextBody, nextAttachmentId) =>
-                  updateComment.mutate({
-                    id: item.comment.id,
-                    data: { body: nextBody, attachmentId: nextAttachmentId },
-                  })
-                }
-              />
-            ) : (
-              <TaskActivityRow key={item.entry.id} activity={item.entry} />
-            )
-          )}
-        </div>
-      )}
+      {/* One frame for the conversation: the messages, then the field on the same surface behind a divider. */}
+      <div className="divide-y rounded-md border">
+        {feed.map((item) =>
+          "comment" in item ? (
+            <CommentRow
+              key={item.comment.id}
+              comment={item.comment}
+              taskId={taskId}
+              members={members}
+              isAuthor={item.comment.userId === user?.id && !item.comment.id.startsWith(PENDING_COMMENT_PREFIX)}
+              onDelete={() => setPendingDelete(item.comment)}
+              onSave={(nextBody, nextAttachmentId) =>
+                updateComment.mutate({
+                  id: item.comment.id,
+                  data: { body: nextBody, attachmentId: nextAttachmentId },
+                })
+              }
+            />
+          ) : (
+            <TaskActivityRow key={item.entry.id} activity={item.entry} />
+          )
+        )}
 
-      <div className={cn("space-y-1.5 rounded-md border p-2", feed.length === 0 && "border-dashed")}>
-        <MentionInput
-          value={body}
-          onValueChange={setBody}
-          members={members}
-          onPick={(member) => setPicked((list) => [...list, { userId: member.userId, name: member.name }])}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) submit();
-          }}
-          onPaste={(e) => attach(imageFile(e.clipboardData?.items))}
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={(e) => {
-            e.preventDefault();
-            attach(imageFile(e.dataTransfer?.files));
-          }}
-          placeholder="Write a comment… @ to mention someone, paste or drop an image to attach it"
-          rows={2}
-        />
-        {attachment && <AttachmentPreview url={attachment.url} onRemove={() => setAttachment(null)} />}
-        <div className="flex items-center justify-end">
-          <Button size="sm" className="gap-1.5" disabled={!body.trim()} onClick={submit}>
-            <Send className="h-3.5 w-3.5" />
-            Comment
-          </Button>
+        <div className="space-y-1.5 px-3 py-2.5">
+          <MentionInput
+            variant="bare"
+            value={body}
+            onValueChange={setBody}
+            members={members}
+            onPick={(member) => setPicked((list) => [...list, { userId: member.userId, name: member.name }])}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) submit();
+            }}
+            onPaste={(e) => attach(imageFile(e.clipboardData?.items))}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => {
+              e.preventDefault();
+              attach(imageFile(e.dataTransfer?.files));
+            }}
+            placeholder="Write a comment… @ to mention someone, paste or drop an image to attach it"
+          />
+          {attachment && <AttachmentPreview url={attachment.url} onRemove={() => setAttachment(null)} />}
+          <div className="flex items-center justify-end">
+            <Button size="sm" className="gap-1.5" disabled={!body.trim()} onClick={submit}>
+              <Send className="h-3.5 w-3.5" />
+              Comment
+            </Button>
+          </div>
         </div>
       </div>
 

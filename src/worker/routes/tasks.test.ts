@@ -166,3 +166,75 @@ describe("POST /:id/comments — mentions written in the text", () => {
     expect(String(inserts[0].params[5]).split(",").sort()).toEqual(["u-ana", "u-bo"]);
   });
 });
+
+describe("PUT /:id — people tagged in the description", () => {
+  const taskRow = (description: string | null) => ({
+    id: "task-1", workspace_id: "workspace-A", project_id: "project-1", name: "Write report", description,
+    active: 1, status_id: "s1", due_date: null, priority: 4, parent_id: null, recur_rule: null,
+    estimated_seconds: null, completed_at: null, subtask_total: 0,
+  });
+  const joinRow = {
+    ...taskRow(null), project_name: "Acme", project_color: "#000000", status_name: "To do", status_color: "#3b82f6",
+    status_category: "not_started", tracked_seconds: 0, sort_order: 1, board_order: 1, subtask_done: 0,
+    created_at: "2026-01-01T00:00:00.000Z", assignees_json: "[]",
+  };
+  const doc = (...ids: string[]) =>
+    JSON.stringify({ type: "doc", content: [{ type: "paragraph", content: ids.map((id) => ({ type: "mention", attrs: { id, label: id } })) }] });
+
+  function put(before: string | null, after: string) {
+    const notified: unknown[][] = [];
+    const pending: Promise<unknown>[] = [];
+    const { app, env } = mountedApp({
+      first: (call) => {
+        if (call.sql.includes("SELECT * FROM tasks WHERE id")) return taskRow(before);
+        if (call.sql.includes('FROM "member"') && call.sql.includes("role")) return { role: "owner" };
+        if (call.sql.includes('FROM "user"')) return { name: "Author", email: "a@x.test" };
+        return null;
+      },
+      all: (call) => {
+        if (call.sql.includes('DISTINCT userId FROM "member"')) return { results: call.params.slice(1).map((userId) => ({ userId })) };
+        if (call.sql.includes("FROM tasks tk")) return { results: [joinRow] };
+        return { results: [] };
+      },
+      run: (call) => {
+        if (call.sql.includes("INSERT INTO notifications")) notified.push(call.params);
+        return { success: true };
+      },
+    });
+    const ctx = { waitUntil: (p: Promise<unknown>) => pending.push(p), passThroughOnException: () => {} } as unknown as ExecutionContext;
+    const timerRoom = { idFromName: () => "room", get: () => ({ fetch: async () => new Response("ok") }) };
+    const notifyRoom = { idFromName: () => "n", get: () => ({ fetch: async () => new Response("ok") }) };
+    return {
+      notified,
+      run: async () => {
+        const res = await app.request("/task-1", {
+          method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ description: after }),
+        }, { ...env, TIMER_ROOM: timerRoom, NOTIFICATION_ROOM: notifyRoom } as unknown as Env, ctx);
+        await Promise.all(pending);
+        return res;
+      },
+    };
+  }
+
+  it("notifies a person newly tagged, with a link to the task", async () => {
+    const t = put(null, doc("u-ana"));
+    const res = await t.run();
+    expect(res.status).toBe(200);
+    expect(t.notified).toHaveLength(1);
+    expect(t.notified[0]).toContain("u-ana");
+    expect(JSON.stringify(t.notified[0])).toContain("/tasks/task-1");
+  });
+
+  it("does not notify someone who was already tagged, nor the author", async () => {
+    const t = put(doc("u-ana"), doc("u-ana", "user-1", "u-bo"));
+    await t.run();
+    expect(t.notified).toHaveLength(1);
+    expect(t.notified[0]).toContain("u-bo");
+  });
+
+  it("notifies nobody when the description has no tags", async () => {
+    const t = put(null, JSON.stringify({ type: "doc", content: [{ type: "paragraph" }] }));
+    await t.run();
+    expect(t.notified).toHaveLength(0);
+  });
+});

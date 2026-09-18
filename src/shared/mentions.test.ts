@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decodeMentions, encodeMentions, mentionedIds, mentionsToPlain, mentionToken, splitMentions, taggedPeople } from "./mentions";
+import { decodeMentions, docMentions, encodeMentions, mentionedIds, mentionsToPlain, mentionToken, splitMentions, splitPlainMentions, taggedPeople } from "./mentions";
 
 const luis = { userId: "u-luis", name: "Luis GritoWeb" };
 const ana = { userId: "u-ana", name: "Ana" };
@@ -90,5 +90,44 @@ describe("two people with the same name", () => {
 
   it("skips a tagged person who is no longer a member", () => {
     expect(taggedPeople("@[Gone](user:u-gone)", [first])).toEqual([]);
+  });
+});
+
+describe("docMentions", () => {
+  const doc = (content: unknown[]) => JSON.stringify({ type: "doc", content });
+  const mention = (id: string, label: string) => ({ type: "mention", attrs: { id, label } });
+
+  it("finds tagged people anywhere in the doc, once each, in order", () => {
+    const raw = doc([
+      { type: "paragraph", content: [{ type: "text", text: "oi " }, mention("a", "Ana")] },
+      { type: "bulletList", content: [{ type: "listItem", content: [{ type: "paragraph", content: [mention("b", "Bo"), mention("a", "Ana")] }] }] },
+    ]);
+    expect(docMentions(raw)).toEqual([{ userId: "a", label: "Ana" }, { userId: "b", label: "Bo" }]);
+  });
+
+  it("is empty for no doc, plain text, broken JSON or a doc without tags", () => {
+    expect(docMentions(null)).toEqual([]);
+    expect(docMentions("just words")).toEqual([]);
+    expect(docMentions("{not json")).toEqual([]);
+    expect(docMentions(doc([{ type: "paragraph", content: [{ type: "text", text: "@Ana" }] }]))).toEqual([]);
+  });
+
+  it("ignores a mention node with no usable id", () => {
+    expect(docMentions(doc([{ type: "paragraph", content: [{ type: "mention", attrs: { id: 5 } }] }]))).toEqual([]);
+  });
+});
+
+describe("splitPlainMentions", () => {
+  it("turns @Name in plain text into a mention and keeps the rest as text", () => {
+    expect(splitPlainMentions("Revisar com @Luis GritoWeb hoje", [luis])).toEqual([
+      { type: "text", text: "Revisar com " },
+      { type: "mention", userId: "u-luis", label: "Luis GritoWeb" },
+      { type: "text", text: " hoje" },
+    ]);
+  });
+
+  it("is a single text segment when nobody is named", () => {
+    expect(splitPlainMentions("Sem ninguém", [luis])).toEqual([{ type: "text", text: "Sem ninguém" }]);
+    expect(splitPlainMentions("", [luis])).toEqual([]);
   });
 });

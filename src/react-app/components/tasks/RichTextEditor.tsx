@@ -7,7 +7,9 @@ import { Placeholder } from "@tiptap/extension-placeholder";
 import { Image } from "@tiptap/extension-image";
 import { Plugin, PluginKey, type EditorState } from "@tiptap/pm/state";
 import { Decoration, DecorationSet, type EditorView } from "@tiptap/pm/view";
+import { useEditorMentions } from "./useEditorMentions";
 import { cn } from "@/lib/utils";
+import type { WorkspaceMember } from "@/hooks/useWorkspaceRole";
 import { toastApiError } from "@/lib/toastApiError";
 
 interface RichTextEditorProps {
@@ -20,6 +22,8 @@ interface RichTextEditorProps {
   onUploadImage?: (file: File) => Promise<{ url: string; id: string }>;
   /** Cleans up an attachment that finished uploading but whose insertion spot vanished mid-upload (e.g. that text got deleted). */
   onDeleteImage?: (id: string) => void;
+  /** Who "@" can tag; without it the editor has no mentions. */
+  members?: WorkspaceMember[];
 }
 
 function imageFile(items: DataTransferItemList | FileList | null | undefined): File | null {
@@ -134,7 +138,9 @@ export function RichTextEditor({
   "aria-label": ariaLabel,
   onUploadImage,
   onDeleteImage,
+  members = [],
 }: RichTextEditorProps) {
+  const mentions = useEditorMentions(members);
   const editor = useEditor({
     extensions: [
       StarterKit.configure({ codeBlock: false, horizontalRule: false }),
@@ -143,6 +149,7 @@ export function RichTextEditor({
       Placeholder.configure({ placeholder }),
       Image,
       UploadPlaceholderExtension,
+      mentions.extension,
     ],
     content,
     editorProps: {
@@ -150,6 +157,12 @@ export function RichTextEditor({
         role: "textbox",
         ...(ariaLabel ? { "aria-label": ariaLabel } : {}),
         class: cn("tt-richtext min-h-16 px-0 py-0 text-lg", "focus:outline-none"),
+      },
+      handleDOMEvents: {
+        click: (_view, event) => {
+          mentions.onChipClick(event);
+          return false;
+        },
       },
       handlePaste: (view, event) => {
         const file = imageFile(event.clipboardData?.items);
@@ -181,5 +194,10 @@ export function RichTextEditor({
 
   if (!editor) return null;
 
-  return <EditorContent editor={editor} className={className} />;
+  return (
+    <>
+      <EditorContent editor={editor} className={className} />
+      {mentions.ui}
+    </>
+  );
 }

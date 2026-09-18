@@ -12,6 +12,7 @@ interface AssignButtonProps
 function AssignButton({
   className,
   size,
+  reveal,
   "aria-label": ariaLabel = "Add assignee",
   title = "Add assignee",
   ...props
@@ -22,7 +23,7 @@ function AssignButton({
       data-slot="assign-button"
       aria-label={ariaLabel}
       title={title}
-      className={cn(assignButtonVariants({ size }), className)}
+      className={cn(assignButtonVariants({ size, reveal }), className)}
       {...props}
     >
       <UserPlus />

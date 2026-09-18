@@ -1,5 +1,47 @@
 # Changelog
 
+## 2026-09-18 (29)
+### Fixed
+- **Dark mode: the subtask field and the Estimate field no longer show a lighter box of their own.** The base `Input` carries `dark:bg-input/30` (a white veil of about 4%); the quick-add row and the Estimate field passed `bg-transparent`, which a `dark:` class beats, so in dark the field was a different tone from the row behind it (the row's own hover/focus colour) while in light it was flat. Both now also pass `dark:bg-transparent` (and the Estimate keeps its hover colour in dark). This was not caused by the dark Backlog column change (a different token, and a different surface).
+
+Verified in a real browser, light and dark, on the focused subtask field: input background is transparent and the row keeps its own colour (before: `oklab(1 0 0 / 0.039)` over the row's `bg-accent/50` in dark); the Estimate field is transparent in both. `tsc -b` 0, lint 0, vitest 567/567.
+
+## 2026-09-18 (28)
+### Added
+- **A person tagged in the task title is drawn as a red, clickable chip.** The name stays plain text (`... com @Ana`), so it costs nothing in cards, reports and exports; in the sheet, while the title is not being edited, each `@Name` that matches a member becomes the same chip the comments and the description use, and clicking it opens the person's profile. Clicking the words (or Tab) turns the title back into the field with the caret at the end; leaving the field saves and shows the chips again. `splitPlainMentions` (shared) does the matching.
+
+Verified in a real browser: after `@gra` + Enter, Enter the title showed a chip in the primary colour on a light tint at 40px, the stored name was still plain text, clicking the chip opened the profile, clicking the words opened the field focused with the name intact. Component tests for the chip view, the profile, starting an edit and saving on blur. `tsc -b` 0, lint 0, vitest 567/567.
+
+## 2026-09-18 (27)
+### Changed
+- **The comment field lives inside the conversation's frame, starts taller and grows without scrolling.** The messages and the field now share one bordered frame, the field behind a divider (it read as loose, outside the messages, in dark mode). It starts about three lines tall (72px, was one line), grows with what is typed, and has no scrollbar and no drag handle to resize (`Textarea` variant `bare`: `min-h-18`, `resize-none`, `overflow-hidden`, same self-measuring fallback as the title).
+
+Verified in a real browser, light and dark: the field sits inside the frame that holds the messages; 72px empty, 121px with six lines with `scrollHeight` = `clientHeight`, `overflow-y` hidden, `resize` none. Component test for the variant. `tsc -b` 0, lint 0, vitest 560/560.
+
+## 2026-09-18 (26)
+### Fixed
+- **The task title no longer scrolls.** Its box was 1px shorter than its text (the fixed 50px line height leaves the content at 51px) and it had `overflow-y: auto`, so even a one-line title could scroll (a scrollbar on Linux/Chrome, a 1px shift from the keyboard). The `title` variant is now `overflow-hidden` with `pb-px` so the box is exactly as tall as the text and always grows to fit; where the browser lacks `field-sizing: content`, `Textarea` measures itself instead.
+
+Verified in a real browser with one-, two- and five-line titles: `overflow-y` hidden, `clientHeight` = `scrollHeight` (51/51, 101/101, 251/251) and `scrollTop` 0 after Ctrl+End and a mouse wheel. Component test for the variant. `tsc -b` 0, lint 0, vitest 560/560.
+
+## 2026-09-18 (25)
+### Fixed
+- **"Add a subtask": the `+` is a real button and the assign button is always visible.** The `+` at the left of the quick-add row was decoration; it now adds what is typed (like Enter) or, with nothing typed, puts the cursor in the field. The dashed assign button in that row was hover-only in both themes because `AssignButton` carried `tt-reveal`; it has a `reveal` variant now (`hover` stays the default for dense rows and board cards, `always` for a row whose job is to fill it) and the quick-add uses `always`, at full muted-foreground contrast.
+
+Verified in a real browser on a hover-capable device, light and dark: the assign button in the quick-add row has opacity 1 with no hover (dashed border, contrast from `muted-foreground`), typing a name and clicking `+` created the subtask through the API, an empty `+` focused the field. Component tests for the `+` and for the `reveal` variant. `tsc -b` 0, lint 0, vitest 559/559.
+
+## 2026-09-18 (24)
+### Changed
+- **The comment composer is a divider and a field, not a box.** The bordered, rounded box around the comment field is gone: a single line separates the feed from the field, the field has no border or fill (new `Textarea` variant `bare`), and the Comment button sits right under it. Closer to ClickUp's calm composer.
+
+Verified in a real browser (screenshot of the Comments tab); component test for the `bare` variant. `tsc -b` 0, lint 0.
+
+## 2026-09-18 (23)
+### Added
+- **@ works in the task description and in the task name.** In the description (the TipTap editor) `@` opens the team beside the caret; picking one writes a chip (a `mention` node saved with the person's id) that stays after a reload and opens the person's profile when clicked. Saving the description notifies only people **newly** tagged (not the ones already there, not the author), with a link to the task; a mention also reads as `@Name` in the board card preview and in the MCP's plain-text description. In the task name, `@` lists the team and writes the picked name as **plain text**: a name has no tags, chips or notifications, because it is shown in cards, reports and exports. The list, the search and the profile card are shared with the comments (`MentionOptions`, `filterMembers`, `MemberProfile`). New dependencies: `@tiptap/extension-mention` and `@tiptap/suggestion` (3.31.3, same as the rest of tiptap).
+
+Verified in a real browser: `@gra` in the description listed the person, Enter wrote the chip, blur saved a `mention` node with the id, after a reload the chip was still there and a click opened the profile; in the name `@gra` + Enter wrote `... com @Grader Member` and the next Enter saved it. Route tests for who is notified from a description (new tag, already tagged, author, none), unit tests for `docMentions` and `filterMembers`. `tsc -b` 0, `pnpm lint` 0, vitest 559/559, `pnpm build` ok.
+
 ## 2026-09-18 (22)
 ### Fixed
 - **The task panel's title renders at the size the styleguide gives it.** DESIGN.md §3 defines the task sheet's title as Display (40px), but it measured **14px** on desktop. Two causes: the title was an `Input` whose base carries `md:text-sm`, and `tailwind-merge` did not know `text-display` is a font size (it read it as a colour, exactly the trap `text-micro` had), so neither `text-base` nor `md:text-sm` was ever dropped. `cn` now knows `display`; `Textarea` gains a `title` variant (bare, wraps, display step on every breakpoint) and the panel title uses it, so a long name wraps instead of clipping and Enter confirms. The description's own `h2` was 14px, *smaller* than its 18px paragraph; it is now the Title step (20px). The sheet is `max-w-xl` (576px) so a 40px title has room.

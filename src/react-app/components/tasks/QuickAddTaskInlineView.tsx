@@ -1,4 +1,6 @@
+import { useRef } from "react";
 import { Plus, CornerDownLeft, CalendarDays } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -20,6 +22,7 @@ interface QuickAddTaskInlineViewProps {
   onKeyDown: (e: React.KeyboardEvent) => void;
   autoFocus: boolean;
   canSubmit: boolean;
+  onSubmit: () => void;
   showProjectField: boolean;
   projectId: string | null;
   onProjectChange: (id: string) => void;
@@ -47,6 +50,7 @@ export function QuickAddTaskInlineView({
   onKeyDown,
   autoFocus,
   canSubmit,
+  onSubmit,
   showProjectField,
   projectId,
   onProjectChange,
@@ -63,6 +67,7 @@ export function QuickAddTaskInlineView({
   effectiveProjectId,
   hasAnyProject,
 }: QuickAddTaskInlineViewProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
   return (
     <div className={cn("space-y-1", className)}>
       <div
@@ -73,15 +78,27 @@ export function QuickAddTaskInlineView({
             : "rounded-md border border-dashed focus-within:border-solid focus-within:border-ring"
         )}
       >
-        <Plus className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+        {/* The "+" is the button: it adds what is typed, or puts the cursor in the field when nothing is. */}
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-xs"
+          aria-label="Add"
+          title={canSubmit ? "Add (Enter)" : "Type a name to add"}
+          onClick={() => (canSubmit ? onSubmit() : inputRef.current?.focus())}
+          className="shrink-0 text-muted-foreground"
+        >
+          <Plus className="h-3.5 w-3.5" />
+        </Button>
         <Input
+          ref={inputRef}
           autoFocus={autoFocus}
           value={value}
           onChange={(e) => onValueChange(e.target.value)}
           onKeyDown={onKeyDown}
           placeholder={placeholder}
           aria-label="Add a task"
-          className="h-6 border-0 bg-transparent px-0 py-0 text-sm shadow-none focus-visible:ring-0"
+          className="h-6 border-0 bg-transparent px-0 py-0 text-sm shadow-none focus-visible:ring-0 dark:bg-transparent"
         />
         {showProjectField && (
           <ProjectPicker value={projectId} onChange={onProjectChange} className="shrink-0 rounded-md" />
@@ -129,7 +146,7 @@ export function QuickAddTaskInlineView({
                 />
               </button>
             ) : (
-              <AssignButton className="shrink-0" />
+              <AssignButton className="shrink-0" reveal="always" />
             )
           }
         />

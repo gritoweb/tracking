@@ -155,6 +155,7 @@ export function QuickAddTask({
       onKeyDown={onKeyDown}
       autoFocus={autoFocus}
       canSubmit={canSubmit}
+      onSubmit={submit}
       showProjectField={showProjectField}
       projectId={projectId}
       onProjectChange={setProjectId}

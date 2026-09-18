@@ -12,7 +12,7 @@ import {
 } from "@shared/schemas";
 import { nextOccurrence, normalizeRecurRule } from "@shared/task-recurrence";
 import { taskPath } from "@shared/task-links";
-import { mentionedIds } from "@shared/mentions";
+import { docMentions, mentionedIds } from "@shared/mentions";
 import { sqliteUtcToIso, sqliteUtcToIsoOrNull } from "../lib/sqlite-time";
 import { listActivity, memberNames, recordActivity, statusName, type ActivityInput } from "../lib/task-activity";
 import { broadcast, requestOrigin } from "../db/queries";
@@ -450,6 +450,24 @@ export const tasksRouter = new Hono<{
       await c.env.DB.prepare(
         `UPDATE tasks SET ${fields.join(", ")} WHERE id = ? AND workspace_id = ?`
       ).bind(...values, id, workspaceId).run();
+    }
+
+    // Someone newly tagged in the description hears about it; whoever was already tagged, or the author, does not.
+    if (data.description !== undefined) {
+      const already = new Set(docMentions(existing.description).map((m) => m.userId));
+      const fresh = docMentions(data.description ?? null)
+        .map((m) => m.userId)
+        .filter((mentionId) => !already.has(mentionId) && mentionId !== userId);
+      if (fresh.length) {
+        c.executionCtx.waitUntil(
+          notifyMentions(c.env, workspaceId, fresh, {
+            type: "task_mention",
+            title: `${await actorDisplayName(c.env.DB, userId)} mentioned you`,
+            body: `${existing.name}: in the description`,
+            link: taskPath(id),
+          })
+        );
+      }
     }
 
     const activity: ActivityInput[] = [];

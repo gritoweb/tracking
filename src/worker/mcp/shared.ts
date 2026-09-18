@@ -207,6 +207,7 @@ export function hours(seconds: number): number {
 interface RichNode {
   type?: string;
   text?: string;
+  attrs?: { id?: unknown; label?: unknown };
   content?: RichNode[];
 }
 
@@ -221,6 +222,10 @@ export function richTextToPlain(raw: string | null | undefined): string | null {
   }
   if (doc?.type !== "doc") return raw;
   const walk = (node: RichNode): string =>
-    node.type === "text" ? (node.text ?? "") : (node.content ?? []).map(walk).join("");
+    node.type === "text"
+      ? (node.text ?? "")
+      : node.type === "mention"
+        ? `@${String(node.attrs?.label ?? node.attrs?.id ?? "")}`
+        : (node.content ?? []).map(walk).join("");
   return (doc.content ?? []).map(walk).join("\n").trim() || null;
 }
