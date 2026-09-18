@@ -347,3 +347,118 @@ export function nest(tasks: Task[], compare: (a: Task, b: Task) => number): Task
       children: (children.get(task.id) ?? []).sort((a, b) => a.sortOrder - b.sortOrder),
     }));
 }
+
+/** Tracked total for a node and everything under it, without double-counting. */
+function nodeSeconds(node: TaskNode) {
+  // `trackedSeconds` on a parent already rolls its children up (TASK_SELECT),
+  // so summing the children again here would count every subtask twice.
+  return node.task.trackedSeconds;
+}
+
+export interface TaskSection {
+  key: string;
+  label: string;
+  color?: string | null;
+  trackedSeconds: number;
+  nodes: TaskNode[];
+  defaultProjectId?: string | null;
+  defaultDueDate?: string | null;
+  /** Drag-to-reorder is only meaningful where the order is the user's own. */
+  reorderable?: boolean;
+}
+
+/** The List layout's grouped/sorted/filtered sections — the same shape `TaskBoardList` used to build inline. */
+export function buildTaskSections(params: {
+  tasks: Task[];
+  dueFilter: DueFilter;
+  status: StatusFilter;
+  groupBy: GroupBy;
+  sortBy: SortBy;
+  today: string;
+  /** Task status ids in board-column order, for `groupBy: "status"`. */
+  statusOrder: string[];
+}): TaskSection[] {
+  const { tasks, dueFilter, status, groupBy, sortBy, today, statusOrder } = params;
+  const compare = SORTERS[sortBy];
+
+  let byDue = tasks;
+  if (dueFilter !== "all") {
+    const matched = tasks.filter((t) => matchesDueFilter(t, dueFilter, today));
+    // Subtasks have no due date of their own, so a matched parent needs them re-attached.
+    byDue = withSubtasks(matched, tasks);
+  }
+  const filtered = byDue.filter((t) => (status === "all" ? true : status === "active" ? t.active : !t.active));
+
+  if (groupBy === "none") {
+    const nodes = nest(filtered, compare);
+    return nodes.length
+      ? [
+          {
+            key: "all",
+            label: "All tasks",
+            trackedSeconds: nodes.reduce((sum, n) => sum + nodeSeconds(n), 0),
+            nodes,
+            reorderable: sortBy === "plan",
+          },
+        ]
+      : [];
+  }
+
+  const map = new Map<
+    string,
+    { label: string; color?: string | null; tasks: Task[]; defaultProjectId?: string | null; defaultDueDate?: string | null }
+  >();
+  for (const t of filtered) {
+    let key: string;
+    let label: string;
+    if (groupBy === "project") {
+      key = t.projectId ?? "none";
+      label = t.projectName ?? "No project";
+    } else if (groupBy === "status") {
+      // The real columns now, not just Active/Done.
+      key = t.statusId ?? "none";
+      label = t.statusName ?? "No status";
+    } else {
+      key = t.dueDate ?? "none";
+      label = t.dueDate ? formatDueHeading(t.dueDate, today) : "No due date";
+    }
+    let bucket = map.get(key);
+    if (!bucket) {
+      bucket = {
+        label,
+        color: groupBy === "project" ? t.projectColor : groupBy === "status" ? t.statusColor : null,
+        tasks: [],
+        defaultProjectId: groupBy === "project" ? t.projectId : null,
+        defaultDueDate: groupBy === "due" && t.dueDate ? t.dueDate : null,
+      };
+      map.set(key, bucket);
+    }
+    bucket.tasks.push(t);
+  }
+
+  const entries = [...map.entries()].map(([key, b]) => {
+    const nodes = nest(b.tasks, compare);
+    return {
+      key,
+      label: b.label,
+      color: b.color,
+      defaultProjectId: b.defaultProjectId,
+      defaultDueDate: b.defaultDueDate,
+      nodes,
+      trackedSeconds: nodes.reduce((sum, n) => sum + nodeSeconds(n), 0),
+      // Ordering is only the user's own inside a project; in any other
+      // grouping a drag would be rewriting a sequence the group doesn't own.
+      reorderable: groupBy === "project" && sortBy === "plan",
+    };
+  });
+
+  // Due groups sort chronologically; status groups follow the board's own column order.
+  if (groupBy === "due") {
+    return entries.sort((a, b) => (a.key === "none" ? 1 : b.key === "none" ? -1 : a.key.localeCompare(b.key)));
+  }
+  if (groupBy === "status") {
+    const rank = new Map(statusOrder.map((id, i) => [id, i]));
+    return entries.sort((a, b) => (rank.get(a.key) ?? Infinity) - (rank.get(b.key) ?? Infinity));
+  }
+  return entries.sort((a, b) => a.label.localeCompare(b.label));
+}

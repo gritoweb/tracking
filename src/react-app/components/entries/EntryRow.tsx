@@ -1,39 +1,21 @@
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Play, Trash2, MoreHorizontal, Edit2, Upload, Check, AlertTriangle } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Spinner } from "@/components/ui/spinner";
-import { AssignProjectChip } from "@/components/pickers/ProjectPicker";
-import { TimeRangePopover } from "./TimeRangePopover";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useUpdateEntry, useDeleteEntry, useCreateEntry } from "@/hooks/useEntries";
 import { useProjects, useTagColors } from "@/hooks/useProjects";
 import { usePushEntries, useIntegrations } from "@/hooks/useIntegrations";
 import { useTimer } from "@/hooks/useTimer";
 import { cn } from "@/lib/utils";
-import {
-  formatDurationShort,
-  formatShortDate,
-  formatEntryTime,
-  localDayKey,
-  parseTimeInput,
-} from "@/lib/dateUtils";
+import { formatDurationShort, formatShortDate, formatEntryTime, localDayKey, parseTimeInput } from "@/lib/dateUtils";
 import { toCreatePayload } from "@/lib/entryUtils";
 import { useUIStore } from "@/stores/uiStore";
 import { useSavedFlash } from "@/hooks/useSavedFlash";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
-import { SavedTick } from "./SavedTick";
 import { ColorDot } from "@/components/ColorDot";
-import { ProjectBadge } from "@/components/ProjectBadge";
-import { UserAvatar } from "@/components/layout/UserAvatar";
+import { EntryRowDescription } from "./EntryRowDescription";
+import { EntryRowTiming } from "./EntryRowTiming";
+import { EntryRowIndicators } from "./EntryRowIndicators";
+import { EntryRowActions } from "./EntryRowActions";
 import type { TimeEntry } from "@shared/schemas";
 
 interface EntryRowProps {
@@ -210,342 +192,90 @@ export function EntryRow({ entry, isSelected = false, onToggleSelect }: EntryRow
   };
 
   return (
-    <>
-      <div
-        className={cn(
-          "group flex items-center gap-3 border-b border-border-strong px-4 py-2.5 transition-colors duration-fast ease-out-quart hover:bg-accent/40",
-          removing
-            ? "pointer-events-none animate-out fade-out slide-out-to-right-4 fill-mode-forwards duration-base ease-out-quart"
-            : highlighted
-              ? "animate-stopped"
-              : "animate-fade-up",
-          isSelected && "bg-accent/60"
-        )}
-      >
-        {/* Checkbox (visible on hover or when any selection active) */}
-        {onToggleSelect && (
-          <button
-            type="button"
-            role="checkbox"
-            aria-checked={isSelected}
-            aria-label="Select entry"
-            onClick={() => onToggleSelect(entry.id)}
-            // The 16×16 box is the only control here that failed even WCAG 2.2
-            // AA's 24px floor (SC 2.5.8). The ::before expands the hit target to
-            // 28×28 without changing the visual weight of the checkbox itself.
-            className={`relative flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors duration-fast ease-out-quart before:absolute before:-inset-1.5 before:content-[''] focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 ${
-              isSelected
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-muted-foreground/40 tt-reveal hover:border-primary"
-            }`}
-          >
-            {isSelected && (
-              <svg className="h-2.5 w-2.5" viewBox="0 0 10 10" fill="none">
-                <path d="M2 5l2.5 2.5L8 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            )}
-          </button>
-        )}
+    <div
+      className={cn(
+        "group flex items-center gap-3 border-b border-border-strong px-4 py-2.5 transition-colors duration-fast ease-out-quart hover:bg-accent/40",
+        removing
+          ? "pointer-events-none animate-out fade-out slide-out-to-right-4 fill-mode-forwards duration-base ease-out-quart"
+          : highlighted
+            ? "animate-stopped"
+            : "animate-fade-up",
+        isSelected && "bg-accent/60"
+      )}
+    >
+      {/* Checkbox (visible on hover or when any selection active) */}
+      {onToggleSelect && (
+        <Checkbox
+          checked={isSelected}
+          onCheckedChange={() => onToggleSelect(entry.id)}
+          aria-label="Select entry"
+          className={cn(!isSelected && "tt-reveal")}
+        />
+      )}
 
-        {/* Project color dot */}
-        <ColorDot color={entry.projectColor} className="h-3 w-3" />
+      {/* Project color dot */}
+      <ColorDot color={entry.projectColor} className="h-3 w-3" />
 
-        {/* Description */}
-        <div className="relative min-w-0 flex-1">
-          <SavedTick saved={savedDesc.saved} className="-right-3" />
-          {editingDesc ? (
-            <input
-              autoFocus
-              // The inline editor had no accessible name at all — a screen reader
-              // landed on an unlabelled text field. The button it replaces reads
-              // out the description itself, so the swap lost the only context.
-              aria-label="Description"
-              value={desc}
-              onChange={(e) => setDesc(e.target.value)}
-              onBlur={handleDescBlur}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") e.currentTarget.blur();
-                if (e.key === "Escape") {
-                  setDesc(entry.description);
-                  setEditingDesc(false);
-                }
-              }}
-              className="w-full border-b border-primary/40 bg-transparent text-sm outline-none ring-0"
-            />
-          ) : (
-            <button
-              // Use the system focus ring rather than a bare underline: a third
-              // focus vocabulary in one page means keyboard users have to relearn
-              // "where am I" per control.
-              className="relative rounded-sm text-left text-sm transition-colors duration-fast ease-out-quart before:absolute before:inset-x-0 before:-inset-y-1 before:content-[''] hover:text-primary-ink focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-              onClick={() => setEditingDesc(true)}
-            >
-              {entry.description || (
-                <span className="italic text-muted-foreground">
-                  No description
-                </span>
-              )}
-            </button>
-          )}
+      <EntryRowDescription
+        entry={entry}
+        desc={desc}
+        editingDesc={editingDesc}
+        onDescChange={setDesc}
+        onStartEdit={() => setEditingDesc(true)}
+        onDescBlur={handleDescBlur}
+        onDescKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
+          if (e.key === "Escape") {
+            setDesc(entry.description);
+            setEditingDesc(false);
+          }
+        }}
+        descSaved={savedDesc.saved}
+        timeFormat={timeFormat}
+        onRangeChange={handleRangeChange}
+        projectSaved={savedProject.saved}
+        onAssignProject={(projectId) =>
+          updateEntry.mutate(
+            { id: entry.id, data: { projectId } },
+            { onSuccess: savedProject.flash }
+          )
+        }
+        tagColor={tagColor}
+      />
 
-          {/* Project + tags row. Below `sm` this line also carries the time
-              range: the row's horizontal rail has no space for it there (adding
-              it pushed the row to 568px inside a 390px viewport and clipped the
-              duration off the end), but correcting "that meeting started at
-              14:00, not 13:30" is the single most likely edit on a phone, and
-              dropping the control entirely meant it could not be made from the
-              list at all. One of the two instances is always `hidden`, so it
-              adds no tab stop. */}
-          <div className="mt-0.5 flex flex-wrap items-center gap-1">
-            <span className="relative inline-flex sm:hidden">
-              <TimeRangePopover
-                start={entry.start}
-                stop={entry.stop}
-                onChange={handleRangeChange}
-                triggerClassName="flex items-center gap-1 rounded-sm px-1 text-micro tabular-nums text-muted-foreground"
-              >
-                <span>{formatEntryTime(entry.start, timeFormat)}</span>
-                <span>–</span>
-                <span>
-                  {entry.stop ? formatEntryTime(entry.stop, timeFormat) : "…"}
-                </span>
-              </TimeRangePopover>
-            </span>
-            {entry.projectName ? (
-              <ProjectBadge
-                name={entry.clientName ? `${entry.projectName} · ${entry.clientName}` : entry.projectName}
-                color={entry.projectColor}
-              />
-            ) : (
-              <span className="relative">
-                <SavedTick saved={savedProject.saved} className="-right-3" />
-                {/* Assigning a project is an inline commit like the others and
-                    gets the same acknowledgement — it was the one that said
-                    nothing at all. */}
-                <AssignProjectChip
-                  // Scoped like the group chip's label. The bare "Assign
-                  // project" collided with the stop toast's action, which does
-                  // something different (opens the whole editor) at a different
-                  // scope — a screen reader heard two identical controls.
-                  ariaLabel="Assign project to this entry"
-                  onAssign={(projectId) =>
-                    updateEntry.mutate(
-                      { id: entry.id, data: { projectId } },
-                      { onSuccess: savedProject.flash }
-                    )
-                  }
-                />
-              </span>
-            )}
-            {entry.tags.map((tag) => (
-              <Badge
-                key={tag}
-                variant="outline"
-                className="h-4 gap-1 px-1 py-0 text-micro font-normal"
-              >
-                <span
-                  className="h-1.5 w-1.5 shrink-0 rounded-full"
-                  style={{ backgroundColor: tagColor(tag) }}
-                />
-                {tag}
-              </Badge>
-            ))}
-          </div>
-        </div>
+      <EntryRowIndicators entry={entry} integration={integration} isPushing={isPushing} pushTitle={pushTitle} />
 
-        {/* Integration sync status — persistent indicator, only once it's meaningful */}
-        {integration && (isPushing || entry.syncStatus === "synced" || entry.syncStatus === "error") && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span
-                aria-label={pushTitle}
-                className={cn(
-                  "flex h-5 w-5 shrink-0 items-center justify-center",
-                  entry.syncStatus === "synced"
-                    ? "text-success-ink"
-                    : entry.syncStatus === "error"
-                      ? "text-destructive"
-                      : "text-muted-foreground"
-                )}
-              >
-                {isPushing ? (
-                  <Spinner size="sm" />
-                ) : entry.syncStatus === "synced" ? (
-                  <Check className="h-3.5 w-3.5" />
-                ) : (
-                  <AlertTriangle className="h-3.5 w-3.5" />
-                )}
-              </span>
-            </TooltipTrigger>
-            <TooltipContent>{pushTitle}</TooltipContent>
-          </Tooltip>
-        )}
+      <EntryRowTiming
+        entry={entry}
+        timeFormat={timeFormat}
+        onRangeChange={handleRangeChange}
+        rangeSaved={savedRange.saved}
+        editingDuration={editingDuration}
+        durationInput={durationInput}
+        durationInvalid={durationInvalid}
+        onDurationInputChange={(value) => {
+          setDurationInput(value);
+          if (durationInvalid) setDurationInvalid(false);
+        }}
+        onDurationBlur={handleSaveDuration}
+        onDurationKeyDown={(e) => {
+          if (e.key === "Enter") handleSaveDuration();
+          if (e.key === "Escape") cancelDurationEdit();
+        }}
+        onStartEditDuration={handleStartEditDuration}
+        durationSaved={savedDuration.saved}
+      />
 
-        {/* Billable indicator */}
-        {entry.billable && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              {/* Was a bare <span> whose only "Billable" text lived in a mouse-only
-                  tooltip, so the state was invisible to screen readers. An sr-only
-                  label announces it in reading order — better than making it
-                  focusable, which would add a tab stop per row to an already
-                  tab-stop-heavy list for something that isn't an action. */}
-              <span className="text-micro font-semibold text-primary-ink">
-                <span aria-hidden>$</span>
-                <span className="sr-only">Billable</span>
-              </span>
-            </TooltipTrigger>
-            <TooltipContent>Billable</TooltipContent>
-          </Tooltip>
-        )}
-
-        {/* Who logged it — omitted when unknown (pre-existing rows, or cron-
-            materialized entries with no single human creator). */}
-        {(entry.userName || entry.userEmail) && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="hidden shrink-0 sm:inline-flex">
-                <UserAvatar
-                  name={entry.userName}
-                  email={entry.userEmail}
-                  image={entry.userImage}
-                  className="h-5 w-5 text-micro"
-                />
-              </span>
-            </TooltipTrigger>
-            <TooltipContent>{entry.userName ?? entry.userEmail}</TooltipContent>
-          </Tooltip>
-        )}
-
-        {/* Time range — click to edit start/stop + date inline. A running entry
-            has no stop yet but its start is just as correctable, and it used to
-            be the one row you couldn't fix without opening the sheet. */}
-        <span className="relative hidden sm:inline-flex">
-          <SavedTick saved={savedRange.saved} />
-          <TimeRangePopover
-            start={entry.start}
-            stop={entry.stop}
-            onChange={handleRangeChange}
-            // font-mono + tabular-nums + a fixed width, like the duration
-            // beside it. Without them this was the one number in the row that
-            // wasn't in a column: proportional digits made the trigger's width
-            // depend on which digits it held, which walked the billable "$"
-            // before it across a measured 13px down a single list while the
-            // durations held an exact column. DESIGN.md §8 asks for tabular
-            // figures in any list column, and this is the app's most-read list.
-            //
-            // The width is per-format because 12h is genuinely wider and its
-            // strings are ragged ("9:00 AM" vs "11:15 AM"); justify-end pulls
-            // the short ones into the same right edge.
-            triggerClassName={cn(
-              "flex items-center justify-end gap-1 px-1 font-mono text-xs tabular-nums text-muted-foreground",
-              timeFormat === "12h" ? "w-[9.25rem]" : "w-[6.5rem]"
-            )}
-          >
-            <span>{formatEntryTime(entry.start, timeFormat)}</span>
-            <span>–</span>
-            <span>
-              {entry.stop ? formatEntryTime(entry.stop, timeFormat) : "…"}
-            </span>
-          </TimeRangePopover>
-        </span>
-
-        {/* Duration — click to edit */}
-        {editingDuration ? (
-          <input
-            autoFocus
-            value={durationInput}
-            onChange={(e) => {
-              setDurationInput(e.target.value);
-              if (durationInvalid) setDurationInvalid(false);
-            }}
-            onBlur={handleSaveDuration}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleSaveDuration();
-              if (e.key === "Escape") cancelDurationEdit();
-            }}
-            aria-label="Duration"
-            aria-invalid={durationInvalid}
-            // "1h 30m" needs more room than "01:30:00" did, and the width has to
-            // match the button below or the row shifts on every click.
-            title={durationInvalid ? "Enter a duration like 1h 30m, 1:30, or 90m" : undefined}
-            className={cn(
-              "w-20 bg-transparent text-right font-mono text-sm tabular-nums outline-none ring-0 border-b",
-              durationInvalid ? "border-destructive text-destructive" : "border-primary"
-            )}
-          />
-        ) : (
-          <span className="relative">
-            <SavedTick saved={savedDuration.saved} />
-            <button
-              onClick={handleStartEditDuration}
-              className="relative min-w-20 rounded-sm text-right font-mono text-sm tabular-nums transition-colors duration-fast ease-out-quart before:absolute before:inset-x-0 before:-inset-y-1 before:content-[''] hover:text-primary-ink focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-            >
-              {entry.duration ? formatDurationShort(entry.duration) : "–"}
-            </button>
-          </span>
-        )}
-
-        {/* Actions (visible on hover) */}
-        <div className="tt-reveal flex items-center gap-1">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label="Continue timing this entry"
-                onClick={handleContinue}
-              >
-                <Play className="h-3.5 w-3.5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Continue</TooltipContent>
-          </Tooltip>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label="Entry actions"
-              >
-                <MoreHorizontal className="h-3.5 w-3.5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => openEntryEditor(entry.id)}>
-                <Edit2 className="mr-2 h-3.5 w-3.5" />
-                Edit
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleContinue}>
-                <Play className="mr-2 h-3.5 w-3.5" />
-                Continue
-              </DropdownMenuItem>
-              {integration && (
-                <DropdownMenuItem
-                  onClick={handlePush}
-                  disabled={isPushing || (!isCompleted && entry.syncStatus !== "error")}
-                >
-                  <Upload className="mr-2 h-3.5 w-3.5" />
-                  {entry.syncStatus === "synced"
-                    ? "Push again"
-                    : entry.syncStatus === "error"
-                      ? "Retry push"
-                      : "Push to integration"}
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                className="text-destructive"
-                onClick={handleDelete}
-              >
-                <Trash2 className="mr-2 h-3.5 w-3.5" />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </div>
-    </>
+      <EntryRowActions
+        entry={entry}
+        integration={integration}
+        isCompleted={isCompleted}
+        isPushing={isPushing}
+        onContinue={handleContinue}
+        onEdit={() => openEntryEditor(entry.id)}
+        onPush={handlePush}
+        onDelete={handleDelete}
+      />
+    </div>
   );
 }

@@ -98,6 +98,7 @@ export function TimerControl({ isRunning, onStart, onStop, startDisabled = false
         ) : (
           <Tooltip>
             <TooltipTrigger asChild>
+              {/* Inline value trigger sized by TimerDisplay's own content, not a Button shape. */}
               <button
                 type="button"
                 onClick={handleStartEditElapsed}

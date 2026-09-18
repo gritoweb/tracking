@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildTaskSections,
   clusterTasks,
   comparePlanned,
   dateToLocalDate,
@@ -336,6 +337,68 @@ describe("withSubtasks", () => {
   it("is a no-op when nothing selected has children", () => {
     const solo = makeTask({ id: "solo" });
     expect(withSubtasks([solo], [solo])).toEqual([solo]);
+  });
+});
+
+describe("buildTaskSections", () => {
+  const base = { dueFilter: "all" as const, status: "all" as const, sortBy: "plan" as const, today: TODAY, statusOrder: [] };
+
+  it("groups into a single 'All tasks' section when groupBy is 'none'", () => {
+    const tasks = [makeTask({ id: "a" }), makeTask({ id: "b" })];
+    const sections = buildTaskSections({ ...base, tasks, groupBy: "none" });
+    expect(sections).toHaveLength(1);
+    expect(sections[0]).toMatchObject({ key: "all", label: "All tasks", reorderable: true });
+    expect(sections[0].nodes).toHaveLength(2);
+  });
+
+  it("returns no sections for an empty ungrouped list", () => {
+    expect(buildTaskSections({ ...base, tasks: [], groupBy: "none" })).toEqual([]);
+  });
+
+  it("groups by project, sorted by label, and marks the section reorderable only for plan order", () => {
+    const tasks = [
+      makeTask({ id: "a", projectId: "p2", projectName: "Zeta" }),
+      makeTask({ id: "b", projectId: "p1", projectName: "Alpha" }),
+    ];
+    const sections = buildTaskSections({ ...base, tasks, groupBy: "project" });
+    expect(sections.map((s) => s.label)).toEqual(["Alpha", "Zeta"]);
+    expect(sections.every((s) => s.reorderable)).toBe(true);
+    expect(buildTaskSections({ ...base, tasks, groupBy: "project", sortBy: "name" })[0].reorderable).toBe(false);
+  });
+
+  it("groups by status honoring the given column order, undefined ranks last", () => {
+    const tasks = [
+      makeTask({ id: "a", statusId: "s2", statusName: "Done" }),
+      makeTask({ id: "b", statusId: "s1", statusName: "Todo" }),
+    ];
+    const sections = buildTaskSections({ ...base, tasks, groupBy: "status", statusOrder: ["s1", "s2"] });
+    expect(sections.map((s) => s.key)).toEqual(["s1", "s2"]);
+  });
+
+  it("groups by due date chronologically, with 'none' last", () => {
+    const tasks = [
+      makeTask({ id: "a", dueDate: null }),
+      makeTask({ id: "b", dueDate: "2026-01-20" }),
+      makeTask({ id: "c", dueDate: "2026-01-16" }),
+    ];
+    const sections = buildTaskSections({ ...base, tasks, groupBy: "due" });
+    expect(sections.map((s) => s.key)).toEqual(["2026-01-16", "2026-01-20", "none"]);
+  });
+
+  it("filters by status and due date before grouping", () => {
+    const tasks = [
+      makeTask({ id: "a", active: false, projectName: "P" }),
+      makeTask({ id: "b", active: true, projectName: "P" }),
+    ];
+    const sections = buildTaskSections({ ...base, tasks, groupBy: "project", status: "active" });
+    expect(sections[0].nodes.map((n) => n.task.id)).toEqual(["b"]);
+  });
+
+  it("sums tracked seconds without double-counting subtasks", () => {
+    const parent = makeTask({ id: "p", trackedSeconds: 100, projectName: "P" });
+    const tasks = [parent];
+    const sections = buildTaskSections({ ...base, tasks, groupBy: "project" });
+    expect(sections[0].trackedSeconds).toBe(100);
   });
 });
 

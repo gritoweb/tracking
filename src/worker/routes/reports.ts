@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
+import { NEUTRAL_SWATCH } from "@shared/colors";
 import {
   ReportQuerySchema,
   GroupedReportQuerySchema,
@@ -288,7 +289,7 @@ export const reportsRouter = new Hono<{
       billableSeconds: totals[0]?.billable_seconds ?? 0,
       billableAmount: totals[0]?.billable_amount ?? 0,
       entryCount: totals[0]?.entry_count ?? 0,
-      byProject: mapBreakdown(byProject, "No project", "#94a3b8"),
+      byProject: mapBreakdown(byProject, "No project", NEUTRAL_SWATCH),
       byClient: mapBreakdown(byClient, "No client"),
       byTask: mapBreakdown(byTask, "No task"),
       byTag: mapBreakdown(byTag, "No tag"),

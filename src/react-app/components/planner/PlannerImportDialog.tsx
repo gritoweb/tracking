@@ -258,7 +258,7 @@ export function PlannerImportDialog({ open, onClose, weekDayKeys }: PlannerImpor
                         {r.error ? (
                           <span className="text-destructive">{r.error}</span>
                         ) : r.outsideWeek ? (
-                          <span className="text-amber-600 dark:text-amber-500">
+                          <span className="text-warning-ink">
                             Outside visible week
                           </span>
                         ) : (

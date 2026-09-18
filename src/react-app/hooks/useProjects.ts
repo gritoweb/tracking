@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api } from "@/lib/api-client";
 import { toastApiError } from "@/lib/toastApiError";
+import { NEUTRAL_SWATCH } from "@shared/colors";
 import type {
   CreateProject,
   UpdateProject,
@@ -175,7 +176,7 @@ export function useTags() {
 export function useTagColors() {
   const { data: tags = [] } = useTags();
   const map = new Map(tags.map((t) => [t.name, t.color]));
-  return (name: string) => map.get(name) ?? "#64748b";
+  return (name: string) => map.get(name) ?? NEUTRAL_SWATCH;
 }
 
 /** Creates the tag as soon as it's added, so its swatch is the real one rather than a guess. */

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Check, Copy, KeyRound, Plug, Trash2 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { SettingsCardHeader } from "./SettingsCardHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -121,12 +122,7 @@ export function McpConnectorCard() {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <Plug className="h-4 w-4" />
-          MCP connector
-        </CardTitle>
-      </CardHeader>
+      <SettingsCardHeader icon={Plug} title="MCP connector" />
       <CardContent className="space-y-5">
         <div>
           <p className="text-xs leading-normal text-muted-foreground">

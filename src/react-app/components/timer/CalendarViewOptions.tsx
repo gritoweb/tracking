@@ -80,6 +80,7 @@ export function CalendarViewOptions({
                 className="grid grid-cols-4 gap-0.5 rounded-full bg-muted p-0.5"
               >
                 {VIEW_OPTIONS.map(({ value, label }) => (
+                  // Custom radiogroup (DESIGN.md §5, The Segmented Rule) — a `grid`, so it stays hand-rolled.
                   <button
                     key={value}
                     type="button"
@@ -87,7 +88,7 @@ export function CalendarViewOptions({
                     aria-checked={requestedCalendarView === value}
                     onClick={() => onCalendarViewChange(value)}
                     className={cn(
-                      "rounded-full px-1 py-1 text-xs transition-colors duration-fast ease-out-quart focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
+                      "focus-ring rounded-full px-1 py-1 text-xs transition-colors duration-fast ease-out-quart",
                       requestedCalendarView === value
                         ? "bg-foreground font-medium text-background"
                         : "text-muted-foreground hover:text-foreground"

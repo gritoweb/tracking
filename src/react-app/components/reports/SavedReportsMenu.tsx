@@ -1,8 +1,10 @@
 import { useState } from "react";
-import { Bookmark, Plus, Trash2 } from "lucide-react";
+import { Bookmark, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { RemoveButton } from "@/components/ui/remove-button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,6 +26,7 @@ import {
   useCreateSavedReport,
   useDeleteSavedReport,
   type ReportConfig,
+  type SavedReport,
 } from "@/hooks/useSavedReports";
 
 interface SavedReportsMenuProps {
@@ -37,6 +40,7 @@ export function SavedReportsMenu({ current, onLoad }: SavedReportsMenuProps) {
   const remove = useDeleteSavedReport();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [name, setName] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<SavedReport | null>(null);
 
   const handleSave = () => {
     const trimmed = name.trim();
@@ -74,17 +78,13 @@ export function SavedReportsMenu({ current, onLoad }: SavedReportsMenuProps) {
                 className="group flex items-center justify-between gap-2"
               >
                 <span className="truncate">{r.name}</span>
-                <button
-                  type="button"
+                <RemoveButton
                   aria-label={`Delete ${r.name}`}
                   onClick={(e) => {
                     e.stopPropagation();
-                    remove.mutate(r.id);
+                    setDeleteTarget(r);
                   }}
-                  className="tt-reveal shrink-0 rounded p-0.5 text-muted-foreground hover:text-destructive"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
+                />
               </DropdownMenuItem>
             ))
           )}
@@ -124,6 +124,17 @@ export function SavedReportsMenu({ current, onLoad }: SavedReportsMenuProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        title="Delete saved report?"
+        description={`"${deleteTarget?.name}" will be permanently deleted. This cannot be undone.`}
+        onConfirm={() => {
+          if (deleteTarget) remove.mutate(deleteTarget.id);
+          setDeleteTarget(null);
+        }}
+      />
     </>
   );
 }

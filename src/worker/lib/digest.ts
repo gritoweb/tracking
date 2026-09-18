@@ -14,6 +14,7 @@ import { isManager } from "./permissions";
 import { runBriefNarrative } from "./ai";
 
 import { appUrl } from "./app-url";
+import { NEUTRAL_SWATCH } from "@shared/colors";
 /** Top N projects in the split — past this it stops being a glance. */
 const MAX_PROJECT_LINES = 6;
 const MAX_BUDGET_LINES = 3;
@@ -142,7 +143,7 @@ export async function buildDigest(
       .first<{ n: number; total: number; billable: number }>(),
     env.DB.prepare(
       `SELECT COALESCE(p.name, 'No project') AS name,
-              COALESCE(p.color, '#94a3b8') AS color,
+              COALESCE(p.color, '${NEUTRAL_SWATCH}') AS color,
               SUM(te.duration) AS seconds
        FROM time_entries te
        LEFT JOIN projects p ON p.id = te.project_id AND p.workspace_id = te.workspace_id

@@ -83,7 +83,7 @@ export function AppShell() {
           Visually hidden until focused, then pinned above everything. */}
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:z-portal focus:fixed focus:top-3 focus:left-3 focus:rounded-md focus:bg-primary focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-primary-foreground focus:shadow-md focus:outline-none focus:ring-[3px] focus:ring-ring/50"
+        className="sr-only focus:not-sr-only focus:z-portal focus:fixed focus:top-3 focus:left-3 focus:rounded-md focus:bg-primary focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-primary-foreground focus-ring"
       >
         Skip to content
       </a>

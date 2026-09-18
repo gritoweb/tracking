@@ -1,7 +1,7 @@
 import { useMemo } from "react";
-import { X, Search, SlidersHorizontal } from "lucide-react";
+import { X, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { SearchInput } from "@/components/ui/search-input";
 import { Label } from "@/components/ui/label";
 import {
   Popover,
@@ -122,15 +122,12 @@ export function ReportFilterBar({ filters, onChange, canFilterPeople = false }: 
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <div className="relative">
-        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          value={filters.search}
-          onChange={(e) => onChange({ ...filters, search: e.target.value })}
-          placeholder="Search description…"
-          className="h-8 w-48 pl-8 text-sm"
-        />
-      </div>
+      <SearchInput
+        value={filters.search}
+        onChange={(e) => onChange({ ...filters, search: e.target.value })}
+        placeholder="Search description…"
+        className="h-8 w-48 text-sm"
+      />
 
       {/* Client / Project / Task / Tags / Billable used to sit here as five
           always-open controls. Together with search, rounding and saved reports

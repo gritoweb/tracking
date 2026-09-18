@@ -15,7 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ProjectPicker } from "@/components/pickers/ProjectPicker";
 import { TaskPicker } from "@/components/pickers/TaskPicker";
 import { TagPicker } from "@/components/pickers/TagPicker";
-import { TimeOfDayInput } from "./TimeOfDayInput";
+import { TimeOfDayInput } from "@/components/entries/TimeOfDayInput";
 import type { useEntryDraft } from "@/hooks/useEntryDraft";
 
 type Draft = ReturnType<typeof useEntryDraft>;

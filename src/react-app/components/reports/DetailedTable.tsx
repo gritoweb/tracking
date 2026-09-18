@@ -1,12 +1,10 @@
 import { useMemo, useState } from "react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
-  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -18,8 +16,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatDurationShort, formatShortDate, formatEntryTime } from "@/lib/dateUtils";
-import { formatCurrency } from "@/lib/currency";
 import { useUIStore } from "@/stores/uiStore";
 import {
   useUpdateEntry,
@@ -28,59 +24,24 @@ import {
   useBulkUpdateEntries,
   useBulkDeleteEntries,
 } from "@/hooks/useEntries";
-import { EntryForm } from "@/components/entries/EntryForm";
-import { ColorDot } from "@/components/ColorDot";
-import { UserAvatar } from "@/components/layout/UserAvatar";
+import { EntryForm } from "@/components/forms/EntryForm";
 import { cn } from "@/lib/utils";
 import {
   ChevronDown,
   ChevronUp,
-  Columns3,
   MoreHorizontal,
   Pencil,
   Copy,
   DollarSign,
   Trash2,
-  X,
   Inbox,
 } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { toast } from "sonner";
-import type { ReportDetailedEntry } from "@shared/schemas";
+import { COLUMNS, renderCell, type ColumnKey, type DetailedEntry } from "./DetailedTableColumns";
+import { DetailedTableToolbar } from "./DetailedTableToolbar";
 
-// Pinned on the worker's own response — see routes/reports.ts `/detailed`.
-export type DetailedEntry = ReportDetailedEntry;
-
-type ColumnKey =
-  | "description"
-  | "client"
-  | "project"
-  | "task"
-  | "person"
-  | "date"
-  | "time"
-  | "amount"
-  | "duration";
-
-interface ColumnDef {
-  key: ColumnKey;
-  label: string;
-  defaultVisible: boolean;
-  align?: "right";
-  sortValue: (e: DetailedEntry) => string | number;
-}
-
-const COLUMNS: ColumnDef[] = [
-  { key: "description", label: "Description", defaultVisible: true, sortValue: (e) => e.description.toLowerCase() },
-  { key: "client", label: "Client", defaultVisible: false, sortValue: (e) => (e.clientName ?? "").toLowerCase() },
-  { key: "project", label: "Project", defaultVisible: true, sortValue: (e) => (e.projectName ?? "").toLowerCase() },
-  { key: "task", label: "Task", defaultVisible: false, sortValue: (e) => (e.taskName ?? "").toLowerCase() },
-  { key: "person", label: "Person", defaultVisible: true, sortValue: (e) => (e.userName ?? e.userEmail ?? "").toLowerCase() },
-  { key: "date", label: "Date", defaultVisible: true, sortValue: (e) => e.start },
-  { key: "time", label: "Time", defaultVisible: true, sortValue: (e) => e.start },
-  { key: "amount", label: "Amount", defaultVisible: true, align: "right", sortValue: (e) => e.amount },
-  { key: "duration", label: "Duration", defaultVisible: true, align: "right", sortValue: (e) => e.duration ?? 0 },
-];
+export type { DetailedEntry } from "./DetailedTableColumns";
 
 const STORAGE_KEY = "reports_detailed_columns";
 
@@ -156,6 +117,7 @@ export function DetailedTable({ entries, hideAmounts = false }: DetailedTablePro
       return next;
     });
   const allSelected = sorted.length > 0 && selected.size === sorted.length;
+  const someSelected = selected.size > 0 && !allSelected;
   const toggleAll = () =>
     setSelected(allSelected ? new Set() : new Set(sorted.map((e) => e.id)));
 
@@ -196,52 +158,15 @@ export function DetailedTable({ entries, hideAmounts = false }: DetailedTablePro
 
   return (
     <div className="space-y-3">
-      {/* Toolbar: bulk action bar when rows are selected, else column menu */}
-      {selected.size > 0 ? (
-        <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 print:hidden">
-          <span className="text-sm font-medium">{selected.size} selected</span>
-          <div className="ml-auto flex items-center gap-1.5">
-            <Button variant="outline" size="sm" className="h-8" onClick={() => bulkBillable(true)}>
-              Billable
-            </Button>
-            <Button variant="outline" size="sm" className="h-8" onClick={() => bulkBillable(false)}>
-              Non-billable
-            </Button>
-            <Button variant="outline" size="sm" className="h-8 gap-1.5 text-destructive" onClick={bulkRemove}>
-              <Trash2 className="h-3.5 w-3.5" />
-              Delete
-            </Button>
-            <Button variant="ghost" size="icon-sm" onClick={clearSelection} aria-label="Clear selection">
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <div className="flex justify-end print:hidden">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-8 gap-1.5 text-sm">
-                <Columns3 className="h-3.5 w-3.5" />
-                Columns
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {menuColumns.map((c) => (
-                <DropdownMenuCheckboxItem
-                  key={c.key}
-                  checked={visible[c.key]}
-                  onCheckedChange={() => toggleColumn(c.key)}
-                  onSelect={(e) => e.preventDefault()}
-                >
-                  {c.label}
-                </DropdownMenuCheckboxItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      )}
+      <DetailedTableToolbar
+        selectedCount={selected.size}
+        onClearSelection={clearSelection}
+        onBulkBillable={bulkBillable}
+        onBulkRemove={bulkRemove}
+        menuColumns={menuColumns}
+        visible={visible}
+        onToggleColumn={toggleColumn}
+      />
 
       {/* Table */}
       <div className="rounded-lg border">
@@ -252,21 +177,21 @@ export function DetailedTable({ entries, hideAmounts = false }: DetailedTablePro
           <TableHeader>
             <TableRow className="[&>th]:sticky [&>th]:top-0 [&>th]:z-sticky [&>th]:bg-muted [&>th]:shadow-[inset_0_-1px_0_var(--border)] hover:bg-transparent">
               <TableHead className="w-8 rounded-tl-lg print:hidden" aria-label="Select">
-                <input
-                  type="checkbox"
+                <Checkbox
+                  size="sm"
                   aria-label="Select all"
-                  checked={allSelected}
-                  onChange={toggleAll}
-                  className="relative size-3.5 accent-primary before:absolute before:-inset-[5px] before:content-['']"
+                  checked={someSelected ? "indeterminate" : allSelected}
+                  onCheckedChange={toggleAll}
                 />
               </TableHead>
               {cols.map((c) => (
                 <TableHead key={c.key} className={cn("text-xs", c.align === "right" && "text-right")}>
+                  {/* raw: a column header's own sort trigger, not a standalone action */}
                   <button
                     type="button"
                     onClick={() => setSortKey(c.key)}
                     className={cn(
-                      "relative inline-flex items-center gap-1 transition-colors duration-fast ease-out-quart before:absolute before:inset-x-0 before:-inset-y-1 before:content-[''] hover:text-foreground",
+                      "hit-area inline-flex items-center gap-1 transition-colors duration-fast ease-out-quart hover:text-foreground",
                       c.align === "right" && "flex-row-reverse"
                     )}
                   >
@@ -287,12 +212,11 @@ export function DetailedTable({ entries, hideAmounts = false }: DetailedTablePro
             {sorted.map((entry) => (
               <TableRow key={entry.id} data-state={selected.has(entry.id) ? "selected" : undefined}>
                 <TableCell className="print:hidden">
-                  <input
-                    type="checkbox"
+                  <Checkbox
+                    size="sm"
                     aria-label={`Select ${entry.description || "entry"}`}
                     checked={selected.has(entry.id)}
-                    onChange={() => toggleSelect(entry.id)}
-                    className="relative size-3.5 accent-primary before:absolute before:-inset-[5px] before:content-['']"
+                    onCheckedChange={() => toggleSelect(entry.id)}
                   />
                 </TableCell>
                 {cols.map((c) => (
@@ -366,82 +290,4 @@ export function DetailedTable({ entries, hideAmounts = false }: DetailedTablePro
       )}
     </div>
   );
-}
-
-function renderCell(
-  key: ColumnKey,
-  entry: DetailedEntry,
-  timeFormat: "24h" | "12h",
-  currency: string
-) {
-  switch (key) {
-    case "description":
-      return (
-        <div className="min-w-0">
-          <span className="block truncate text-sm font-medium">
-            {entry.description || (
-              <span className="italic text-muted-foreground">No description</span>
-            )}
-          </span>
-          <div className="mt-0.5 flex flex-wrap items-center gap-1">
-            {entry.billable && (
-              <span className="text-micro font-semibold text-primary">$</span>
-            )}
-            {entry.tags.map((tag) => (
-              <Badge key={tag} variant="outline" className="h-4 px-1 py-0 text-micro font-normal">
-                {tag}
-              </Badge>
-            ))}
-          </div>
-        </div>
-      );
-    case "client":
-      return entry.clientName ? (
-        <span className="truncate text-xs">{entry.clientName}</span>
-      ) : (
-        <span className="text-xs text-muted-foreground">—</span>
-      );
-    case "project":
-      return entry.projectName ? (
-        <div className="flex items-center gap-1.5">
-          <ColorDot color={entry.projectColor} className="h-2 w-2" />
-          <span className="truncate text-xs">{entry.projectName}</span>
-        </div>
-      ) : (
-        <span className="text-xs text-muted-foreground">—</span>
-      );
-    case "task":
-      return entry.taskName ? (
-        <span className="truncate text-xs">{entry.taskName}</span>
-      ) : (
-        <span className="text-xs text-muted-foreground">—</span>
-      );
-    case "person":
-      return entry.userName || entry.userEmail ? (
-        <div className="flex items-center gap-1.5">
-          <UserAvatar
-            name={entry.userName}
-            email={entry.userEmail}
-            image={entry.userImage}
-            className="h-5 w-5 text-micro"
-          />
-          <span className="truncate text-xs">{entry.userName ?? entry.userEmail}</span>
-        </div>
-      ) : (
-        <span className="text-xs text-muted-foreground">—</span>
-      );
-    case "date":
-      return formatShortDate(entry.start);
-    case "time":
-      return (
-        <>
-          {formatEntryTime(entry.start, timeFormat)}
-          {entry.stop && <> – {formatEntryTime(entry.stop, timeFormat)}</>}
-        </>
-      );
-    case "amount":
-      return entry.amount ? formatCurrency(entry.amount, currency) : "–";
-    case "duration":
-      return entry.duration ? formatDurationShort(entry.duration) : "–";
-  }
 }

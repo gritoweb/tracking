@@ -1,12 +1,6 @@
 import { useMemo, useState } from "react";
 import { addDays, format } from "date-fns";
-import { Plus, Copy, AlertTriangle, CalendarRange, Upload } from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { ColorDot } from "@/components/ColorDot";
-import { EmptyState } from "@/components/ui/empty-state";
-import { Spinner } from "@/components/ui/spinner";
 import { useEntriesRange } from "@/hooks/useEntries";
 import {
   useAllocationsRange,
@@ -14,34 +8,16 @@ import {
   useBulkUpsertAllocations,
 } from "@/hooks/usePlanner";
 import { api } from "@/lib/api-client";
-import { formatDurationShort, formatTimeInput, parseTimeInput } from "@/lib/dateUtils";
-import { cn } from "@/lib/utils";
-import { weekGrid } from "@/lib/weekGridColumns";
-import { AddTimesheetRowDialog } from "@/components/timesheet/AddTimesheetRowDialog";
+import { parseTimeInput } from "@/lib/dateUtils";
+import { AddTimesheetRowDialog } from "@/components/week-grid/AddTimesheetRowDialog";
 import { PlannerImportDialog } from "./PlannerImportDialog";
-
-const PLANNER_LOCKED_HELP_ID = "planner-locked-cell-help";
+import { PlannerGrid } from "./PlannerGrid";
+import { PlannerToolbar } from "./PlannerToolbar";
+import { rowKeyOf, type PlanCell, type PlannerRowMeta } from "./plannerTypes";
 
 interface PlannerViewProps {
   weekStart: Date;
 }
-
-interface RowMeta {
-  key: string;
-  projectId: string | null;
-  taskId: string | null;
-  projectName: string | null;
-  projectColor: string | null;
-  taskName: string | null;
-}
-
-interface PlanCell {
-  planned: number;
-  actual: number;
-}
-
-const rowKeyOf = (projectId: string | null, taskId: string | null) =>
-  `${projectId ?? ""}__${taskId ?? ""}`;
 
 // The Planner grid: same project/task rows × day columns as the timesheet, but
 // cells hold *planned* seconds (editable, per-user) with the week's actual
@@ -70,7 +46,7 @@ export function PlannerView({ weekStart }: PlannerViewProps) {
   const upsert = useUpsertAllocation();
   const bulkUpsert = useBulkUpsertAllocations();
 
-  const [extraRows, setExtraRows] = useState<RowMeta[]>([]);
+  const [extraRows, setExtraRows] = useState<PlannerRowMeta[]>([]);
   const [addOpen, setAddOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [copying, setCopying] = useState(false);
@@ -78,10 +54,10 @@ export function PlannerView({ weekStart }: PlannerViewProps) {
   const [draft, setDraft] = useState("");
 
   const { rows, cells } = useMemo(() => {
-    const rowMap = new Map<string, RowMeta>();
+    const rowMap = new Map<string, PlannerRowMeta>();
     const cellMap = new Map<string, PlanCell[]>();
 
-    const ensureRow = (m: RowMeta) => {
+    const ensureRow = (m: PlannerRowMeta) => {
       if (!rowMap.has(m.key)) {
         rowMap.set(m.key, m);
         cellMap.set(
@@ -151,7 +127,10 @@ export function PlannerView({ weekStart }: PlannerViewProps) {
     { planned: 0, actual: 0 }
   );
 
-  const commitCell = (row: RowMeta, dayIndex: number) => {
+  const handleStartEdit = (row: PlannerRowMeta, dayIndex: number) =>
+    setEditing({ row: row.key, day: dayIndex });
+
+  const commitCell = (row: PlannerRowMeta, dayIndex: number) => {
     const cell = cells.get(row.key)![dayIndex];
     setEditing(null);
     if (!row.projectId) return; // "Without project" rows can't be planned
@@ -215,283 +194,39 @@ export function PlannerView({ weekStart }: PlannerViewProps) {
     }
   };
 
-  const actionButtons = (
-    <>
-      <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setAddOpen(true)}>
-        <Plus className="h-4 w-4" />
-        Add row
-      </Button>
-      <Button
-        variant="outline"
-        size="sm"
-        className="gap-1.5"
-        onClick={handleCopyLastWeek}
-        disabled={copying}
-      >
-        {copying ? <Spinner /> : <Copy className="h-4 w-4" />}
-        Copy last week's plan
-      </Button>
-      <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setImportOpen(true)}>
-        <Upload className="h-4 w-4" />
-        Import CSV
-      </Button>
-    </>
+  const toolbar = (
+    <PlannerToolbar
+      onAddRow={() => setAddOpen(true)}
+      onCopyLastWeek={handleCopyLastWeek}
+      onImport={() => setImportOpen(true)}
+      copying={copying}
+    />
   );
-
-  // Planned on top (editable), actual beneath; warned only when over an actual
-  // plan — being on/under plan is normal, not a state to celebrate or punish.
-  //
-  // The `planned > 0` guard is the whole point: without it every tracked cell
-  // on a fresh Planner rendered amber, because `actual > 0 > planned = 0` reads
-  // as "over plan". Day one of the Planner was a full grid of warning colour
-  // for the crime of having worked. You can't be over a plan you never made.
-  //
-  // Which of the two lines is loud depends on which one has something to say.
-  // The plan line is on top because it is the edit target, but with no plan
-  // entered — the state of every new user, and of any week nobody pre-planned —
-  // the top line was an em-dash rendered at the dominant weight while the real
-  // tracked hours sat beneath it smaller and dimmer. A grid full of tracked
-  // time read as empty, and the first-run impression of the feature was that
-  // nothing had recorded.
-  //
-  // So an absent plan de-emphasises to a placeholder and the tracked figure
-  // takes the weight. Nothing moves: the top line stays the click target, and
-  // the row keeps one shape whether or not it is planned.
-  const renderPair = (cell: PlanCell, opts?: { alignRight?: boolean; strong?: boolean }) => {
-    const unplanned = cell.planned === 0 && cell.actual > 0;
-    return (
-      <span
-        className={cn("flex flex-col leading-tight", opts?.alignRight ? "items-end" : "items-center")}
-      >
-        <span
-          className={cn(
-            "tabular-nums",
-            unplanned
-              ? "text-micro font-normal text-muted-foreground/60"
-              : opts?.strong
-                ? "font-semibold"
-                : "font-medium"
-          )}
-        >
-          {cell.planned > 0 ? formatDurationShort(cell.planned) : "–"}
-        </span>
-        {(cell.planned > 0 || cell.actual > 0) && (
-          <span
-            className={cn(
-              "tabular-nums",
-              unplanned
-                ? cn("text-foreground", opts?.strong ? "font-semibold" : "font-medium")
-                : "text-micro",
-              !unplanned &&
-                (cell.planned > 0 && cell.actual > cell.planned
-                  ? "text-warning-ink"
-                  : "text-muted-foreground")
-            )}
-          >
-            {cell.actual > 0 ? formatDurationShort(cell.actual) : "–"}
-          </span>
-        )}
-      </span>
-    );
-  };
 
   return (
     <div className="flex h-full flex-col overflow-auto">
-      <span id={PLANNER_LOCKED_HELP_ID} className="sr-only">
-        Assign a project to this row before planning hours against it.
-      </span>
-      <table className={weekGrid.table}>
-        <thead className="sticky top-0 z-overlay bg-background">
-          <tr className="border-b text-xs text-muted-foreground">
-            {/* Column geometry is shared with the Timesheet — see
-                lib/weekGridColumns.ts, which also explains the small-screen
-                widths. */}
-            <th className={weekGrid.headTask}>
-              Task
-            </th>
-            <th className={weekGrid.headProject}>
-              {/* The cells stack two numbers and the only thing naming them was
-                  the totals row, at the far bottom-left of a scrolling grid. A
-                  reader meeting the Planner for the first time met the stack
-                  before the legend. */}
-              <span className="flex flex-col leading-tight">
-                <span>Project</span>
-                <span className="text-micro font-normal text-muted-foreground/80">
-                  planned / tracked
-                </span>
-              </span>
-            </th>
-            {days.map((d, i) => (
-              <th key={i} className="px-2 py-2 text-center font-medium">
-                <div className="uppercase">{format(d, "EEE")}</div>
-                <div className="text-micro text-muted-foreground">{format(d, "MMM d")}</div>
-              </th>
-            ))}
-            <th className="px-3 py-2 text-right font-medium">Total</th>
-          </tr>
-        </thead>
-        <tbody>
-          {isLoading ? (
-            <tr>
-              <td colSpan={10} className="py-16 text-center text-muted-foreground">
-                <Spinner size="lg" className="mx-auto" />
-              </td>
-            </tr>
-          ) : isError ? (
-            <tr>
-              <td colSpan={10} className="py-10">
-                <EmptyState
-                  icon={AlertTriangle}
-                  title="Couldn't load this week's plan"
-                  description="The request didn't get through. Your plan is safe."
-                  action={
-                    <Button variant="outline" size="sm" onClick={() => refetch()}>
-                      Try again
-                    </Button>
-                  }
-                  className="py-0"
-                />
-              </td>
-            </tr>
-          ) : rows.length === 0 ? (
-            <tr>
-              <td colSpan={10} className="py-10">
-                <EmptyState
-                  icon={CalendarRange}
-                  title="No plan for this week"
-                  description="Add a row to plan hours by project and day, copy last week's plan, or import allocations from a CSV."
-                  action={<div className="flex items-center gap-2">{actionButtons}</div>}
-                  className="py-0"
-                />
-              </td>
-            </tr>
-          ) : (
-            rows.map((row) => {
-              const rowCells = cells.get(row.key)!;
-              const rowTotal = rowCells.reduce(
-                (acc, c) => ({ planned: acc.planned + c.planned, actual: acc.actual + c.actual }),
-                { planned: 0, actual: 0 }
-              );
-              const plannable = row.projectId !== null;
-              return (
-                <tr
-                  key={row.key}
-                  className="group/row border-b border-border-strong transition-colors duration-fast ease-out-quart hover:bg-muted/30"
-                >
-                  <td className={weekGrid.cellTask}>
-                    <div className="w-[108px] truncate" title={row.taskName ?? "No task"}>
-                      {row.taskName ?? <span className="italic text-muted-foreground">No task</span>}
-                    </div>
-                  </td>
-                  <td className={weekGrid.cellProject}>
-                    {/* A fixed-width block, not just `truncate`: a <td>'s width is
-                        advisory in auto table layout, so the min-content of a long
-                        consultancy project name still expanded the column and pushed
-                        the day columns and Total off the pane (measured 1387px inside
-                        1056px). Bounding the content is what actually caps it. */}
-                    <span className="flex w-[124px] items-center gap-1.5">
-                      <ColorDot color={row.projectColor} />
-                      <span
-                        title={row.projectName ?? "Without project"}
-                        className={cn(
-                          "truncate",
-                          !row.projectName && "text-muted-foreground"
-                        )}
-                      >
-                        {row.projectName ?? "Without project"}
-                      </span>
-                    </span>
-                  </td>
-                  {rowCells.map((cell, dayIndex) => {
-                    const isEditing = editing?.row === row.key && editing?.day === dayIndex;
-                    return (
-                      <td key={dayIndex} className="px-1 py-1 text-center">
-                        {isEditing ? (
-                          <Input
-                            autoFocus
-                            value={draft}
-                            onChange={(e) => setDraft(e.target.value)}
-                            onBlur={() => commitCell(row, dayIndex)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") commitCell(row, dayIndex);
-                              if (e.key === "Escape") setEditing(null);
-                            }}
-                            className="h-11 w-16 px-1 text-center text-xs tabular-nums"
-                          />
-                        ) : (
-                          <button
-                            type="button"
-                            // See the timesheet's matching cell: aria-disabled
-                            // keeps the control reachable so its explanation is
-                            // actually announced.
-                            aria-disabled={!plannable || undefined}
-                            aria-describedby={!plannable ? PLANNER_LOCKED_HELP_ID : undefined}
-                            title={
-                              plannable && (cell.planned > 0 || cell.actual > 0)
-                                ? `Planned ${formatDurationShort(cell.planned)} · Tracked ${formatDurationShort(cell.actual)}`
-                                : undefined
-                            }
-                            onClick={() => {
-                              if (!plannable) return;
-                              setDraft(formatTimeInput(cell.planned || null));
-                              setEditing({ row: row.key, day: dayIndex });
-                            }}
-                            className={cn(
-                              "mx-auto flex h-11 w-16 items-center justify-center rounded border text-xs transition-colors duration-fast ease-out-quart",
-                              cell.planned > 0
-                                ? "border-border"
-                                : "border-transparent text-muted-foreground/40 hover:border-border",
-                              // Dashed is reserved for "empty, click to fill".
-                              plannable
-                                ? "hover:bg-muted"
-                                : "cursor-not-allowed opacity-50"
-                            )}
-                          >
-                            {renderPair(cell)}
-                          </button>
-                        )}
-                      </td>
-                    );
-                  })}
-                  <td className="px-3 py-2 text-right text-xs">
-                    {renderPair(rowTotal, { alignRight: true, strong: true })}
-                  </td>
-                </tr>
-              );
-            })
-          )}
-        </tbody>
-        {rows.length > 0 && (
-          <tfoot>
-            <tr className="border-t-2 font-medium">
-              <td
-                className={weekGrid.footLabel}
-                colSpan={2}
-              >
-                <span className="flex flex-col leading-tight">
-                  <span>Planned</span>
-                  <span className="text-micro">Tracked</span>
-                </span>
-              </td>
-              {dayTotals.map((t, i) => (
-                <td key={i} className="px-2 py-2 text-center text-xs">
-                  {renderPair(t)}
-                </td>
-              ))}
-              <td className="px-3 py-2 text-right text-xs">
-                {renderPair(grandTotal, { alignRight: true, strong: true })}
-              </td>
-            </tr>
-          </tfoot>
-        )}
-      </table>
+      <PlannerGrid
+        days={days}
+        rows={rows}
+        cells={cells}
+        dayTotals={dayTotals}
+        grandTotal={grandTotal}
+        isLoading={isLoading}
+        isError={isError}
+        onRetry={() => refetch()}
+        emptyStateActions={toolbar}
+        editing={editing}
+        draft={draft}
+        onDraftChange={setDraft}
+        onStartEdit={handleStartEdit}
+        onCommitCell={commitCell}
+        onCancelEdit={() => setEditing(null)}
+      />
 
       {/* The empty state owns the actions while the body is empty — rendering
           them here as well put the same labels twice on one screen, 84px
           apart, which reads as a rendering bug. One rule, four screens. */}
-      {rows.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 p-3">{actionButtons}</div>
-      )}
+      {rows.length > 0 && <div className="flex flex-wrap items-center gap-2 p-3">{toolbar}</div>}
 
       <AddTimesheetRowDialog
         open={addOpen}

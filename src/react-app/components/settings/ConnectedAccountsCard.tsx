@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
+import { SettingsListItem } from "./SettingsListItem";
 import { authClient } from "@/lib/auth-client";
 
 interface AccountRow {
@@ -72,18 +73,19 @@ export function ConnectedAccountsCard() {
           PROVIDERS.map((p) => {
             const linked = accounts.find((a) => a.providerId === p.id);
             return (
-              <div
+              <SettingsListItem
                 key={p.id}
-                className="flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-sm"
+                title={
+                  <>
+                    <span className="font-medium">{p.label}</span>
+                    {linked && (
+                      <Badge variant="secondary" className="text-micro">
+                        Connected
+                      </Badge>
+                    )}
+                  </>
+                }
               >
-                <div className="flex items-center gap-2">
-                  <span className="font-medium">{p.label}</span>
-                  {linked && (
-                    <Badge variant="secondary" className="text-micro">
-                      Connected
-                    </Badge>
-                  )}
-                </div>
                 {linked ? (
                   <Button
                     variant="ghost"
@@ -109,7 +111,7 @@ export function ConnectedAccountsCard() {
                     {link.isPending ? <Spinner size="sm" /> : "Connect"}
                   </Button>
                 )}
-              </div>
+              </SettingsListItem>
             );
           })
         )}

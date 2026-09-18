@@ -25,4 +25,8 @@ export const weekGrid = {
   cellProject: `${PROJECT_COL} ${PAD} bg-background group-hover/row:bg-muted/30`,
   /** The totals row spans both label columns, so it carries their combined width. */
   footLabel: `sticky left-0 z-sticky w-[196px] min-w-[196px] border-r border-border-strong bg-background ${PAD} text-muted-foreground sm:w-[280px] sm:min-w-[280px]`,
+  /** Inner content wrapper inside a task label cell — bounds a long task name so it truncates instead of stretching the sticky column (Timesheet/Planner). */
+  innerTask: "w-(--size-grid-label) truncate",
+  /** Inner content wrapper inside a project label cell — same bound for the dot + name pair. */
+  innerProject: "flex w-(--size-grid-meta) items-center gap-1.5",
 } as const;

@@ -16,7 +16,9 @@ import {
   ChartLegendContent,
   type ChartConfig,
 } from "@/components/ui/chart";
-import { formatDurationShort, formatPlainDate } from "@/lib/dateUtils";
+import { formatPlainDate } from "@/lib/dateUtils";
+import { Duration } from "@/components/ui/numeric";
+import { LegendSwatch } from "@/components/ui/legend-swatch";
 import type { WeeklyData, WeeklyDay } from "@/hooks/useReports";
 
 interface WeeklyBarChartProps {
@@ -141,16 +143,11 @@ export function WeeklyBarChart({ data }: WeeklyBarChartProps) {
                 <ChartTooltipContent
                   formatter={(value, name) => (
                     <>
-                      <div
-                        className="h-2.5 w-2.5 shrink-0 rounded-[2px]"
-                        style={{ background: `var(--color-${name})` }}
-                      />
+                      <LegendSwatch color={`var(--color-${name})`} />
                       <span className="text-muted-foreground">
                         {chartConfig[name as keyof typeof chartConfig]?.label ?? name}
                       </span>
-                      <span className="ml-auto font-mono font-medium tabular-nums text-foreground">
-                        {formatDurationShort(Number(value) * 3600)}
-                      </span>
+                      <Duration seconds={Number(value) * 3600} size="sm" weight="medium" className="ml-auto" />
                     </>
                   )}
                 />

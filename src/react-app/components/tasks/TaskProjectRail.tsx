@@ -17,8 +17,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ColorDot } from "@/components/ColorDot";
-import { ProjectForm } from "@/components/projects/ProjectForm";
-import { ClientForm } from "@/components/clients/ClientForm";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ProjectForm } from "@/components/forms/ProjectForm";
+import { ClientForm } from "@/components/forms/ClientForm";
 import { useProjects, useClients, useDeleteProject, useDeleteClient } from "@/hooks/useProjects";
 import { useWorkspaceRole } from "@/hooks/useWorkspaceRole";
 import { useMediaQuery, BELOW_MD } from "@/hooks/useMediaQuery";
@@ -49,6 +50,9 @@ export function TaskProjectRail({ tasks, projectId, onChange, clientId, onClient
   const [editClient, setEditClient] = useState<Client | null>(null);
   // Right-click on a row opens the same menu as its "..." button — one open at a time.
   const [openMenu, setOpenMenu] = useState<string | null>(null);
+  // Archive has no undo toast, so it goes through ConfirmDialog like every other destructive action.
+  const [archiveProject, setArchiveProject] = useState<Project | null>(null);
+  const [archiveClient, setArchiveClient] = useState<Client | null>(null);
 
   const clientById = useMemo(() => new Map(clients.map((c) => [c.id, c])), [clients]);
 
@@ -106,7 +110,7 @@ export function TaskProjectRail({ tasks, projectId, onChange, clientId, onClient
         className={cn(
           "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm font-medium",
           "transition-colors duration-fast ease-out-quart",
-          "focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
+          "focus-ring",
           projectId === null && clientId === null
             ? "bg-primary/10 text-primary-ink"
             : "text-foreground hover:bg-accent"
@@ -139,7 +143,7 @@ export function TaskProjectRail({ tasks, projectId, onChange, clientId, onClient
                   className={cn(
                     "flex min-w-0 flex-1 items-center justify-between gap-2 rounded px-1 py-0.5 text-left text-xs font-medium",
                     "transition-colors duration-fast ease-out-quart",
-                    "focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
+                    "focus-ring",
                     clientActive ? "bg-primary/10 text-primary-ink" : "text-muted-foreground hover:bg-accent"
                   )}
                 >
@@ -171,7 +175,7 @@ export function TaskProjectRail({ tasks, projectId, onChange, clientId, onClient
                       <Edit2 className="mr-2 h-3.5 w-3.5" />
                       Edit
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => deleteClient.mutate(client.id)}>
+                    <DropdownMenuItem onClick={() => setArchiveClient(client)}>
                       <Archive className="mr-2 h-3.5 w-3.5" />
                       Archive
                     </DropdownMenuItem>
@@ -199,7 +203,7 @@ export function TaskProjectRail({ tasks, projectId, onChange, clientId, onClient
                       className={cn(
                         "flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm",
                         "transition-colors duration-fast ease-out-quart",
-                        "focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
+                        "focus-ring",
                         active ? "bg-primary/10 text-primary-ink" : "text-foreground hover:bg-accent"
                       )}
                     >
@@ -229,7 +233,7 @@ export function TaskProjectRail({ tasks, projectId, onChange, clientId, onClient
                             <Edit2 className="mr-2 h-3.5 w-3.5" />
                             Edit
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => deleteProject.mutate(project.id)}>
+                          <DropdownMenuItem onClick={() => setArchiveProject(project)}>
                             <Archive className="mr-2 h-3.5 w-3.5" />
                             Archive
                           </DropdownMenuItem>
@@ -250,6 +254,29 @@ export function TaskProjectRail({ tasks, projectId, onChange, clientId, onClient
       {editClient && (
         <ClientForm client={editClient} open onClose={() => setEditClient(null)} />
       )}
+
+      <ConfirmDialog
+        open={!!archiveProject}
+        onOpenChange={(o) => !o && setArchiveProject(null)}
+        title={`Archive "${archiveProject?.name}"?`}
+        description="It disappears from active pickers. Nothing is deleted."
+        confirmLabel="Archive"
+        onConfirm={() => {
+          if (archiveProject) deleteProject.mutate(archiveProject.id);
+          setArchiveProject(null);
+        }}
+      />
+      <ConfirmDialog
+        open={!!archiveClient}
+        onOpenChange={(o) => !o && setArchiveClient(null)}
+        title={`Archive "${archiveClient?.name}"?`}
+        description="It disappears from active pickers. Nothing is deleted."
+        confirmLabel="Archive"
+        onConfirm={() => {
+          if (archiveClient) deleteClient.mutate(archiveClient.id);
+          setArchiveClient(null);
+        }}
+      />
     </nav>
   );
 }

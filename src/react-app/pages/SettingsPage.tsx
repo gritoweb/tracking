@@ -1,28 +1,15 @@
 import { useSearchParams } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { ThemeToggle } from "@/components/layout/ThemeToggle";
-import { SegmentedControl } from "@/components/ui/segmented-control";
-import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Spinner } from "@/components/ui/spinner";
-import { Download, Palette } from "lucide-react";
+import { Download } from "lucide-react";
 import { useEntries } from "@/hooks/useEntries";
 import { exportToCSV } from "@/lib/exportUtils";
 import { useUIStore } from "@/stores/uiStore";
 import { useUpdateSettings } from "@/hooks/useSettings";
 import { useRecolorProjects } from "@/hooks/useProjects";
 import { useWorkspaceRole } from "@/hooks/useWorkspaceRole";
-import { CURRENCIES } from "@/lib/currency";
+import { GeneralSettingsTab } from "@/components/settings/GeneralSettingsTab";
 import { IntegrationsCard } from "@/components/integrations/IntegrationsCard";
 import { CalendarSyncCard } from "@/components/settings/CalendarSyncCard";
 import { ProductivityCard } from "@/components/settings/ProductivityCard";
@@ -36,7 +23,7 @@ import { SessionsCard } from "@/components/settings/SessionsCard";
 import { ConnectedAccountsCard } from "@/components/settings/ConnectedAccountsCard";
 import { PasskeysCard } from "@/components/settings/PasskeysCard";
 import { DangerZoneCard } from "@/components/settings/DangerZoneCard";
-import { Kbd } from "@/components/ui/kbd";
+
 const TABS = ["general", "tracking", "workspace", "account"] as const;
 type Tab = (typeof TABS)[number];
 
@@ -129,177 +116,21 @@ export function SettingsPage() {
         </TabsList>
 
         <TabsContent value="general" className="mt-4 space-y-4">
-      {/* Appearance */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Appearance</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <Label>Theme</Label>
-              <p className="mt-1 text-xs leading-normal text-muted-foreground">
-                Choose light, dark, or system default
-              </p>
-            </div>
-            <ThemeToggle />
-          </div>
-
-          <Separator />
-
-          {/* Auto-assign colors */}
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="pr-2">
-              <Label htmlFor="pref-autocolor" className="flex items-center gap-1.5">
-                <Palette className="h-3.5 w-3.5" />
-                Auto-assign colors
-              </Label>
-              <p className="mt-1 text-xs leading-normal text-muted-foreground">
-                Give new projects a distinct color automatically.
-                {canManage && ' "Apply to existing" uses AI to color your current projects distinctly.'}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              {canManage && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => recolorProjects.mutate()}
-                // Reads as actionable while the setting it belongs to is off,
-                // which is the one state where pressing it contradicts the
-                // switch beside it.
-                disabled={recolorProjects.isPending || !autoAssignColors}
-                title={
-                  autoAssignColors
-                    ? "Spread distinct colors across your existing projects"
-                    : "Turn on auto-assign colors to recolor existing projects"
-                }
-              >
-                {recolorProjects.isPending ? (
-                  <Spinner size="sm" />
-                ) : (
-                  "Apply to existing"
-                )}
-              </Button>
-              )}
-              <Switch
-                id="pref-autocolor"
-                checked={autoAssignColors}
-                onCheckedChange={handleAutoAssignColorsChange}
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Keyboard shortcuts */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Keyboard shortcuts</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3 text-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-muted-foreground">Start / Stop timer</span>
-            <Kbd className="px-2">Alt+Shift+S</Kbd>
-          </div>
-          <Separator />
-          <div className="flex items-center justify-between">
-            <span className="text-muted-foreground">Discard running timer</span>
-            <Kbd className="px-2">Alt+Shift+X</Kbd>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Preferences */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Preferences</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-5">
-          {/* Time display format */}
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <Label>Time display format</Label>
-              <p className="mt-1 text-xs leading-normal text-muted-foreground">
-                How times are shown throughout the app
-              </p>
-            </div>
-            <SegmentedControl
-              label="Time display format"
-              options={[
-                { value: "24h", label: "24h" },
-                { value: "12h", label: "12h" },
-              ]}
-              value={timeFormat}
-              onChange={handleTimeFormatChange}
-            />
-          </div>
-
-          <Separator />
-
-          {/* Currency */}
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <Label htmlFor="pref-currency">Currency</Label>
-              <p className="mt-1 text-xs leading-normal text-muted-foreground">
-                Used for billable amounts in reports
-              </p>
-            </div>
-            <Select value={currency} onValueChange={handleCurrencyChange}>
-              <SelectTrigger className="w-48 text-sm" id="pref-currency">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {CURRENCIES.map((c) => (
-                  <SelectItem key={c.code} value={c.code}>
-                    {c.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <Separator />
-
-          {/* Week start */}
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <Label htmlFor="pref-week-start">Week starts on</Label>
-              <p className="mt-1 text-xs leading-normal text-muted-foreground">
-                First day of the week in the calendar and timesheet
-              </p>
-            </div>
-            <Select value={String(weekStart)} onValueChange={handleWeekStartChange}>
-              <SelectTrigger className="w-48 text-sm" id="pref-week-start">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="0">Sunday</SelectItem>
-                <SelectItem value="1">Monday</SelectItem>
-                <SelectItem value="6">Saturday</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <Separator />
-
-          {/* Show weekends */}
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <Label htmlFor="pref-weekends">Show weekends</Label>
-              <p className="mt-1 text-xs leading-normal text-muted-foreground">
-                Include Saturday and Sunday columns on the calendar
-              </p>
-            </div>
-            <Switch
-              id="pref-weekends"
-              checked={showWeekends}
-              onCheckedChange={handleShowWeekendsChange}
-            />
-          </div>
-        </CardContent>
-      </Card>
-
+          <GeneralSettingsTab
+            canManage={canManage}
+            autoAssignColors={autoAssignColors}
+            onAutoAssignColorsChange={handleAutoAssignColorsChange}
+            onRecolorProjects={() => recolorProjects.mutate()}
+            recoloringPending={recolorProjects.isPending}
+            timeFormat={timeFormat}
+            onTimeFormatChange={handleTimeFormatChange}
+            currency={currency}
+            onCurrencyChange={handleCurrencyChange}
+            weekStart={weekStart}
+            onWeekStartChange={handleWeekStartChange}
+            showWeekends={showWeekends}
+            onShowWeekendsChange={handleShowWeekendsChange}
+          />
         </TabsContent>
 
         <TabsContent value="tracking" className="mt-4 space-y-4">

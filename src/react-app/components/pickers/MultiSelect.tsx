@@ -1,7 +1,8 @@
 import { useState, type ReactNode } from "react";
-import { Check, ChevronDown, X } from "lucide-react";
+import { Check, ChevronDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ClearButton } from "@/components/ui/clear-button";
 import {
   Popover,
   PopoverContent,
@@ -122,14 +123,7 @@ export function MultiSelect({
               >
                 <OptionMark option={o} />
                 <span className="max-w-32 truncate">{o.label}</span>
-                <button
-                  type="button"
-                  onClick={() => toggle(o.value)}
-                  aria-label={`Remove ${o.label}`}
-                  className="rounded-sm text-muted-foreground transition-colors duration-fast ease-out-quart hover:text-foreground focus-visible:text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                >
-                  <X className="h-2.5 w-2.5" />
-                </button>
+                <ClearButton aria-label={`Remove ${o.label}`} onClick={() => toggle(o.value)} />
               </Badge>
             ))}
           </div>

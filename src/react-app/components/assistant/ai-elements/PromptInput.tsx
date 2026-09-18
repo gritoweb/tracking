@@ -63,6 +63,7 @@ export function PromptInput({
       }}
       className={cn(
         "flex items-end gap-2 rounded-lg border bg-transparent p-1.5",
+        // focus-within, not focus-visible: rings on the child Textarea's focus, and `focus-ring` has no such variant.
         "transition-[color,box-shadow] focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50"
       )}
     >

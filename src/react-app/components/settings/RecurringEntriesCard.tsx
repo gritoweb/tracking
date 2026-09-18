@@ -1,9 +1,12 @@
 import { useState } from "react";
 import { Plus, Pencil, Trash2, Repeat } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ProjectBadge } from "@/components/ProjectBadge";
+import { SettingsCardHeader } from "./SettingsCardHeader";
+import { SettingsListItem } from "./SettingsListItem";
 import { RecurringEntryDialog } from "./RecurringEntryDialog";
 import {
   useRecurringEntries,
@@ -29,6 +32,7 @@ export function RecurringEntriesCard() {
   const deleteRecurring = useDeleteRecurring();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<RecurringEntry | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<RecurringEntry | null>(null);
 
   const openNew = () => {
     setEditing(null);
@@ -41,16 +45,16 @@ export function RecurringEntriesCard() {
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between gap-2">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <Repeat className="h-4 w-4" />
-          Recurring entries
-        </CardTitle>
-        <Button variant="outline" size="sm" className="gap-1.5" onClick={openNew}>
-          <Plus className="h-3.5 w-3.5" />
-          Add
-        </Button>
-      </CardHeader>
+      <SettingsCardHeader
+        icon={Repeat}
+        title="Recurring entries"
+        action={
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={openNew}>
+            <Plus className="h-3.5 w-3.5" />
+            Add
+          </Button>
+        }
+      />
       <CardContent className="space-y-2">
         {items.length === 0 ? (
           <p className="text-sm leading-normal text-muted-foreground">
@@ -59,19 +63,18 @@ export function RecurringEntriesCard() {
           </p>
         ) : (
           items.map((r) => (
-            <div
+            <SettingsListItem
               key={r.id}
-              className="flex items-center justify-between gap-3 rounded-md border px-3 py-2"
-            >
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
+              title={
+                <>
                   <span className="truncate text-sm font-medium">
                     {r.description || <span className="text-muted-foreground">(no description)</span>}
                   </span>
                   {r.projectName && <ProjectBadge name={r.projectName} color={r.projectColor} />}
-                </div>
-                <p className="truncate text-xs text-muted-foreground">{scheduleLabel(r)}</p>
-              </div>
+                </>
+              }
+              subtitle={scheduleLabel(r)}
+            >
               <div className="flex shrink-0 items-center gap-1">
                 <Switch
                   checked={r.active}
@@ -93,13 +96,13 @@ export function RecurringEntriesCard() {
                   variant="ghost"
                   size="icon-sm"
                   className="text-muted-foreground hover:text-destructive"
-                  onClick={() => deleteRecurring.mutate(r.id)}
+                  onClick={() => setDeleteTarget(r)}
                   aria-label="Delete recurring entry"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
               </div>
-            </div>
+            </SettingsListItem>
           ))
         )}
       </CardContent>
@@ -112,6 +115,17 @@ export function RecurringEntriesCard() {
           onClose={() => setDialogOpen(false)}
         />
       )}
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(o) => !o && setDeleteTarget(null)}
+        title="Delete recurring entry?"
+        description={`"${deleteTarget?.description || "(no description)"}" will stop generating new time entries. This can't be undone.`}
+        onConfirm={() => {
+          if (deleteTarget) deleteRecurring.mutate(deleteTarget.id);
+          setDeleteTarget(null);
+        }}
+      />
     </Card>
   );
 }

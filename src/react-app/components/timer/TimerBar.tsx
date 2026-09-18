@@ -1,24 +1,16 @@
 import { useState, useRef, useEffect } from "react";
-import { Trash2, X } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { toastApiError } from "@/lib/toastApiError";
-import { TimerControl } from "./TimerControl";
-import { FavoritesMenu } from "./FavoritesMenu";
-import { ResumeLastButton } from "./ResumeLastButton";
 import { Input } from "@/components/ui/input";
-import { ProjectPicker } from "@/components/pickers/ProjectPicker";
-import { TaskPicker } from "@/components/pickers/TaskPicker";
-import { AssistantButton } from "@/components/assistant/AssistantButton";
-import { NotificationBell } from "@/components/layout/NotificationBell";
+import { TimerBarTagList } from "./TimerBarTagList";
+import { TimerBarProjectTask } from "./TimerBarProjectTask";
+import { TimerBarControls } from "./TimerBarControls";
 import { useTimerStore } from "@/stores/timerStore";
 import { useUIStore } from "@/stores/uiStore";
 import { useTimer, useTimerLifecycle, type StartTimerInput } from "@/hooks/useTimer";
 import { useUpdateEntry } from "@/hooks/useEntries";
 import { useTagColors } from "@/hooks/useProjects";
-import { BillableToggle } from "./BillableToggle";
+import { BillableToggle } from "@/components/pickers/BillableToggle";
 import { DEFAULT_ENTRY_BILLABLE } from "@shared/billable";
 import { cn } from "@/lib/utils";
 
@@ -215,139 +207,59 @@ export function TimerBar() {
         }}
         placeholder="What are you working on?"
         className={cn(
-          // `focus-visible:ring-0` left the app's most-used control with no
-          // focus indicator at all (WCAG 2.4.7) — and axe doesn't catch it,
-          // because the element is focusable and labelled, just invisible when
-          // focused. An inset ring keeps the borderless look in the bar while
-          // still marking focus.
-          //
-          // The one deliberate deviation from the house ring: `inset`, because
-          // an outset ring on a full-bleed borderless input clips against the
-          // bar, and full opacity rather than /50, because with `border-0` this
-          // ring is the *only* focus signal — the canonical pairing leans on
-          // `border-ring` for half its contrast. Width follows the scale.
-          //
-          // `min-w-0` is what lets `flex-1` actually yield at `xl`; without it
-          // the input's intrinsic min-width fights the row and the overflow
-          // comes out of whatever sits furthest right.
-          // `dark:bg-transparent` is not redundant: `Input` carries a
-          // `dark:bg-input/30` fill, so the same control read as a bare label in
-          // light mode and a bordered field in dark. The bar's design is a
-          // full-bleed borderless input in both — the placeholder and the inset
-          // focus ring are what mark it as a field.
+          // Inset + full opacity: border-0 leaves this ring as the input's only focus signal (WCAG 2.4.7).
+          // min-w-0 lets flex-1 yield at xl; without it the overflow pushes the rightmost control off-screen.
+          // dark:bg-transparent overrides Input's dark:bg-input/30 fill to keep the borderless look in both themes.
+          // eslint-disable-next-line no-restricted-syntax -- an inset ring: the house ring would draw outside this borderless field
           "tt-touch basis-full border-0 bg-transparent text-sm shadow-none placeholder:text-muted-foreground focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:ring-inset dark:bg-transparent xl:min-w-0 xl:flex-1 xl:basis-auto",
           isRunning && "font-medium"
         )}
       />
 
-      {/* Tags carried over from a suggestion/favorite — removable, but only
-          addable via those paths; full tag editing stays in the entry sheet. */}
-      {tags.length > 0 && (
-        <span className="flex shrink-0 items-center gap-1">
-          {tags.map((tag) => (
-            <Badge
-              key={tag}
-              variant="secondary"
-              className="gap-1 pr-1 text-xs font-normal"
-            >
-              <span
-                className="h-1.5 w-1.5 shrink-0 rounded-full"
-                style={{ backgroundColor: tagColor(tag) }}
-              />
-              <span className="max-w-32 truncate">{tag}</span>
-              <button
-                type="button"
-                aria-label={`Remove tag ${tag}`}
-                onClick={() => removeTag(tag)}
-                className="rounded-sm text-muted-foreground transition-colors duration-fast ease-out-quart hover:text-foreground focus-visible:text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </Badge>
-          ))}
-        </span>
-      )}
+      <TimerBarTagList tags={tags} tagColor={tagColor} onRemove={removeTag} />
 
-      {/* Project + task chips. Button's base is `shrink-0`, so these could never
-          give up width and the overflow came out of the controls instead.
-          `basis-28` is the load-bearing part: flex wraps a line *before* it
-          shrinks anything, so chips sized by their content (178px + 184px for a
-          real project name) pushed the control cluster onto a row of its own at
-          every width below `lg`. Sizing them from a 7rem basis and letting them
-          grow into the leftover keeps chips and controls on one line down to
-          768px, and the same 7rem as `min-w` stops them collapsing into
-          unreadable slivers when they genuinely don't fit. */}
-      {/* The clear button used to float loose next to the picker, unrelated to it at a
-          glance — one pill now houses both, so "this button clears that chip" reads
-          without having to notice they're separate elements. */}
-      <div className="tt-touch flex shrink items-center rounded-full max-xl:min-w-28 max-xl:grow max-xl:basis-28">
-        <ProjectPicker
-          value={projectId}
-          open={projectPickerOpen}
-          holdOpen={Boolean(pendingStart)}
-          onOpenChange={(open) => {
-            setProjectPickerOpen(open);
-            if (!open) setPendingStart(null);
-          }}
-          onChange={(id) => {
-            setProjectId(id);
-            useUIStore.getState().setLastProjectId(id);
-            setTaskId(null);
-            // Billable is its own toggle now — the project no longer sets it.
-            if (runningEntry) {
-              updateEntry.mutate({
-                id: runningEntry.id,
-                data: { projectId: id, taskId: null },
-              });
-            } else if (pendingStart) {
-              startTimer({
-                description: pendingStart.description ?? description,
-                tags: pendingStart.tags ?? tags,
-                billable: pendingStart.billable ?? billable,
-                projectId: id,
-                taskId: null,
-              });
-              setPendingStart(null);
-            }
-          }}
-          compact
-          className={cn("min-w-0 flex-1", isRunning || !projectId ? "rounded-full" : "rounded-l-full rounded-r-none")}
-        />
-        {/* The picker itself never offers "no project" — every entry needs one (D3) — but the
-            bar pre-fills the last one used while idle, and there was no way back to a blank slate. */}
-        {!isRunning && projectId && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-xs"
-            aria-label="Clear project"
-            onClick={() => {
-              setProjectId(null);
-              setTaskId(null);
-              useUIStore.getState().setLastProjectId(null);
-            }}
-            className="shrink-0 rounded-l-none rounded-r-full text-muted-foreground"
-          >
-            <X className="h-3.5 w-3.5" />
-          </Button>
-        )}
-      </div>
-
-      {/* Task picker — only when a project is selected */}
-      <TaskPicker
+      <TimerBarProjectTask
         projectId={projectId}
-        value={taskId}
-        onChange={(id) => {
+        taskId={taskId}
+        isRunning={isRunning}
+        projectPickerOpen={projectPickerOpen}
+        holdOpen={Boolean(pendingStart)}
+        onProjectPickerOpenChange={(open) => {
+          setProjectPickerOpen(open);
+          if (!open) setPendingStart(null);
+        }}
+        onProjectChange={(id) => {
+          setProjectId(id);
+          useUIStore.getState().setLastProjectId(id);
+          setTaskId(null);
+          // Billable is its own toggle now — the project no longer sets it.
+          if (runningEntry) {
+            updateEntry.mutate({
+              id: runningEntry.id,
+              data: { projectId: id, taskId: null },
+            });
+          } else if (pendingStart) {
+            startTimer({
+              description: pendingStart.description ?? description,
+              tags: pendingStart.tags ?? tags,
+              billable: pendingStart.billable ?? billable,
+              projectId: id,
+              taskId: null,
+            });
+            setPendingStart(null);
+          }
+        }}
+        onClearProject={() => {
+          setProjectId(null);
+          setTaskId(null);
+          useUIStore.getState().setLastProjectId(null);
+        }}
+        onTaskChange={(id) => {
           setTaskId(id);
           if (runningEntry) {
             updateEntry.mutate({ id: runningEntry.id, data: { taskId: id } });
           }
         }}
-        compact
-        // Empty, it's an icon and a chevron — nothing to grow for. Forcing 7rem on it
-        // anyway was the actual space hog on a tablet-width screen; only claim room
-        // once there's a task name that needs it.
-        className={cn("tt-touch shrink", taskId ? "max-xl:min-w-28 max-xl:grow max-xl:basis-28" : "shrink-0")}
       />
 
       {/* Billable toggle. Last in the draft sequence — description, then what
@@ -364,69 +276,23 @@ export function TimerBar() {
         }}
       />
 
-      {/* Control cluster. One shrink-0 unit, pushed right by `ml-auto`: it wraps
-          to its own row as a whole when the chips can't make room, and never
-          gives up width to them. Stop must be on screen at every width — that
-          is the invariant `e2e/timer-bar-responsive.spec.ts` guards. */}
-      <div className="ml-auto flex shrink-0 items-center gap-1 xl:gap-2">
-        {/* Discard button (only when running) */}
-        {isRunning && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className="tt-touch animate-in fade-in text-muted-foreground duration-base ease-out-quart hover:text-destructive"
-                onClick={() => setConfirmDiscard(true)}
-                aria-label="Discard timer"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              Discard timer
-              <span className="ml-1.5 text-background/60">Alt+Shift+X</span>
-            </TooltipContent>
-          </Tooltip>
-        )}
-
-        {/* Resume the last thing tracked, and one-click start from a saved
-            preset. Both are idle-only: neither means anything while a timer is
-            already running, and the slot they leave is what the Discard button
-            takes above. */}
-        {!isRunning && (
-          <>
-            <ResumeLastButton
-              // Starts directly rather than routing through `handleSuggestion`:
-              // that one focuses the description input, which reopens the
-              // suggestion popover over a timer that has just started. The
-              // running-entry sync refills the bar's fields from the created
-              // entry anyway.
-              onResume={(s) =>
-                startTimer({
-                  description: s.description,
-                  projectId: s.projectId,
-                  taskId: s.taskId,
-                  tags: s.tags,
-                  billable: s.billable,
-                })
-              }
-            />
-            <FavoritesMenu current={{ description, projectId, taskId, tags, billable }} />
-          </>
-        )}
-
-        {/* Combined elapsed + Start/Stop capsule */}
-        <TimerControl
-          isRunning={isRunning}
-          onStart={handleStart}
-          onStop={handleStop}
-          startDisabled={!projectId}
-        />
-
-        <NotificationBell />
-        <AssistantButton />
-      </div>
+      <TimerBarControls
+        isRunning={isRunning}
+        onDiscard={() => setConfirmDiscard(true)}
+        onResume={(s) =>
+          startTimer({
+            description: s.description,
+            projectId: s.projectId,
+            taskId: s.taskId,
+            tags: s.tags,
+            billable: s.billable,
+          })
+        }
+        favoritesCurrent={{ description, projectId, taskId, tags, billable }}
+        onStart={handleStart}
+        onStop={handleStop}
+        startDisabled={!projectId}
+      />
 
       <ConfirmDialog
         open={confirmDiscard}

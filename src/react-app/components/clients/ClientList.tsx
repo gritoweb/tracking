@@ -15,13 +15,14 @@ import { useUIStore } from "@/stores/uiStore";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ClientForm } from "./ClientForm";
+import { ClientForm } from "@/components/forms/ClientForm";
 import { useAllClients, useDeleteClient, useUpdateClient } from "@/hooks/useProjects";
 import { useWorkspaceRole } from "@/hooks/useWorkspaceRole";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -125,6 +126,7 @@ export function ClientList() {
   const navigate = useNavigate();
   const [showCreate, setShowCreate] = useState(false);
   const [editClient, setEditClient] = useState<Client | null>(null);
+  const [archiveTarget, setArchiveTarget] = useState<Client | null>(null);
 
   if (isLoading) {
     return (
@@ -178,6 +180,7 @@ export function ClientList() {
             key={client.id}
             className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg bg-card px-4 py-3 md:flex-nowrap"
           >
+            {/* raw: the row's own navigation target, not a standalone action */}
             <button
               type="button"
               onClick={() => navigate(`/clients/${client.id}`)}
@@ -249,7 +252,7 @@ export function ClientList() {
                   onClick={() =>
                     client.archived
                       ? updateClient.mutate({ id: client.id, data: { archived: false } })
-                      : deleteClient.mutate(client.id)
+                      : setArchiveTarget(client)
                   }
                 >
                   <Archive className="mr-2 h-3.5 w-3.5" />
@@ -280,6 +283,18 @@ export function ClientList() {
       {editClient && (
         <ClientForm client={editClient} open onClose={() => setEditClient(null)} />
       )}
+
+      <ConfirmDialog
+        open={!!archiveTarget}
+        onOpenChange={(open) => !open && setArchiveTarget(null)}
+        title="Archive client?"
+        description={`"${archiveTarget?.name}" and its projects will stop appearing in pickers and active lists. You can unarchive it later from its menu.`}
+        confirmLabel="Archive"
+        onConfirm={() => {
+          if (archiveTarget) deleteClient.mutate(archiveTarget.id);
+          setArchiveTarget(null);
+        }}
+      />
     </div>
   );
 }

@@ -40,7 +40,7 @@ export function TaskBoardColumn({
   const clusters = clusterTasks(tasks, groupBy, todayLocalDate());
 
   return (
-    <section aria-label={status.name} className="flex w-72 shrink-0 flex-col rounded-container">
+    <section aria-label={status.name} className="flex w-(--size-board-column) shrink-0 flex-col rounded-container">
       {/* The drop/scroll region is always full column height (so you can drop into the empty
           space below a short list), but the tint wrapper inside it is natural-height — it only
           covers the header and however many cards there are, same as the ClickUp reference,

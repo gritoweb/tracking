@@ -6,9 +6,6 @@ import {
 } from "@/components/reports/ReportHeader";
 import { AiSummaryDialog } from "@/components/reports/AiSummaryDialog";
 import { SummaryCards, SummaryMetricsMenu } from "@/components/reports/SummaryCards";
-import { DailyBarChart } from "@/components/reports/DailyBarChart";
-import { BreakdownCard } from "@/components/reports/BreakdownCard";
-import { SummaryTree } from "@/components/reports/SummaryTree";
 import { RoundingControl } from "@/components/reports/RoundingControl";
 import { SavedReportsMenu } from "@/components/reports/SavedReportsMenu";
 import type { ReportConfig } from "@/hooks/useSavedReports";
@@ -17,16 +14,7 @@ import {
   EMPTY_FILTERS,
   type ReportFilters,
 } from "@/components/reports/report-filters";
-import { WeeklyBarChart } from "@/components/reports/WeeklyBarChart";
-import { DetailedTable } from "@/components/reports/DetailedTable";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { ReportsSummarySection } from "@/components/reports/ReportsSummarySection";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -158,47 +146,10 @@ export function ReportsPage() {
     setHideAmounts(Boolean(cfg.hideAmounts));
   };
 
-  // Group-by + sub-group-by controls, shared by the breakdown and tree views.
-  const groupControls = (
-    <div className="flex items-center gap-1.5">
-      <Select
-        value={effectiveGroup}
-        onValueChange={(v) => {
-          const dim = v as GroupDimension;
-          setGroupDim(dim);
-          if (subGroupDim === dim) setSubGroupDim("none");
-        }}
-      >
-        <SelectTrigger className="h-7 w-24 text-xs" aria-label="Group by">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {groupDims.map((d) => (
-            <SelectItem key={d.value} value={d.value}>
-              {d.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <span className="text-xs text-muted-foreground">›</span>
-      <Select
-        value={effectiveSubGroup}
-        onValueChange={(v) => setSubGroupDim(v as SubGroupDimension)}
-      >
-        <SelectTrigger className="h-7 w-32 text-xs" aria-label="Sub-group by">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="none">No sub-group</SelectItem>
-          {groupDims.filter((d) => d.value !== effectiveGroup).map((d) => (
-            <SelectItem key={d.value} value={d.value}>
-              {d.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  );
+  const handleGroupChange = (dim: GroupDimension) => {
+    setGroupDim(dim);
+    if (subGroupDim === dim) setSubGroupDim("none");
+  };
 
   return (
     <div className="space-y-4 p-6">
@@ -262,67 +213,23 @@ export function ReportsPage() {
             hideAmount={hideAmounts}
           />
 
-          <Tabs defaultValue="summary">
-            <TabsList className="print:hidden">
-              <TabsTrigger value="summary">Summary</TabsTrigger>
-              <TabsTrigger value="weekly">Weekly</TabsTrigger>
-              <TabsTrigger value="detailed">
-                Detailed
-                {detailed.length > 0 && (
-                  <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 text-micro font-medium tabular-nums text-muted-foreground">
-                    {detailed.length}
-                  </span>
-                )}
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="summary" className="mt-4 space-y-4">
-              {/* [&>*]:min-w-0 — grid items default to min-width:auto, so a card
-                  containing a chart inherits the chart's min-content width and
-                  refuses to shrink. Without this the Summary column measured
-                  441px inside a 342px track at 390px wide. */}
-              <div className="grid gap-4 lg:grid-cols-2 [&>*]:min-w-0">
-                <DailyBarChart
-                  data={summary.daily}
-                  since={range.since}
-                  until={range.until}
-                />
-                {showTree && grouped ? (
-                  <SummaryTree data={grouped} showAmount={!hideAmounts} header={groupControls} />
-                ) : groupKey ? (
-                  <BreakdownCard
-                    title="Breakdown"
-                    rows={summary[groupKey] as ReportSummary["byProject"]}
-                    totalSeconds={summary.totalSeconds}
-                    showAmount={!hideAmounts}
-                    header={groupControls}
-                  />
-                ) : (
-                  <Skeleton className="h-60" />
-                )}
-              </div>
-            </TabsContent>
-
-            <TabsContent value="weekly" className="mt-4">
-              {weeklyLoading ? (
-                <Skeleton className="h-72" />
-              ) : (
-                <WeeklyBarChart data={weekly} />
-              )}
-            </TabsContent>
-
-            <TabsContent value="detailed" className="mt-4">
-              {detailedLoading ? (
-                <div className="space-y-2">
-                  {[...Array(6)].map((_, i) => (
-                    <Skeleton key={i} className="h-10" />
-                  ))}
-                </div>
-              ) : (
-                <DetailedTable entries={detailed} hideAmounts={hideAmounts} />
-              )}
-            </TabsContent>
-          </Tabs>
+          <ReportsSummarySection
+            summary={summary}
+            since={range.since}
+            until={range.until}
+            groupDims={groupDims}
+            effectiveGroup={effectiveGroup}
+            effectiveSubGroup={effectiveSubGroup}
+            onGroupChange={handleGroupChange}
+            onSubGroupChange={setSubGroupDim}
+            grouped={grouped}
+            showTree={showTree}
+            hideAmounts={hideAmounts}
+            weekly={weekly}
+            weeklyLoading={weeklyLoading}
+            detailed={detailed}
+            detailedLoading={detailedLoading}
+          />
         </>
       ) : (
         <EmptyState

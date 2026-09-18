@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { EntryFormSheet } from "@/components/entries/EntryFormSheet";
+import { EntryFormSheet } from "@/components/forms/EntryFormSheet";
 import { useCreateEntry } from "@/hooks/useEntries";
 import { useAllTasks, useCompleteTask } from "@/hooks/useTasks";
 import { useUIStore } from "@/stores/uiStore";

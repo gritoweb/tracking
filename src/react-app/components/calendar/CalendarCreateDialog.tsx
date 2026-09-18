@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { CalendarPlus } from "lucide-react";
-import { EntryFormSheet } from "@/components/entries/EntryFormSheet";
+import { EntryFormSheet } from "@/components/forms/EntryFormSheet";
 import { useCreateEntry } from "@/hooks/useEntries";
 import { useEntryDraft } from "@/hooks/useEntryDraft";
 

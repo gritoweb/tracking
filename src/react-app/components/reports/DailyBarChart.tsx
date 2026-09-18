@@ -18,6 +18,8 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 import { formatDurationShort, formatPlainDate } from "@/lib/dateUtils";
+import { Duration } from "@/components/ui/numeric";
+import { LegendSwatch } from "@/components/ui/legend-swatch";
 
 interface DailyData {
   date: string;
@@ -177,7 +179,7 @@ export function DailyBarChart({ data, since, until }: DailyBarChartProps) {
                   strokeOpacity={0.6}
                 />
               </svg>
-              avg {formatDurationShort(Math.round(avgHours * 3600))}/day
+              avg <Duration seconds={Math.round(avgHours * 3600)} size="xs" weight="medium" tone="muted" />/day
             </span>
           )}
         </div>
@@ -217,21 +219,18 @@ export function DailyBarChart({ data, since, until }: DailyBarChartProps) {
                     return (
                       <div className="flex w-full flex-col gap-0.5">
                         <div className="flex w-full items-center gap-2">
-                          <span
-                            className="h-2.5 w-2.5 shrink-0 rounded-[2px]"
-                            style={{ background: `var(--color-${name})` }}
-                          />
+                          <LegendSwatch color={`var(--color-${name})`} />
                           <span className="text-muted-foreground">{label}</span>
-                          <span className="ml-auto font-mono font-medium tabular-nums text-foreground">
-                            {formatDurationShort(Number(value) * 3600)}
-                          </span>
+                          <Duration seconds={Number(value) * 3600} size="sm" weight="medium" className="ml-auto" />
                         </div>
                         {/* Only under the last segment, so the day's total and
                             entry count appear once rather than per series. */}
                         {name === "nonBillable" && (
-                          <span className="mt-1 border-t pt-1 text-xs text-muted-foreground">
-                            {formatDurationShort(d.totalSeconds)} · {d.entryCount}{" "}
-                            {d.entryCount === 1 ? "entry" : "entries"}
+                          <span className="mt-1 flex items-center gap-1 border-t pt-1 text-xs text-muted-foreground">
+                            <Duration seconds={d.totalSeconds} size="xs" weight="medium" tone="muted" />
+                            <span>
+                              · {d.entryCount} {d.entryCount === 1 ? "entry" : "entries"}
+                            </span>
                           </span>
                         )}
                       </div>

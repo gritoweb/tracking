@@ -1,5 +1,44 @@
 # Changelog
 
+## 2026-09-18 (2)
+### Changed
+- **Every screen now composes the design-system primitives instead of restyling them.** The four
+  hand-made colour pickers became one `ColorSwatchPicker` (selection by outline, check ink by
+  contrast — two of them used `ring`, which means focus in this app, and one drew a white check that
+  vanished on light swatches); every hand-rolled checkbox became `Checkbox`, including the tri-state
+  select-all; avatars, stacks (now showing `+N`) and the dashed assign button became `Avatar`,
+  `AvatarStack` and `AssignButton`; chip ✕, menu trash, search fields, durations and legend squares
+  use their primitives. The approved visual changes were exactly those: one picker look, mono
+  durations and a round ✕, the danger card as a wash instead of a red border, the quick-add assign
+  button dashed, and the dragged card as wide as its column.
+- **No screen file is above ~300 lines any more.** Twenty-two components were split into a controller
+  that owns hooks and mutations plus pure view pieces — `TaskSheet` 625 → 287, `EntryRow` 551 → 281,
+  `TaskBoardList` 583 → 296, `ToolCard` 365 → 41 — with pure helpers moved to `lib/` under unit tests.
+  Timesheet and Planner share one `WeekGrid`; shared forms moved to `components/forms/` and shared
+  pickers to `components/pickers/`, so a feature no longer imports another feature's internals.
+- **Forms validate with the server's own schemas.** `ProjectForm`, `ClientForm`, `IntegrationForm` and
+  the recurring-entry dialog run on React Hook Form with `zodResolver` over `@shared/schemas`, so the
+  message under a field is the same one the API would return.
+- **Every destructive action without an undo asks first** through the shared `ConfirmDialog`: comments,
+  attachments, saved reports, favourites, notifications, passkeys, recurring templates, calendar
+  disconnect, archiving clients and projects, and removing a workspace member (who keeps their logged
+  hours). Time entries keep their undo toast, as decided.
+- **The design rules are build errors now.** Empty `.catch`, `onError` without its argument, raw hex or
+  Tailwind palette colours, resting shadows, arbitrary pixel sizes and hand-copied focus rings fail
+  `pnpm lint`; each legitimate exception carries a one-line reason. Each scope spreads its full rule
+  set because a flat-config `no-restricted-syntax` replaces, never merges. The worker's reinvented
+  neutral fallbacks now come from `NEUTRAL_SWATCH`, and the "Client review" status seed uses the
+  palette's pink instead of an off-palette hex.
+### Fixed
+- The recurring-entry dialog's Create button had become enabled with no project chosen during the form
+  migration; it is gated again.
+
+Verified: `npx tsc -b` exit 0, `pnpm lint` exit 0 with the rules as errors (a probe file with one
+violation of each rule fails all six), `pnpm test` 467 passed, `pnpm build` exit 0, `npx playwright
+test` 130/133 — the three failures were `database is locked` during sign-up under two workers and pass
+when rerun; one intermittent (`task-planning.spec.ts:24`, stop from a task card) passes 5/5 alone and
+is tracked in `plano.md` with its evidence.
+
 ## 2026-09-17 (11)
 ### Changed
 - **The front-end now gets its types from the worker's routes.** `src/react-app/lib/http-clients.ts`

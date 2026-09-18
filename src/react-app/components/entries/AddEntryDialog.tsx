@@ -1,6 +1,6 @@
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { EntryFormSheet } from "./EntryFormSheet";
+import { EntryFormSheet } from "@/components/forms/EntryFormSheet";
 import { useCreateEntry } from "@/hooks/useEntries";
 import { useEntryDraft } from "@/hooks/useEntryDraft";
 

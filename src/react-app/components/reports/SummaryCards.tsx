@@ -121,7 +121,8 @@ export function SummaryCards({
         <div className="mt-2 flex items-center gap-2 sm:mt-2">
           <Progress
             value={billablePercent}
-            className="h-1.5 w-16 flex-1 bg-success/15 sm:w-auto [&>div]:bg-success"
+            tone="success"
+            className="h-1.5 w-16 flex-1 sm:w-auto"
             aria-hidden
           />
           <span className="text-xs tabular-nums text-muted-foreground">

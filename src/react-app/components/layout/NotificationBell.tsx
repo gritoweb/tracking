@@ -5,6 +5,7 @@ import { formatDistanceToNow } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   useClearAllNotifications,
   useDeleteNotification,
@@ -18,6 +19,8 @@ import type { Notification } from "@shared/schemas";
 /** The always-visible entry point to a user's own notifications — same slot/style as AssistantButton. */
 export function NotificationBell() {
   const [open, setOpen] = useState(false);
+  const [confirmClearAll, setConfirmClearAll] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Notification | null>(null);
   const navigate = useNavigate();
   const { data } = useNotifications();
   const markRead = useMarkNotificationRead();
@@ -78,7 +81,7 @@ export function NotificationBell() {
                 variant="ghost"
                 size="sm"
                 className="h-auto p-0 text-xs text-muted-foreground hover:text-destructive"
-                onClick={() => clearAll.mutate()}
+                onClick={() => setConfirmClearAll(true)}
               >
                 Clear all
               </Button>
@@ -102,6 +105,7 @@ export function NotificationBell() {
                   !n.isRead && "bg-primary/5"
                 )}
               >
+                {/* raw: the row's own open target, not a standalone action */}
                 <button type="button" onClick={() => openNotification(n)} className="flex min-w-0 flex-1 gap-2.5 text-left">
                   <span
                     aria-hidden
@@ -119,7 +123,7 @@ export function NotificationBell() {
                   variant="ghost"
                   size="icon-xs"
                   aria-label="Dismiss notification"
-                  onClick={() => deleteNotification.mutate(n.id)}
+                  onClick={() => setDeleteTarget(n)}
                   className="tt-reveal shrink-0 self-start text-muted-foreground"
                 >
                   <X className="h-3 w-3" />
@@ -129,6 +133,29 @@ export function NotificationBell() {
           )}
         </div>
       </PopoverContent>
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(o) => !o && setDeleteTarget(null)}
+        title="Dismiss notification?"
+        description="This notification will be permanently removed."
+        confirmLabel="Dismiss"
+        onConfirm={() => {
+          if (deleteTarget) deleteNotification.mutate(deleteTarget.id);
+          setDeleteTarget(null);
+        }}
+      />
+      <ConfirmDialog
+        open={confirmClearAll}
+        onOpenChange={setConfirmClearAll}
+        title="Clear all notifications?"
+        description="Every notification will be permanently removed. This cannot be undone."
+        confirmLabel="Clear all"
+        onConfirm={() => {
+          clearAll.mutate();
+          setConfirmClearAll(false);
+        }}
+      />
     </Popover>
   );
 }

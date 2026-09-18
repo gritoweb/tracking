@@ -1,4 +1,5 @@
-import { Star, Plus, X, Play } from "lucide-react";
+import { useState } from "react";
+import { Star, Plus, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -9,6 +10,8 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { RemoveButton } from "@/components/ui/remove-button";
 import { ColorDot } from "@/components/ColorDot";
 import { useFavorites, useCreateFavorite, useDeleteFavorite } from "@/hooks/useFavorites";
 import { useTimer } from "@/hooks/useTimer";
@@ -34,6 +37,8 @@ export function FavoritesMenu({ current }: FavoritesMenuProps) {
   const createFavorite = useCreateFavorite();
   const deleteFavorite = useDeleteFavorite();
   const { startTimer } = useTimer();
+  // Deletion has no undo, so it goes through the shared confirm dialog rather than firing on click.
+  const [pendingRemove, setPendingRemove] = useState<Favorite | null>(null);
 
   const start = (f: Favorite) =>
     startTimer({
@@ -117,18 +122,13 @@ export function FavoritesMenu({ current }: FavoritesMenuProps) {
                 <span className="text-muted-foreground"> · {f.projectName}</span>
               )}
             </span>
-            <button
-              type="button"
-              className="tt-reveal shrink-0 rounded p-0.5 text-muted-foreground hover:text-destructive"
-              title="Remove favorite"
+            <RemoveButton
               aria-label="Remove favorite"
               onClick={(e) => {
                 e.stopPropagation();
-                deleteFavorite.mutate(f.id);
+                setPendingRemove(f);
               }}
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
+            />
           </DropdownMenuItem>
         ))}
 
@@ -147,6 +147,18 @@ export function FavoritesMenu({ current }: FavoritesMenuProps) {
           </>
         )}
       </DropdownMenuContent>
+
+      <ConfirmDialog
+        open={Boolean(pendingRemove)}
+        onOpenChange={(open) => !open && setPendingRemove(null)}
+        title="Remove favorite?"
+        description={`"${pendingRemove?.description || pendingRemove?.projectName || "This favorite"}" will be removed from your list.`}
+        confirmLabel="Remove"
+        onConfirm={() => {
+          if (pendingRemove) deleteFavorite.mutate(pendingRemove.id);
+          setPendingRemove(null);
+        }}
+      />
     </DropdownMenu>
   );
 }

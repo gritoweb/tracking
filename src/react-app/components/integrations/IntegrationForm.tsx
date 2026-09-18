@@ -1,7 +1,9 @@
 import { useState } from "react";
+import { useForm, useWatch } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Field, FieldLabel, FieldMessage } from "@/components/forms/Field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -21,11 +23,8 @@ import {
   useUpdateIntegration,
   useTestIntegration,
 } from "@/hooks/useIntegrations";
-import type {
-  CreateIntegration,
-  Integration,
-  IntegrationType,
-} from "@shared/schemas";
+import { buildFormSchema, type IntegrationFormValues } from "./IntegrationForm.schema";
+import type { CreateIntegration, Integration, IntegrationType } from "@shared/schemas";
 
 interface IntegrationFormProps {
   integration?: Integration;
@@ -45,14 +44,6 @@ const BASE_URL_HINT: Record<IntegrationType, string> = {
 
 export function IntegrationForm({ integration, open, onClose }: IntegrationFormProps) {
   const isEdit = !!integration;
-  const [type, setType] = useState<IntegrationType>(integration?.type ?? "workfront");
-  const [name, setName] = useState(integration?.name ?? "");
-  const [baseUrl, setBaseUrl] = useState(integration?.baseUrl ?? "");
-  // Credentials are never returned from the server; blank means "keep existing".
-  const [apiKey, setApiKey] = useState("");
-  const [tenantId, setTenantId] = useState("");
-  const [clientId, setClientId] = useState("");
-  const [clientSecret, setClientSecret] = useState("");
   const [testStatus, setTestStatus] = useState<{ ok: boolean; message: string } | null>(null);
 
   const createIntegration = useCreateIntegration();
@@ -60,56 +51,55 @@ export function IntegrationForm({ integration, open, onClose }: IntegrationFormP
   const testIntegration = useTestIntegration();
   const isPending = createIntegration.isPending || updateIntegration.isPending;
 
-  const buildCredentials = ():
-    | { apiKey: string }
-    | { tenantId: string; clientId: string; clientSecret: string }
-    | null => {
-    if (type === "workfront") {
-      return apiKey ? { apiKey } : null;
+  const form = useForm<IntegrationFormValues>({
+    resolver: zodResolver(buildFormSchema(isEdit)),
+    defaultValues: {
+      type: integration?.type ?? "workfront",
+      name: integration?.name ?? "",
+      baseUrl: integration?.baseUrl ?? "",
+      // Credentials are never returned from the server; blank means "keep existing".
+      apiKey: "",
+      tenantId: "",
+      clientId: "",
+      clientSecret: "",
+    },
+  });
+
+  const type = useWatch({ control: form.control, name: "type" });
+
+  const buildCredentials = (values: IntegrationFormValues) => {
+    if (values.type === "workfront") {
+      return values.apiKey ? { apiKey: values.apiKey } : null;
     }
-    if (tenantId || clientId || clientSecret) {
-      return { tenantId, clientId, clientSecret };
+    if (values.tenantId || values.clientId || values.clientSecret) {
+      return { tenantId: values.tenantId, clientId: values.clientId, clientSecret: values.clientSecret };
     }
     return null;
   };
 
-  const credentialsComplete =
-    type === "workfront"
-      ? !!apiKey
-      : !!(tenantId && clientId && clientSecret);
+  const onSubmit = form.handleSubmit((values) => {
+    const credentials = buildCredentials(values);
 
-  // Create requires full credentials; edit only requires them if changing.
-  const canSubmit =
-    !!name.trim() &&
-    !!baseUrl.trim() &&
-    (isEdit || credentialsComplete) &&
-    !isPending;
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!canSubmit) return;
-    const credentials = buildCredentials();
-
-    if (isEdit) {
+    if (isEdit && integration) {
       updateIntegration.mutate(
         {
-          id: integration!.id,
+          id: integration.id,
           data: {
-            name,
-            baseUrl,
+            name: values.name,
+            baseUrl: values.baseUrl,
             ...(credentials ? { credentials } : {}),
           },
         },
         { onSuccess: onClose }
       );
     } else {
-      // credentialsComplete guarantees credentials is non-null here.
+      // The schema guarantees full credentials here (create requires them).
       createIntegration.mutate(
-        { type, name, baseUrl, credentials } as CreateIntegration,
+        { type: values.type, name: values.name, baseUrl: values.baseUrl, credentials } as CreateIntegration,
         { onSuccess: onClose }
       );
     }
-  };
+  });
 
   const handleTest = async () => {
     if (!integration) return;
@@ -129,14 +119,14 @@ export function IntegrationForm({ integration, open, onClose }: IntegrationFormP
           <DialogTitle>{isEdit ? "Edit integration" : "Add integration"}</DialogTitle>
         </DialogHeader>
 
-        <form className="space-y-4 py-2" onSubmit={handleSubmit} noValidate>
+        <form className="space-y-4 py-2" onSubmit={onSubmit} noValidate>
           {/* Type */}
-          <div className="space-y-1.5">
-            <Label htmlFor="integration-type">System</Label>
+          <Field>
+            <FieldLabel htmlFor="integration-type">System</FieldLabel>
             {isEdit ? (
               <p className="text-sm text-muted-foreground">{TYPE_LABELS[type]}</p>
             ) : (
-              <Select value={type} onValueChange={(v) => setType(v as IntegrationType)}>
+              <Select value={type} onValueChange={(v) => form.setValue("type", v as IntegrationType)}>
                 <SelectTrigger id="integration-type">
                   <SelectValue />
                 </SelectTrigger>
@@ -146,33 +136,32 @@ export function IntegrationForm({ integration, open, onClose }: IntegrationFormP
                 </SelectContent>
               </Select>
             )}
-          </div>
+          </Field>
 
           {/* Name */}
-          <div className="space-y-1.5">
-            <Label>Name</Label>
-            <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Workfront – Acme"
-              autoFocus
-            />
-          </div>
+          <Field>
+            <FieldLabel htmlFor="integration-name">Name</FieldLabel>
+            <Input id="integration-name" {...form.register("name")} placeholder="e.g. Workfront – Acme" autoFocus />
+            <FieldMessage name="name" />
+          </Field>
 
           {/* Base URL */}
-          <div className="space-y-1.5">
-            <Label>{type === "workfront" ? "Workfront domain" : "Organization URL"}</Label>
+          <Field>
+            <FieldLabel htmlFor="integration-base-url">
+              {type === "workfront" ? "Workfront domain" : "Organization URL"}
+            </FieldLabel>
             <Input
-              value={baseUrl}
-              onChange={(e) => setBaseUrl(e.target.value)}
+              id="integration-base-url"
+              {...form.register("baseUrl")}
               placeholder={BASE_URL_HINT[type]}
               autoComplete="off"
             />
-          </div>
+            <FieldMessage name="baseUrl" />
+          </Field>
 
           {/* Credentials */}
           <div className="space-y-2">
-            <Label>Credentials</Label>
+            <FieldLabel>Credentials</FieldLabel>
             <p className="text-xs text-muted-foreground">
               {type === "workfront"
                 ? "Create an API key in Workfront (Setup → System → API Keys), or reuse your personal API key."
@@ -180,40 +169,40 @@ export function IntegrationForm({ integration, open, onClose }: IntegrationFormP
               {isEdit ? " Leave blank to keep the current credentials." : ""}
             </p>
             {type === "workfront" ? (
-              <Input
-                type="password"
-                placeholder="API key"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                autoComplete="off"
-              />
-            ) : (
-              <div className="space-y-2">
-                <Input
-                  placeholder="Tenant ID"
-                  value={tenantId}
-                  onChange={(e) => setTenantId(e.target.value)}
-                  autoComplete="off"
-                />
-                <Input
-                  placeholder="Client ID"
-                  value={clientId}
-                  onChange={(e) => setClientId(e.target.value)}
-                  autoComplete="off"
-                />
+              <Field>
                 <Input
                   type="password"
-                  placeholder="Client secret"
-                  value={clientSecret}
-                  onChange={(e) => setClientSecret(e.target.value)}
+                  placeholder="API key"
                   autoComplete="off"
+                  {...form.register("apiKey")}
                 />
+                <FieldMessage name="apiKey" />
+              </Field>
+            ) : (
+              <div className="space-y-2">
+                <Field>
+                  <Input placeholder="Tenant ID" autoComplete="off" {...form.register("tenantId")} />
+                  <FieldMessage name="tenantId" />
+                </Field>
+                <Field>
+                  <Input placeholder="Client ID" autoComplete="off" {...form.register("clientId")} />
+                  <FieldMessage name="clientId" />
+                </Field>
+                <Field>
+                  <Input
+                    type="password"
+                    placeholder="Client secret"
+                    autoComplete="off"
+                    {...form.register("clientSecret")}
+                  />
+                  <FieldMessage name="clientSecret" />
+                </Field>
               </div>
             )}
           </div>
 
           {testStatus && (
-            <p className={`text-xs ${testStatus.ok ? "text-success-ink" : "text-destructive"}`}>
+            <p className={testStatus.ok ? "text-xs text-success-ink" : "text-xs text-destructive"}>
               {testStatus.message}
             </p>
           )}
@@ -233,7 +222,7 @@ export function IntegrationForm({ integration, open, onClose }: IntegrationFormP
             <Button type="button" variant="ghost" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" disabled={!canSubmit}>
+            <Button type="submit" disabled={isPending}>
               {isEdit ? "Save changes" : "Add integration"}
             </Button>
           </DialogFooter>

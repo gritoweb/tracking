@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
+import { SettingsRow } from "./SettingsRow";
 import {
   Select,
   SelectContent,
@@ -81,30 +81,23 @@ export function ProductivityCard() {
         {/* Notifications permission */}
         {notificationsSupported() && !granted && (
           <>
-            <div className="flex items-center justify-between">
-              <div className="pr-4">
-                <Label>Browser notifications</Label>
-                <p className="mt-1 text-xs leading-normal text-muted-foreground">
-                  Required for reminders, pomodoro, and assistant alerts when the tab
-                  is in the background.
-                </p>
-              </div>
+            <SettingsRow
+              label="Browser notifications"
+              description="Required for reminders, pomodoro, and assistant alerts when the tab is in the background."
+            >
               <Button variant="outline" size="sm" onClick={enableNotifications}>
                 Enable
               </Button>
-            </div>
+            </SettingsRow>
             <Separator />
           </>
         )}
 
-        {/* Idle detection */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="pr-2">
-            <Label htmlFor="pref-idle">Idle detection</Label>
-            <p className="mt-1 text-xs leading-normal text-muted-foreground">
-              Prompt to keep or discard time when you step away while tracking.
-            </p>
-          </div>
+        <SettingsRow
+          htmlFor="pref-idle"
+          label="Idle detection"
+          description="Prompt to keep or discard time when you step away while tracking."
+        >
           <div className="flex flex-wrap items-center gap-3 sm:justify-end">
             <MinuteSelect
               value={p.idleThresholdMinutes}
@@ -118,18 +111,15 @@ export function ProductivityCard() {
               onCheckedChange={(v) => setProductivity({ idleEnabled: v })}
             />
           </div>
-        </div>
+        </SettingsRow>
 
         <Separator />
 
-        {/* Tracking reminders */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="pr-2">
-            <Label htmlFor="pref-reminder">Not-tracking reminders</Label>
-            <p className="mt-1 text-xs leading-normal text-muted-foreground">
-              Nudge me when no timer is running.
-            </p>
-          </div>
+        <SettingsRow
+          htmlFor="pref-reminder"
+          label="Not-tracking reminders"
+          description="Nudge me when no timer is running."
+        >
           <div className="flex flex-wrap items-center gap-3 sm:justify-end">
             <MinuteSelect
               value={p.reminderIntervalMinutes}
@@ -143,36 +133,29 @@ export function ProductivityCard() {
               onCheckedChange={(v) => setProductivity({ reminderEnabled: v })}
             />
           </div>
-        </div>
+        </SettingsRow>
 
         <Separator />
 
-        {/* Assistant nudge alerts */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="pr-2">
-            <Label htmlFor="pref-aski-alerts">Assistant nudge alerts</Label>
-            <p className="mt-1 text-xs leading-normal text-muted-foreground">
-              Toast when the assistant notices something new — untracked meetings,
-              long-running timers. Each nudge alerts once.
-            </p>
-          </div>
+        <SettingsRow
+          htmlFor="pref-aski-alerts"
+          label="Assistant nudge alerts"
+          description="Toast when the assistant notices something new — untracked meetings, long-running timers. Each nudge alerts once."
+        >
           <Switch
             id="pref-aski-alerts"
             checked={alertsEnabled}
             onCheckedChange={setAlertsEnabled}
           />
-        </div>
+        </SettingsRow>
 
         <Separator />
 
-        {/* Pomodoro */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="pr-2">
-            <Label htmlFor="pref-pomodoro">Pomodoro</Label>
-            <p className="mt-1 text-xs leading-normal text-muted-foreground">
-              Focus / break cycle alerts while a timer runs.
-            </p>
-          </div>
+        <SettingsRow
+          htmlFor="pref-pomodoro"
+          label="Pomodoro"
+          description="Focus / break cycle alerts while a timer runs."
+        >
           <div className="flex flex-wrap items-center gap-2 sm:justify-end">
             <MinuteSelect
               value={p.pomodoroWorkMinutes}
@@ -193,7 +176,7 @@ export function ProductivityCard() {
               onCheckedChange={(v) => setProductivity({ pomodoroEnabled: v })}
             />
           </div>
-        </div>
+        </SettingsRow>
       </CardContent>
     </Card>
   );

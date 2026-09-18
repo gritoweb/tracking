@@ -329,7 +329,7 @@
   --scrim: oklch(0.22 0.006 30 / 50%);
 
   /* Named for Lote 5 to adopt via `w-(--size-x)`/`max-h-(--size-x)`; only `ui/dialog.tsx`'s `size` variant consumes one so far. */
-  --size-board-column: 17rem; /* TaskCard.tsx's `w-[272px]` — the board column itself is still `w-72` (288px) and should match this. */
+  --size-board-column: 18rem; /* the board column and its drag overlay share it, so a dragged card keeps the column's width */
   --size-grid-label: 6.75rem; /* TimesheetView/PlannerView's duplicated `w-[108px]` row-label column. */
   --size-grid-meta: 7.75rem; /* TimesheetView/PlannerView's duplicated `w-[124px]` row-meta column. */
   --size-cap-60vh: 60vh; /* DetailedTable's scroll body. */

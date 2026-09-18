@@ -1,31 +1,13 @@
-import {
-  ChevronLeft,
-  ChevronRight,
-  Plus,
-  Sparkles,
-  ArrowRight,
-  ChevronDown,
-} from "lucide-react";
-import { Link } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { TimerViewSwitcher } from "./TimerViewSwitcher";
 import { DraftDayButton } from "@/components/drafts/DraftDayButton";
 import { CalendarViewOptions } from "./CalendarViewOptions";
-import { VIEW_LABELS } from "./calendarViewLabels";
-import { ListRangePicker } from "./ListRangePicker";
+import { TimerPeriodNav } from "./TimerPeriodNav";
+import { TimerAddEntrySplitButton } from "./TimerAddEntrySplitButton";
+import { TimerLoggedBar } from "./TimerLoggedBar";
 import type { TimerView } from "@/stores/uiStore";
 import type { CalendarViewType } from "@/components/calendar/CalendarView";
 import {
   formatPeriodLabel,
-  formatDurationShort,
   formatListRangeLabel,
   summarizePeriod,
   type ListRangeKey,
@@ -134,93 +116,26 @@ export function TimerWorkspaceHeader({
   return (
     <div className="border-b">
       <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2">
-        <div className="flex items-center gap-2">
-          {isListView ? (
-            <ListRangePicker
-              value={listRangeKey}
-              customSince={listRangeSince}
-              customUntil={listRangeUntil}
-              onChange={onListRangeChange}
-            />
-          ) : (
-            <>
-              <div className="flex items-center" data-slot="period-nav">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={onPrev}
-                      aria-label={`Previous ${periodNoun}`}
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Previous {periodNoun}</TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={onNext}
-                      aria-label={`Next ${periodNoun}`}
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Next {periodNoun}</TooltipContent>
-                </Tooltip>
-              </div>
-            </>
-          )}
-          {/* One "back to now" control for every view, including the list —
-              which previously had none, so leaving Split stranded it on
-              "Custom range · Monday, Aug 17" with the dropdown as the only way
-              home. "Today" has always meant "the period containing today"
-              (it returns a week view to this week), so pointing the list at
-              This week is the same promise, not a new one.
-
-              Redundant once the visible period already contains now. Disabled
-              rather than hidden so the toolbar doesn't reflow as you step
-              through periods; `invisible` (not `hidden`) when the label itself
-              already says "Today" — same reserved box, no duplicated word, and
-              out of the a11y tree. */}
-          {/* Deliberately visible-but-disabled when the period already contains
-              today, never hidden. An earlier pass made it `invisible` +
-              `aria-hidden` to avoid the label reading "Today Today" beside the
-              h1 — which traded an affordance for a cosmetic nit, and fired at
-              exactly the wrong moment: switching to Split collapses the period
-              to a single day, so the one period control vanished from both the
-              screen and the a11y tree just as a user would reach for it. */}
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8"
-            onClick={isListView ? () => onListRangeChange("thisWeek") : onToday}
-            disabled={periodIncludesToday}
-          >
-            Today
-          </Button>
-          <h1 className="ml-1 text-sm font-semibold tracking-tight tabular-nums">
-            {isListView
+        <TimerPeriodNav
+          isListView={isListView}
+          listRangeKey={listRangeKey}
+          listRangeSince={listRangeSince}
+          listRangeUntil={listRangeUntil}
+          onListRangeChange={onListRangeChange}
+          onPrev={onPrev}
+          onNext={onNext}
+          periodNoun={periodNoun}
+          onToday={onToday}
+          periodIncludesToday={periodIncludesToday}
+          label={
+            isListView
               ? formatListRangeLabel(listRangeKey, since, until, wso)
-              : formatPeriodLabel(since, until, { weekStamp: !isDayView })}
-          </h1>
-          {/* Names the effect, not the cause. "narrow pane" described the
-              app's own layout state — a fact about the container, offered to a
-              user who asked for a week and got five days. The full sentence
-              already lives in the View options popover; this is its short form
-              in the same vocabulary. */}
-          {densityReduced && (
-            <span
-              className="rounded-full bg-muted px-2 py-0.5 text-micro font-medium text-muted-foreground"
-              title={`The pane is too narrow for ${VIEW_LABELS[requestedCalendarView]}.`}
-            >
-              Showing {VIEW_LABELS[calendarView]}
-            </span>
-          )}
-        </div>
+              : formatPeriodLabel(since, until, { weekStamp: !isDayView })
+          }
+          densityReduced={densityReduced}
+          calendarView={calendarView}
+          requestedCalendarView={requestedCalendarView}
+        />
 
         <div className="flex flex-wrap items-center gap-2">
           {showCalendarControls && (
@@ -236,129 +151,15 @@ export function TimerWorkspaceHeader({
             />
           )}
 
-          <DraftDayButton
-            onClick={onDraftDay}
-            pending={draftPending}
-            pendingCount={draftCount}
-          />
+          <DraftDayButton onClick={onDraftDay} pending={draftPending} pendingCount={draftCount} />
 
           <TimerViewSwitcher view={view} onChange={onViewChange} allowSplit={allowSplit} />
 
-          {/* Split control: Add entry stays a single click (it's the primary
-              action here); AI quick-add moves behind the caret rather than
-              sitting at equal weight beside it. */}
-          <div className="flex items-center rounded-md border">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  className="rounded-r-none"
-                  onClick={onAddEntry}
-                  aria-label="Add entry"
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Add entry</TooltipContent>
-            </Tooltip>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                {/* Same icon-sm token as its sibling: a shorter caret left gaps
-                    inside the shared border and needed an arbitrary divider. The
-                    separator is the button's own left border. */}
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  className="w-6 rounded-l-none border-l"
-                  aria-label="More ways to add"
-                >
-                  <ChevronDown className="h-3 w-3 opacity-60" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onSelect={onAiQuickAdd}>
-                  <Sparkles className="mr-2 h-3.5 w-3.5" />
-                  Add with AI…
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+          <TimerAddEntrySplitButton onAddEntry={onAddEntry} onAiQuickAdd={onAiQuickAdd} />
         </div>
       </div>
 
-      {/* Logged-this-period bar */}
-      <div className="flex items-center gap-3 px-4 pb-2">
-        {/* Name the period the number covers. "Logged" alone meant a different
-            span in each view, so the total appeared to contradict itself when
-            you switched tabs. */}
-        <span className="whitespace-nowrap text-xs font-medium text-muted-foreground">
-          Logged <span className="text-foreground">{periodSummary}</span>
-        </span>
-        {/* At 0m the bar was a full-width empty grey track — a chart of nothing.
-            Collapse to a hairline rule so the row keeps its rhythm without
-            implying there's a value to read. */}
-        {/* A proportion bar, not a progress bar: the segments are projects and
-            they always sum to the full width, so there is no unfilled remainder
-            to misread as "not done yet".
-            
-            It was, however, mute. The breakdown lived entirely in per-segment
-            hover tooltips inside non-focusable divs, so a screen-reader user
-            got a decorative strip and nothing else. One label carries the same
-            sentence the tooltips do. */}
-        <div
-          role="img"
-          aria-label={
-            totalSeconds > 0
-              ? `Logged ${periodSummary}: ${formatDurationShort(totalSeconds)}. ` +
-                segments
-                  .map(
-                    (seg) =>
-                      `${seg.projectName ?? "No project"} ${formatDurationShort(seg.seconds)}, ` +
-                      `${Math.round((seg.seconds / totalSeconds) * 100)}%`
-                  )
-                  .join("; ")
-              : `Nothing logged ${periodSummary}`
-          }
-          className={cn(
-            "flex flex-1 overflow-hidden rounded-full bg-muted transition-all duration-fast ease-out-quart",
-            totalSeconds > 0 ? "h-2" : "h-px"
-          )}
-        >
-          {totalSeconds > 0 &&
-            segments.map((seg) => (
-              <Tooltip key={seg.projectId ?? "none"}>
-                <TooltipTrigger asChild>
-                  <div
-                    aria-hidden
-                    className="h-full first:rounded-l-full last:rounded-r-full"
-                    style={{
-                      width: `${(seg.seconds / totalSeconds) * 100}%`,
-                      backgroundColor: seg.color,
-                    }}
-                  />
-                </TooltipTrigger>
-                <TooltipContent>
-                  {seg.projectName ?? "No project"}
-                  <span className="ml-1.5 text-background/60">
-                    {formatDurationShort(seg.seconds)} ·{" "}
-                    {Math.round((seg.seconds / totalSeconds) * 100)}%
-                  </span>
-                </TooltipContent>
-              </Tooltip>
-            ))}
-        </div>
-        <span className="text-xs font-semibold tabular-nums">
-          {formatDurationShort(totalSeconds)}
-        </span>
-        <Link
-          to="/reports"
-          className="relative flex items-center gap-0.5 text-xs font-medium text-muted-foreground transition-colors duration-fast ease-out-quart before:absolute before:inset-x-0 before:-inset-y-1.5 before:content-[''] hover:text-foreground"
-        >
-          View reports
-          <ArrowRight className="h-3 w-3" />
-        </Link>
-      </div>
+      <TimerLoggedBar periodSummary={periodSummary} totalSeconds={totalSeconds} segments={segments} />
     </div>
   );
 }

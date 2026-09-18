@@ -266,7 +266,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         // Fire-and-forget: refresh timer state from server in background.
         // Counts as a poll so the next alarm tick doesn't immediately re-fetch.
         if (stored.authToken) {
-          chrome.storage.session.set({ lastPollAt: Date.now() }).catch(() => {});
+          chrome.storage.session.set({ lastPollAt: Date.now() }).catch((err: unknown) => console.warn("lastPollAt write failed", err));
           const base = resolveBase(stored.apiUrl);
           authedFetch(
             base,
@@ -291,7 +291,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
                 chrome.storage.local.remove("timerState");
               }
             })
-            .catch(() => {});
+            .catch((err: unknown) => console.warn("badge poll failed", err));
         }
         break;
       }

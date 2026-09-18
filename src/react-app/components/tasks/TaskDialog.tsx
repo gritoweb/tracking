@@ -8,30 +8,12 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { DatePicker } from "@/components/ui/date-picker";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { ProjectPicker } from "@/components/pickers/ProjectPicker";
-import { MultiSelect } from "@/components/pickers/MultiSelect";
+import { TaskDialogFields } from "./TaskDialogFields";
 import { useCreateTask, useUpdateTask } from "@/hooks/useTasks";
 import { useTaskStatuses } from "@/hooks/useTaskStatuses";
 import { useWorkspaceMembers } from "@/hooks/useWorkspaceRole";
-import { ColorDot } from "@/components/ColorDot";
 import { parseTimeInput, formatTimeInput } from "@/lib/dateUtils";
-import {
-  PRIORITIES,
-  PRIORITY_LABEL,
-  dateToLocalDate,
-  localDateToDate,
-} from "@/lib/taskUtils";
+import { localDateToDate } from "@/lib/taskUtils";
 import type { Task } from "@shared/schemas";
 
 interface TaskDialogProps {
@@ -47,14 +29,6 @@ interface TaskDialogProps {
   defaultStatusId?: string | null;
 }
 
-const REPEAT_OPTIONS = [
-  { value: "none", label: "Doesn't repeat" },
-  { value: "daily", label: "Every day" },
-  { value: "weekdays", label: "Every weekday" },
-  { value: "weekly", label: "Weekly on the due day" },
-  { value: "monthly", label: "Monthly on the due date" },
-];
-
 /** Stored rule → the option that represents it in the picker. */
 function repeatValue(rule: string | null): string {
   if (!rule) return "none";
@@ -68,6 +42,8 @@ function repeatValue(rule: string | null): string {
  * ninth — which is exactly how "notes" would have ended up creatable but not
  * editable. The row keeps its fast paths (click the name to rename, click the
  * due chip to re-date); this is where everything else lives.
+ *
+ * Controller: owns hooks/mutations/state; TaskDialogFields is the pure view.
  */
 export function TaskDialog({
   open,
@@ -174,7 +150,7 @@ export function TaskDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-h-(--size-cap-85vh) overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{editing ? "Edit task" : "New task"}</DialogTitle>
           <DialogDescription>
@@ -184,158 +160,31 @@ export function TaskDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-2">
-          <div className="space-y-1.5">
-            <Label htmlFor="task-name">Name</Label>
-            <Input
-              id="task-name"
-              autoFocus
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && canSubmit && handleSubmit()}
-              placeholder="What needs doing?"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="task-notes">Notes</Label>
-            <Textarea
-              id="task-notes"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              // No Enter-to-submit here: this is the one field where a newline is
-              // the expected result of pressing Return.
-              placeholder="Context, links, acceptance criteria — anything that isn't the name."
-              rows={3}
-              className="resize-y"
-            />
-          </div>
-
-          {!isSubtask && (
-            <div className="space-y-1.5">
-              <Label>Project</Label>
-              <div>
-                <ProjectPicker value={projectId} onChange={setProjectId} className="rounded-md" />
-              </div>
-            </div>
-          )}
-
-          {/* Beside Project, not Estimate — a third field there would orphan a cell. */}
-          <div className="space-y-1.5">
-            <Label>Status</Label>
-            <Select
-              value={statusId ?? statuses.find((s) => s.isDefault)?.id ?? ""}
-              onValueChange={setStatusId}
-            >
-              <SelectTrigger className="w-full" aria-label="Status">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                {statuses.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>
-                    <span className="flex items-center gap-2">
-                      <ColorDot color={s.color} className="h-2 w-2" />
-                      {s.name}
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="task-estimate">Estimate</Label>
-              <Input
-                id="task-estimate"
-                value={estimate}
-                onChange={(e) => setEstimate(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && canSubmit && handleSubmit()}
-                placeholder="e.g. 1h 30m"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label>Priority</Label>
-              <Select value={String(priority)} onValueChange={(v) => setPriority(Number(v))}>
-                <SelectTrigger className="w-full" aria-label="Priority">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PRIORITIES.map((p) => (
-                    <SelectItem key={p} value={String(p)}>
-                      {PRIORITY_LABEL[p]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label>Due date</Label>
-            <div className="flex items-center gap-2">
-              {/* min-w-0 flex-1, not a bare sibling: DatePicker's trigger is
-                  `w-full`, so beside a flex sibling it claims the whole row and
-                  pushes Clear off the edge of the dialog. */}
-              <div className="min-w-0 flex-1">
-                <DatePicker
-                  value={dueDate ? localDateToDate(dueDate) : new Date()}
-                  onSelect={(d) => setDueDate(dateToLocalDate(d))}
-                  className={dueDate ? undefined : "text-muted-foreground"}
-                />
-              </div>
-              {dueDate && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="shrink-0"
-                  onClick={() => setDueDate(null)}
-                  aria-label="Clear due date"
-                >
-                  Clear
-                </Button>
-              )}
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label>Assignees</Label>
-            <MultiSelect
-              label="Assignees"
-              closeOnSelect
-              options={members.map((m) => ({ value: m.userId, label: m.name, image: m.image }))}
-              value={assigneeIds}
-              onChange={setAssigneeIds}
-              loading={membersLoading}
-            />
-          </div>
-
-          {!isSubtask && (
-            <div className="space-y-1.5">
-              <Label>Repeat</Label>
-              <Select value={repeat} onValueChange={setRepeat}>
-                <SelectTrigger className="w-full" aria-label="Repeat">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {REPEAT_OPTIONS.map((o) => (
-                    <SelectItem key={o.value} value={o.value}>
-                      {o.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {/* Completing an occurrence is what creates the next one — say so,
-                  or a repeat that hasn't visibly done anything reads as broken. */}
-              {repeat !== "none" && (
-                <p className="text-micro text-muted-foreground">
-                  The next occurrence is created when you tick this one off.
-                </p>
-              )}
-            </div>
-          )}
-        </div>
+        <TaskDialogFields
+          name={name}
+          onNameChange={setName}
+          onEnterSubmit={() => canSubmit && handleSubmit()}
+          description={description}
+          onDescriptionChange={setDescription}
+          isSubtask={isSubtask}
+          projectId={projectId}
+          onProjectChange={setProjectId}
+          statuses={statuses}
+          statusValue={statusId ?? statuses.find((s) => s.isDefault)?.id ?? ""}
+          onStatusChange={setStatusId}
+          estimate={estimate}
+          onEstimateChange={setEstimate}
+          priority={priority}
+          onPriorityChange={setPriority}
+          dueDate={dueDate}
+          onDueDateChange={setDueDate}
+          members={members}
+          membersLoading={membersLoading}
+          assigneeIds={assigneeIds}
+          onAssigneeIdsChange={setAssigneeIds}
+          repeat={repeat}
+          onRepeatChange={setRepeat}
+        />
 
         <DialogFooter>
           <Button variant="ghost" onClick={handleClose}>

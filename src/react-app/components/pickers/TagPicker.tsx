@@ -1,8 +1,10 @@
 import { useState } from "react";
-import { X, Tag, Plus } from "lucide-react";
+import { Tag, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
+import { ClearButton } from "@/components/ui/clear-button";
+import { ColorSwatchPicker } from "@/components/ui/color-swatch-picker";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Command,
@@ -15,7 +17,6 @@ import {
 import { cn } from "@/lib/utils";
 import { ColorDot, DEFAULT_PROJECT_COLOR } from "@/components/ColorDot";
 import { useCreateTag, useTags, useUpdateTag } from "@/hooks/useProjects";
-import { SWATCH_COLORS, SWATCH_COLOR_NAMES } from "@/lib/colorUtils";
 
 interface TagPickerProps {
   value: string[];
@@ -121,7 +122,7 @@ export function TagPicker({
                         aria-label={`Recolor ${tag}`}
                         onClick={() => setRecoloring((cur) => (cur === tag ? null : tag))}
                         // inline-flex, or the dot inside stays an inline span and Tailwind's size is ignored.
-                        className="inline-flex rounded-full ring-offset-1 transition-transform duration-fast ease-out-quart hover:scale-125 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                        className="focus-ring inline-flex rounded-full ring-offset-1 transition-transform duration-fast ease-out-quart hover:scale-125"
                       >
                         <ColorDot color={colorOf(tag)} />
                       </button>
@@ -132,14 +133,7 @@ export function TagPicker({
                   <ColorDot color={colorOf(tag)} />
                 )}
                 {tag}
-                <button
-                  type="button"
-                  onClick={() => removeTag(tag)}
-                  aria-label={`Remove ${tag}`}
-                  className="rounded-sm text-muted-foreground transition-colors duration-fast ease-out-quart hover:text-foreground focus-visible:text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                >
-                  <X className="h-2.5 w-2.5" />
-                </button>
+                <ClearButton aria-label={`Remove ${tag}`} onClick={() => removeTag(tag)} />
               </Badge>
             ))}
           </div>
@@ -147,28 +141,17 @@ export function TagPicker({
 
         {/* Inline recolor palette for the tag whose dot was clicked. */}
         {recoloring && byName.has(recoloring) && (
-          <div className="flex flex-wrap gap-1.5 border-b p-2">
-            {SWATCH_COLORS.map((c) => (
-              <Tooltip key={c}>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    aria-label={`Set ${recoloring} to ${SWATCH_COLOR_NAMES[c] ?? c}`}
-                    onClick={() => {
-                      const t = byName.get(recoloring);
-                      if (t) updateTag.mutate({ id: t.id, color: c });
-                      setRecoloring(null);
-                    }}
-                    className={cn(
-                      "h-5 w-5 rounded-full ring-2 ring-offset-1 transition-transform duration-fast ease-out-quart hover:scale-110",
-                      colorOf(recoloring) === c ? "ring-foreground" : "ring-transparent"
-                    )}
-                    style={{ backgroundColor: c }}
-                  />
-                </TooltipTrigger>
-                <TooltipContent>{SWATCH_COLOR_NAMES[c] ?? c}</TooltipContent>
-              </Tooltip>
-            ))}
+          <div className="border-b p-2">
+            <ColorSwatchPicker
+              size="sm"
+              value={colorOf(recoloring)}
+              aria-label={`Recolor ${recoloring}`}
+              onChange={(color) => {
+                const t = byName.get(recoloring);
+                if (t) updateTag.mutate({ id: t.id, color });
+                setRecoloring(null);
+              }}
+            />
           </div>
         )}
         <Command shouldFilter={false}>
@@ -187,10 +170,7 @@ export function TagPicker({
               <CommandGroup>
                 {suggestions.slice(0, 8).map((tag) => (
                   <CommandItem key={tag} value={tag} onSelect={() => addTag(tag)}>
-                    <span
-                      className="h-2.5 w-2.5 shrink-0 rounded-full"
-                      style={{ backgroundColor: colorOf(tag) }}
-                    />
+                    <ColorDot color={colorOf(tag)} />
                     {tag}
                   </CommandItem>
                 ))}

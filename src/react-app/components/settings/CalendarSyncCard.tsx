@@ -1,15 +1,17 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { CalendarDays } from "lucide-react";
 import { toast } from "sonner";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { SettingsCardHeader } from "./SettingsCardHeader";
+import { SettingsRow } from "./SettingsRow";
 import {
   useCalendarStatus,
   useDisconnectCalendar,
@@ -30,6 +32,7 @@ export function CalendarSyncCard() {
   const { data: providers = [], isLoading } = useCalendarStatus();
   const disconnect = useDisconnectCalendar();
   const setAutoTrack = useSetAutoTrack();
+  const [disconnectTarget, setDisconnectTarget] = useState<CalendarProviderStatus | null>(null);
 
   // Surface the OAuth round-trip result (redirected back to /settings?calendar=…).
   useEffect(() => {
@@ -47,12 +50,7 @@ export function CalendarSyncCard() {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <CalendarDays className="h-4 w-4" />
-          Calendar sync
-        </CardTitle>
-      </CardHeader>
+      <SettingsCardHeader icon={CalendarDays} title="Calendar sync" />
       <CardContent>
         {isLoading ? (
           <Skeleton className="h-4 w-64" />
@@ -75,7 +73,7 @@ export function CalendarSyncCard() {
                   {i > 0 && <Separator />}
                   <ProviderRow
                     provider={provider}
-                    onDisconnect={() => disconnect.mutate(provider.provider)}
+                    onDisconnect={() => setDisconnectTarget(provider)}
                     disconnecting={
                       disconnect.isPending && disconnect.variables === provider.provider
                     }
@@ -89,6 +87,18 @@ export function CalendarSyncCard() {
           </div>
         )}
       </CardContent>
+
+      <ConfirmDialog
+        open={!!disconnectTarget}
+        onOpenChange={(o) => !o && setDisconnectTarget(null)}
+        title="Disconnect calendar?"
+        description={`Ghost blocks and auto-track for ${disconnectTarget?.label ?? "this calendar"} will stop. Time already tracked is unaffected.`}
+        confirmLabel="Disconnect"
+        onConfirm={() => {
+          if (disconnectTarget) disconnect.mutate(disconnectTarget.provider);
+          setDisconnectTarget(null);
+        }}
+      />
     </Card>
   );
 }
@@ -143,22 +153,19 @@ function ProviderRow({
       </div>
 
       {provider.connected && (
-        <div className="flex items-center justify-between rounded-md border p-3">
-          <div className="pr-4">
-            <Label htmlFor={`auto-track-${provider.provider}`}>
-              Auto-track calendar events
-            </Label>
-            <p className="mt-1 text-xs leading-normal text-muted-foreground">
-              Automatically create a time entry when an event on this calendar ends.
-            </p>
-          </div>
+        <SettingsRow
+          className="rounded-md border p-3"
+          htmlFor={`auto-track-${provider.provider}`}
+          label="Auto-track calendar events"
+          description="Automatically create a time entry when an event on this calendar ends."
+        >
           <Switch
             id={`auto-track-${provider.provider}`}
             checked={provider.autoTrack}
             disabled={autoTrackPending}
             onCheckedChange={onAutoTrack}
           />
-        </div>
+        </SettingsRow>
       )}
     </div>
   );

@@ -211,7 +211,7 @@ export function TaskBoard({
     return (
       <div className="flex gap-3 overflow-x-auto pb-4">
         {[...Array(4)].map((_, i) => (
-          <Skeleton key={i} className="h-64 w-72 shrink-0 rounded-container" />
+          <Skeleton key={i} className="h-64 w-(--size-board-column) shrink-0 rounded-container" />
         ))}
       </div>
     );

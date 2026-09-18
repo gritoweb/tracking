@@ -1,38 +1,19 @@
 import { useMemo, useState, Suspense, lazy } from "react";
-import {
-  startOfWeek,
-  endOfWeek,
-  addWeeks,
-  startOfMonth,
-  endOfMonth,
-  addMonths,
-  startOfDay,
-  endOfDay,
-  addDays,
-  isSameDay,
-  format,
-  parseISO,
-} from "date-fns";
-import { EntryList } from "@/components/entries/EntryList";
+import { addWeeks, addMonths, addDays, format, parseISO } from "date-fns";
 import { TimerWorkspaceHeader } from "@/components/timer/TimerWorkspaceHeader";
+import { TimerWorkspaceBody } from "@/components/timer/TimerWorkspaceBody";
 import { TIMER_PANEL_ID, timerTabId } from "@/components/timer/timerTabs";
 import { AddEntryDialog } from "@/components/entries/AddEntryDialog";
-import { DEFAULT_PROJECT_COLOR } from "@/components/ColorDot";
 import { useEntriesRange } from "@/hooks/useEntries";
 import { useDraftRange, useGenerateDrafts } from "@/hooks/useDrafts";
-import { resolveListRange } from "@/lib/dateUtils";
-import {
-  useUIStore,
-  CALENDAR_SLOT_HEIGHT_STEP,
-} from "@/stores/uiStore";
+import { resolveTimerPeriod, summarizeLoggedSegments, matchListRangeKey } from "@/lib/timerPeriod";
+import { useUIStore, CALENDAR_SLOT_HEIGHT_STEP } from "@/stores/uiStore";
 import { useDayRollover } from "@/hooks/useDayRollover";
 import { useMediaQuery, BELOW_MD, BELOW_LG } from "@/hooks/useMediaQuery";
 import { useElementWidth } from "@/hooks/useElementWidth";
 import { resolveCalendarDensity } from "@/lib/calendarDensity";
 import type { TimerView } from "@/stores/uiStore";
 import type { CalendarViewType } from "@/components/calendar/CalendarView";
-import type { LoggedSegment } from "@/components/timer/TimerWorkspaceHeader";
-import { Spinner } from "@/components/ui/spinner";
 
 // Review pulls in the project picker and the entry controls; it's only ever
 // opened deliberately, so it shouldn't sit in the Timer landing chunk.
@@ -42,30 +23,9 @@ const DraftReviewDialog = lazy(() =>
   }))
 );
 
-// FullCalendar (~270 kB) and the timesheet grid load only when their view is
-// selected, keeping the eager Timer landing route lean.
-const CalendarBody = lazy(() =>
-  import("@/components/calendar/CalendarBody").then((m) => ({ default: m.CalendarBody }))
-);
-const TimesheetView = lazy(() =>
-  import("@/components/timesheet/TimesheetView").then((m) => ({ default: m.TimesheetView }))
-);
-const PlannerView = lazy(() =>
-  import("@/components/planner/PlannerView").then((m) => ({ default: m.PlannerView }))
-);
 // The rail pulls FullCalendar's Draggable, so it rides the same lazy boundary
 // as the grid it drags onto rather than the Timer landing chunk.
-const TaskRail = lazy(() =>
-  import("@/components/tasks/TaskRail").then((m) => ({ default: m.TaskRail }))
-);
-
-function BodyFallback() {
-  return (
-    <div className="flex flex-1 items-center justify-center">
-      <Spinner size="lg" className="text-muted-foreground" />
-    </div>
-  );
-}
+const TaskRailLazy = lazy(() => import("@/components/tasks/TaskRail").then((m) => ({ default: m.TaskRail })));
 
 // The unified Timer tab: owns the navigable week + active view, renders the
 // shared header, and swaps the body between list / calendar / split / timesheet
@@ -124,32 +84,22 @@ export function TimerWorkspace() {
   const today = useMemo(() => parseISO(dayKey), [dayKey]);
   const anchor = anchorOverride ?? today;
 
-  // The list view scopes by the user's chosen range (persisted); every other
-  // view — including the list pane *inside* split, which must stay aligned with
-  // the calendar beside it — scopes by the navigable week/month.
   const isListView = effectiveView === "list";
-  const { since, until } = useMemo(() => {
-    if (isListView) {
-      const r = resolveListRange(listRangeKey, listRangeSince, listRangeUntil, wso, today);
-      return { since: r.since, until: r.until };
-    }
-    if (isMonthView) return { since: startOfMonth(anchor), until: endOfMonth(anchor) };
-    if (isDayView) return { since: startOfDay(anchor), until: endOfDay(anchor) };
-    return {
-      since: startOfWeek(anchor, { weekStartsOn: wso }),
-      until: endOfWeek(anchor, { weekStartsOn: wso }),
-    };
-  }, [
-    anchor,
-    today,
-    isMonthView,
-    isDayView,
-    isListView,
-    listRangeKey,
-    listRangeSince,
-    listRangeUntil,
-    wso,
-  ]);
+  const { since, until } = useMemo(
+    () =>
+      resolveTimerPeriod({
+        isListView,
+        isMonthView,
+        isDayView,
+        listRangeKey,
+        listRangeSince,
+        listRangeUntil,
+        weekStartsOn: wso,
+        today,
+        anchor,
+      }),
+    [anchor, today, isMonthView, isDayView, isListView, listRangeKey, listRangeSince, listRangeUntil, wso]
+  );
 
   const [addEntryOpen, setAddEntryOpen] = useState(false);
 
@@ -160,17 +110,11 @@ export function TimerWorkspace() {
    * period. Drafting tomorrow is meaningless (nothing has happened yet), and
    * silently drafting a day the user isn't looking at would be worse.
    */
-  const reviewDate = format(
-    today >= since && today <= until ? today : since,
-    "yyyy-MM-dd"
-  );
+  const reviewDate = format(today >= since && today <= until ? today : since, "yyyy-MM-dd");
   const [reviewOpen, setReviewOpen] = useState(false);
   const [reviewDay, setReviewDay] = useState<string>(reviewDate);
   const generateDrafts = useGenerateDrafts(reviewDate);
-  const { data: periodDrafts = [] } = useDraftRange(
-    format(since, "yyyy-MM-dd"),
-    format(until, "yyyy-MM-dd")
-  );
+  const { data: periodDrafts = [] } = useDraftRange(format(since, "yyyy-MM-dd"), format(until, "yyyy-MM-dd"));
 
   const openReview = (day: string) => {
     setReviewDay(day);
@@ -208,11 +152,6 @@ export function TimerWorkspace() {
    * — a list showing this week opens Split on today, not on Monday, and "All
    * dates" opens on this week rather than on the epoch. Only when the range is
    * entirely in the past (or future) does the grid fall back to its first day.
-   *
-   * The today-preference used to live in CalendarBody as a grid-only override,
-   * which is how the desync got in: the grid jumped to today while the header,
-   * the "Logged" strip, the totals and the entry pane all stayed on the range
-   * start. It belongs here, where moving the anchor moves all four together.
    */
   const changeView = (next: TimerView) => {
     const leavingList = effectiveView === "list" && next !== "list";
@@ -221,17 +160,8 @@ export function TimerWorkspace() {
     if (leavingList) {
       setAnchorOverride(today >= since && today <= until ? today : since);
     } else if (enteringList && !belowMd) {
-      // Name the period if it's one the picker can express, else keep the exact
-      // dates as a custom range.
-      const wk = resolveListRange("thisWeek", null, null, wso, today);
-      const lastWk = resolveListRange("lastWeek", null, null, wso, today);
-      if (isSameDay(since, wk.since) && isSameDay(until, wk.until)) {
-        setListRange("thisWeek");
-      } else if (isSameDay(since, lastWk.since) && isSameDay(until, lastWk.until)) {
-        setListRange("lastWeek");
-      } else {
-        setListRange("custom", format(since, "yyyy-MM-dd"), format(until, "yyyy-MM-dd"));
-      }
+      const r = matchListRangeKey(since, until, wso, today);
+      setListRange(r.key, r.since, r.until);
     }
     // Below md the calendar is forced to a single day by *layout*, not by the
     // user asking for a day. Writing that back into the list range turned every
@@ -244,83 +174,7 @@ export function TimerWorkspace() {
   // Week entries drive the "Logged" bar. Shares the ["time-entries", since, until]
   // query key with the body views, so this is deduped, not a second fetch.
   const { data: entries = [] } = useEntriesRange(since.toISOString(), until.toISOString());
-  const { periodSeconds, segments } = useMemo(() => {
-    const byProject = new Map<string | null, LoggedSegment>();
-    let total = 0;
-    for (const e of entries) {
-      const secs = e.duration ?? 0;
-      if (secs <= 0) continue;
-      total += secs;
-      const seg = byProject.get(e.projectId);
-      if (seg) seg.seconds += secs;
-      else
-        byProject.set(e.projectId, {
-          projectId: e.projectId,
-          projectName: e.projectName,
-          color: e.projectColor ?? DEFAULT_PROJECT_COLOR,
-          seconds: secs,
-        });
-    }
-    return {
-      periodSeconds: total,
-      segments: [...byProject.values()].sort((a, b) => b.seconds - a.seconds),
-    };
-  }, [entries]);
-
-  // In split the entry list sits beside the grid and explains an empty period
-  // itself, so the grid's own overlay would just say it twice.
-  const calendarFor = (view: TimerView) => (
-    <CalendarBody
-      periodStart={since}
-      calendarView={effectiveCalendarView}
-      slotHeight={slotHeight}
-      weekStartsOn={weekStart}
-      showWeekends={showWeekends}
-      showEmptyState={view !== "split"}
-      onReviewDay={openReview}
-      // The rail only renders at lg and up, and only beside a grid — below that
-      // there is nothing to drag from, so the grid shouldn't claim to accept one.
-      acceptTaskDrops={!belowLg}
-    />
-  );
-  const list = (
-    <EntryList since={since} until={until} onAddEntry={() => setAddEntryOpen(true)} />
-  );
-
-  let body: React.ReactNode;
-  if (effectiveView === "calendar")
-    body = (
-      <Suspense fallback={<BodyFallback />}>
-        <div ref={calendarPaneRef} className="flex min-h-0 flex-1 flex-col">
-          {calendarFor("calendar")}
-        </div>
-      </Suspense>
-    );
-  else if (effectiveView === "timesheet")
-    body = (
-      <Suspense fallback={<BodyFallback />}>
-        <TimesheetView weekStart={since} />
-      </Suspense>
-    );
-  else if (effectiveView === "planner")
-    body = (
-      <Suspense fallback={<BodyFallback />}>
-        <PlannerView weekStart={since} />
-      </Suspense>
-    );
-  else if (effectiveView === "split")
-    // Only reachable at lg and up — below that `effectiveView` is already "list".
-    body = (
-      <Suspense fallback={<BodyFallback />}>
-        <div className="grid min-h-0 flex-1 grid-cols-1 divide-x lg:grid-cols-2">
-          <div ref={calendarPaneRef} className="flex min-h-0 flex-col">
-            {calendarFor("split")}
-          </div>
-          <div className="flex min-h-0 flex-col overflow-hidden">{list}</div>
-        </div>
-      </Suspense>
-    );
-  else body = list;
+  const { periodSeconds, segments } = useMemo(() => summarizeLoggedSegments(entries), [entries]);
 
   /** Move whichever period control is active so `date` becomes visible. */
   const revealDate = (date: Date) => {
@@ -335,11 +189,7 @@ export function TimerWorkspace() {
   const step = (dir: 1 | -1) =>
     setAnchorOverride((d) => {
       const from = d ?? anchor;
-      return isMonthView
-        ? addMonths(from, dir)
-        : isDayView
-          ? addDays(from, dir)
-          : addWeeks(from, dir);
+      return isMonthView ? addMonths(from, dir) : isDayView ? addDays(from, dir) : addWeeks(from, dir);
     });
 
   return (
@@ -391,11 +241,23 @@ export function TimerWorkspace() {
           // edge — its collapse control and quick-add clipped by the window.
           className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
         >
-          {body}
+          <TimerWorkspaceBody
+            view={effectiveView}
+            since={since}
+            until={until}
+            calendarView={effectiveCalendarView}
+            slotHeight={slotHeight}
+            weekStartsOn={wso}
+            showWeekends={showWeekends}
+            belowLg={belowLg}
+            onReviewDay={openReview}
+            onAddEntry={() => setAddEntryOpen(true)}
+            calendarPaneRef={calendarPaneRef}
+          />
         </div>
         {isCalendarish && !belowLg && (
           <Suspense fallback={null}>
-            <TaskRail />
+            <TaskRailLazy />
           </Suspense>
         )}
       </div>

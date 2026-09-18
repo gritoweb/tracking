@@ -38,7 +38,7 @@ export function ConversationScrollButton() {
     <Button
       variant="outline"
       size="icon-sm"
-      className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full shadow-md"
+      className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full"
       onClick={() => scrollToBottom()}
       aria-label="Scroll to latest"
       title="Scroll to latest"

@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Plus, Trash2, Check, Pencil, Clock } from "lucide-react";
+import { Plus, Trash2, Pencil, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { SpentFigure } from "@/components/ui/spent-figure";
@@ -97,18 +98,12 @@ export function TaskList({ projectId }: TaskListProps) {
             className="group flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors duration-fast ease-out-quart hover:bg-muted/50"
           >
             {/* Done toggle */}
-            <button
-              onClick={() => handleToggleDone(task)}
+            <Checkbox
+              size="sm"
+              checked={!task.active}
+              onCheckedChange={() => handleToggleDone(task)}
               aria-label={task.active ? "Mark task done" : "Mark task not done"}
-              aria-pressed={!task.active}
-              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors duration-fast ease-out-quart ${
-                !task.active
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-muted-foreground/40 hover:border-primary"
-              }`}
-            >
-              {!task.active && <Check className="h-2.5 w-2.5" />}
-            </button>
+            />
 
             {/* Name / edit */}
             <div className="min-w-0 flex-1">
@@ -152,6 +147,7 @@ export function TaskList({ projectId }: TaskListProps) {
               ) : progress !== null ? (
                 <Tooltip>
                   <TooltipTrigger asChild>
+                    {/* raw: embeds a Progress bar inline, which Button's fixed padding can't host */}
                     <button
                       className="mt-0.5 flex w-full items-center gap-1.5 hover:opacity-70 transition-opacity duration-fast ease-out-quart"
                       onClick={() => handleStartEditTime(task)}
@@ -166,6 +162,7 @@ export function TaskList({ projectId }: TaskListProps) {
                   <TooltipContent>Edit estimate — {Math.round(progress)}% used</TooltipContent>
                 </Tooltip>
               ) : task.trackedSeconds > 0 ? (
+                // raw: inline micro-text trigger, not a labelled action — Button's padding would misalign it with the row above.
                 <button
                   // gap-1.5 so the dashed underline isn't flush against the "·".
                   className="mt-0.5 flex items-center gap-1.5 text-micro text-muted-foreground hover:opacity-70 transition-opacity duration-fast ease-out-quart"

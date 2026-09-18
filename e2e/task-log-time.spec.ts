@@ -73,6 +73,6 @@ test("a task with no estimate is still convertible, with blank times", async ({ 
 
   await page.waitForTimeout(1200);
   await expect(
-    page.getByRole("button", { name: "Mark task not done" }).first()
+    page.getByRole("checkbox", { name: "Mark task not done" }).first()
   ).toBeVisible();
 });

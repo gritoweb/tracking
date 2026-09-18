@@ -1,74 +1,27 @@
 import { useState } from "react";
-import {
-  Trash2,
-  Check,
-  Pencil,
-  Clock,
-  Play,
-  Square,
-  ChevronRight,
-  MoreHorizontal,
-  Repeat,
-  CalendarDays,
-  Flag,
-  Plus,
-  UserPlus,
-} from "lucide-react";
+import { ChevronRight, Play, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Progress } from "@/components/ui/progress";
-import { SpentFigure } from "@/components/ui/spent-figure";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { ProjectBadge } from "@/components/ProjectBadge";
-import { UserAvatar } from "@/components/layout/UserAvatar";
-import { MultiSelect } from "@/components/pickers/MultiSelect";
-import { TaskStatusChip } from "./TaskStatusChip";
+import { Checkbox } from "@/components/ui/checkbox";
+import { TaskRowIdentity } from "./TaskRowIdentity";
+import { TaskRowMeta } from "./TaskRowMeta";
+import { TaskRowActions } from "./TaskRowActions";
 import { useUpdateTask, useCompleteTask } from "@/hooks/useTasks";
 import { useWorkspaceMembers } from "@/hooks/useWorkspaceRole";
 import { useTimer } from "@/hooks/useTimer";
 import { useTimerStore } from "@/stores/timerStore";
 import { useUIStore } from "@/stores/uiStore";
-import { formatDurationShort, formatSeconds, parseTimeInput, formatTimeInput } from "@/lib/dateUtils";
-import {
-  PRIORITIES,
-  PRIORITY_LABEL,
-  PRIORITY_RING,
-  dateToLocalDate,
-  dueTone,
-  formatDueDate,
-  localDateToDate,
-} from "@/lib/taskUtils";
+import { formatSeconds, parseTimeInput, formatTimeInput } from "@/lib/dateUtils";
+import { dueTone, PRIORITY_LABEL } from "@/lib/taskUtils";
 import { describeRecurRule } from "@shared/task-recurrence";
-import { descriptionToPlainText } from "@/lib/richText";
 import { cn } from "@/lib/utils";
 import type { Task } from "@shared/schemas";
 
-const RECUR_OPTIONS = [
-  { value: "", label: "Doesn't repeat" },
-  { value: "daily", label: "Every day" },
-  { value: "weekdays", label: "Every weekday" },
-  { value: "weekly", label: "Weekly on this day" },
-  { value: "monthly", label: "Monthly on this date" },
-];
-
-const DUE_TONE_CLASS: Record<string, string> = {
-  overdue: "text-destructive",
-  today: "text-foreground",
-  soon: "text-muted-foreground",
-  later: "text-muted-foreground",
+// Priority 1/2 borrow the destructive/warning checkbox tones; 3/4 stay the neutral default.
+const PRIORITY_TONE: Record<number, "destructive" | "warning" | "default"> = {
+  1: "destructive",
+  2: "warning",
+  3: "default",
+  4: "default",
 };
 
 interface TaskRowProps {
@@ -107,6 +60,8 @@ interface TaskRowProps {
 // Self-contained task row: done toggle, inline-edit name, click-to-edit estimate
 // with a tracked/estimate progress bar, and — the point of the whole surface —
 // a one-click start control that turns the task into a running timer.
+//
+// Controller: owns hooks/mutations/state; TaskRowIdentity/Meta/Actions are pure views.
 export function TaskRow({
   task,
   showProject = true,
@@ -173,7 +128,6 @@ export function TaskRow({
     : null;
 
   const tone = dueTone(task.dueDate);
-  const plainDescription = descriptionToPlainText(task.description);
   const repeats = describeRecurRule(task.recurRule);
   const hasChildren = task.subtaskTotal > 0;
 
@@ -222,20 +176,13 @@ export function TaskRow({
   );
 
   const doneToggle = (
-    <button
-      onClick={() => completeTask(task, task.active)}
+    <Checkbox
+      checked={!task.active}
+      onCheckedChange={(checked) => completeTask(task, checked === true)}
+      tone={PRIORITY_TONE[task.priority] ?? "default"}
       aria-label={task.active ? "Mark task done" : "Mark task not done"}
-      aria-pressed={!task.active}
       title={task.priority < 4 ? `Priority: ${PRIORITY_LABEL[task.priority]}` : undefined}
-      className={cn(
-        "flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors duration-fast ease-out-quart",
-        !task.active
-          ? "border-primary bg-primary text-primary-foreground"
-          : cn(PRIORITY_RING[task.priority] ?? PRIORITY_RING[4], "hover:border-primary")
-      )}
-    >
-      {!task.active && <Check className="h-2.5 w-2.5" />}
-    </button>
+    />
   );
 
   // The rail trades everything that isn't identity or action for width: one
@@ -291,305 +238,58 @@ export function TaskRow({
         </button>
       )}
 
-      {/* Name / edit + estimate */}
-      <div className="min-w-0 flex-1">
-        {editingName ? (
-          <Input
-            autoFocus
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            onBlur={saveName}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") saveName();
-              if (e.key === "Escape") {
-                setName(task.name);
-                setEditingName(false);
-              }
-            }}
-            className="h-6 py-0 text-sm"
-          />
-        ) : (
-          // Click-to-rename: the fast path for a typo, so the dialog is only for
-          // the things that actually need a form.
-          <button
-            type="button"
-            title="Click to rename"
-            onClick={() => {
-              setName(task.name);
-              setEditingName(true);
-            }}
-            className={cn(
-              "block max-w-full truncate text-left text-sm",
-              !task.active && "text-muted-foreground line-through"
-            )}
-          >
-            {task.name}
-          </button>
-        )}
+      <TaskRowIdentity
+        task={task}
+        editingName={editingName}
+        name={name}
+        onNameChange={setName}
+        onStartEditName={() => {
+          setName(task.name);
+          setEditingName(true);
+        }}
+        onSaveName={saveName}
+        onCancelEditName={() => {
+          setName(task.name);
+          setEditingName(false);
+        }}
+        editingTime={editingTime}
+        estimate={estimate}
+        onEstimateChange={setEstimate}
+        onStartEditTime={startEditTime}
+        onSaveEstimate={saveEstimate}
+        onCancelEditTime={() => setEditingTime(false)}
+        progress={progress}
+      />
 
-        {/* Notes sit under the name, clamped to one line: enough to recognise
-            what the task is about, never enough to turn the list into prose.
-            The full text is in the dialog and in the tooltip. */}
-        {task.description && (
-          <p className="mt-0.5 line-clamp-1 text-micro text-muted-foreground" title={plainDescription}>
-            {plainDescription}
-          </p>
-        )}
-
-        {editingTime ? (
-          <div className="mt-0.5">
-            <Input
-              autoFocus
-              value={estimate}
-              onChange={(e) => setEstimate(e.target.value)}
-              onBlur={saveEstimate}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") saveEstimate();
-                if (e.key === "Escape") setEditingTime(false);
-              }}
-              placeholder="e.g. 1h 30m"
-              title="Estimated time — e.g. 1h 30m, 1:30, 90m"
-              className="h-5 w-28 py-0 text-micro"
-            />
-          </div>
-        ) : progress !== null ? (
-          <button
-            className="mt-0.5 flex w-full max-w-xs items-center gap-1.5 transition-opacity duration-fast ease-out-quart hover:opacity-70"
-            onClick={startEditTime}
-          >
-            <Progress value={progress} className="h-1 flex-1" aria-hidden />
-            <SpentFigure
-              spent={formatDurationShort(task.trackedSeconds)}
-              of={formatDurationShort(task.estimatedSeconds!)}
-            />
-          </button>
-        ) : task.trackedSeconds > 0 ? (
-          <button
-            // gap-1.5, not gap-1: the trailing space in the text node is swallowed
-            // at the flex-item boundary, so the dashed underline started hard
-            // against the "·" and read tighter than the spaces around it.
-            className="mt-0.5 flex items-center gap-1.5 text-micro text-muted-foreground transition-opacity duration-fast ease-out-quart hover:opacity-70"
-            onClick={startEditTime}
-          >
-            <span>{formatDurationShort(task.trackedSeconds)} tracked ·</span>
-            <span className="underline decoration-dashed">add estimate</span>
-          </button>
-        ) : (
-          <button
-            // `block`: a bare <button> is inline-block, so this ran onto the same
-            // line as the task name ("Data mappingadd estimate"). The other two
-            // states are flex and already drop below; mt-0.5 shows this meant to.
-            className="mt-0.5 block text-micro text-muted-foreground/0 transition-colors duration-fast ease-out-quart group-hover:text-muted-foreground/50 hover:text-muted-foreground!"
-            onClick={startEditTime}
-          >
-            add estimate
-          </button>
-        )}
-      </div>
-
-      {/* ─── Metadata ──────────────────────────────────────────────────────── */}
-
-      {hasChildren && !nested && (
-        <span
-          className="shrink-0 text-micro tabular-nums text-muted-foreground"
-          title={`${task.subtaskDone} of ${task.subtaskTotal} subtasks done`}
-        >
-          {task.subtaskDone}/{task.subtaskTotal}
-        </span>
-      )}
-
-      {repeats && (
-        <Repeat className="h-3 w-3 shrink-0 text-muted-foreground" aria-label={repeats} />
-      )}
-
-      {/* The due chip is the control, not a label beside one — clicking the date
-          is how you change the date. */}
-      <Popover open={dueOpen} onOpenChange={setDueOpen}>
-        <PopoverTrigger asChild>
-          <button
-            aria-label={task.dueDate ? `Due ${formatDueDate(task.dueDate)} — change` : "Set due date"}
-            className={cn(
-              "shrink-0 rounded px-1 text-xs transition-colors duration-fast ease-out-quart hover:bg-muted",
-              task.dueDate
-                ? DUE_TONE_CLASS[tone ?? "later"]
-                : "tt-reveal text-muted-foreground/50 hover:text-muted-foreground"
-            )}
-          >
-            {task.dueDate ? formatDueDate(task.dueDate) : <CalendarDays className="h-3.5 w-3.5" />}
-          </button>
-        </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="end">
-          <Calendar
-            mode="single"
-            selected={task.dueDate ? localDateToDate(task.dueDate) : undefined}
-            onSelect={(date) => {
-              updateTask.mutate({
-                id: task.id,
-                data: { dueDate: date ? dateToLocalDate(date) : null },
-              });
-              setDueOpen(false);
-            }}
-          />
-          {task.dueDate && (
-            <div className="border-t p-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-full justify-start"
-                onClick={() => {
-                  updateTask.mutate({ id: task.id, data: { dueDate: null } });
-                  setDueOpen(false);
-                }}
-              >
-                Clear due date
-              </Button>
-            </div>
-          )}
-        </PopoverContent>
-      </Popover>
-
-      {/* A subtask always follows its parent's column, so its own is never shown. */}
-      {showStatus && !nested && <TaskStatusChip task={task} />}
-
-      {showProject && !nested && task.projectName && (
-        <ProjectBadge name={task.projectName} color={task.projectColor} />
-      )}
-
-      <MultiSelect
-        label="Assignees"
-        closeOnSelect
-        options={members.map((m) => ({ value: m.userId, label: m.name, image: m.image }))}
-        value={task.assignees.map((a) => a.userId)}
-        onChange={saveAssignees}
-        loading={membersLoading}
-        trigger={
-          task.assignees.length > 0 ? (
-            <button
-              type="button"
-              aria-label="Edit assignees"
-              title={task.assignees.map((a) => a.name).join(", ")}
-              className="flex shrink-0 -space-x-1.5 rounded-full focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-            >
-              {task.assignees.slice(0, 3).map((a) => (
-                <UserAvatar key={a.userId} name={a.name} image={a.image} className="h-5 w-5 border-2 border-background text-micro" />
-              ))}
-            </button>
-          ) : (
-            <button
-              type="button"
-              aria-label="Add assignee"
-              title="Add assignee"
-              className="tt-reveal flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-dashed border-muted-foreground/50 text-muted-foreground/50 hover:border-muted-foreground hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-            >
-              <UserPlus className="h-3 w-3" />
-            </button>
-          )
-        }
+      <TaskRowMeta
+        task={task}
+        nested={nested}
+        showStatus={showStatus}
+        showProject={showProject}
+        hasChildren={hasChildren}
+        repeats={repeats}
+        tone={tone}
+        dueOpen={dueOpen}
+        onDueOpenChange={setDueOpen}
+        onChangeDueDate={(dueDate) => updateTask.mutate({ id: task.id, data: { dueDate } })}
+        members={members}
+        membersLoading={membersLoading}
+        onChangeAssignees={saveAssignees}
       />
 
       {/* ─── Actions ───────────────────────────────────────────────────────── */}
       <div className="flex shrink-0 items-center gap-0.5">
-        <div className="tt-reveal flex items-center gap-0.5">
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            aria-label={`Log time to ${task.name}`}
-            title="Log time already spent on this task"
-            onClick={() => onLogTime(task)}
-          >
-            <Clock className="h-3 w-3" />
-          </Button>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon-xs" aria-label={`More actions for ${task.name}`}>
-                <MoreHorizontal className="h-3 w-3" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-52">
-              {onEdit && (
-                <DropdownMenuItem onSelect={() => onEdit(task)}>
-                  <Pencil className="h-3.5 w-3.5" />
-                  Edit task…
-                </DropdownMenuItem>
-              )}
-
-              <DropdownMenuSub>
-                <DropdownMenuSubTrigger>
-                  <Flag className="h-3.5 w-3.5" />
-                  Priority
-                </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent>
-                  <DropdownMenuRadioGroup
-                    value={String(task.priority)}
-                    onValueChange={(v) =>
-                      updateTask.mutate({ id: task.id, data: { priority: Number(v) } })
-                    }
-                  >
-                    {PRIORITIES.map((p) => (
-                      <DropdownMenuRadioItem key={p} value={String(p)}>
-                        {PRIORITY_LABEL[p]}
-                      </DropdownMenuRadioItem>
-                    ))}
-                  </DropdownMenuRadioGroup>
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
-
-              {/* Recurrence belongs to the thing you schedule; a repeating
-                  subtask would spawn siblings inside a parent that never
-                  repeats, so the server rejects it and the menu doesn't offer it. */}
-              {!nested && (
-                <DropdownMenuSub>
-                  <DropdownMenuSubTrigger>
-                    <Repeat className="h-3.5 w-3.5" />
-                    Repeat
-                  </DropdownMenuSubTrigger>
-                  <DropdownMenuSubContent>
-                    <DropdownMenuRadioGroup
-                      value={task.recurRule?.split(":")[0] ?? ""}
-                      onValueChange={(v) => {
-                        const anchor = task.dueDate ?? dateToLocalDate(new Date());
-                        const rule =
-                          v === ""
-                            ? null
-                            : v === "weekly"
-                              ? `weekly:${localDateToDate(anchor).getDay()}`
-                              : v === "monthly"
-                                ? `monthly:${localDateToDate(anchor).getDate()}`
-                                : v;
-                        updateTask.mutate({ id: task.id, data: { recurRule: rule } });
-                      }}
-                    >
-                      {RECUR_OPTIONS.map((o) => (
-                        <DropdownMenuRadioItem key={o.value} value={o.value}>
-                          {o.label}
-                        </DropdownMenuRadioItem>
-                      ))}
-                    </DropdownMenuRadioGroup>
-                  </DropdownMenuSubContent>
-                </DropdownMenuSub>
-              )}
-
-              {!nested && onAddSubtask && (
-                <DropdownMenuItem onSelect={() => onAddSubtask(task)}>
-                  <Plus className="h-3.5 w-3.5" />
-                  Add subtask
-                </DropdownMenuItem>
-              )}
-
-              <DropdownMenuItem onSelect={() => openTaskLogTime(task.id)}>
-                <Clock className="h-3.5 w-3.5" />
-                Log time
-              </DropdownMenuItem>
-
-              <DropdownMenuSeparator />
-              <DropdownMenuItem variant="destructive" onSelect={() => onRequestDelete(task)}>
-                <Trash2 className="h-3.5 w-3.5" />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+        <TaskRowActions
+          task={task}
+          nested={nested}
+          onEdit={onEdit}
+          onLogTime={onLogTime}
+          onAddSubtask={onAddSubtask}
+          onRequestDelete={onRequestDelete}
+          onOpenLogTimeSheet={() => openTaskLogTime(task.id)}
+          onChangePriority={(priority) => updateTask.mutate({ id: task.id, data: { priority } })}
+          onChangeRecurRule={(recurRule) => updateTask.mutate({ id: task.id, data: { recurRule } })}
+        />
 
         {startControl}
       </div>

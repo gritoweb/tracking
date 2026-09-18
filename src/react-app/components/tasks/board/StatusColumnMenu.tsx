@@ -30,10 +30,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { SWATCH_COLORS, SWATCH_COLOR_NAMES } from "@shared/colors";
+import { ColorSwatchPicker } from "@/components/ui/color-swatch-picker";
 import { useArchiveTaskStatus, useUpdateTaskStatus } from "@/hooks/useTaskStatuses";
 import { midpointOrder, STATUS_CATEGORY_LABEL } from "@/lib/taskUtils";
-import { cn } from "@/lib/utils";
 import type { TaskStatus, TaskStatusCategory } from "@shared/schemas";
 
 interface StatusColumnMenuProps {
@@ -129,25 +128,12 @@ export function StatusColumnMenu({ status, statuses, taskCount, projectId }: Sta
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>Color</DropdownMenuSubTrigger>
             <DropdownMenuSubContent className="w-auto p-2">
-              <div className="grid grid-cols-6 gap-1">
-                {SWATCH_COLORS.map((color) => (
-                  <button
-                    key={color}
-                    type="button"
-                    aria-label={SWATCH_COLOR_NAMES[color] ?? color}
-                    title={SWATCH_COLOR_NAMES[color] ?? color}
-                    onClick={() => update.mutate({ id: status.id, data: { color } })}
-                    style={{ backgroundColor: color }}
-                    className={cn(
-                      "flex h-5 w-5 items-center justify-center rounded-full",
-                      "transition-transform duration-fast ease-out-quart hover:scale-110",
-                      "focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                    )}
-                  >
-                    {color === status.color && <Check className="h-3 w-3 text-white" />}
-                  </button>
-                ))}
-              </div>
+              <ColorSwatchPicker
+                value={status.color}
+                onChange={(color) => update.mutate({ id: status.id, data: { color } })}
+                size="sm"
+                columns={6}
+              />
             </DropdownMenuSubContent>
           </DropdownMenuSub>
 

@@ -1,21 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useLocation } from "react-router-dom";
-import {
-  Sparkles,
-  CalendarClock,
-  Clock,
-  Play,
-  Hourglass,
-  Coffee,
-  TrendingUp,
-  X,
-  CheckCircle2,
-  Eraser,
-} from "lucide-react";
+import { Sparkles, CheckCircle2, Eraser } from "lucide-react";
 import { useAgent } from "agents/react";
 import { useAgentChat } from "@cloudflare/ai-chat/react";
 import { Button } from "@/components/ui/button";
-import { Spinner } from "@/components/ui/spinner";
 import {
   Sheet,
   SheetContent,
@@ -24,147 +11,18 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import { useAssistantStore } from "@/stores/assistantStore";
-import { useTimerStore } from "@/stores/timerStore";
 import { useUIStore } from "@/stores/uiStore";
-import { useAssistantNudges, useTrackNudgeEvent } from "@/hooks/useAssistant";
-import { useTimer } from "@/hooks/useTimer";
-import type { AssistantNudge } from "@shared/schemas";
+import { useAssistantNudges } from "@/hooks/useAssistant";
+import { AssistantNudgeCard } from "./AssistantNudgeCard";
+import { AssistantMessageList } from "./AssistantMessageList";
+import { useContextualSuggestions } from "./useContextualSuggestions";
 import { SuggestionChips } from "./ai-elements/SuggestionChips";
-import { ToolCard } from "./ai-elements/ToolCard";
-import { AssistantMarkdown } from "./ai-elements/AssistantMarkdown";
-import { MessageActions } from "./ai-elements/MessageActions";
 import { PromptInput } from "./ai-elements/PromptInput";
 import {
   Conversation,
   ConversationContent,
   ConversationScrollButton,
 } from "./ai-elements/Conversation";
-
-const NUDGE_ICONS: Record<AssistantNudge["kind"], typeof CalendarClock> = {
-  untracked_meeting: CalendarClock,
-  meeting_now: Play,
-  meeting_soon: Clock,
-  long_timer: Hourglass,
-  nothing_tracked: Coffee,
-  budget_risk: TrendingUp,
-};
-
-/**
- * Suggestion chips follow the user's context: the reports page leads with
- * summaries, project/client/task pages with per-project breakdowns, and the
- * timer views with tracking gaps. A running timer swaps the "start a timer"
- * chip for a check-in on the current one.
- */
-function useContextualSuggestions(): string[] {
-  const { pathname } = useLocation();
-  const runningEntry = useTimerStore((s) => s.runningEntry);
-
-  return useMemo(() => {
-    const timerChip = runningEntry
-      ? "How long has my timer been running?"
-      : "Start a timer for my current meeting";
-    if (pathname.startsWith("/reports")) {
-      return [
-        "Summarize my time this week",
-        "How much have I billed today?",
-        "What haven't I tracked yet?",
-        timerChip,
-      ];
-    }
-    if (/^\/(projects|clients|tasks)/.test(pathname)) {
-      return [
-        "Which projects got my time this week?",
-        "What haven't I tracked yet?",
-        timerChip,
-        "What's next on my calendar?",
-      ];
-    }
-    return [
-      "What haven't I tracked yet?",
-      "How much have I billed today?",
-      timerChip,
-      "What's next on my calendar?",
-    ];
-  }, [pathname, runningEntry]);
-}
-
-function NudgeCard({ nudge }: { nudge: AssistantNudge }) {
-  const dismissNudge = useAssistantStore((s) => s.dismissNudge);
-  const trackNudgeEvent = useTrackNudgeEvent();
-  const { startTimer, stopTimer } = useTimer();
-  const Icon = NUDGE_ICONS[nudge.kind];
-
-  const trackEvent = () => {
-    if (!nudge.event) return;
-    trackNudgeEvent.mutate(
-      {
-        calendarEventId: nudge.event.calendarEventId,
-        title: nudge.event.title,
-        start: nudge.event.start,
-        stop: nudge.event.stop,
-      },
-      { onSuccess: () => dismissNudge(nudge.id) }
-    );
-  };
-
-  const startFromEvent = () => {
-    startTimer({ description: nudge.event?.title ?? "" });
-    dismissNudge(nudge.id);
-  };
-
-  // "Your timer has been running for 18h — still on it?" used to offer nothing
-  // but a chat window. The nudge names the problem, so it should carry the fix:
-  // stopping is the whole answer, and the entry survives it (unlike Discard),
-  // so it needs no confirmation — same grammar as the timer bar's own Stop.
-  const stopFromNudge = () => {
-    stopTimer();
-    dismissNudge(nudge.id);
-  };
-
-  return (
-    <div className="flex items-start gap-2.5 rounded-container bg-card p-3">
-      <Icon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium">{nudge.title}</p>
-        <p className="mt-0.5 text-xs text-muted-foreground">{nudge.body}</p>
-        {(nudge.kind === "untracked_meeting" ||
-          nudge.kind === "meeting_now" ||
-          nudge.kind === "long_timer") && (
-          <div className="mt-2">
-            {nudge.kind === "untracked_meeting" ? (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={trackEvent}
-                disabled={trackNudgeEvent.isPending}
-              >
-                {trackNudgeEvent.isPending ? "Adding…" : "Add to timesheet"}
-              </Button>
-            ) : nudge.kind === "long_timer" ? (
-              <Button variant="outline" size="sm" onClick={stopFromNudge}>
-                Stop timer
-              </Button>
-            ) : (
-              <Button variant="outline" size="sm" onClick={startFromEvent}>
-                Start timer
-              </Button>
-            )}
-          </div>
-        )}
-      </div>
-      <Button
-        variant="ghost"
-        size="icon-xs"
-        className="shrink-0 text-muted-foreground"
-        onClick={() => dismissNudge(nudge.id)}
-        aria-label="Dismiss nudge"
-        title="Dismiss"
-      >
-        <X className="h-3.5 w-3.5" />
-      </Button>
-    </div>
-  );
-}
 
 /**
  * Right-side sheet hosting the assistant's nudges and streaming chat.
@@ -263,7 +121,7 @@ export function AssistantPanel() {
             {/* Nudges */}
             <div className="space-y-2">
               {nudges.length > 0 ? (
-                nudges.map((n) => <NudgeCard key={n.id} nudge={n} />)
+                nudges.map((n) => <AssistantNudgeCard key={n.id} nudge={n} />)
               ) : (
                 <div className="flex items-center gap-2.5 rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
                   <CheckCircle2 className="h-4 w-4 shrink-0" />
@@ -307,49 +165,14 @@ export function AssistantPanel() {
                 </div>
               )}
 
-              {messages.map((m) => (
-                <div
-                  key={m.id}
-                  className={
-                    m.role === "user"
-                      ? "ml-8 rounded-lg bg-muted px-3 py-2 text-sm whitespace-pre-wrap"
-                      : "group mr-4 flex gap-2"
-                  }
-                >
-                  {m.role === "assistant" && (
-                    <Sparkles className="mt-1 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                  )}
-                  <div className="min-w-0 flex-1 space-y-2">
-                    {m.parts.map((part, i) => {
-                      if (part.type === "text") {
-                        return m.role === "user" ? (
-                          <span key={i}>{part.text}</span>
-                        ) : (
-                          <AssistantMarkdown key={i} text={part.text} />
-                        );
-                      }
-                      if (typeof part.type === "string" && part.type.startsWith("tool-")) {
-                        return <ToolCard key={i} part={part} onApprove={approve} />;
-                      }
-                      return null;
-                    })}
-                    {m.role === "assistant" && (
-                      <MessageActions
-                        message={m}
-                        canRegenerate={m.id === lastAssistantId && !busy}
-                        onRegenerate={() => regenerate()}
-                      />
-                    )}
-                  </div>
-                </div>
-              ))}
-
-              {showThinking && (
-                <div className="mr-4 flex items-center gap-2 text-sm text-muted-foreground">
-                  <Spinner size="sm" />
-                  <span>Thinking…</span>
-                </div>
-              )}
+              <AssistantMessageList
+                messages={messages}
+                lastAssistantId={lastAssistantId}
+                busy={busy}
+                showThinking={showThinking}
+                onApprove={approve}
+                onRegenerate={() => regenerate()}
+              />
             </div>
           </ConversationContent>
           <ConversationScrollButton />

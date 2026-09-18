@@ -1,7 +1,6 @@
 import { useMemo, useRef, useState, useEffect } from "react";
 import type FullCalendar from "@fullcalendar/react";
-import type { EventClickArg, EventDropArg } from "@fullcalendar/core";
-import type { EventResizeDoneArg, DropArg } from "@fullcalendar/interaction";
+import type { EventClickArg } from "@fullcalendar/core";
 import {
   endOfWeek,
   startOfWeek,
@@ -10,16 +9,13 @@ import {
   startOfDay,
   endOfDay,
 } from "date-fns";
-import { CalendarPlus, AlertTriangle, Pencil, Copy, Trash2 } from "lucide-react";
-import { toast } from "sonner";
-import { toastApiError } from "@/lib/toastApiError";
 import { CalendarView, type CalendarViewType } from "./CalendarView";
 import { CalendarCreateDialog } from "./CalendarCreateDialog";
-import { EntryForm, type EditableEntry } from "@/components/entries/EntryForm";
-import { Button } from "@/components/ui/button";
-import { EmptyState } from "@/components/ui/empty-state";
-import { Spinner } from "@/components/ui/spinner";
-import { useEntriesRange, useUpdateEntry, useCreateEntry, useDeleteEntry } from "@/hooks/useEntries";
+import { CalendarBodyOverlays } from "./CalendarBodyOverlays";
+import { CalendarEventContextMenu } from "./CalendarEventContextMenu";
+import { useCalendarEntryActions } from "./useCalendarEntryActions";
+import { EntryForm, type EditableEntry } from "@/components/forms/EntryForm";
+import { useEntriesRange } from "@/hooks/useEntries";
 import { useCalendarEvents, useConvertCalendarRange } from "@/hooks/useCalendarSync";
 import { useTimerStore } from "@/stores/timerStore";
 import { useUIStore } from "@/stores/uiStore";
@@ -30,14 +26,7 @@ import {
   type CalendarEventExtendedProps,
 } from "@/lib/calendarMapping";
 import { useDraftRange } from "@/hooks/useDrafts";
-import { localDayKey, formatEntryTime } from "@/lib/dateUtils";
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
+import { localDayKey } from "@/lib/dateUtils";
 
 import "@/styles/fullcalendar.css";
 
@@ -140,9 +129,8 @@ export function CalendarBody({
 
   const timeFormat = useUIStore((s) => s.timeFormat);
   const runningEntry = useTimerStore((s) => s.runningEntry);
-  const updateEntry = useUpdateEntry();
-  const createEntry = useCreateEntry();
-  const deleteEntry = useDeleteEntry();
+  const { handleMoveOrResize, handleTaskDrop, handleDuplicate, handleDeleteEntry } =
+    useCalendarEntryActions(timeFormat);
 
   const { data: externalEvents = [] } = useCalendarEvents(
     range.start.toISOString(),
@@ -218,69 +206,6 @@ export function CalendarBody({
     api()?.unselect();
   };
 
-  const handleMoveOrResize = (arg: EventDropArg | EventResizeDoneArg) => {
-    const { start, end } = arg.event;
-    if (!start || !end) {
-      arg.revert();
-      return;
-    }
-    updateEntry.mutate(
-      { id: arg.event.id, data: { start: start.toISOString(), stop: end.toISOString() } },
-      {
-        onError: (error) => {
-          arg.revert();
-          toastApiError(error, "Couldn't update entry");
-        },
-      }
-    );
-  };
-
-  /**
-   * A task dropped on the grid becomes a completed entry at that slot.
-   *
-   * Written immediately, with an Undo toast — no confirm dialog. A gesture whose
-   * whole value is "one motion, done" cannot end in a form; the confirmation is
-   * that you can see where it landed, and take it back.
-   *
-   * Length is the task's estimate, falling back to the grid's own slot (30m) so
-   * the block matches the space the pointer was over. Month view has no time of
-   * day to drop onto, so it isn't a target.
-   */
-  const handleTaskDrop = (arg: DropArg) => {
-    const el = arg.draggedEl;
-    const taskId = el.getAttribute("data-task-id");
-    const projectId = el.getAttribute("data-project-id");
-    const name = el.getAttribute("data-task-name") ?? "";
-    if (!taskId || !projectId) return;
-
-    const estimate = Number(el.getAttribute("data-estimate")) || 30 * 60;
-    const start = arg.date;
-    const stop = new Date(start.getTime() + estimate * 1000);
-
-    createEntry.mutate(
-      {
-        description: name,
-        projectId,
-        taskId,
-        start: start.toISOString(),
-        stop: stop.toISOString(),
-        tags: [],
-      },
-      {
-        onSuccess: (entry) => {
-          toast.success(`Logged ${name}`, {
-            description: `${formatEntryTime(entry.start, timeFormat)} – ${formatEntryTime(
-              entry.stop!,
-              timeFormat
-            )}`,
-            action: { label: "Undo", onClick: () => deleteEntry.mutate(entry.id) },
-          });
-        },
-        onError: (error) => toastApiError(error, "Couldn't log that task"),
-      }
-    );
-  };
-
   const handleEventClick = (arg: EventClickArg) => {
     const props = arg.event.extendedProps as CalendarEventExtendedProps;
     if (props.draft) {
@@ -300,11 +225,6 @@ export function CalendarBody({
     if (props.entry) setEditEntry(props.entry);
   };
 
-  // Right-click menu for a real, non-running entry. Positioned at the click
-  // coordinates rather than nested in eventContent — FullCalendar renders that
-  // through its own flushSync-based portal, and a Radix menu mounted inside it
-  // fought that render pass silently (console showed "flushSync was called
-  // from inside a lifecycle method" and the menu never opened).
   const [contextMenu, setContextMenu] = useState<{
     entry: EditableEntry;
     x: number;
@@ -319,94 +239,19 @@ export function CalendarBody({
     if (props.entry) setContextMenu({ entry: props.entry, x, y });
   };
 
-  const handleDuplicate = (entry: EditableEntry) => {
-    // Every entry needs a project (D3); an older entry without one has to get one first.
-    if (!entry.projectId) {
-      toast.error("Give this entry a project before duplicating it");
-      return;
-    }
-    const projectId = entry.projectId;
-    createEntry.mutate(
-      {
-        description: entry.description,
-        projectId,
-        taskId: entry.taskId,
-        tags: entry.tags,
-        billable: entry.billable,
-        start: entry.start,
-        stop: entry.stop,
-      },
-      { onError: (error) => toastApiError(error, "Couldn't duplicate entry") }
-    );
-  };
-
-  const handleDeleteEntry = (entry: EditableEntry) => {
-    deleteEntry.mutate(entry.id, {
-      onError: (error) => toastApiError(error, "Couldn't delete entry"),
-    });
-  };
-
   return (
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden p-2">
-      {entriesLoading && (
-        <div className="absolute inset-0 z-sticky flex items-center justify-center bg-background/60 backdrop-blur-[1px]">
-          <Spinner size="lg" className="text-muted-foreground" />
-        </div>
-      )}
+      <CalendarBodyOverlays
+        entriesLoading={entriesLoading}
+        entriesError={entriesError}
+        onRetry={() => refetchEntries()}
+        showEmptyState={showEmptyState}
+        isEmpty={events.length === 0}
+        ghostCount={ghostCount}
+        onConvertAll={handleConvertAll}
+        convertPending={convertRange.isPending}
+      />
 
-      {/* A failed fetch used to render as an ordinary empty grid — visually
-          identical to a week with nothing tracked. Overlay rather than replace,
-          so the dates stay on screen as context. */}
-      {entriesError && !entriesLoading && (
-        <div className="absolute inset-0 z-overlay flex items-center justify-center bg-background/85 p-4 backdrop-blur-[1px]">
-          <EmptyState
-            icon={AlertTriangle}
-            title="Couldn't load this period"
-            description="The request didn't get through. Your tracked time is safe."
-            action={
-              <Button variant="outline" size="sm" onClick={() => refetchEntries()}>
-                Try again
-              </Button>
-            }
-            className="py-0"
-          />
-        </div>
-      )}
-
-      {/* Nothing tracked: the grid alone gives no hint that it's empty *because
-          you haven't logged anything*, versus still loading or broken. */}
-      {showEmptyState && !entriesLoading && !entriesError && events.length === 0 && (
-        // The card is inert all the way through. It holds no controls, and
-        // sitting in the middle of an empty grid it swallowed exactly the two
-        // gestures it exists to invite: the click it tells you to make, and a
-        // task dragged from the rail onto the emptiest week you own.
-        <div className="pointer-events-none absolute inset-0 z-sticky flex items-center justify-center p-4">
-          <EmptyState
-            icon={CalendarPlus}
-            title="Nothing tracked in this period"
-            description="Click any empty slot to log time, or start the timer to track as you work."
-            className="rounded-xl border bg-background/95 px-8 py-8 shadow-sm"
-          />
-        </div>
-      )}
-
-      {ghostCount > 0 && (
-        <Button
-          variant="secondary"
-          size="sm"
-          className="absolute right-4 top-3 z-overlay gap-1.5 shadow-sm"
-          onClick={handleConvertAll}
-          disabled={convertRange.isPending}
-          title="Add every calendar event in view as a time entry"
-        >
-          {convertRange.isPending ? (
-            <Spinner size="sm" />
-          ) : (
-            <CalendarPlus className="h-3.5 w-3.5" />
-          )}
-          Convert {ghostCount} {ghostCount === 1 ? "event" : "events"}
-        </Button>
-      )}
       <CalendarView
         ref={calendarRef}
         initialView={initialView}
@@ -428,59 +273,13 @@ export function CalendarBody({
         onEventContextMenu={handleEventContextMenu}
       />
 
-      {contextMenu && (
-        <DropdownMenu
-          open
-          onOpenChange={(open) => !open && setContextMenu(null)}
-        >
-          {/* Popper needs a real anchor to measure from — this invisible 1px
-              point at the click coordinates stands in for the trigger a
-              context menu doesn't otherwise have. */}
-          <DropdownMenuTrigger asChild>
-            <span
-              className="fixed h-px w-px"
-              style={{ left: contextMenu.x, top: contextMenu.y }}
-            />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent
-            className="w-40"
-            align="start"
-            side="bottom"
-            sideOffset={0}
-            onCloseAutoFocus={(e) => e.preventDefault()}
-          >
-            <DropdownMenuItem
-              onSelect={() => {
-                setEditEntry(contextMenu.entry);
-                setContextMenu(null);
-              }}
-            >
-              <Pencil className="h-3.5 w-3.5" />
-              Edit
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onSelect={() => {
-                handleDuplicate(contextMenu.entry);
-                setContextMenu(null);
-              }}
-            >
-              <Copy className="h-3.5 w-3.5" />
-              Duplicate
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              variant="destructive"
-              onSelect={() => {
-                handleDeleteEntry(contextMenu.entry);
-                setContextMenu(null);
-              }}
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-              Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      )}
+      <CalendarEventContextMenu
+        contextMenu={contextMenu}
+        onClose={() => setContextMenu(null)}
+        onEdit={setEditEntry}
+        onDuplicate={handleDuplicate}
+        onDelete={handleDeleteEntry}
+      />
 
       <CalendarCreateDialog
         open={createOpen}

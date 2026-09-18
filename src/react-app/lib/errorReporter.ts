@@ -20,9 +20,8 @@ export function reportClientError(error: unknown, { kind, route }: ReportClientE
       route: route ?? window.location.pathname,
       kind,
     }),
-  }).catch(() => {
-    // intentional: reporting a reporting failure would recurse into this same path
-  });
+    // eslint-disable-next-line no-restricted-syntax -- reporting a reporting failure would recurse into this same path
+  }).catch(() => {});
 }
 
 /** Wired once at startup, catching what no boundary sees. */

@@ -2,7 +2,7 @@ import type { CSSProperties } from "react";
 import type { EventContentArg } from "@fullcalendar/core";
 import { CalendarPlus, Wand2 } from "lucide-react";
 import { formatDurationShort } from "@/lib/dateUtils";
-import { DEFAULT_PROJECT_COLOR } from "@/components/ColorDot";
+import { ColorDot, DEFAULT_PROJECT_COLOR } from "@/components/ColorDot";
 import type { CalendarEventExtendedProps } from "@/lib/calendarMapping";
 
 // Custom renderer for a calendar block. Passed to FullCalendar's `eventContent`.
@@ -67,12 +67,7 @@ export function CalendarEventContent(arg: EventContentArg) {
   const body = (
     <div className="flex h-full flex-col gap-0.5 overflow-hidden text-left leading-tight">
       <div className="flex items-center gap-1">
-        {running && (
-          <span
-            className="tt-running-dot h-1.5 w-1.5 shrink-0 rounded-full"
-            style={{ backgroundColor: color }}
-          />
-        )}
+        {running && <ColorDot color={color} className="tt-running-dot h-1.5 w-1.5" />}
         <span className="truncate text-xs font-medium">
           {entry.description || "(no description)"}
         </span>

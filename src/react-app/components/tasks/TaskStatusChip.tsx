@@ -34,7 +34,7 @@ export function TaskStatusChip({ task, className }: TaskStatusChipProps) {
           className={cn(
             "flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-xs tt-swatch-tint",
             "transition-colors duration-fast ease-out-quart hover:brightness-95",
-            "focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
+            "focus-ring",
             className
           )}
         >

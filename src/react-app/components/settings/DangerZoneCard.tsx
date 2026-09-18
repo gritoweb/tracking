@@ -16,6 +16,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Spinner } from "@/components/ui/spinner";
+import { SettingsRow } from "./SettingsRow";
 import { authClient } from "@/lib/auth-client";
 
 export function DangerZoneCard() {
@@ -41,25 +42,24 @@ export function DangerZoneCard() {
   };
 
   return (
-    <Card className="border-destructive/40">
+    <Card tone="destructive">
       <CardHeader>
         <CardTitle className="text-base text-destructive">Danger zone</CardTitle>
       </CardHeader>
-      <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-sm font-medium">Delete account</p>
-          <p className="mt-1 text-xs leading-normal text-muted-foreground">
-            Permanently deletes your account and all associated data. This cannot be undone.
-          </p>
-        </div>
-        <Button
-          variant="outline"
-          size="sm"
-          className="shrink-0 border-destructive/50 text-destructive hover:bg-destructive hover:text-destructive-foreground"
-          onClick={() => setOpen(true)}
+      <CardContent>
+        <SettingsRow
+          label={<span className="text-sm font-medium text-foreground">Delete account</span>}
+          description="Permanently deletes your account and all associated data. This cannot be undone."
         >
-          Delete account
-        </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="shrink-0 border-destructive/50 text-destructive hover:bg-destructive hover:text-destructive-foreground"
+            onClick={() => setOpen(true)}
+          >
+            Delete account
+          </Button>
+        </SettingsRow>
       </CardContent>
 
       <AlertDialog open={open} onOpenChange={setOpen}>

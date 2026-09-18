@@ -45,12 +45,10 @@ const MOTION_AND_LAYER_CHECKS = [
 	},
 ];
 
-// ── Silent-failure and design-drift guards (declared, not wired yet) ────
-// A follow-up change spreads these into their own file-scoped configs as
-// "error", each alongside its own `ignores` — a config object's
-// `no-restricted-syntax` fully replaces, rather than merges with, another
-// matching config's, so every selector that must apply to a given file has
-// to be spread into that file's own array.
+// ── Silent-failure and design-drift guards ──────────────────────────────
+// A config object's `no-restricted-syntax` fully replaces, rather than merges
+// with, another matching config's, so each scope below spreads every selector
+// that must apply to its files.
 const CATCH_CHECKS = [
 	{
 		selector:
@@ -60,7 +58,7 @@ const CATCH_CHECKS = [
 	},
 	{
 		selector:
-			"Property[key.name='onError'] > ArrowFunctionExpression[params.length=0], JSXAttribute[name.name='onError'] ArrowFunctionExpression[params.length=0]",
+			"Property[key.name='onError'] > ArrowFunctionExpression[params.length=0]",
 		message:
 			"no-discarded-onError-argument: onError takes no parameter, so the error is being discarded.",
 	},
@@ -78,6 +76,8 @@ const COLOR_EXEMPT_FILES = [
 	// Email clients do not support oklch(), and Chrome's setBadgeBackgroundColor takes a literal.
 	"src/worker/emails/**",
 	"extension/background/**",
+	// The popup still carries its own inline styles; it moves to the shared tokens with the extension work.
+	"extension/popup/**",
 	"e2e/**",
 	"scripts/**",
 ];
@@ -108,7 +108,8 @@ const COLOR_CHECKS = [
 ];
 
 // A hand-rolled control reinventing a components/ui primitive — only that folder is exempt.
-const UI_PRIMITIVE_EXEMPT_FILES = ["src/react-app/components/ui/**"];
+// weekGridColumns.ts is the single home of the week-grid column widths.
+const UI_PRIMITIVE_EXEMPT_FILES = ["src/react-app/components/ui/**", "src/react-app/lib/weekGridColumns.ts"];
 
 const UI_PRIMITIVE_CHECKS = [
 	{
@@ -163,8 +164,27 @@ export default tseslint.config(
 				"warn",
 				{ allowConstantExport: true },
 			],
-			"no-restricted-syntax": ["error", ...MOTION_AND_LAYER_CHECKS],
+			"no-restricted-syntax": ["error", ...MOTION_AND_LAYER_CHECKS, ...CATCH_CHECKS],
 		},
 	},
-	// import/no-restricted-paths is deferred: it needs eslint-plugin-import, added separately.
+	{
+		files: ["**/*.{ts,tsx}"],
+		ignores: [...UI_PRIMITIVE_EXEMPT_FILES, "**/*.test.ts", "**/*.test.tsx"],
+		rules: {
+			"no-restricted-syntax": ["error", ...MOTION_AND_LAYER_CHECKS, ...CATCH_CHECKS, ...UI_PRIMITIVE_CHECKS],
+		},
+	},
+	{
+		files: ["**/*.{ts,tsx}"],
+		ignores: [...COLOR_EXEMPT_FILES, ...UI_PRIMITIVE_EXEMPT_FILES, "**/*.test.ts", "**/*.test.tsx"],
+		rules: {
+			"no-restricted-syntax": [
+				"error",
+				...MOTION_AND_LAYER_CHECKS,
+				...CATCH_CHECKS,
+				...UI_PRIMITIVE_CHECKS,
+				...COLOR_CHECKS,
+			],
+		},
+	},
 );

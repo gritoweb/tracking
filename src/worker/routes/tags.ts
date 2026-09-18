@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { CreateTagSchema, UpdateTagSchema, type Tag } from "@shared/schemas";
-import { nextUnusedColor } from "@shared/colors";
+import { NEUTRAL_SWATCH, nextUnusedColor } from "@shared/colors";
 import type { TagRow } from "../db/rows";
 
 export const tagsRouter = new Hono<{
@@ -22,7 +22,7 @@ export const tagsRouter = new Hono<{
           id: r.id,
           workspaceId: r.workspace_id,
           name: r.name,
-          color: r.color ?? "#64748b",
+          color: r.color ?? NEUTRAL_SWATCH,
         })
       ),
       200
@@ -38,7 +38,7 @@ export const tagsRouter = new Hono<{
       .bind(workspaceId, name)
       .first<{ id: string; color: string | null }>();
     if (existing) {
-      return c.json({ id: existing.id, workspaceId, name, color: existing.color ?? "#64748b" }, 200);
+      return c.json({ id: existing.id, workspaceId, name, color: existing.color ?? NEUTRAL_SWATCH }, 200);
     }
 
     const { results: inUse } = await c.env.DB.prepare(

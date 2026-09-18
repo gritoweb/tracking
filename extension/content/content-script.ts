@@ -19,9 +19,10 @@ const APP_ORIGINS = new Set([
 if (APP_ORIGINS.has(window.location.origin)) {
   window.addEventListener("timetracker:sync", (e: Event) => {
     const { detail } = e as CustomEvent;
-    // sendMessage wakes the service worker if it's sleeping; ignore errors
-    // (e.g. extension reloading mid-session) to avoid uncaught promise rejections.
-    chrome.runtime.sendMessage({ type: "TIMER_STATE_CHANGED", state: detail }).catch(() => {});
+    // A reload mid-session invalidates the extension context, so the relay can reject.
+    chrome.runtime
+      .sendMessage({ type: "TIMER_STATE_CHANGED", state: detail })
+      .catch((err: unknown) => console.warn("timer state relay failed", err));
   });
 
   // assistant nudge dismissals — relayed so the badge's nudge count (computed from
@@ -30,7 +31,7 @@ if (APP_ORIGINS.has(window.location.origin)) {
     const { detail } = e as CustomEvent;
     chrome.runtime
       .sendMessage({ type: "ASSISTANT_DISMISSED", dismissed: detail?.dismissed })
-      .catch(() => {});
+      .catch((err: unknown) => console.warn("assistant dismissal relay failed", err));
   });
 }
 

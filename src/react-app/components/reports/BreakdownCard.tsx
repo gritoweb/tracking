@@ -7,10 +7,10 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 import { Inbox } from "lucide-react";
-import { formatDurationShort } from "@/lib/dateUtils";
 import { formatCurrency } from "@/lib/currency";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ColorDot } from "@/components/ColorDot";
+import { Duration } from "@/components/ui/numeric";
 import { DISTINCT_COLORS } from "@/lib/colorUtils";
 import { useUIStore } from "@/stores/uiStore";
 import type { BreakdownRow } from "@/hooks/useReports";
@@ -95,9 +95,7 @@ export function BreakdownCard({
                       formatter={(value, name) => (
                         <>
                           <span className="text-muted-foreground">{name}</span>
-                          <span className="ml-auto font-mono font-medium tabular-nums text-foreground">
-                            {formatDurationShort(Number(value))}
-                          </span>
+                          <Duration seconds={Number(value)} size="sm" weight="medium" className="ml-auto" />
                         </>
                       )}
                     />
@@ -136,9 +134,7 @@ export function BreakdownCard({
                         {formatCurrency(row.billableAmount, currency)}
                       </span>
                     )}
-                    <span className="min-w-12 shrink-0 text-right text-sm font-medium tabular-nums">
-                      {formatDurationShort(row.totalSeconds)}
-                    </span>
+                    <Duration seconds={row.totalSeconds} size="sm" weight="medium" className="min-w-12 shrink-0" />
                     {/* The share is a share of TIME, and it used to sit between
                         the amount and the duration — styled identically to the
                         amount and differently from the duration, so it read as
@@ -165,9 +161,7 @@ export function BreakdownCard({
                     )}
                   </span>
                 )}
-                <span className="min-w-12 shrink-0 text-right text-sm font-semibold tabular-nums">
-                  {formatDurationShort(totalSeconds)}
-                </span>
+                <Duration seconds={totalSeconds} size="sm" weight="semibold" className="min-w-12 shrink-0" />
                 <span className="w-9 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
                   100%
                 </span>

@@ -106,6 +106,7 @@ export function CommandPalette() {
       />
       <CommandList>
         <CommandEmpty>
+          {/* raw: a cmdk option row, not a standalone action */}
           <button
             className="flex w-full items-center gap-2 px-3 py-2 text-sm transition-colors duration-fast ease-out-quart hover:bg-accent"
             onClick={handleStartTimer}

@@ -24,9 +24,9 @@ test("tag colors: recolor an existing tag in the entry dialog", async ({ page })
   await page.getByPlaceholder("Add a tag...").fill("design");
   await page.getByRole("option", { name: /design/ }).first().click();
 
-  // The selected tag's dot opens the inline recolor palette.
+  // The selected tag's dot opens the inline recolor palette (shared ColorSwatchPicker: a radiogroup of named swatches).
   await page.getByRole("button", { name: "Recolor design" }).click();
-  await page.getByRole("button", { name: /Set design to Violet/ }).click();
+  await page.getByRole("radio", { name: "Violet" }).click();
   await expect(page.getByRole("button", { name: "Recolor design" })).toBeVisible();
 });
 

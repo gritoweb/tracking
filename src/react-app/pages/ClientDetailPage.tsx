@@ -27,7 +27,8 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { ClientForm } from "@/components/clients/ClientForm";
+import { ClientForm } from "@/components/forms/ClientForm";
+import { ColorDot } from "@/components/ColorDot";
 import { TaskList } from "@/components/projects/TaskList";
 import { useClient, useAllProjects } from "@/hooks/useProjects";
 import { useWorkspaceRole } from "@/hooks/useWorkspaceRole";
@@ -225,10 +226,7 @@ export function ClientDetailPage() {
             >
               <div className="rounded-lg bg-card">
                 <div className="flex items-center gap-3 px-4 py-3">
-                  <span
-                    className="h-3 w-3 shrink-0 rounded-full"
-                    style={{ backgroundColor: project.color }}
-                  />
+                  <ColorDot color={project.color} className="h-3 w-3" />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span

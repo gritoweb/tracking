@@ -6,8 +6,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { SettingsListItem } from "./SettingsListItem";
 import { authClient } from "@/lib/auth-client";
 import { formatShortDate } from "@/lib/dateUtils";
+
+// Just enough of the SDK's passkey shape for the confirm dialog's copy.
+interface DeletablePasskey {
+  id: string;
+  name?: string | null;
+}
 
 function toIso(d: Date | string): string {
   return typeof d === "string" ? d : d.toISOString();
@@ -16,6 +24,7 @@ function toIso(d: Date | string): string {
 export function PasskeysCard() {
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<DeletablePasskey | null>(null);
 
   const { data: passkeys = [], isLoading } = useQuery({
     queryKey: ["auth", "passkeys"],
@@ -67,32 +76,23 @@ export function PasskeysCard() {
         ) : passkeys.length > 0 ? (
           <div className="space-y-2">
             {passkeys.map((p) => (
-              <div
+              <SettingsListItem
                 key={p.id}
-                className="flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-sm"
+                icon={KeyRound}
+                title={<span className="truncate font-medium">{p.name || "Passkey"}</span>}
+                subtitle={p.createdAt ? `Added ${formatShortDate(toIso(p.createdAt))}` : undefined}
               >
-                <div className="flex min-w-0 items-center gap-3">
-                  <KeyRound className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  <div className="min-w-0">
-                    <p className="truncate font-medium">{p.name || "Passkey"}</p>
-                    {p.createdAt && (
-                      <p className="mt-1 text-xs leading-normal text-muted-foreground">
-                        Added {formatShortDate(toIso(p.createdAt))}
-                      </p>
-                    )}
-                  </div>
-                </div>
                 <Button
                   variant="ghost"
                   size="icon-sm"
                   className="shrink-0 text-muted-foreground hover:text-destructive"
                   aria-label="Remove passkey"
-                  onClick={() => remove.mutate(p.id)}
+                  onClick={() => setDeleteTarget(p)}
                   disabled={remove.isPending}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
-              </div>
+              </SettingsListItem>
             ))}
           </div>
         ) : null}
@@ -118,6 +118,18 @@ export function PasskeysCard() {
           </Button>
         </div>
       </CardContent>
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(o) => !o && setDeleteTarget(null)}
+        title="Remove passkey?"
+        description={`"${deleteTarget?.name || "Passkey"}" will no longer sign you in. This can't be undone.`}
+        confirmLabel="Remove"
+        onConfirm={() => {
+          if (deleteTarget) remove.mutate(deleteTarget.id);
+          setDeleteTarget(null);
+        }}
+      />
     </Card>
   );
 }

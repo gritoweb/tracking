@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Play, Repeat, Square, UserPlus } from "lucide-react";
+import { Play, Repeat, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -13,7 +13,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ProjectBadge } from "@/components/ProjectBadge";
-import { UserAvatar } from "@/components/layout/UserAvatar";
+import { AssignButton } from "@/components/ui/assign-button";
+import { AvatarStack } from "@/components/ui/avatar";
 import { MultiSelect } from "@/components/pickers/MultiSelect";
 import { TaskStatusChip } from "../TaskStatusChip";
 import { useTimer } from "@/hooks/useTimer";
@@ -93,13 +94,14 @@ export function TaskCard({ task, onOpen, overlay = false }: TaskCardProps) {
         "group flex flex-col gap-1.5 rounded-lg bg-popover p-2.5",
         "transition-colors duration-fast ease-out-quart",
         !overlay && "cursor-grab touch-none active:cursor-grabbing",
-        !overlay && "focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
+        !overlay && "focus-ring",
         running && "bg-primary/5",
         // Stays in place as a hole while the overlay follows the pointer.
         !overlay && sortable.isDragging && "opacity-40",
         // The overlay renders in a portal, outside the column's own width — without this it
         // sizes to its content instead of matching the card it was picked up from.
-        overlay && "w-[272px] shadow-lg"
+        // eslint-disable-next-line no-restricted-syntax -- the drag overlay floats over the board, so it is an overlay shadow
+        overlay && "w-(--size-board-column) shadow-lg"
       )}
     >
       <div className="flex items-start gap-1.5">
@@ -108,13 +110,14 @@ export function TaskCard({ task, onOpen, overlay = false }: TaskCardProps) {
         {task.priority < 4 && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
+              {/* Raw: a colored dot control has no matching primitive shape */}
               <button
                 type="button"
                 title={`Priority: ${PRIORITY_LABEL[task.priority]} — change`}
                 aria-label={`Priority ${PRIORITY_LABEL[task.priority]} — change`}
                 className={cn(
                   "mt-1 h-2 w-2 shrink-0 rounded-full border-2 transition-transform duration-fast ease-out-quart hover:scale-125",
-                  "focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
+                  "focus-ring",
                   PRIORITY_RING[task.priority]
                 )}
               />
@@ -134,12 +137,12 @@ export function TaskCard({ task, onOpen, overlay = false }: TaskCardProps) {
           </DropdownMenu>
         )}
 
+        {/* Raw: inline text trigger inside a dense row, not a sized Button */}
         <button
           type="button"
           onClick={() => onOpen(task)}
           className={cn(
-            "min-w-0 flex-1 text-left text-sm",
-            "focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 rounded",
+            "min-w-0 flex-1 rounded text-left text-sm focus-ring",
             done && "text-muted-foreground line-through"
           )}
         >
@@ -253,29 +256,12 @@ export function TaskCard({ task, onOpen, overlay = false }: TaskCardProps) {
             loading={membersLoading}
             trigger={
               task.assignees.length > 0 ? (
-                <button
-                  type="button"
-                  aria-label="Edit assignees"
-                  className="ml-auto flex -space-x-1.5 rounded-full focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                >
-                  {task.assignees.slice(0, 3).map((a) => (
-                    <UserAvatar
-                      key={a.userId}
-                      name={a.name}
-                      image={a.image}
-                      className="h-5 w-5 border-2 border-background text-micro"
-                    />
-                  ))}
+                // Raw: MultiSelect's custom trigger, wrapping the avatar stack
+                <button type="button" aria-label="Edit assignees" className="ml-auto rounded-full focus-ring">
+                  <AvatarStack members={task.assignees.map((a) => ({ id: a.userId, name: a.name, image: a.image }))} max={3} size="xs" />
                 </button>
               ) : (
-                <button
-                  type="button"
-                  aria-label="Add assignee"
-                  title="Add assignee"
-                  className="tt-reveal ml-auto flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-dashed border-muted-foreground/50 text-muted-foreground/50 hover:border-muted-foreground hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                >
-                  <UserPlus className="h-3 w-3" />
-                </button>
+                <AssignButton className="ml-auto" size="xs" />
               )
             }
           />

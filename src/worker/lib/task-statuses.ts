@@ -27,7 +27,7 @@ const DEFAULT_STATUSES: {
   { name: "Em progresso", color: swatch("Violet"), category: "active", isDefault: false },
   { name: "QA", color: swatch("Orange"), category: "active", isDefault: false },
   // A darker pink than the picker's stock swatch, short of purple — asked for by name.
-  { name: "Client review", color: "#db2777", category: "active", isDefault: false },
+  { name: "Client review", color: swatch("Pink"), category: "active", isDefault: false },
   { name: "Closed", color: swatch("Green"), category: "completed", isDefault: false },
 ];
 

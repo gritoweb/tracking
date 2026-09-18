@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
@@ -99,10 +100,13 @@ export function TeamCard() {
     refetch();
   };
 
-  const handleRemoveMember = async (memberId: string) => {
-    if (!organizationId) return;
+  // Destructive with no undo — gated behind the confirm dialog below (removeTarget).
+  const [removeTarget, setRemoveTarget] = useState<{ id: string; name: string } | null>(null);
+
+  const handleRemoveMember = async () => {
+    if (!organizationId || !removeTarget) return;
     const { error } = await authClient.organization.removeMember({
-      memberIdOrEmail: memberId,
+      memberIdOrEmail: removeTarget.id,
       organizationId,
     });
     if (error) {
@@ -173,7 +177,12 @@ export function TeamCard() {
                               <Button
                                 size="icon-xs"
                                 variant="ghost"
-                                onClick={() => handleRemoveMember(member.id)}
+                                onClick={() =>
+                                  setRemoveTarget({
+                                    id: member.id,
+                                    name: member.user?.name ?? member.user?.email ?? "this member",
+                                  })
+                                }
                                 aria-label="Remove member"
                               >
                                 <X className="h-3.5 w-3.5" />
@@ -249,6 +258,15 @@ export function TeamCard() {
           </>
         )}
       </CardContent>
+
+      <ConfirmDialog
+        open={removeTarget !== null}
+        onOpenChange={(open) => !open && setRemoveTarget(null)}
+        title={`Remove ${removeTarget?.name}?`}
+        description="They'll lose access to this workspace right away. Their logged hours stay on the record."
+        confirmLabel="Remove"
+        onConfirm={handleRemoveMember}
+      />
     </Card>
   );
 }

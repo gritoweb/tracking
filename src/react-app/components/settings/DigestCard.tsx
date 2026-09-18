@@ -1,10 +1,11 @@
 import { Mail, Send } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
+import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { SettingsCardHeader } from "./SettingsCardHeader";
+import { SettingsRow } from "./SettingsRow";
 import {
   Select,
   SelectContent,
@@ -53,53 +54,37 @@ export function DigestCard() {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <Mail className="h-4 w-4" />
-          Email digests
-        </CardTitle>
-      </CardHeader>
+      <SettingsCardHeader icon={Mail} title="Email digests" />
       <CardContent className="space-y-5">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <Label htmlFor="digest-daily">Morning briefing</Label>
-            <p className="mt-1 text-xs leading-normal text-muted-foreground">
-              Yesterday&apos;s hours by project, budgets worth a look, and anything
-              waiting for review
-            </p>
-          </div>
+        <SettingsRow
+          htmlFor="digest-daily"
+          label="Morning briefing"
+          description="Yesterday's hours by project, budgets worth a look, and anything waiting for review"
+        >
           <Switch
             id="digest-daily"
             checked={daily}
             onCheckedChange={(checked) => patch({ digestDaily: checked })}
           />
-        </div>
+        </SettingsRow>
 
         <Separator />
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <Label htmlFor="digest-weekly">Weekly summary</Label>
-            <p className="mt-1 text-xs leading-normal text-muted-foreground">
-              The same, for the week just gone — sent on Monday
-            </p>
-          </div>
+        <SettingsRow
+          htmlFor="digest-weekly"
+          label="Weekly summary"
+          description="The same, for the week just gone — sent on Monday"
+        >
           <Switch
             id="digest-weekly"
             checked={weekly}
             onCheckedChange={(checked) => patch({ digestWeekly: checked })}
           />
-        </div>
+        </SettingsRow>
 
         <Separator />
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <Label>Send at</Label>
-            <p className="mt-1 text-xs leading-normal text-muted-foreground">
-              Your local time
-            </p>
-          </div>
+        <SettingsRow label="Send at" description="Your local time">
           <Select
             value={String(hour)}
             onValueChange={(v) => patch({ digestHour: Number(v) })}
@@ -116,17 +101,11 @@ export function DigestCard() {
               ))}
             </SelectContent>
           </Select>
-        </div>
+        </SettingsRow>
 
         <Separator />
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <Label>Preview</Label>
-            <p className="mt-1 text-xs leading-normal text-muted-foreground">
-              Sends one to your own address right now, covering yesterday
-            </p>
-          </div>
+        <SettingsRow label="Preview" description="Sends one to your own address right now, covering yesterday">
           <Button
             variant="outline"
             size="sm"
@@ -137,7 +116,7 @@ export function DigestCard() {
             {sendDigest.isPending ? <Spinner size="sm" /> : <Send className="h-3.5 w-3.5" />}
             Send one now
           </Button>
-        </div>
+        </SettingsRow>
       </CardContent>
     </Card>
   );

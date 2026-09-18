@@ -6,8 +6,8 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
-import { formatDurationShort } from "@/lib/dateUtils";
 import { ColorDot } from "@/components/ColorDot";
+import { Duration } from "@/components/ui/numeric";
 
 interface ProjectData {
   projectId: string | null;
@@ -79,9 +79,7 @@ export function ProjectBreakdown({ data, totalSeconds }: ProjectBreakdownProps) 
                         <>
                           <ColorDot color={(item.payload as ProjectData).projectColor} />
                           <span className="text-muted-foreground">{name}</span>
-                          <span className="ml-auto font-mono font-medium tabular-nums text-foreground">
-                            {formatDurationShort(Number(value))}
-                          </span>
+                          <Duration seconds={Number(value)} size="sm" weight="medium" className="ml-auto" />
                         </>
                       )}
                     />
@@ -111,9 +109,7 @@ export function ProjectBreakdown({ data, totalSeconds }: ProjectBreakdownProps) 
                       {p.projectName}
                     </span>
                     <span className="text-xs text-muted-foreground">{pct}%</span>
-                    <span className="min-w-12 text-right text-sm font-medium">
-                      {formatDurationShort(p.totalSeconds)}
-                    </span>
+                    <Duration seconds={p.totalSeconds} size="sm" weight="medium" className="min-w-12" />
                   </div>
                 );
               })}
@@ -125,9 +121,7 @@ export function ProjectBreakdown({ data, totalSeconds }: ProjectBreakdownProps) 
                   Total
                 </span>
                 <span className="text-xs text-muted-foreground">100%</span>
-                <span className="min-w-12 text-right text-sm font-semibold">
-                  {formatDurationShort(totalSeconds)}
-                </span>
+                <Duration seconds={totalSeconds} size="sm" weight="semibold" className="min-w-12" />
               </div>
             </>
           )}

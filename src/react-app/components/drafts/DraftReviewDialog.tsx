@@ -1,16 +1,5 @@
 import { useMemo, useState } from "react";
-import {
-  CalendarClock,
-  Check,
-  ChevronLeft,
-  Repeat,
-  SquareDashed,
-  Trash2,
-  CalendarPlus,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
+import { CalendarPlus } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -20,8 +9,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ProjectPicker } from "@/components/pickers/ProjectPicker";
-import { BillableToggle } from "@/components/timer/BillableToggle";
+import { DraftCard } from "./DraftCard";
+import { DraftTotalCard } from "./DraftTotalCard";
 import {
   useDrafts,
   useUpdateDraft,
@@ -31,29 +20,8 @@ import {
 import { useEntriesRange } from "@/hooks/useEntries";
 import { useCalendarStatus } from "@/hooks/useCalendarSync";
 import { useUIStore } from "@/stores/uiStore";
-import {
-  formatDurationShort,
-  formatEntryTime,
-  formatPlainDate,
-  parseTimeInput,
-  formatTimeInput,
-} from "@/lib/dateUtils";
-import type { DraftEntry, DraftSource } from "@shared/schemas";
-
-const SOURCE_ICON: Record<DraftSource, typeof CalendarClock> = {
-  calendar: CalendarClock,
-  gap: SquareDashed,
-  pattern: Repeat,
-};
-
-const SOURCE_LABEL: Record<DraftSource, string> = {
-  calendar: "From your calendar",
-  gap: "Unaccounted time",
-  pattern: "Weekly habit",
-};
-
-/** Nudge a draft's length without opening a time picker. */
-const ADJUST_STEPS = [-30, -15, 15, 30];
+import { formatPlainDate, parseTimeInput, formatTimeInput } from "@/lib/dateUtils";
+import type { DraftEntry } from "@shared/schemas";
 
 interface DraftReviewDialogProps {
   open: boolean;
@@ -76,6 +44,8 @@ interface DraftReviewDialogProps {
  * plausible entries can still add up to a number the user won't stand behind,
  * and correcting that by hand-editing five entries is work nobody does. Setting
  * the total scales the batch proportionally instead.
+ *
+ * Controller: owns hooks/mutations/state; DraftCard/DraftTotalCard are pure views.
  */
 export function DraftReviewDialog({ open, localDate, onClose }: DraftReviewDialogProps) {
   const { data: drafts = [], isLoading } = useDrafts(localDate, open);
@@ -87,15 +57,10 @@ export function DraftReviewDialog({ open, localDate, onClose }: DraftReviewDialo
   // Time already on the timesheet for this day — the total card reports the
   // whole day, not just the part being confirmed.
   const dayStart = useMemo(() => new Date(`${localDate}T00:00:00`), [localDate]);
-  const dayEnd = useMemo(
-    () => new Date(dayStart.getTime() + 86_400_000),
-    [dayStart]
-  );
-  const { data: dayEntries = [] } = useEntriesRange(
-    dayStart.toISOString(),
-    dayEnd.toISOString(),
-    { enabled: open }
-  );
+  const dayEnd = useMemo(() => new Date(dayStart.getTime() + 86_400_000), [dayStart]);
+  const { data: dayEntries = [] } = useEntriesRange(dayStart.toISOString(), dayEnd.toISOString(), {
+    enabled: open,
+  });
   const confirmedSeconds = dayEntries
     .filter((e) => e.stop)
     .reduce((sum, e) => sum + (e.duration ?? 0), 0);
@@ -193,60 +158,19 @@ export function DraftReviewDialog({ open, localDate, onClose }: DraftReviewDialo
             <Progress value={progress} className="h-1" aria-label="Review progress" />
 
             {onTotalCard ? (
-              <div className="space-y-4 py-2">
-                <div className="rounded-lg bg-card p-4">
-                  <p className="text-sm font-medium">How much time should we report?</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {confirmedSeconds > 0 && (
-                      <>
-                        {formatDurationShort(confirmedSeconds)} already tracked ·{" "}
-                      </>
-                    )}
-                    {formatDurationShort(draftSeconds)} drafted
-                  </p>
-                  <div className="mt-3 flex items-center gap-2">
-                    <Input
-                      value={totalInput}
-                      onChange={(e) => setTypedTotal(e.target.value)}
-                      aria-label="Total time to report for the day"
-                      className="h-9 w-28 font-mono tabular-nums"
-                    />
-                    <span className="text-xs text-muted-foreground">
-                      for the whole day
-                    </span>
-                  </div>
-                  {/* Say what the number will do before it does it. Silent
-                      rescaling of five entries is exactly the kind of edit
-                      someone needs to see coming. */}
-                  {willScale && (
-                    <p className="mt-3 text-xs text-warning-ink">
-                      The {drafts.length} drafted{" "}
-                      {drafts.length === 1 ? "entry" : "entries"} will be scaled to fit —{" "}
-                      {formatDurationShort(draftSeconds)} → {formatDurationShort(draftTarget)}.
-                    </p>
-                  )}
-                </div>
-
-                <div className="flex items-center justify-between gap-2">
-                  <Button variant="ghost" size="sm" onClick={goBack}>
-                    <ChevronLeft className="h-4 w-4" />
-                    Back
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={handleConfirm}
-                    disabled={confirmDrafts.isPending || missingProject}
-                    className="gap-1.5"
-                  >
-                    {confirmDrafts.isPending ? (
-                      <Spinner size="sm" />
-                    ) : (
-                      <Check className="h-4 w-4" />
-                    )}
-                    Add {drafts.length} to timesheet
-                  </Button>
-                </div>
-              </div>
+              <DraftTotalCard
+                confirmedSeconds={confirmedSeconds}
+                draftSeconds={draftSeconds}
+                draftCount={drafts.length}
+                totalInput={totalInput}
+                onTotalInputChange={setTypedTotal}
+                willScale={willScale}
+                draftTarget={draftTarget}
+                onBack={goBack}
+                onConfirm={handleConfirm}
+                confirming={confirmDrafts.isPending}
+                confirmDisabled={missingProject}
+              />
             ) : current ? (
               <DraftCard
                 key={current.id}
@@ -259,12 +183,8 @@ export function DraftReviewDialog({ open, localDate, onClose }: DraftReviewDialo
                   setRenaming(null);
                 }}
                 onCancelRename={() => setRenaming(null)}
-                onProject={(projectId) =>
-                  updateDraft.mutate({ id: current.id, data: { projectId } })
-                }
-                onBillable={(billable) =>
-                  updateDraft.mutate({ id: current.id, data: { billable } })
-                }
+                onProject={(projectId) => updateDraft.mutate({ id: current.id, data: { projectId } })}
+                onBillable={(billable) => updateDraft.mutate({ id: current.id, data: { billable } })}
                 onAdjust={(delta) => adjustMinutes(current, delta)}
                 onDiscard={() => handleDiscard(current)}
                 onKeep={goNext}
@@ -276,9 +196,9 @@ export function DraftReviewDialog({ open, localDate, onClose }: DraftReviewDialo
               <p className="flex items-start gap-2 border-t pt-3 text-xs leading-normal text-muted-foreground">
                 <CalendarPlus className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                 <span>
-                  These come from gaps in your day and your weekly habits. Connect a
-                  calendar in <span className="font-medium">Settings</span> and meetings
-                  you didn&apos;t track get drafted too.
+                  These come from gaps in your day and your weekly habits. Connect a calendar in{" "}
+                  <span className="font-medium">Settings</span> and meetings you didn&apos;t track get
+                  drafted too.
                 </span>
               </p>
             )}
@@ -286,150 +206,5 @@ export function DraftReviewDialog({ open, localDate, onClose }: DraftReviewDialo
         )}
       </DialogContent>
     </Dialog>
-  );
-}
-
-interface DraftCardProps {
-  draft: DraftEntry;
-  timeFormat: "24h" | "12h";
-  renaming: boolean;
-  onStartRename: () => void;
-  onRename: (description: string) => void;
-  onCancelRename: () => void;
-  onProject: (projectId: string | null) => void;
-  onBillable: (billable: boolean) => void;
-  onAdjust: (deltaMinutes: number) => void;
-  onDiscard: () => void;
-  onKeep: () => void;
-  onBack?: () => void;
-}
-
-function DraftCard({
-  draft,
-  timeFormat,
-  renaming,
-  onStartRename,
-  onRename,
-  onCancelRename,
-  onProject,
-  onBillable,
-  onAdjust,
-  onDiscard,
-  onKeep,
-  onBack,
-}: DraftCardProps) {
-  // Seeded once per card — the card is keyed by draft id, so switching cards
-  // remounts it rather than syncing state through an effect.
-  const [draftText, setDraftText] = useState(draft.description);
-
-  const SourceIcon = SOURCE_ICON[draft.source];
-
-  return (
-    <div className="space-y-4 py-2">
-      <div className="rounded-lg bg-card p-4">
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <SourceIcon className="h-3.5 w-3.5" />
-          <span>{SOURCE_LABEL[draft.source]}</span>
-          {draft.confidence === "low" && (
-            <Badge variant="outline" className="text-micro">
-              Low confidence
-            </Badge>
-          )}
-        </div>
-
-        {renaming ? (
-          <div className="mt-2 flex items-center gap-2">
-            <Input
-              autoFocus
-              value={draftText}
-              onChange={(e) => setDraftText(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") onRename(draftText);
-                if (e.key === "Escape") onCancelRename();
-              }}
-              placeholder="What was this?"
-              aria-label="Entry description"
-              className="h-9"
-            />
-            <Button size="sm" onClick={() => onRename(draftText)}>
-              Save
-            </Button>
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={onStartRename}
-            className="mt-2 block w-full rounded text-left text-sm font-medium transition-colors duration-fast ease-out-quart hover:text-muted-foreground"
-            title="Rename this entry"
-          >
-            {draft.description || (
-              <span className="text-muted-foreground italic">
-                Click to describe this time
-              </span>
-            )}
-          </button>
-        )}
-
-        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-          <span className="font-mono tabular-nums">
-            {formatEntryTime(draft.start, timeFormat)}–
-            {formatEntryTime(draft.stop, timeFormat)}
-          </span>
-          <span aria-hidden>·</span>
-          <span className="font-semibold tabular-nums text-foreground">
-            {formatDurationShort(draft.duration)}
-          </span>
-        </div>
-
-        {/* Why this was proposed. A proposal the user can't account for is one
-            they can't judge — and an unjudgeable proposal gets rubber-stamped. */}
-        {draft.reason && (
-          <p className="mt-2 text-xs text-muted-foreground">{draft.reason}</p>
-        )}
-
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <ProjectPicker value={draft.projectId} onChange={onProject} compact />
-          <BillableToggle value={draft.billable} onChange={onBillable} />
-          <div className="ml-auto flex items-center gap-1">
-            {ADJUST_STEPS.map((step) => (
-              <Button
-                key={step}
-                variant="outline"
-                size="sm"
-                className="h-7 px-2 font-mono text-micro tabular-nums"
-                onClick={() => onAdjust(step)}
-                aria-label={`${step > 0 ? "Add" : "Remove"} ${Math.abs(step)} minutes`}
-              >
-                {step > 0 ? `+${step}` : step}
-              </Button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1">
-          {onBack && (
-            <Button variant="ghost" size="sm" onClick={onBack}>
-              <ChevronLeft className="h-4 w-4" />
-              Back
-            </Button>
-          )}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onDiscard}
-            className="text-muted-foreground"
-          >
-            <Trash2 className="h-4 w-4" />
-            Discard
-          </Button>
-        </div>
-        <Button size="sm" onClick={onKeep} className="gap-1.5">
-          <Check className="h-4 w-4" />
-          Keep
-        </Button>
-      </div>
-    </div>
   );
 }

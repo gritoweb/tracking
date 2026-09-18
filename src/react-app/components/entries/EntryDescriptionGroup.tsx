@@ -2,6 +2,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { ChevronRight, Play, Trash2, MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Collapsible,
   CollapsibleContent,
@@ -93,38 +94,14 @@ export function EntryDescriptionGroup({
           someSelected && "bg-accent/60"
         )}
       >
-        {/* Checkbox */}
+        {/* Checkbox — tri-state: indeterminate while some (not all) entries are selected. */}
         {onToggleSelect && (
-          <button
-            type="button"
-            role="checkbox"
-            aria-checked={allSelected ? true : someSelected ? "mixed" : false}
+          <Checkbox
+            checked={allSelected ? true : someSelected ? "indeterminate" : false}
+            onCheckedChange={handleGroupSelect}
             aria-label="Select all entries in group"
-            onClick={handleGroupSelect}
-            className={cn(
-              // Matches EntryRow: the 16x16 box fails WCAG 2.2 AA's 24px floor
-              // (SC 2.5.8), so ::before expands the hit target to 28x28 without
-              // changing the checkbox's visual weight.
-              "relative flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors duration-fast ease-out-quart before:absolute before:-inset-1.5 before:content-[''] focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
-              allSelected
-                ? "border-primary bg-primary text-primary-foreground"
-                : someSelected
-                ? "border-primary bg-primary/40"
-                : "border-muted-foreground/40 tt-reveal hover:border-primary"
-            )}
-          >
-            {(allSelected || someSelected) && (
-              <svg className="h-2.5 w-2.5" viewBox="0 0 10 10" fill="none">
-                <path
-                  d={allSelected ? "M2 5l2.5 2.5L8 3" : "M2 5h6"}
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            )}
-          </button>
+            className={cn(!allSelected && !someSelected && "tt-reveal")}
+          />
         )}
 
         {/* Project color dot */}

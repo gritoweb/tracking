@@ -1,24 +1,11 @@
 import { useState } from "react";
-import { Plus, MoreHorizontal, Archive, Edit2, ChevronDown, FolderOpen, Search } from "lucide-react";
+import { Plus, FolderOpen, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { SpentFigure } from "@/components/ui/spent-figure";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { ProjectForm } from "./ProjectForm";
-import { TaskList } from "./TaskList";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { SearchInput } from "@/components/ui/search-input";
+import { ProjectForm } from "@/components/forms/ProjectForm";
+import { ProjectListRow } from "./ProjectListRow";
 import {
   useAllProjects,
   useDeleteProject,
@@ -26,13 +13,9 @@ import {
   useProjectPacing,
 } from "@/hooks/useProjects";
 import { useWorkspaceRole } from "@/hooks/useWorkspaceRole";
-import { pacingLabel, pacingToneClass } from "@/lib/pacing";
 import { Target } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { formatDurationShort, formatPlainDate } from "@/lib/dateUtils";
-import { formatCurrency } from "@/lib/currency";
 import { useUIStore } from "@/stores/uiStore";
-import { cn } from "@/lib/utils";
 import { CollectionHeader } from "@/components/layout/CollectionHeader";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import {
@@ -40,7 +23,6 @@ import {
   resolveCollectionPeriod,
   type CollectionPeriod,
 } from "@/lib/collectionPeriod";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -73,6 +55,7 @@ export function ProjectList() {
   const { canManage } = useWorkspaceRole();
   const [editProject, setEditProject] = useState<Project | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [archiveTarget, setArchiveTarget] = useState<Project | null>(null);
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   // Two critiques flagged the same gap: at 30 projects this page was a scroll
   // with no way to narrow it, while Clients had a period control and Tasks had
@@ -117,7 +100,7 @@ export function ProjectList() {
         case "tracked":
           return (b.trackedSeconds ?? 0) - (a.trackedSeconds ?? 0);
         case "client":
-          return (a.clientName ?? "\uffff").localeCompare(b.clientName ?? "\uffff")
+          return (a.clientName ?? "￿").localeCompare(b.clientName ?? "￿")
             || a.name.localeCompare(b.name);
         case "rate":
           return (b.rate ?? -1) - (a.rate ?? -1) || a.name.localeCompare(b.name);
@@ -150,16 +133,13 @@ export function ProjectList() {
       >
         {projects.length > 0 && (
           <>
-            <div className="relative">
-              <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search projects…"
-                aria-label="Search projects by name or client"
-                className="h-8 w-48 pl-8"
-              />
-            </div>
+            <SearchInput
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search projects…"
+              aria-label="Search projects by name or client"
+              className="h-8 w-48"
+            />
             <SegmentedControl
               label="Period"
               options={[...COLLECTION_PERIODS]}
@@ -198,187 +178,25 @@ export function ProjectList() {
       )}
 
       <div className="space-y-1.5">
-        {visible.map((project) => {
-          // budgetSeconds, not trackedSeconds: the bar is cumulative against
-          // the estimate and must not follow the period control, or `11h / 40h`
-          // becomes a sentence whose two halves cover different spans.
-          const budgetPercent =
-            project.estimatedHours && project.budgetSeconds !== undefined
-              ? Math.min(
-                  100,
-                  Math.round(
-                    (project.budgetSeconds / (project.estimatedHours * 3600)) * 100
-                  )
-                )
-              : null;
-          const projectPacing = pacingByProject.get(project.id);
-          const paceLabel = projectPacing ? pacingLabel(projectPacing) : null;
-          const isExpanded = expandedTasks.has(project.id);
-
-          return (
-            <Collapsible
-              key={project.id}
-              open={isExpanded}
-              onOpenChange={() => toggleTasks(project.id)}
-            >
-              <div className="rounded-lg bg-card">
-                <div className="flex items-center gap-3 px-4 py-3">
-                  <span
-                    className="h-3 w-3 shrink-0 rounded-full"
-                    style={{ backgroundColor: project.color }}
-                  />
-                  <div className="min-w-0 flex-1">
-                    {/* Wrapping, with the name claiming a whole line below sm.
-                        The row used to be a nowrap flex where the badges
-                        couldn't shrink, so a name long enough to need two lines
-                        broke *around* the badge — four of five rows on a 390px
-                        screen rendered as a ragged L, with the rate outranking
-                        the thing it describes. The identifier gets the line;
-                        the rate is a detail and can sit beneath it. */}
-                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                      <span
-                        className={cn(
-                          "min-w-0 max-w-full basis-full truncate text-sm font-medium sm:basis-auto",
-                          !project.active && "text-muted-foreground line-through"
-                        )}
-                      >
-                        {project.name}
-                      </span>
-                      {!project.active && (
-                        <Badge variant="outline" className="text-xs">Archived</Badge>
-                      )}
-                      {project.billable && (
-                        <Badge variant="secondary" className="text-xs">
-                          Billable{project.rate ? ` ${formatCurrency(project.rate, currency)}/h` : ""}
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                      {project.clientName && <span>{project.clientName}</span>}
-                      {project.trackedSeconds > 0 && (
-                        <span>
-                          {formatDurationShort(project.trackedSeconds)} tracked
-                          {period !== "all" && (
-                            <span className="text-muted-foreground/80">
-                              {" "}
-                              {periodLabel.toLowerCase()}
-                            </span>
-                          )}
-                        </span>
-                      )}
-                      {/* A project with time in it, but none inside the chosen
-                          window, said nothing at all — indistinguishable from a
-                          project nobody has ever touched. */}
-                      {project.trackedSeconds === 0 && project.budgetSeconds > 0 && (
-                        <span>Nothing tracked {periodLabel.toLowerCase()}</span>
-                      )}
-                      {project.endDate && (
-                        <span>Due {formatPlainDate(project.endDate)}</span>
-                      )}
-                    </div>
-                    {/* Budget progress bar */}
-                    {budgetPercent !== null && (
-                      <div className="mt-1.5 flex items-center gap-2">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Progress
-                              value={budgetPercent}
-                              aria-label={`${Math.round(budgetPercent)}% of budget used, all time`}
-                              className={cn(
-                                "h-1.5 flex-1",
-                                budgetPercent >= 100
-                                  ? "bg-destructive/20 [&>div]:bg-destructive"
-                                  : budgetPercent >= 80
-                                  ? "bg-warning/20 [&>div]:bg-warning"
-                                  : undefined
-                              )}
-                            />
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            {Math.round(budgetPercent)}% of budget used — all time
-                          </TooltipContent>
-                        </Tooltip>
-                        <SpentFigure
-                          spent={formatDurationShort(project.budgetSeconds)}
-                          of={`${project.estimatedHours}h${period !== "all" ? " all time" : ""}`}
-                        />
-                      </div>
-                    )}
-                    {/* The percentage says where the project is; this says where
-                        it's going. Only rendered when there's something specific
-                        to report — a dormant project isn't "on pace" for
-                        anything, and inventing a verdict for it would cry wolf. */}
-                    {paceLabel && projectPacing && (
-                      <div
-                        className={cn(
-                          "mt-1 text-micro font-medium",
-                          pacingToneClass(projectPacing.status)
-                        )}
-                      >
-                        {paceLabel}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Tasks toggle */}
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <CollapsibleTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          className="text-muted-foreground"
-                          aria-label={isExpanded ? "Hide tasks" : "Show tasks"}
-                        >
-                          <ChevronDown
-                            className={cn(
-                              "h-3.5 w-3.5 transition-transform duration-fast ease-out-quart",
-                              isExpanded && "rotate-180"
-                            )}
-                          />
-                        </Button>
-                      </CollapsibleTrigger>
-                    </TooltipTrigger>
-                    <TooltipContent>{isExpanded ? "Hide tasks" : "Show tasks"}</TooltipContent>
-                  </Tooltip>
-
-                  {canManage && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon-sm" aria-label="Project actions">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => setEditProject(project)}>
-                        <Edit2 className="mr-2 h-3.5 w-3.5" />
-                        Edit
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() =>
-                          project.active
-                            ? deleteProject.mutate(project.id)
-                            : updateProject.mutate({ id: project.id, data: { active: true } })
-                        }
-                      >
-                        <Archive className="mr-2 h-3.5 w-3.5" />
-                        {project.active ? "Archive" : "Unarchive"}
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                  )}
-                </div>
-
-                {/* Tasks section */}
-                <CollapsibleContent>
-                  <div className="border-t px-4 pb-3">
-                    <TaskList projectId={project.id} />
-                  </div>
-                </CollapsibleContent>
-              </div>
-            </Collapsible>
-          );
-        })}
+        {visible.map((project) => (
+          <ProjectListRow
+            key={project.id}
+            project={project}
+            pacing={pacingByProject.get(project.id)}
+            period={period}
+            periodLabel={periodLabel}
+            currency={currency}
+            canManage={canManage}
+            isExpanded={expandedTasks.has(project.id)}
+            onToggleExpanded={() => toggleTasks(project.id)}
+            onEdit={() => setEditProject(project)}
+            onArchiveToggle={() =>
+              project.active
+                ? setArchiveTarget(project)
+                : updateProject.mutate({ id: project.id, data: { active: true } })
+            }
+          />
+        ))}
 
         {projects.length === 0 && (
           <EmptyState
@@ -414,6 +232,18 @@ export function ProjectList() {
       {editProject && (
         <ProjectForm project={editProject} open onClose={() => setEditProject(null)} />
       )}
+
+      <ConfirmDialog
+        open={!!archiveTarget}
+        onOpenChange={(open) => !open && setArchiveTarget(null)}
+        title="Archive project?"
+        description={`"${archiveTarget?.name}" will stop appearing in pickers and active lists. You can unarchive it later from its menu.`}
+        confirmLabel="Archive"
+        onConfirm={() => {
+          if (archiveTarget) deleteProject.mutate(archiveTarget.id);
+          setArchiveTarget(null);
+        }}
+      />
     </div>
   );
 }

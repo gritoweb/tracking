@@ -10,10 +10,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { SWATCH_COLORS, SWATCH_COLOR_NAMES, nextUnusedColor } from "@shared/colors";
+import { ColorSwatchPicker } from "@/components/ui/color-swatch-picker";
+import { nextUnusedColor } from "@shared/colors";
 import { useCreateTaskStatus } from "@/hooks/useTaskStatuses";
 import { STATUS_CATEGORY_LABEL } from "@/lib/taskUtils";
-import { cn } from "@/lib/utils";
 import type { TaskStatus, TaskStatusCategory } from "@shared/schemas";
 
 interface AddStatusColumnProps {
@@ -51,7 +51,7 @@ export function AddStatusColumn({ statuses, projectId }: AddStatusColumnProps) {
           setColor(nextUnusedColor(statuses.map((s) => s.color)));
           setOpen(true);
         }}
-        className="h-8 w-72 shrink-0 justify-start gap-1.5 text-muted-foreground"
+        className="h-8 w-(--size-board-column) shrink-0 justify-start gap-1.5 text-muted-foreground"
       >
         <Plus className="h-4 w-4" />
         Add status
@@ -60,7 +60,7 @@ export function AddStatusColumn({ statuses, projectId }: AddStatusColumnProps) {
   }
 
   return (
-    <div className="flex w-72 shrink-0 flex-col gap-3 rounded-container bg-muted/40 p-3">
+    <div className="flex w-(--size-board-column) shrink-0 flex-col gap-3 rounded-container bg-muted/40 p-3">
       <div className="space-y-1.5">
         <Label htmlFor="new-status-name">Name</Label>
         <Input
@@ -97,24 +97,7 @@ export function AddStatusColumn({ statuses, projectId }: AddStatusColumnProps) {
 
       <div className="space-y-1.5">
         <Label>Color</Label>
-        <div className="grid grid-cols-9 gap-1">
-          {SWATCH_COLORS.map((c) => (
-            <button
-              key={c}
-              type="button"
-              aria-label={SWATCH_COLOR_NAMES[c] ?? c}
-              title={SWATCH_COLOR_NAMES[c] ?? c}
-              aria-pressed={c === color}
-              onClick={() => setColor(c)}
-              style={{ backgroundColor: c }}
-              className={cn(
-                "h-5 w-5 rounded-full transition-transform duration-fast ease-out-quart hover:scale-110",
-                "focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
-                c === color && "ring-2 ring-foreground ring-offset-2 ring-offset-background"
-              )}
-            />
-          ))}
-        </div>
+        <ColorSwatchPicker value={color} onChange={setColor} size="sm" />
       </div>
 
       <div className="flex justify-end gap-2">

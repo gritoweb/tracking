@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
+import { SettingsListItem } from "./SettingsListItem";
 import { authClient } from "@/lib/auth-client";
 import { formatShortDate, formatEntryTime } from "@/lib/dateUtils";
 
@@ -112,28 +113,27 @@ export function SessionsCard() {
             const isCurrent = s.token === currentToken;
             const Icon = mobile ? Smartphone : Monitor;
             return (
-              <div
+              <SettingsListItem
                 key={s.id}
-                className="flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-sm"
+                icon={Icon}
+                title={
+                  <>
+                    <span className="truncate font-medium">{label}</span>
+                    {isCurrent && (
+                      <Badge variant="secondary" className="text-micro">
+                        This device
+                      </Badge>
+                    )}
+                  </>
+                }
+                subtitle={
+                  <>
+                    {s.ipAddress || "Unknown IP"}
+                    {s.createdAt &&
+                      ` · signed in ${formatShortDate(toIso(s.createdAt))} ${formatEntryTime(toIso(s.createdAt))}`}
+                  </>
+                }
               >
-                <div className="flex min-w-0 items-center gap-3">
-                  <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="truncate font-medium">{label}</span>
-                      {isCurrent && (
-                        <Badge variant="secondary" className="text-micro">
-                          This device
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {s.ipAddress || "Unknown IP"}
-                      {s.createdAt &&
-                        ` · signed in ${formatShortDate(toIso(s.createdAt))} ${formatEntryTime(toIso(s.createdAt))}`}
-                    </p>
-                  </div>
-                </div>
                 {!isCurrent && (
                   <Button
                     variant="ghost"
@@ -145,7 +145,7 @@ export function SessionsCard() {
                     {revoke.isPending ? <Spinner size="sm" /> : "Revoke"}
                   </Button>
                 )}
-              </div>
+              </SettingsListItem>
             );
           })
         )}

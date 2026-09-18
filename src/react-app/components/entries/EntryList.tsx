@@ -2,7 +2,7 @@ import { useState, useCallback } from "react";
 import { toast } from "sonner";
 import { Trash2, X, DollarSign, Upload, Clock, AlertTriangle } from "lucide-react";
 import { EntryGroup } from "./EntryGroup";
-import { EntryForm } from "./EntryForm";
+import { EntryForm } from "@/components/forms/EntryForm";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";

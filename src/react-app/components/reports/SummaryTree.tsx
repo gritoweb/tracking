@@ -2,8 +2,8 @@ import { useState } from "react";
 import { ChevronRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ColorDot } from "@/components/ColorDot";
+import { Duration } from "@/components/ui/numeric";
 import { cn } from "@/lib/utils";
-import { formatDurationShort } from "@/lib/dateUtils";
 import { formatCurrency } from "@/lib/currency";
 import { useUIStore } from "@/stores/uiStore";
 import type { GroupedReport, GroupRow } from "@/hooks/useReports";
@@ -48,6 +48,7 @@ export function SummaryTree({ data, showAmount = true, header }: SummaryTreeProp
               const open = expanded.has(key);
               return (
                 <div key={key}>
+                  {/* raw: the whole row is the expand/collapse target */}
                   <button
                     type="button"
                     disabled={!hasSub || !g.subGroups?.length}
@@ -76,9 +77,7 @@ export function SummaryTree({ data, showAmount = true, header }: SummaryTreeProp
                         {formatCurrency(g.billableAmount, currency)}
                       </span>
                     )}
-                    <span className="w-16 text-right text-sm font-semibold tabular-nums">
-                      {formatDurationShort(g.totalSeconds)}
-                    </span>
+                    <Duration seconds={g.totalSeconds} size="sm" weight="semibold" className="w-16" />
                     {/* Share of TIME — kept next to the duration it describes,
                         not next to the amount it doesn't. */}
                     <span className="w-9 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
@@ -102,9 +101,7 @@ export function SummaryTree({ data, showAmount = true, header }: SummaryTreeProp
                               {formatCurrency(s.billableAmount, currency)}
                             </span>
                           )}
-                          <span className="w-16 text-right text-sm tabular-nums">
-                            {formatDurationShort(s.totalSeconds)}
-                          </span>
+                          <Duration seconds={s.totalSeconds} size="sm" weight="medium" className="w-16" />
                           <span className="w-9 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
                             {pct(s.totalSeconds)}%
                           </span>
@@ -125,9 +122,7 @@ export function SummaryTree({ data, showAmount = true, header }: SummaryTreeProp
                   {formatCurrency(data.billableAmount, currency)}
                 </span>
               )}
-              <span className="w-16 text-right text-sm font-semibold tabular-nums">
-                {formatDurationShort(data.totalSeconds)}
-              </span>
+              <Duration seconds={data.totalSeconds} size="sm" weight="semibold" className="w-16" />
               <span className="w-9 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
                 100%
               </span>
