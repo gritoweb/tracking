@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-18 (31)
+### Fixed
+- **The comments and the comment field are two separate blocks.** A line inside one frame still read as a single thing (the field looked like part of the last comment). The conversation keeps its frame and the field has a frame of its own 16px below it (same border and radius: neither glued to the messages nor loose on the panel). With no messages yet, only the field's frame shows. Replaces the separator-inside-the-frame layout from the entry above.
+
+Verified in a real browser with three comments, light and dark: the field's frame is a different element from the messages' frame and 16px below it. `tsc -b` 0, lint 0, vitest 567/567, build ok.
+
 ## 2026-09-18 (30)
 ### Fixed
 - **The comment field no longer sits glued to the last message.** Inside the conversation's frame the field was one hairline and 10px away from the last comment. It is now set apart by the `Separator` component with space around it (12px above the line inside the frame's rhythm, 16px below it) and a roomier field block (`px-4`, `pb-3`). With no messages yet the frame holds just the field.
