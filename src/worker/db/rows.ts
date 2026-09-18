@@ -194,6 +194,7 @@ export interface TaskJoinRow extends TaskRow {
   tracked_seconds: number;
   subtask_total: number;
   subtask_done: number;
+  comment_count: number;
   assignees_json: string | null;
 }
 

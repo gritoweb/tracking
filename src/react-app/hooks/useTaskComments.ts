@@ -29,7 +29,11 @@ export function useTaskActivity(taskId: string | null) {
 
 function useCommentInvalidation(taskId: string) {
   const queryClient = useQueryClient();
-  return () => queryClient.invalidateQueries({ queryKey: ["task-comments", taskId] });
+  return () => {
+    queryClient.invalidateQueries({ queryKey: ["task-comments", taskId] });
+    // The board card shows how many comments a task has.
+    queryClient.invalidateQueries({ queryKey: ["tasks"] });
+  };
 }
 
 export function useCreateTaskComment(taskId: string) {
@@ -62,7 +66,10 @@ export function useCreateTaskComment(taskId: string) {
     },
     // The composer owns the message (it has the text to put back), so only the cache rolls back here.
     onError: (_error: Error, _data, context) => queryClient.setQueryData(key, context?.previous),
-    onSettled: () => queryClient.invalidateQueries({ queryKey: key }),
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: key });
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+    },
   });
 }
 

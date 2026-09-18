@@ -292,6 +292,8 @@ export const TaskSchema = z.object({
   recurRule: z.string().nullable(),
   subtaskTotal: z.number(),
   subtaskDone: z.number(),
+  /** How many comments the task has (D8): the chip on the board card. */
+  commentCount: z.number(),
   /** One or more workspace members (D6). Empty on an unassigned task. */
   assignees: z.array(TaskAssigneeSchema),
   createdAt: z.string(),

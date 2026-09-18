@@ -240,6 +240,7 @@ export function useWebSocket() {
           if (!isOwnEcho && taskId) {
             queryClient.invalidateQueries({ queryKey: ["task-comments", taskId] });
             queryClient.invalidateQueries({ queryKey: ["task-activity", taskId] });
+            queryClient.invalidateQueries({ queryKey: ["tasks"] });
           }
           break;
         }

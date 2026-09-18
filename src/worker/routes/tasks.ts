@@ -57,6 +57,7 @@ function formatTask(row: TaskJoinRow): Task {
     recurRule: row.recur_rule ?? null,
     boardOrder: row.board_order ?? 0,
     subtaskTotal: row.subtask_total ?? 0,
+    commentCount: row.comment_count ?? 0,
     subtaskDone: row.subtask_done ?? 0,
     assignees: parseJsonColumn(row.assignees_json, taskAssigneeArray, [], "tasks.assignees_json"),
     createdAt: row.created_at,
@@ -104,6 +105,7 @@ function taskSelect(scoped: boolean): string {
     ) AS tracked_seconds,
     (SELECT COUNT(*) FROM tasks c WHERE c.parent_id = tk.id) AS subtask_total,
     (SELECT COUNT(*) FROM tasks c WHERE c.parent_id = tk.id AND c.active = 0) AS subtask_done,
+    (SELECT COUNT(*) FROM task_comments tcm WHERE tcm.task_id = tk.id AND tcm.workspace_id = tk.workspace_id) AS comment_count,
     (SELECT json_group_array(json_object('userId', ta.user_id, 'name', COALESCE(u.name, u.email), 'image', u.image))
        FROM task_assignees ta JOIN "user" u ON u.id = ta.user_id
       WHERE ta.task_id = tk.id

@@ -12,7 +12,7 @@ vi.mock("@cf-wasm/photon/workerd", () => ({
 const { taskAndSubtaskIds, tasksRouter } = await import("./tasks");
 
 function mountedApp(handlers: D1StubHandlers) {
-  const { db } = createD1Stub(handlers);
+  const { db, calls } = createD1Stub(handlers);
   const app = new Hono<{ Bindings: Env; Variables: { workspaceId: string; userId: string } }>()
     .use("*", async (c, next) => {
       c.set("workspaceId", "workspace-A");
@@ -20,7 +20,7 @@ function mountedApp(handlers: D1StubHandlers) {
       await next();
     })
     .route("/", tasksRouter);
-  return { app, env: { DB: db } as unknown as Env };
+  return { app, env: { DB: db } as unknown as Env, calls };
 }
 
 describe("taskAndSubtaskIds (P0-2)", () => {
@@ -86,6 +86,21 @@ describe("GET / — formatTask's assignees_json (TYPE-2: typed rows, parsed via 
     const res = await app.request("/", {}, env);
     const body = (await res.json()) as Array<{ assignees: unknown }>;
     expect(body[0]?.assignees).toEqual([{ userId: "u1", name: "Ana", image: null }]);
+  });
+
+  it("reports how many comments a task has, counted by the query itself (D8)", async () => {
+    const { app, env, calls } = mountedApp({
+      first: () => ({ role: "member" }),
+      all: (call) =>
+        call.sql.includes("FROM tasks tk")
+          ? { results: [{ ...baseRow, comment_count: 3, assignees_json: null }, { ...baseRow, id: "task-2", assignees_json: null }] }
+          : { results: [] },
+    });
+    const res = await app.request("/", {}, env);
+    const body = (await res.json()) as Array<{ id: string; commentCount: number }>;
+    expect(body.find((t) => t.id === "task-1")?.commentCount).toBe(3);
+    expect(body.find((t) => t.id === "task-2")?.commentCount).toBe(0);
+    expect(calls.some((c) => c.sql.includes("FROM task_comments") && c.sql.includes("comment_count"))).toBe(true);
   });
 
   it("falls back to an empty list rather than throwing on malformed assignees_json", async () => {
