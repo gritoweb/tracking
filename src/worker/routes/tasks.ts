@@ -12,6 +12,7 @@ import {
 } from "@shared/schemas";
 import { nextOccurrence, normalizeRecurRule } from "@shared/task-recurrence";
 import { taskPath } from "@shared/task-links";
+import { mentionedIds } from "@shared/mentions";
 import { sqliteUtcToIso, sqliteUtcToIsoOrNull } from "../lib/sqlite-time";
 import { listActivity, memberNames, recordActivity, statusName, type ActivityInput } from "../lib/task-activity";
 import { broadcast, requestOrigin } from "../db/queries";
@@ -824,8 +825,8 @@ export const tasksRouter = new Hono<{
       ? await c.env.DB.prepare(`SELECT id FROM task_attachments WHERE id = ? AND task_id = ? AND workspace_id = ?`)
           .bind(attachmentId, taskId, workspaceId).first<{ id: string }>()
       : null;
-    // Who's tagged (persisted, shown on the comment) is not who's notified — see below.
-    const mentions = await currentMemberIds(c.env.DB, workspaceId, mentionedUserIds);
+    // Who's tagged (persisted, shown on the comment) is not who's notified — see below. The tags in the text count, and so do the ids a client sends (MCP).
+    const mentions = await currentMemberIds(c.env.DB, workspaceId, [...mentionedUserIds, ...mentionedIds(body)]);
     // A self-mention is never a notification.
     const notifyTargets = mentions.filter((m) => m !== userId);
 
@@ -874,7 +875,7 @@ export const tasksRouter = new Hono<{
     if (existing.user_id !== userId) return c.json({ error: "Only the author can edit this comment" }, 403);
 
     const { body, mentionedUserIds = [], attachmentId } = c.req.valid("json");
-    const mentions = await currentMemberIds(c.env.DB, workspaceId, mentionedUserIds);
+    const mentions = await currentMemberIds(c.env.DB, workspaceId, [...mentionedUserIds, ...mentionedIds(body)]);
     const attachment = attachmentId
       ? await c.env.DB.prepare(`SELECT id FROM task_attachments WHERE id = ? AND task_id = ? AND workspace_id = ?`)
           .bind(attachmentId, taskId, workspaceId).first<{ id: string }>()

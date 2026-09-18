@@ -2,12 +2,11 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { AttachmentPreview } from "./TaskCommentAttachment";
 import { CommentRow } from "./TaskCommentRow";
 import { TaskActivityRow } from "./TaskActivityRow";
-import { MentionPicker } from "./TaskCommentMentionPicker";
+import { MentionInput } from "./MentionInput";
 import {
   PENDING_COMMENT_PREFIX,
   useCreateTaskComment,
@@ -20,16 +19,12 @@ import { useUploadTaskAttachment } from "@/hooks/useTasks";
 import { ACCEPTED_TYPES, MAX_ATTACHMENT_BYTES, imageFile } from "@/lib/taskCommentAttachments";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
+import { encodeMentions, type MentionPerson } from "@shared/mentions";
+import type { WorkspaceMember } from "@/hooks/useWorkspaceRole";
 import type { TaskComment } from "@shared/schemas";
 
-export interface Member {
-  userId: string;
-  name: string;
-  image: string | null;
-}
-
 /** Flat, single-level comments on one task — no reply/thread, same as a WhatsApp group chat. */
-export function TaskComments({ taskId, members }: { taskId: string; members: Member[] }) {
+export function TaskComments({ taskId, members }: { taskId: string; members: WorkspaceMember[] }) {
   const { user } = useAuth();
   const { data: comments = [] } = useTaskComments(taskId);
   const { data: activity = [] } = useTaskActivity(taskId);
@@ -48,18 +43,10 @@ export function TaskComments({ taskId, members }: { taskId: string; members: Mem
   const uploadAttachment = useUploadTaskAttachment();
 
   const [body, setBody] = useState("");
-  const [mentioned, setMentioned] = useState<string[]>([]);
+  const [picked, setPicked] = useState<MentionPerson[]>([]);
   const [attachment, setAttachment] = useState<{ id: string; url: string } | null>(null);
-  const [mentionOpen, setMentionOpen] = useState(false);
   // Deleting a comment has no undo toast, so it goes through ConfirmDialog first.
   const [pendingDelete, setPendingDelete] = useState<TaskComment | null>(null);
-
-  // Typing "@" opens the picker directly — no separate click needed. The "@" itself
-  // never lands in the message; who's mentioned is tracked by id, not by text.
-  const handleBodyChange = (next: string) => {
-    setBody(next);
-    if (next.endsWith("@") && /(?:^|\s)@$/.test(next)) setMentionOpen(true);
-  };
 
   const attach = async (file: File | null) => {
     if (!file) return;
@@ -73,14 +60,14 @@ export function TaskComments({ taskId, members }: { taskId: string; members: Mem
   const submit = () => {
     const text = body.trim();
     if (!text) return;
-    const sent = { mentioned, attachment };
+    const sent = { attachment, picked };
     setBody("");
-    setMentioned([]);
+    setPicked([]);
     setAttachment(null);
     createComment.mutate(
       {
-        body: text,
-        mentionedUserIds: sent.mentioned,
+        // "@Name" typed or picked becomes a tag; the server reads who is mentioned from the text.
+        body: encodeMentions(text, [...sent.picked, ...members]),
         attachmentId: sent.attachment?.id ?? null,
         attachmentUrl: sent.attachment?.url ?? null,
       },
@@ -88,7 +75,7 @@ export function TaskComments({ taskId, members }: { taskId: string; members: Mem
         onError: (error) => {
           toast.error(error.message || "Failed to post comment");
           setBody((current) => current || text);
-          setMentioned((current) => (current.length ? current : sent.mentioned));
+          setPicked((current) => (current.length ? current : sent.picked));
           setAttachment((current) => current ?? sent.attachment);
         },
       }
@@ -108,10 +95,10 @@ export function TaskComments({ taskId, members }: { taskId: string; members: Mem
                 members={members}
                 isAuthor={item.comment.userId === user?.id && !item.comment.id.startsWith(PENDING_COMMENT_PREFIX)}
                 onDelete={() => setPendingDelete(item.comment)}
-                onSave={(nextBody, nextMentioned, nextAttachmentId) =>
+                onSave={(nextBody, nextAttachmentId) =>
                   updateComment.mutate({
                     id: item.comment.id,
-                    data: { body: nextBody, mentionedUserIds: nextMentioned, attachmentId: nextAttachmentId },
+                    data: { body: nextBody, attachmentId: nextAttachmentId },
                   })
                 }
               />
@@ -123,9 +110,11 @@ export function TaskComments({ taskId, members }: { taskId: string; members: Mem
       )}
 
       <div className={cn("space-y-1.5 rounded-md border p-2", feed.length === 0 && "border-dashed")}>
-        <Textarea
+        <MentionInput
           value={body}
-          onChange={(e) => handleBodyChange(e.target.value)}
+          onValueChange={setBody}
+          members={members}
+          onPick={(member) => setPicked((list) => [...list, { userId: member.userId, name: member.name }])}
           onKeyDown={(e) => {
             if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) submit();
           }}
@@ -139,20 +128,7 @@ export function TaskComments({ taskId, members }: { taskId: string; members: Mem
           rows={2}
         />
         {attachment && <AttachmentPreview url={attachment.url} onRemove={() => setAttachment(null)} />}
-        <div className="flex items-center justify-between">
-          <MentionPicker
-            members={members}
-            value={mentioned}
-            onChange={(next) => {
-              // Picked via "@" — drop the trailing "@" now that the mention is tracked by id.
-              if (mentionOpen && next.length > mentioned.length && body.endsWith("@")) {
-                setBody(body.slice(0, -1));
-              }
-              setMentioned(next);
-            }}
-            open={mentionOpen}
-            onOpenChange={setMentionOpen}
-          />
+        <div className="flex items-center justify-end">
           <Button size="sm" className="gap-1.5" disabled={!body.trim()} onClick={submit}>
             <Send className="h-3.5 w-3.5" />
             Comment

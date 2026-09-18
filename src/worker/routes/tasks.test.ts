@@ -118,3 +118,51 @@ describe("GET / — formatTask's assignees_json (TYPE-2: typed rows, parsed via 
     expect(body[0]?.assignees).toEqual([]);
   });
 });
+
+describe("POST /:id/comments — mentions written in the text", () => {
+  const commentRow = {
+    id: "c1", workspace_id: "workspace-A", task_id: "task-1", user_id: "user-1", body: "",
+    mentioned_user_ids: "", attachment_id: null, created_at: "2026-01-01 00:00:00", edited_at: null,
+    user_name: "Author", user_email: "a@x.test", user_image: null, attachment_filename: null,
+  };
+
+  function post(body: string, memberIds: string[], extra: Record<string, unknown> = {}) {
+    const inserts: { params: unknown[] }[] = [];
+    const { app, env } = mountedApp({
+      first: (call) => {
+        if (call.sql.includes("FROM tasks WHERE id")) return { id: "task-1", name: "Write report" };
+        if (call.sql.includes("FROM task_comments tc")) return { ...commentRow, body };
+        return null;
+      },
+      all: (call) => (call.sql.includes('FROM "member"') ? { results: memberIds.map((userId) => ({ userId })) } : { results: [] }),
+      run: (call) => {
+        if (call.sql.includes("INSERT INTO task_comments")) inserts.push({ params: call.params });
+        return { success: true };
+      },
+    });
+    const ctx = { waitUntil: () => {}, passThroughOnException: () => {} } as unknown as ExecutionContext;
+    const timerRoom = { idFromName: () => "room", get: () => ({ fetch: async () => new Response("ok") }) };
+    return { inserts, request: () => app.request("/task-1/comments", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ body, ...extra }),
+    }, { ...env, TIMER_ROOM: timerRoom } as unknown as Env, ctx) };
+  }
+
+  it("stores the members tagged in the text, without the client sending any ids", async () => {
+    const { inserts, request } = post("oi @[Ana](user:u-ana) e @[Bo](user:u-bo)", ["u-ana", "u-bo"]);
+    const res = await request();
+    expect(res.status).toBe(201);
+    expect(inserts[0].params[5]).toBe("u-ana,u-bo");
+  });
+
+  it("drops a tag whose id is not a member of the workspace", async () => {
+    const { inserts, request } = post("oi @[Eve](user:u-outsider) e @[Ana](user:u-ana)", ["u-ana"]);
+    await request();
+    expect(inserts[0].params[5]).toBe("u-ana");
+  });
+
+  it("still honours the ids a client sends (the MCP tool), next to the ones in the text", async () => {
+    const { inserts, request } = post("oi @[Ana](user:u-ana)", ["u-ana", "u-bo"], { mentionedUserIds: ["u-bo"] });
+    await request();
+    expect(String(inserts[0].params[5]).split(",").sort()).toEqual(["u-ana", "u-bo"]);
+  });
+});
