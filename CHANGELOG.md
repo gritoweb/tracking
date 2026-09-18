@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-18 (13)
+### Fixed
+- **Dragging a board card no longer paints the whole column grey.** The drop region is full column height (so an empty column still accepts a drop) and it tinted itself `bg-muted/60` while a card hovered over it, which read as a shadow running to the bottom. The tint is gone; the dimmed placeholder card already shows where the drop lands.
+
+Verified: cause read in `TaskBoardColumn.tsx` (`isOver` → `bg-muted/60` on a `flex-1` region); `tsc -b` 0, eslint 0. Not re-checked by eye during a live drag.
+
 ## 2026-09-18 (12)
 ### Added
 - **Every task state has a link.** `/tasks/:id` opens the task tab and `/tasks/:id/comments` the comments tab; switching tabs, opening a card or a subtask, and closing the sheet all change the URL (`tasks/:id?/:tab?`, helpers in `shared/task-links.ts`, used by both sides). The sheet is now driven by the URL instead of local state, so a copied link reopens exactly there. A link to a task that doesn't exist or isn't visible lands on `/tasks` with a toast. A mention notification now opens the comments tab; assignment and status notifications open the task tab.

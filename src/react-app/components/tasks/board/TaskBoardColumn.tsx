@@ -10,7 +10,6 @@ import { StatusColumnMenu } from "./StatusColumnMenu";
 import { useOutsideClick } from "@/hooks/useOutsideClick";
 import { clusterTasks, type GroupBy } from "@/lib/taskUtils";
 import { todayLocalDate } from "@shared/task-recurrence";
-import { cn } from "@/lib/utils";
 import type { Task, TaskStatus } from "@shared/schemas";
 
 interface TaskBoardColumnProps {
@@ -34,7 +33,7 @@ export function TaskBoardColumn({
   groupBy,
   onOpenTask,
 }: TaskBoardColumnProps) {
-  const { setNodeRef, isOver } = useDroppable({ id: `column:${status.id}` });
+  const { setNodeRef } = useDroppable({ id: `column:${status.id}` });
   const [adding, setAdding] = useState(false);
   const outsideRef = useOutsideClick<HTMLDivElement>(() => setAdding(false));
   const clusters = clusterTasks(tasks, groupBy, todayLocalDate());
@@ -45,10 +44,7 @@ export function TaskBoardColumn({
           space below a short list), but the tint wrapper inside it is natural-height — it only
           covers the header and however many cards there are, same as the ClickUp reference,
           instead of always painting the whole column down to the bottom. */}
-      <div
-        ref={setNodeRef}
-        className={cn("flex min-h-0 flex-1 flex-col overflow-y-auto", isOver && "bg-muted/60")}
-      >
+      <div ref={setNodeRef} className="flex min-h-0 flex-1 flex-col overflow-y-auto">
         <div
           style={{ "--swatch": status.color } as CSSProperties}
           className="flex flex-col tt-swatch-column rounded-container"
