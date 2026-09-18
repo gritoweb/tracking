@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-18 (30)
+### Fixed
+- **The comment field no longer sits glued to the last message.** Inside the conversation's frame the field was one hairline and 10px away from the last comment. It is now set apart by the `Separator` component with space around it (12px above the line inside the frame's rhythm, 16px below it) and a roomier field block (`px-4`, `pb-3`). With no messages yet the frame holds just the field.
+
+Verified in a real browser with three comments, light and dark: last message → line 12px, line → field 16px (screenshot checked). `tsc -b` 0, lint 0, vitest 567/567, build ok.
+
 ## 2026-09-18 (29)
 ### Fixed
 - **Dark mode: the subtask field and the Estimate field no longer show a lighter box of their own.** The base `Input` carries `dark:bg-input/30` (a white veil of about 4%); the quick-add row and the Estimate field passed `bg-transparent`, which a `dark:` class beats, so in dark the field was a different tone from the row behind it (the row's own hover/focus colour) while in light it was flat. Both now also pass `dark:bg-transparent` (and the Estimate keeps its hover colour in dark). This was not caused by the dark Backlog column change (a different token, and a different surface).
