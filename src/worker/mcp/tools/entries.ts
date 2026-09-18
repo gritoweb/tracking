@@ -5,6 +5,9 @@ import type { TimeEntryJoinRow } from "../../db/rows";
 import { generateDrafts, listDrafts } from "../../lib/drafts";
 import { UpdateTimeEntrySchema } from "@shared/schemas";
 import { segment } from "../rest-bridge";
+import { entryUrl } from "../links";
+import { appUrl } from "../../lib/app-url";
+import type { TimeEntry } from "@shared/schemas";
 import {
   DESTRUCTIVE, DateArg, IdArg, MUTATES, READ_ONLY, ROW_LIMIT, TimezoneArg,
   fromBridge, hours, json, rangeToIso, refuse, type ToolDeps,
@@ -27,8 +30,13 @@ interface McpRunningTimerRow {
   project_name: string | null;
 }
 
+/** An entry as the API returns it, plus where the app shows it. */
+function withEntryUrl(entry: TimeEntry, base: string) {
+  return { ...entry, url: entryUrl(base, entry.start) };
+}
+
 export function registerEntryReads(d: ToolDeps): void {
-  const { server, ctx, db, workspaceId, userId, scopeUserId, bridge } = d;
+  const { server, ctx, env, db, workspaceId, userId, scopeUserId, bridge } = d;
 
   server.registerTool(
     "get_time_summary",
@@ -170,6 +178,7 @@ export function registerEntryReads(d: ToolDeps): void {
       return json(
         results.map(formatEntry).map((e) => ({
           id: e.id,
+          url: entryUrl(appUrl(env), e.start),
           date: e.start.slice(0, 10),
           start: e.start,
           stop: e.stop,
@@ -254,7 +263,8 @@ export function registerEntryReads(d: ToolDeps): void {
       inputSchema: { entryId: IdArg("time entry (from list_time_entries)") },
       annotations: READ_ONLY,
     },
-    async ({ entryId }) => fromBridge(await bridge("GET", `/api/time_entries/${segment(entryId)}`))
+    async ({ entryId }) =>
+      fromBridge(await bridge<TimeEntry>("GET", `/api/time_entries/${segment(entryId)}`), (e) => withEntryUrl(e, appUrl(env)))
   );
 
   server.registerTool(
@@ -320,11 +330,12 @@ export function registerEntryWrites(d: ToolDeps): void {
       if (Number.isNaN(startMs) || Number.isNaN(stopMs)) return refuse("start and stop must be ISO 8601 timestamps.");
       if (stopMs <= startMs) return refuse("stop must be after start.");
       return fromBridge(
-        await bridge("POST", "/api/time_entries", {
+        await bridge<TimeEntry>("POST", "/api/time_entries", {
           ...rest,
           start: new Date(startMs).toISOString(),
           stop: new Date(stopMs).toISOString(),
-        })
+        }),
+        (e) => withEntryUrl(e, appUrl(env))
       );
     }
   );
@@ -375,7 +386,7 @@ export function registerEntryWrites(d: ToolDeps): void {
       annotations: { ...MUTATES, idempotentHint: true },
     },
     async ({ entryId, ...patch }) =>
-      fromBridge(await bridge("PUT", `/api/time_entries/${segment(entryId)}`, patch))
+      fromBridge(await bridge<TimeEntry>("PUT", `/api/time_entries/${segment(entryId)}`, patch), (e) => withEntryUrl(e, appUrl(env)))
   );
 
   server.registerTool(

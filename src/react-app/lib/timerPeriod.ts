@@ -6,6 +6,8 @@ import {
   startOfDay,
   endOfDay,
   isSameDay,
+  isValid,
+  parseISO,
   format,
 } from "date-fns";
 import { resolveListRange, type ListRangeKey } from "@/lib/dateUtils";
@@ -89,4 +91,11 @@ export function matchListRangeKey(
   if (isSameDay(since, wk.since) && isSameDay(until, wk.until)) return { key: "thisWeek" };
   if (isSameDay(since, lastWk.since) && isSameDay(until, lastWk.until)) return { key: "lastWeek" };
   return { key: "custom", since: format(since, "yyyy-MM-dd"), until: format(until, "yyyy-MM-dd") };
+}
+
+/** A `?date=YYYY-MM-DD` value as a local Date, or null when it is missing or not a real day. */
+export function parseDateParam(value: string | null): Date | null {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const date = parseISO(value);
+  return isValid(date) ? date : null;
 }

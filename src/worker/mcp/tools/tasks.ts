@@ -9,6 +9,7 @@ import { findActiveProject } from "../../lib/projects";
 import { createTask, moveTaskStatus } from "../../routes/tasks";
 import { actorDisplayName, notifyAssigneesOfStatusChange, notifyNewAssignees } from "../../lib/notifications";
 import { appUrl } from "../../lib/app-url";
+import { taskUrl } from "../links";
 import { segment } from "../rest-bridge";
 import { DESTRUCTIVE, IdArg, MUTATES, READ_ONLY, ROW_LIMIT, fromBridge, hours, json, refuse, richTextToPlain, type ToolDeps } from "../shared";
 
@@ -16,10 +17,11 @@ import { DESTRUCTIVE, IdArg, MUTATES, READ_ONLY, ROW_LIMIT, fromBridge, hours, j
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 
 /** A task as a model reads it: plain-text notes, hours, names instead of colours. */
-function taskView(t: Task) {
+function taskView(t: Task, base: string) {
   return {
     id: t.id,
     name: t.name,
+    url: taskUrl(base, t.id),
     notes: richTextToPlain(t.description),
     project: { id: t.projectId, name: t.projectName },
     status: { id: t.statusId, name: t.statusName, category: t.statusCategory },
@@ -36,9 +38,10 @@ function taskView(t: Task) {
   };
 }
 
-function commentView(c: TaskComment) {
+function commentView(c: TaskComment, base: string) {
   return {
     id: c.id,
+    url: taskUrl(base, c.taskId, "comments"),
     author: { userId: c.userId, name: c.userName },
     body: c.body,
     mentionedUserIds: c.mentionedUserIds,
@@ -81,7 +84,7 @@ export function registerTaskReads(d: ToolDeps): void {
         tasks
           .filter((t) => !dueBy || (t.dueDate !== null && t.dueDate <= dueBy))
           .slice(0, ROW_LIMIT)
-          .map(taskView)
+          .map((t) => taskView(t, appUrl(env)))
       );
     }
   );
@@ -100,8 +103,8 @@ export function registerTaskReads(d: ToolDeps): void {
       const task = result.data.find((t) => t.id === taskId);
       if (!task) return refuse(`No task with id ${taskId} in this workspace. Call list_tasks to find it.`);
       return json({
-        ...taskView(task),
-        subtaskList: result.data.filter((t) => t.parentId === taskId).map(taskView),
+        ...taskView(task, appUrl(env)),
+        subtaskList: result.data.filter((t) => t.parentId === taskId).map((t) => taskView(t, appUrl(env))),
       });
     }
   );
@@ -131,7 +134,7 @@ export function registerTaskReads(d: ToolDeps): void {
     },
     async ({ taskId }) =>
       fromBridge(await bridge<TaskComment[]>("GET", `/api/tasks/${segment(taskId)}/comments`), (list) =>
-        list.map(commentView)
+        list.map((c) => commentView(c, appUrl(env)))
       )
   );
 
@@ -175,7 +178,7 @@ export function registerTaskWrites(d: ToolDeps): void {
           await actorDisplayName(db, userId), data.assigneeIds
         );
       }
-      return json(taskView(result.task));
+      return json(taskView(result.task, appUrl(env)));
     }
   );
 
@@ -197,7 +200,7 @@ export function registerTaskWrites(d: ToolDeps): void {
           await actorDisplayName(db, userId), result.task.statusName ?? "a new status"
         );
       }
-      return json(taskView(result.task));
+      return json(taskView(result.task, appUrl(env)));
     }
   );
 
@@ -211,7 +214,7 @@ export function registerTaskWrites(d: ToolDeps): void {
       annotations: { ...MUTATES, idempotentHint: true },
     },
     async ({ taskId, ...patch }) =>
-      fromBridge(await bridge<Task>("PUT", `/api/tasks/${segment(taskId)}`, patch), taskView)
+      fromBridge(await bridge<Task>("PUT", `/api/tasks/${segment(taskId)}`, patch), (t) => taskView(t, appUrl(env)))
   );
 
   server.registerTool(
@@ -236,7 +239,7 @@ export function registerTaskWrites(d: ToolDeps): void {
       annotations: MUTATES,
     },
     async ({ taskId, ...body }) =>
-      fromBridge(await bridge<TaskComment>("POST", `/api/tasks/${segment(taskId)}/comments`, body), commentView)
+      fromBridge(await bridge<TaskComment>("POST", `/api/tasks/${segment(taskId)}/comments`, body), (c) => commentView(c, appUrl(env)))
   );
 
   server.registerTool(
@@ -254,7 +257,7 @@ export function registerTaskWrites(d: ToolDeps): void {
           `/api/tasks/${segment(taskId)}/comments/${segment(commentId)}`,
           body
         ),
-        commentView
+        (c) => commentView(c, appUrl(env))
       )
   );
 

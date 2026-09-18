@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-18 (18)
+### Added
+- **The Assistant and the MCP give links to what they touched.** Task, comment and time-entry results now carry a `url` (`mcp/links.ts`; a task opens its tab, a comment its comments tab, an entry the Timer on its day via the new `/?date=YYYY-MM-DD`). The panel shows those links under each tool result straight from the data — not left to the model, which (glm) ignored a prompt rule to add them — and its markdown renders `[text](url)` too: same-origin links navigate inside the app, other `https` links open in a new tab, anything else (`javascript:`) is plain text. The MCP instructions and the chat prompt tell a model to hand the `url` over. Entry links use the entry's UTC date, so near midnight they can land a day off — the week view still contains the entry.
+
+Verified: MCP `list_tasks` returns `url`; in a real browser the panel listed the task as a link and clicking it opened `/tasks/<id>`; `/?date=2026-03-10` opens the week of 9 March and an invalid date falls back to the current week. New unit tests for links, `appPath`, the markdown links, `linksOf` and `parseDateParam`; `tsc -b` 0, eslint 0.
+
 ## 2026-09-18 (17)
 ### Changed
 - **Settings hides the Calendar sync card when no calendar provider is configured** instead of showing a card that says so. The code stays: the card appears again as soon as the server configures Google or Microsoft. It also stays hidden while the status loads, so it no longer flashes and disappears.

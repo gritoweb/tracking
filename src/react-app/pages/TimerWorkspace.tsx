@@ -1,4 +1,5 @@
 import { useMemo, useState, Suspense, lazy } from "react";
+import { useSearchParams } from "react-router-dom";
 import { addWeeks, addMonths, addDays, format, parseISO } from "date-fns";
 import { TimerWorkspaceHeader } from "@/components/timer/TimerWorkspaceHeader";
 import { TimerWorkspaceBody } from "@/components/timer/TimerWorkspaceBody";
@@ -6,7 +7,7 @@ import { TIMER_PANEL_ID, timerTabId } from "@/components/timer/timerTabs";
 import { AddEntryDialog } from "@/components/entries/AddEntryDialog";
 import { useEntriesRange } from "@/hooks/useEntries";
 import { useDraftRange, useGenerateDrafts } from "@/hooks/useDrafts";
-import { resolveTimerPeriod, summarizeLoggedSegments, matchListRangeKey } from "@/lib/timerPeriod";
+import { resolveTimerPeriod, summarizeLoggedSegments, matchListRangeKey, parseDateParam } from "@/lib/timerPeriod";
 import { useUIStore, CALENDAR_SLOT_HEIGHT_STEP } from "@/stores/uiStore";
 import { useDayRollover } from "@/hooks/useDayRollover";
 import { useMediaQuery, BELOW_MD, BELOW_LG } from "@/hooks/useMediaQuery";
@@ -80,7 +81,9 @@ export function TimerWorkspace() {
   // `null` means "follow the clock": the grid views open on today and keep
   // following it across midnight. Stepping or revealing a date pins an explicit
   // anchor; the Today button releases it again.
-  const [anchorOverride, setAnchorOverride] = useState<Date | null>(null);
+  // `/?date=YYYY-MM-DD` opens on that day: the link an Assistant reply gives for a time entry.
+  const [searchParams] = useSearchParams();
+  const [anchorOverride, setAnchorOverride] = useState<Date | null>(() => parseDateParam(searchParams.get("date")));
   const today = useMemo(() => parseISO(dayKey), [dayKey]);
   const anchor = anchorOverride ?? today;
 

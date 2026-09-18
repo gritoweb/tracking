@@ -1,14 +1,27 @@
 import { Fragment } from "react";
+import { Link } from "react-router-dom";
+import { appPath } from "@/lib/appPath";
 
 // Deliberately tiny markdown renderer — the assistant runs on Llama, which emits plain
 // prose with the occasional list or **bold**. This avoids pulling in streamdown
 // + shiki (heavy) for output that never contains code blocks or tables. Handles
-// paragraphs, bullet lists, inline bold, and inline `code`.
+// paragraphs, bullet lists, inline bold, inline `code` and [links](url).
+
+export function AssistantLink({ label, href }: { label: string; href: string }) {
+  const className = "font-medium text-primary-ink underline underline-offset-2 hover:no-underline";
+  const path = appPath(href, window.location.origin);
+  if (path) return <Link to={path} className={className}>{label}</Link>;
+  if (/^https?:\/\//.test(href)) {
+    return <a href={href} target="_blank" rel="noopener noreferrer" className={className}>{label}</a>;
+  }
+  // javascript:, data: and the like are shown as plain text, never as a link.
+  return <>{label}</>;
+}
 
 function renderInline(text: string, keyPrefix: string): React.ReactNode[] {
   const nodes: React.ReactNode[] = [];
-  // Alternating split on **bold** and `code`.
-  const regex = /(\*\*[^*]+\*\*|`[^`]+`)/g;
+  // Alternating split on **bold**, `code` and [text](url).
+  const regex = /(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\([^)\s]+\))/g;
   let last = 0;
   let m: RegExpExecArray | null;
   let i = 0;
@@ -21,6 +34,9 @@ function renderInline(text: string, keyPrefix: string): React.ReactNode[] {
           {token.slice(2, -2)}
         </strong>
       );
+    } else if (token.startsWith("[")) {
+      const [, label, href] = token.match(/^\[([^\]]+)\]\(([^)]+)\)$/) ?? [];
+      nodes.push(<AssistantLink key={`${keyPrefix}-l${i}`} label={label ?? token} href={href ?? ""} />);
     } else {
       nodes.push(
         <code key={`${keyPrefix}-c${i}`} className="rounded bg-muted px-1 py-0.5 text-xs">

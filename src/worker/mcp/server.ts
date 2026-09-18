@@ -77,6 +77,7 @@ Working with it:
 - Tasks are the plan, entries are the actual time. Due dates are local days (YYYY-MM-DD), never instants.
 - Every tool obeys the same permissions as the app for the key's owner: a member edits only their own entries, and editing projects, clients, statuses and budgets is for owners/admins. A refusal is the app's answer — report it, don't work around it.
 - Before any delete or archive, confirm with the person which exact item they mean.
+- Tasks, time entries and comments in a result carry a \`url\`. When you create, change or find one for the person, give them that link (as \`[name](url)\` where markdown renders) so they can open it. Never build a url yourself.
 - Call \`list_clients\`/\`list_projects\` before \`create_client\`/\`create_project\` to check one doesn't already exist under a slightly different name — neither tool is idempotent, so a retry makes a duplicate.`;
 
 export function buildMcpServer(ctx: McpContext): McpServer {

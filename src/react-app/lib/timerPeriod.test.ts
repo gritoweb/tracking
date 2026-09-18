@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { matchListRangeKey, resolveTimerPeriod, summarizeLoggedSegments } from "./timerPeriod";
+import { matchListRangeKey, parseDateParam, resolveTimerPeriod, summarizeLoggedSegments } from "./timerPeriod";
 import type { TimeEntry } from "@shared/schemas";
 
 const TODAY = new Date(2026, 0, 15); // a Thursday, local time
@@ -124,5 +124,19 @@ describe("matchListRangeKey", () => {
       since: "2026-03-01",
       until: "2026-03-05",
     });
+  });
+});
+
+describe("parseDateParam", () => {
+  it("reads a YYYY-MM-DD value as that local day", () => {
+    const date = parseDateParam("2026-09-18");
+    expect(date && [date.getFullYear(), date.getMonth(), date.getDate()]).toEqual([2026, 8, 18]);
+  });
+
+  it("rejects missing, malformed and impossible values", () => {
+    expect(parseDateParam(null)).toBeNull();
+    expect(parseDateParam("")).toBeNull();
+    expect(parseDateParam("18/09/2026")).toBeNull();
+    expect(parseDateParam("2026-02-31")).toBeNull();
   });
 });
