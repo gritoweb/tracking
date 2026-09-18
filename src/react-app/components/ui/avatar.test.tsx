@@ -59,4 +59,13 @@ describe("AssignButton", () => {
     render(<AssignButton />)
     expect(screen.getByRole("button", { name: "Add assignee" }).className).toContain("border-dashed")
   })
+
+  it("is revealed on hover by default, and always visible where the row exists to fill it", () => {
+    const { rerender } = render(<AssignButton />)
+    expect(screen.getByRole("button", { name: "Add assignee" })).toHaveClass("tt-reveal")
+    rerender(<AssignButton reveal="always" />)
+    const button = screen.getByRole("button", { name: "Add assignee" })
+    expect(button).not.toHaveClass("tt-reveal")
+    expect(button).toHaveClass("border-dashed", "text-muted-foreground")
+  })
 })

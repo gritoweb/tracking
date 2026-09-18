@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-18 (25)
+### Fixed
+- **"Add a subtask": the `+` is a real button and the assign button is always visible.** The `+` at the left of the quick-add row was decoration; it now adds what is typed (like Enter) or, with nothing typed, puts the cursor in the field. The dashed assign button in that row was hover-only in both themes because `AssignButton` carried `tt-reveal`; it has a `reveal` variant now (`hover` stays the default for dense rows and board cards, `always` for a row whose job is to fill it) and the quick-add uses `always`, at full muted-foreground contrast.
+
+Verified in a real browser on a hover-capable device, light and dark: the assign button in the quick-add row has opacity 1 with no hover (dashed border, contrast from `muted-foreground`), typing a name and clicking `+` created the subtask through the API, an empty `+` focused the field. Component tests for the `+` and for the `reveal` variant. `tsc -b` 0, lint 0, vitest 559/559.
+
 ## 2026-09-18 (24)
 ### Changed
 - **The comment composer is a divider and a field, not a box.** The bordered, rounded box around the comment field is gone: a single line separates the feed from the field, the field has no border or fill (new `Textarea` variant `bare`), and the Comment button sits right under it. Closer to ClickUp's calm composer.
