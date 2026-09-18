@@ -271,6 +271,42 @@ export function buildAssistantTools(ctx: AssistantToolContext): ToolSet {
       },
     }),
 
+    listMyTasks: tool({
+      description:
+        "The user's open tasks (assigned to them) due by a local day: overdue plus that day by default. Use for 'what do I have today', 'what's due', 'what's on my plate'.",
+      inputSchema: z.object({
+        daysAhead: z.number().int().min(0).max(30).default(0).describe("0 = due today or overdue; 7 = the coming week too"),
+      }),
+      execute: async ({ daysAhead }) => {
+        const localNow = new Date(Date.now() - ctx.offsetMinutes * 60_000);
+        const today = localNow.toISOString().slice(0, 10);
+        const until = new Date(localNow.getTime() + daysAhead * 86_400_000).toISOString().slice(0, 10);
+        const { results } = await db
+          .prepare(
+            `SELECT tk.name, tk.due_date, tk.priority, p.name AS project, ts.name AS status
+             FROM tasks tk
+             JOIN task_assignees ta ON ta.task_id = tk.id AND ta.user_id = ?
+             LEFT JOIN projects p ON p.id = tk.project_id
+             LEFT JOIN task_statuses ts ON ts.id = tk.status_id
+             WHERE tk.workspace_id = ? AND tk.active = 1 AND tk.due_date IS NOT NULL AND tk.due_date <= ?
+             ORDER BY tk.due_date ASC, tk.priority ASC LIMIT 50`
+          )
+          .bind(userId, workspaceId, until)
+          .all<{ name: string; due_date: string; priority: number; project: string | null; status: string | null }>();
+        return {
+          today,
+          tasks: results.map((r) => ({
+            name: r.name,
+            project: r.project,
+            status: r.status,
+            due: r.due_date,
+            overdue: r.due_date < today,
+            priority: r.priority,
+          })),
+        };
+      },
+    }),
+
     listProjects: tool({
       description: "List the workspace's active projects and whether each one is itself billable.",
       inputSchema: z.object({}),

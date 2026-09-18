@@ -48,6 +48,21 @@ None has been tested with the Assistant's real prompts. Switching is a change to
 needs that test first: the Assistant must call its tools correctly in English and Portuguese, and
 quick-add must return valid JSON with correct local times.
 
+## The streaming bug and its fix (2026-09-18)
+
+Workers AI now streams every chunk **twice over**: the legacy fields (`response`, top-level
+`tool_calls`) and the OpenAI-style `choices[0].delta` carry the same content. `workers-ai-provider`
+(3.3.1, and 4.0.0 too — checked) emits both, so the Assistant doubled every word ("SinceSince today
+today") and concatenated tool-call arguments into invalid JSON, which the AI SDK turned into an
+empty input and "An error occurred". Proven with the raw stream (`/ai/run` with `stream: true`) and
+with `streamText` against the real model: without the fix every tool call failed to parse; with it
+the call arrived intact and the reply was clean in English and Portuguese.
+
+The fix is `src/worker/lib/workers-ai-stream.ts`: `withDedupedStreams(env.AI)` wraps the binding the
+chat uses and drops the legacy duplicates from each SSE event whenever `choices` is present. Only
+streamed runs are touched. Remove it once the provider handles both shapes itself — re-run the
+check in the CHANGELOG entry before removing it.
+
 ## Local development uses the real Workers AI
 
 `"remote": true` on the binding means `pnpm dev` calls Cloudflare's Workers AI on the account in

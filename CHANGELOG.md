@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-09-18 (4)
+### Fixed
+- **The Assistant doubled every word and every tool call failed ("An error occurred").** Workers AI
+  streams each chunk in two shapes at once (legacy `response`/`tool_calls` and OpenAI-style
+  `choices[0].delta`), and `workers-ai-provider` 3.3.1 — and 4.0.0 — emits both. Text came out
+  twice and tool arguments were concatenated into invalid JSON, so the SDK passed `{}` to the tool.
+  `lib/workers-ai-stream.ts` wraps the chat's AI binding and drops the legacy copy whenever `choices`
+  is present. See `docs/IA.md`.
+### Added
+- Assistant tool `listMyTasks`: the person's open assigned tasks due by their local today (overdue
+  included, optional days ahead), so "what do I have today" has an answer. The Assistant now
+  replies in the language the user wrote in.
+
+Verified: raw Scout stream shows both shapes in every chunk; `streamText` against the real model
+failed to parse all 3 tool calls without the wrapper and called the tool with correct arguments
+with it, in Portuguese and English; through the app's real chat socket, "quantas horas eu lancei
+hoje?" called `getTimeSummary` and "o que tenho pra hoje?" called `listMyTasks`, both with clean
+text. `tsc -b` 0, `pnpm lint` 0, `pnpm test` 470/470 (3 new for the stream rewrite).
+
 ## 2026-09-18 (3)
 ### Added
 - **The MCP server covers the app's day-to-day work: 67 tools, up from 15.** Tasks (list, read, edit,
