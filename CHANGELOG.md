@@ -1,5 +1,31 @@
 # Changelog
 
+## 2026-09-18 (8)
+### Changed
+- **The Assistant chat runs on `@cf/zai-org/glm-4.7-flash` instead of Llama 4 Scout.** With the 64-tool
+  catalog Scout chose the wrong tool most of the time ("list my tasks" called `run_report`) and
+  sometimes answered empty or wrote the call as text. Only `ChatAgent.ts` changed; quick-add, recolor and
+  drafting stay on Scout (they need `json_schema`). Numbers and caveats in `docs/IA.md`.
+
+- The chat prompt now says "this week" is Monday to Sunday and to call a tool once per need: glm asked
+  "which day does your week start?" instead of calling `get_time_summary`, and repeated `list_tasks` 4x.
+
+Verified: bench of 4 prompts x 3 runs on the real tools — glm 9/12, gpt-oss-20b 7/12, Scout 5/12.
+Through the app's real chat socket (demo login): "me liste minhas tasks" -> `list_tasks` once,
+"quantas horas eu lancei essa semana?" -> `get_time_summary`, "marque o luis numa tarefa…" ->
+`list_tasks` + `list_members`, no `[tool(...)]` text; the UI already skips `reasoning` parts.
+`tsc -b` 0, eslint 0, vitest 480/480. Not covered: the approval click on a write tool, real data.
+
+## 2026-09-18 (7)
+### Changed
+- **The new-key card now offers a setup per client, not just Claude Code.** Tabs for Claude Code
+  (unchanged), Cursor / Windsurf / VS Code (`mcpServers` JSON), Claude Desktop (`mcp-remote`, key in
+  `env` and no space after the header colon, as in `docs/MCP.md`) and any other AI (URL, transport,
+  header, and a whoami check). Each tab has its own copy button. API keys stay accepted only on `/mcp`,
+  not on `/api/*`: the MCP catalog already covers the app, and a second door would widen the surface.
+
+Verified: `tsc -b` 0, eslint 0 on the touched files, `mcpSetupPrompt.test.ts` 5/5 (3 new).
+
 ## 2026-09-18 (6)
 ### Changed
 - **CI runs only the quality job** (`.github/workflows/ci.yml`: install, typecheck, lint, build, vitest

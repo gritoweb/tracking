@@ -8,7 +8,7 @@ that model is no longer offered and its remaining variant cannot do what the app
 
 | Feature | Code | Model | Why this one |
 |---|---|---|---|
-| Assistant chat (the MCP tool catalog + track a meeting, remember, recall) | `src/worker/durable-objects/ChatAgent.ts` | `@cf/meta/llama-4-scout-17b-16e-instruct` | Needs **function calling** — the tools are how it acts |
+| Assistant chat (the MCP tool catalog + track a meeting, remember, recall) | `src/worker/durable-objects/ChatAgent.ts` | `@cf/zai-org/glm-4.7-flash` | Needs **function calling**; picked the right tool 9/12 vs Scout's 5/12 (see below), at ~1/4.5 of Scout's input price |
 | Quick-add, project recolor, calendar event → project, day-draft enrichment | `src/worker/lib/ai.ts` (`QUICK_ENTRY_MODEL`) | `@cf/meta/llama-4-scout-17b-16e-instruct` | Needs **`json_schema` response mode** |
 | AI summary, digest narrative | `src/worker/lib/ai.ts` (`SUMMARY_MODEL`) | `@cf/meta/llama-3.1-8b-instruct-fp8` | Plain text only — the cheaper model is enough |
 
@@ -34,6 +34,22 @@ Checked on 2026-09-18 with `npx wrangler ai models list --json`:
   drafting.
 
 Scout declares both `function_calling` and a 131k context window.
+
+## Why the chat moved off Scout (2026-09-18)
+
+Same system prompt, the real 64 tools, through `streamText` + `workers-ai-provider` (with the stream
+dedupe), 4 prompts x 3 runs, first tool call scored:
+
+| Model | Right first tool | Input $/M |
+|---|---|---|
+| `llama-4-scout-17b-16e-instruct` | 5/12 (e.g. "list my tasks" called `run_report` 5 of 6 times; some empty replies) | 0.27 |
+| `gpt-oss-20b` | 7/12 (some misses were a fair clarifying question) | 0.20 |
+| `glm-4.7-flash` | 9/12 | 0.0605 |
+
+Caveats: 12 samples per model; glm was slower (~9.5 s per call vs ~1.3 s for Scout); not yet checked in
+the app's own chat. Untested: qwen3-30b, gemma-4-26b, mistral-small-3.1, and Scout with a ~14-tool
+subset (the cheaper lever if the model is kept). Quick-add, recolor and drafting stay on Scout for
+`json_schema`.
 
 ## Cost
 

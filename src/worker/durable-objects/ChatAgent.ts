@@ -23,8 +23,8 @@ import { replyLanguage, settleDanglingToolCalls } from "../lib/assistant-message
 import { recallMemories, buildMemoryBlock } from "../lib/assistant-memory";
 import { withDedupedStreams } from "../lib/workers-ai-stream";
 
-// Needs function calling; llama-3.1-8b-instruct is gone and its -fp8 variant has none (docs/IA.md).
-const MODEL = "@cf/meta/llama-4-scout-17b-16e-instruct";
+// Function calling over the 64-tool catalog; Scout picked the wrong tool most of the time (docs/IA.md).
+const MODEL = "@cf/zai-org/glm-4.7-flash";
 
 // Cost/abuse bounds (this DO is billed per Workers AI call):
 // cap a single reply's length, the size of any one inbound message fed to the
@@ -88,6 +88,8 @@ When to use which tool (call the tool — never just describe the action or tell
 - Pass timezoneOffsetMinutes = ${offset} to every tool that takes one, so dates mean the user's days.
 
 Rules:
+- "This week" means Monday to Sunday, "last week" the one before, "this month" the calendar month: compute the dates and call the tool, never ask which day a week starts on.
+- Call a tool once per need. If the result is empty, say so; do not repeat a call with the same arguments.
 - Prefer taking the action over explaining it. After a tool runs, confirm briefly what happened in one sentence.
 - Resolve relative times ("yesterday", "2pm", "this morning") against the local date/time in CURRENT FACTS, then pass tool start/stop as UTC ISO 8601 timestamps.
 - Use the EXACT known project names when matching work to a project. Every entry needs a project: if unsure which one, ask the user instead of guessing.
