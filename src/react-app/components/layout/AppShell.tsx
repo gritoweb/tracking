@@ -1,8 +1,8 @@
 import { Suspense, useEffect, useState } from "react";
-import { Outlet, useLocation } from "react-router-dom";
 import { WifiOff } from "lucide-react";
 import { useHotkeys } from "react-hotkeys-hook";
 import { Sidebar } from "./Sidebar";
+import { PageFrame } from "./PageFrame";
 import { TimerBar } from "@/components/timer/TimerBar";
 import { ProductivityManager } from "@/components/timer/ProductivityManager";
 import { AssistantNudgeNotifier } from "@/components/assistant/AssistantNudgeNotifier";
@@ -39,7 +39,6 @@ export function AppShell() {
   useNotificationSocket();
   useHydrateSettings();
   const { isOnline } = useOfflineSync();
-  const location = useLocation();
   const quickAddOpen = useUIStore((s) => s.quickAddOpen);
   const setQuickAddOpen = useUIStore((s) => s.setQuickAddOpen);
   const logTimeTaskId = useUIStore((s) => s.logTimeTaskId);
@@ -111,10 +110,7 @@ export function AppShell() {
         {/* Page content */}
         <main id="main-content" tabIndex={-1} className="min-h-0 flex-1 overflow-y-auto">
           <Suspense fallback={<PageFallback />}>
-            {/* Keyed by route so each page crossfades in on navigation. */}
-            <div key={location.pathname} className="h-full animate-fade-in">
-              <Outlet />
-            </div>
+            <PageFrame />
           </Suspense>
         </main>
       </div>
