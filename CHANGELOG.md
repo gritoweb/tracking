@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-18 (29)
+### Fixed
+- **Dark mode: the subtask field and the Estimate field no longer show a lighter box of their own.** The base `Input` carries `dark:bg-input/30` (a white veil of about 4%); the quick-add row and the Estimate field passed `bg-transparent`, which a `dark:` class beats, so in dark the field was a different tone from the row behind it (the row's own hover/focus colour) while in light it was flat. Both now also pass `dark:bg-transparent` (and the Estimate keeps its hover colour in dark). This was not caused by the dark Backlog column change (a different token, and a different surface).
+
+Verified in a real browser, light and dark, on the focused subtask field: input background is transparent and the row keeps its own colour (before: `oklab(1 0 0 / 0.039)` over the row's `bg-accent/50` in dark); the Estimate field is transparent in both. `tsc -b` 0, lint 0, vitest 567/567.
+
 ## 2026-09-18 (28)
 ### Added
 - **A person tagged in the task title is drawn as a red, clickable chip.** The name stays plain text (`... com @Ana`), so it costs nothing in cards, reports and exports; in the sheet, while the title is not being edited, each `@Name` that matches a member becomes the same chip the comments and the description use, and clicking it opens the person's profile. Clicking the words (or Tab) turns the title back into the field with the caret at the end; leaving the field saves and shows the chips again. `splitPlainMentions` (shared) does the matching.

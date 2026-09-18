@@ -209,7 +209,7 @@ export function TaskProperties({
           onBlur={onSaveEstimate}
           onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
           placeholder="e.g. 1h 30m"
-          className="h-auto w-32 rounded-md border-transparent bg-transparent px-1.5 py-1 hover:bg-accent focus-visible:border-transparent focus-visible:ring-0"
+          className="h-auto w-32 rounded-md border-transparent bg-transparent px-1.5 py-1 hover:bg-accent dark:bg-transparent dark:hover:bg-accent focus-visible:border-transparent focus-visible:ring-0"
         />
       </FieldRow>
 

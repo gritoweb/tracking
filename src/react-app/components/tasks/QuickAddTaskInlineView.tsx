@@ -98,7 +98,7 @@ export function QuickAddTaskInlineView({
           onKeyDown={onKeyDown}
           placeholder={placeholder}
           aria-label="Add a task"
-          className="h-6 border-0 bg-transparent px-0 py-0 text-sm shadow-none focus-visible:ring-0"
+          className="h-6 border-0 bg-transparent px-0 py-0 text-sm shadow-none focus-visible:ring-0 dark:bg-transparent"
         />
         {showProjectField && (
           <ProjectPicker value={projectId} onChange={onProjectChange} className="shrink-0 rounded-md" />
