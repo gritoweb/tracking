@@ -24,6 +24,8 @@ export interface WorkspaceMember {
   name: string;
   email: string;
   image: string | null;
+  /** "owner", "admin" or "member" (Better Auth may join several with commas). */
+  role: string;
 }
 
 /** Members of the active workspace (D3 Person filter, D6 assignee picker) — via `/api/me`, not `session.activeOrganizationId`, which a brand-new signup's first session never gets seeded with (see CHANGELOG). */
@@ -47,6 +49,7 @@ export function useWorkspaceMembers(enabled: boolean) {
         name: m.user?.name || m.user?.email || "Unknown",
         email: m.user?.email ?? "",
         image: m.user?.image ?? null,
+        role: m.role ?? "member",
       }));
     },
     enabled: enabled && Boolean(workspaceId),

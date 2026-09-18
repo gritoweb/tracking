@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-18 (21b)
+### Added
+- **Tagging a person in a comment now happens inside the text.** Typing `@` next to the words lists the team beside the field (arrow keys, Enter/Tab or a click pick; Esc closes only the list), and the chosen name is written into the comment where the `@` was. The stored body uses a tag, `@[Name](user:ID)` (`shared/mentions.ts`), and the comment draws it as a clickable chip that opens the person's profile (avatar, name, e-mail, role). The separate "Mention" button under the field is gone. The **server** now reads who is tagged from the text (validated as workspace members) and still honours `mentionedUserIds`, so the MCP tool keeps working; a chip always shows the member's own name, never the name written in the tag, and a tag for someone who left is plain text. The MCP tool descriptions, the server instructions and the chat prompt teach the tag. Edit mode turns tags back into `@Name` and back again on save; two people with one name stay apart because the list remembers who was picked. Descriptions (the TipTap editor) are not part of this change.
+
+Verified: tag/encode/decode round-trips and injection cases in unit tests; route tests for tags in the text, a non-member id and the MCP ids; component tests for the chip, the profile, the list, keyboard picking, Esc not closing the panel, and a repeated team list; in a real browser `@de` listed the team, Enter wrote `@Demo User`, the comment stored `@[Demo User](user:…)`, rendered as a chip and the click opened the profile; through the MCP `add_task_comment` with a tag stored the person in `mentionedUserIds`. `tsc -b` 0, `pnpm lint` 0, vitest 541/541, `pnpm build` ok.
+
 ## 2026-09-18 (21)
 ### Fixed
 - **Switching the Task/Comments tab (or opening a card) no longer reloads the page behind the sheet.** `AppShell` keyed the page container by the full `pathname`, and once the tab and the open task lived in the URL every tab click remounted the whole board with a fade. The container is now `PageFrame`, keyed by the route *section* (`lib/routeSection.ts`), so a page still fades in when you change page but opening a task or switching its tab keeps it mounted. Regression from the shareable-URL change.
