@@ -15,7 +15,7 @@ function swatch(name: string): string {
 }
 
 /** The seven a workspace is born with. */
-const DEFAULT_STATUSES: {
+export const DEFAULT_STATUSES: {
   name: string;
   color: string;
   category: TaskStatusCategory;
