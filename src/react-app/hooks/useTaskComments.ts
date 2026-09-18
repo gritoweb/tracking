@@ -1,7 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api } from "@/lib/api-client";
-import type { CreateTaskComment, UpdateTaskComment } from "@shared/schemas";
+import { useAuth } from "@/hooks/useAuth";
+import type { CreateTaskComment, TaskComment, UpdateTaskComment } from "@shared/schemas";
+
+export const PENDING_COMMENT_PREFIX = "pending-";
+
+/** What the composer sends: the API payload plus the image URL the optimistic row needs to show it. */
+export type NewTaskComment = CreateTaskComment & { attachmentUrl?: string | null };
 
 /** Flat, single-level comments on one task — no reply/thread. */
 export function useTaskComments(taskId: string | null) {
@@ -18,11 +24,37 @@ function useCommentInvalidation(taskId: string) {
 }
 
 export function useCreateTaskComment(taskId: string) {
-  const invalidate = useCommentInvalidation(taskId);
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const key = ["task-comments", taskId];
   return useMutation({
-    mutationFn: (data: CreateTaskComment) => api.tasks.comments.create(taskId, data),
-    onSuccess: () => invalidate(),
-    onError: (error: Error) => toast.error(error.message || "Failed to post comment"),
+    mutationFn: ({ attachmentUrl: _url, ...data }: NewTaskComment) => api.tasks.comments.create(taskId, data),
+    // The comment shows up the instant it is sent; the server's row replaces it on settle.
+    onMutate: async (data) => {
+      await queryClient.cancelQueries({ queryKey: key });
+      const previous = queryClient.getQueryData<TaskComment[]>(key);
+      const pending: TaskComment = {
+        id: `${PENDING_COMMENT_PREFIX}${crypto.randomUUID()}`,
+        taskId,
+        userId: user?.id ?? "",
+        userName: user?.name ?? "",
+        userImage: user?.image ?? null,
+        body: data.body,
+        mentionedUserIds: data.mentionedUserIds ?? [],
+        attachmentId: data.attachmentId ?? null,
+        attachmentUrl: data.attachmentUrl ?? null,
+        attachmentFilename: null,
+        createdAt: new Date().toISOString(),
+        editedAt: null,
+      };
+      queryClient.setQueryData<TaskComment[]>(key, (old = []) => [...old, pending]);
+      return { previous };
+    },
+    onError: (error: Error, _data, context) => {
+      queryClient.setQueryData(key, context?.previous);
+      toast.error(error.message || "Failed to post comment");
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: key }),
   });
 }
 

@@ -8,6 +8,7 @@ import { AttachmentPreview } from "./TaskCommentAttachment";
 import { CommentRow } from "./TaskCommentRow";
 import { MentionPicker } from "./TaskCommentMentionPicker";
 import {
+  PENDING_COMMENT_PREFIX,
   useCreateTaskComment,
   useDeleteTaskComment,
   useTaskComments,
@@ -56,15 +57,26 @@ export function TaskComments({ taskId, members }: { taskId: string; members: Mem
     setAttachment({ id: uploaded.id, url: uploaded.url });
   };
 
+  // The composer clears at once (the comment is already on screen); a failure puts the text back.
   const submit = () => {
-    if (!body.trim()) return;
+    const text = body.trim();
+    if (!text) return;
+    const sent = { mentioned, attachment };
+    setBody("");
+    setMentioned([]);
+    setAttachment(null);
     createComment.mutate(
-      { body: body.trim(), mentionedUserIds: mentioned, attachmentId: attachment?.id ?? null },
       {
-        onSuccess: () => {
-          setBody("");
-          setMentioned([]);
-          setAttachment(null);
+        body: text,
+        mentionedUserIds: sent.mentioned,
+        attachmentId: sent.attachment?.id ?? null,
+        attachmentUrl: sent.attachment?.url ?? null,
+      },
+      {
+        onError: () => {
+          setBody((current) => current || text);
+          setMentioned((current) => (current.length ? current : sent.mentioned));
+          setAttachment((current) => current ?? sent.attachment);
         },
       }
     );
@@ -80,7 +92,7 @@ export function TaskComments({ taskId, members }: { taskId: string; members: Mem
               comment={c}
               taskId={taskId}
               members={members}
-              isAuthor={c.userId === user?.id}
+              isAuthor={c.userId === user?.id && !c.id.startsWith(PENDING_COMMENT_PREFIX)}
               onDelete={() => setPendingDelete(c)}
               onSave={(nextBody, nextMentioned, nextAttachmentId) =>
                 updateComment.mutate({
@@ -124,7 +136,7 @@ export function TaskComments({ taskId, members }: { taskId: string; members: Mem
             open={mentionOpen}
             onOpenChange={setMentionOpen}
           />
-          <Button size="sm" className="gap-1.5" disabled={!body.trim() || createComment.isPending} onClick={submit}>
+          <Button size="sm" className="gap-1.5" disabled={!body.trim()} onClick={submit}>
             <Send className="h-3.5 w-3.5" />
             Comment
           </Button>

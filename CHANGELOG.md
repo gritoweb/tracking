@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-18 (9)
+### Fixed
+- **Posting a task comment no longer freezes.** The composer waited for the POST, then for a second round trip (`invalidate` → refetch) before the comment appeared, which on the remote D1 read as a hang. The comment is now inserted into the cache the instant it is sent and the box clears at once; a failure removes it, puts the text back and toasts. The row shows no edit/delete until the server confirms it.
+
+Verified: local POST measured at ~26 ms warm, so the wait was the two serial round trips, not the handler. `tsc -b` 0.
+
 ## 2026-09-18 (8)
 ### Changed
 - **The Assistant chat runs on `@cf/zai-org/glm-4.7-flash` instead of Llama 4 Scout.** With the 64-tool
