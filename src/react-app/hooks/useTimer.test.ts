@@ -70,6 +70,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     recurRule: null,
     subtaskTotal: 0,
     subtaskDone: 0,
+    commentCount: 0,
     assignees: [],
     createdAt: new Date().toISOString(),
     ...overrides,

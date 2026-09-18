@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-18 (32)
+### Added
+- **The board card shows how many comments a task has (D8).** A comment chip (speech bubble and the number) sits next to the subtask count on every card that has at least one comment, with a tooltip ("3 comments"). The count comes from the task list query itself (`comment_count`, one indexed subquery per task; `Task.commentCount`), so it costs no extra request, and it updates live: posting or deleting a comment, or another person's comment arriving over the socket, refetches the task list.
+
+Verified in a real browser: a task with 2 comments showed `2` (title "2 comments"), a task with none showed no chip, and a third comment posted from outside the page turned it into `3` with no reload. Route test that `commentCount` is mapped from the query and defaults to 0. `tsc -b` 0, lint 0, vitest 568/568, build ok.
+
 ## 2026-09-18 (31)
 ### Fixed
 - **The comments and the comment field are two separate blocks.** A line inside one frame still read as a single thing (the field looked like part of the last comment). The conversation keeps its frame and the field has a frame of its own 16px below it (same border and radius: neither glued to the messages nor loose on the panel). With no messages yet, only the field's frame shows. Replaces the separator-inside-the-frame layout from the entry above.

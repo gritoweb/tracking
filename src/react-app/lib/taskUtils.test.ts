@@ -44,6 +44,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     recurRule: null,
     subtaskTotal: 0,
     subtaskDone: 0,
+    commentCount: 0,
     assignees: [],
     createdAt: "2026-01-01T00:00:00.000Z",
     ...overrides,

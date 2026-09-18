@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Play, Repeat, Square } from "lucide-react";
+import { MessageCircle, Play, Repeat, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -239,6 +239,15 @@ export function TaskCard({ task, onOpen, overlay = false }: TaskCardProps) {
             title={`${task.subtaskDone} of ${task.subtaskTotal} subtasks done`}
           >
             {task.subtaskDone}/{task.subtaskTotal}
+          </span>
+        )}
+        {task.commentCount > 0 && (
+          <span
+            className="flex items-center gap-0.5 text-micro tabular-nums text-muted-foreground"
+            title={`${task.commentCount} comment${task.commentCount === 1 ? "" : "s"}`}
+          >
+            <MessageCircle className="h-3 w-3" aria-hidden />
+            {task.commentCount}
           </span>
         )}
         {task.trackedSeconds > 0 && (
