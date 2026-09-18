@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-18 (28)
+### Added
+- **A person tagged in the task title is drawn as a red, clickable chip.** The name stays plain text (`... com @Ana`), so it costs nothing in cards, reports and exports; in the sheet, while the title is not being edited, each `@Name` that matches a member becomes the same chip the comments and the description use, and clicking it opens the person's profile. Clicking the words (or Tab) turns the title back into the field with the caret at the end; leaving the field saves and shows the chips again. `splitPlainMentions` (shared) does the matching.
+
+Verified in a real browser: after `@gra` + Enter, Enter the title showed a chip in the primary colour on a light tint at 40px, the stored name was still plain text, clicking the chip opened the profile, clicking the words opened the field focused with the name intact. Component tests for the chip view, the profile, starting an edit and saving on blur. `tsc -b` 0, lint 0, vitest 567/567.
+
 ## 2026-09-18 (27)
 ### Changed
 - **The comment field lives inside the conversation's frame, starts taller and grows without scrolling.** The messages and the field now share one bordered frame, the field behind a divider (it read as loose, outside the messages, in dark mode). It starts about three lines tall (72px, was one line), grows with what is typed, and has no scrollbar and no drag handle to resize (`Textarea` variant `bare`: `min-h-18`, `resize-none`, `overflow-hidden`, same self-measuring fallback as the title).

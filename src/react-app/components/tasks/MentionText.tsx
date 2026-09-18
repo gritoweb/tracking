@@ -3,7 +3,7 @@ import { MemberProfile } from "./MemberProfile";
 import { splitMentions } from "@shared/mentions";
 import type { WorkspaceMember } from "@/hooks/useWorkspaceRole";
 
-function MentionChip({ member, fallback }: { member: WorkspaceMember | undefined; fallback: string }) {
+export function MentionChip({ member, fallback }: { member: WorkspaceMember | undefined; fallback: string }) {
   // A tag for someone who left, or a name we can't place, is just text: it must not look like a real person.
   if (!member) return <span className="text-muted-foreground">@{fallback}</span>;
   return (

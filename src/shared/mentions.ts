@@ -100,3 +100,8 @@ export function docMentions(raw: string | null | undefined): { userId: string; l
   walk(doc);
   return [...found].map(([userId, label]) => ({ userId, label }));
 }
+
+/** Plain text that names people ("com @Ana Maria") as segments: the names that match a person become mentions, the rest stays text. */
+export function splitPlainMentions(text: string, people: MentionPerson[]): MentionSegment[] {
+  return splitMentions(encodeMentions(text, people));
+}

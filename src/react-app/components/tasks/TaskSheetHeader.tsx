@@ -1,6 +1,6 @@
 import { ClipboardList, MessageCircle, MoreHorizontal, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { MentionInput } from "./MentionInput";
+import { TaskTitle } from "./TaskTitle";
 import { SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -65,22 +65,7 @@ export function TaskSheetHeader({ task, name, onNameChange, onSaveName, comments
           both tabs, since "whose comments am I reading" matters there too. */}
       <SheetHeader className="px-6 pb-2 pt-3">
         <SheetTitle className="sr-only">{task.name}</SheetTitle>
-        <MentionInput
-          variant="title"
-          members={members}
-          rows={1}
-          value={name}
-          onValueChange={onNameChange}
-          onBlur={onSaveName}
-          onKeyDown={(e) => {
-            // A name is one line that wraps: Enter confirms instead of adding a break.
-            if (e.key === "Enter") {
-              e.preventDefault();
-              e.currentTarget.blur();
-            }
-          }}
-          aria-label="Task name"
-        />
+        <TaskTitle name={name} onNameChange={onNameChange} onSave={onSaveName} members={members} />
       </SheetHeader>
     </>
   );
