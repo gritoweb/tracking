@@ -384,8 +384,8 @@
   --ring: oklch(0.7 0.14 265);
   /* Dark ink is light, so more of the swatch survives before contrast suffers. */
   --swatch-ink-mix: 55%;
-  /* Dark ground needs more percent for the same visible full-surface tint. */
-  --swatch-column-mix: 10%;
+  /* Dark columns sit on --muted (see .dark .tt-swatch-column), so the swatch only needs a light touch. */
+  --swatch-column-mix: 6%;
   --primary-ink: oklch(0.76 0.19 27.33);
   /* Dark ground inverts which end is "muted": the soft mark goes darker than
      the card, not lighter. Same role, same hue discipline as light. */
@@ -425,6 +425,13 @@
 /* Background only, at the weaker full-surface mix — a status column, not a chip. */
 .tt-swatch-column {
   background-color: color-mix(in oklab, var(--swatch) var(--swatch-column-mix), transparent);
+}
+
+/* In dark, transparent-over-background put a low-chroma status (Backlog's slate) at the same
+   lightness as the card resting on it (both ~0.22). Basing the column on --muted keeps every
+   column a step lighter than its cards, whatever the swatch. */
+.dark .tt-swatch-column {
+  background-color: color-mix(in oklab, var(--swatch) var(--swatch-column-mix), var(--muted));
 }
 
 /* ─── Reveal-on-hover ───────────────────────────────────────────────────────

@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-18 (16)
+### Fixed
+- **Dark mode: board columns are a step lighter than their cards.** A column was its swatch at 6–10% over the page background, which for Backlog's low-chroma slate landed at the same lightness as the card on it (measured ~0.222 vs 0.228 in oklab), so the card vanished. In dark the column now mixes the swatch into `--muted` (`.dark .tt-swatch-column`); light mode is unchanged. Every column keeps its hue.
+
+Verified in a real browser with the dark class: column lightness 0.296–0.309 against the card's 0.228 in all five columns; screenshot checked by eye.
+
 ## 2026-09-18 (15)
 ### Fixed
 - **The project picker's default trigger has a tooltip.** In compact form an unselected picker is a folder icon and a chevron with nothing saying what it is (the Timer header's project button). `ProjectPicker` now wraps its own trigger in a tooltip ("Select project" / "Project: <name>"); a caller that passes its own child keeps owning its labelling.
