@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-18 (22)
+### Fixed
+- **The task panel's title renders at the size the styleguide gives it.** DESIGN.md §3 defines the task sheet's title as Display (40px), but it measured **14px** on desktop. Two causes: the title was an `Input` whose base carries `md:text-sm`, and `tailwind-merge` did not know `text-display` is a font size (it read it as a colour, exactly the trap `text-micro` had), so neither `text-base` nor `md:text-sm` was ever dropped. `cn` now knows `display`; `Textarea` gains a `title` variant (bare, wraps, display step on every breakpoint) and the panel title uses it, so a long name wraps instead of clipping and Enter confirms. The description's own `h2` was 14px, *smaller* than its 18px paragraph; it is now the Title step (20px). The sheet is `max-w-xl` (576px) so a 40px title has room.
+
+Verified in a real browser: title 40px, description `h2` 20px, panel 576px; a 100-character name wraps to 4–5 lines without clipping; Enter saves and adds no newline. New tests for `cn` with `text-display` and the `title` variant. `tsc -b` 0, `pnpm lint` 0, vitest 516/516. The description paragraph (18px) is unchanged: it was already large.
+
 ## 2026-09-18 (21)
 ### Fixed
 - **Switching the Task/Comments tab (or opening a card) no longer reloads the page behind the sheet.** `AppShell` keyed the page container by the full `pathname`, and once the tab and the open task lived in the URL every tab click remounted the whole board with a fade. The container is now `PageFrame`, keyed by the route *section* (`lib/routeSection.ts`), so a page still fades in when you change page but opening a task or switching its tab keeps it mounted. Regression from the shareable-URL change.

@@ -1,6 +1,6 @@
 import { ClipboardList, MessageCircle, MoreHorizontal, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -62,12 +62,19 @@ export function TaskSheetHeader({ task, name, onNameChange, onSaveName, comments
           both tabs, since "whose comments am I reading" matters there too. */}
       <SheetHeader className="px-6 pb-2 pt-3">
         <SheetTitle className="sr-only">{task.name}</SheetTitle>
-        <Input
+        <Textarea
+          variant="title"
+          rows={1}
           value={name}
           onChange={(e) => onNameChange(e.target.value)}
           onBlur={onSaveName}
-          onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
-          className="h-auto border-none px-0 text-display font-semibold shadow-none focus-visible:ring-0"
+          onKeyDown={(e) => {
+            // A name is one line that wraps: Enter confirms instead of adding a break.
+            if (e.key === "Enter") {
+              e.preventDefault();
+              e.currentTarget.blur();
+            }
+          }}
           aria-label="Task name"
         />
       </SheetHeader>

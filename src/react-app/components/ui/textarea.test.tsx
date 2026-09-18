@@ -16,4 +16,12 @@ describe("Textarea", () => {
     render(<Textarea aria-label="Notes" className="min-h-24" />)
     expect(screen.getByRole("textbox")).toHaveClass("min-h-24", "rounded-xl")
   })
+
+  it("title variant is bare and sits at the display step on every breakpoint", () => {
+    render(<Textarea aria-label="Name" variant="title" />)
+    const el = screen.getByRole("textbox")
+    expect(el).toHaveClass("text-display", "md:text-display", "border-0", "bg-transparent")
+    expect(el).not.toHaveClass("text-base")
+    expect(el).not.toHaveClass("md:text-sm")
+  })
 })
