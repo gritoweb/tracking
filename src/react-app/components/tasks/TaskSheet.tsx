@@ -1,5 +1,6 @@
 import { taskPath, type TaskTab } from "@shared/task-links";
 import { imageProblem } from "@/lib/taskCommentAttachments";
+import { useSyncedField } from "@/hooks/useSyncedField";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -128,18 +129,11 @@ export function TaskSheet({ open, onClose, task, tab, onTabChange, onRequestDele
   const { startTimer, stopTimer } = useTimer();
   const runningEntry = useTimerStore((s) => s.runningEntry);
 
-  const [name, setName] = useState("");
-  const [estimate, setEstimate] = useState("");
+  // Both follow the server (another person's edit shows up) unless the person is mid-edit.
+  const [name, setName] = useSyncedField(task?.name ?? "", task?.id ?? null);
+  const [estimate, setEstimate] = useSyncedField(formatTimeInput(task?.estimatedSeconds ?? null), task?.id ?? null);
   const [dueOpen, setDueOpen] = useState(false);
   const [lightbox, setLightbox] = useState<TaskAttachment | null>(null);
-
-  const syncedId = useRef<string | null>(null);
-  useEffect(() => {
-    if (!task || task.id === syncedId.current) return;
-    syncedId.current = task.id;
-    setName(task.name);
-    setEstimate(formatTimeInput(task.estimatedSeconds));
-  }, [task]);
 
   if (!task) return null;
 

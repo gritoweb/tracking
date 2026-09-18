@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-18 (34)
+### Fixed
+- **The task panel follows edits made elsewhere (D5).** The panel copied the task's name and estimate into local state only when the task id changed, so a rename by a teammate (or from the MCP, the Assistant or another tab) never showed while the panel stayed open. Both fields now go through `useSyncedField`: they follow the server's value unless the person has typed something of their own, and start over when another task opens.
+
+Verified in a real browser: with the panel open, a `PUT /api/tasks/:id` rename showed in the title without reloading; with the title being typed in, a second remote rename left the typed text alone. Unit tests for the hook (follows the server, keeps a local edit, resets on a new key, resumes following after the edit matches the server). `tsc -b` 0, lint 0.
+
 ## 2026-09-18 (33)
 ### Added
 - **D7: images can be attached from the task panel.** The Attachments section had no way in (images only arrived by pasting or dropping into the description or a comment, and the gallery was read-only). It now has an **Attach image** button (several files at once), accepts files dropped on the whole area, shows a spinner and disables the button while uploading, and says how to add images when there are none. One rule for every way an image gets in: `imageProblem` (png, jpeg, webp or gif, up to 10 MB) replaces three copies of the same check in the sheet, the comment composer and the comment editor.
