@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-18 (27)
+### Changed
+- **The comment field lives inside the conversation's frame, starts taller and grows without scrolling.** The messages and the field now share one bordered frame, the field behind a divider (it read as loose, outside the messages, in dark mode). It starts about three lines tall (72px, was one line), grows with what is typed, and has no scrollbar and no drag handle to resize (`Textarea` variant `bare`: `min-h-18`, `resize-none`, `overflow-hidden`, same self-measuring fallback as the title).
+
+Verified in a real browser, light and dark: the field sits inside the frame that holds the messages; 72px empty, 121px with six lines with `scrollHeight` = `clientHeight`, `overflow-y` hidden, `resize` none. Component test for the variant. `tsc -b` 0, lint 0, vitest 560/560.
+
 ## 2026-09-18 (26)
 ### Fixed
 - **The task title no longer scrolls.** Its box was 1px shorter than its text (the fixed 50px line height leaves the content at 51px) and it had `overflow-y: auto`, so even a one-line title could scroll (a scrollbar on Linux/Chrome, a 1px shift from the keyboard). The `title` variant is now `overflow-hidden` with `pb-px` so the box is exactly as tall as the text and always grows to fit; where the browser lacks `field-sizing: content`, `Textarea` measures itself instead.
