@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-18 (21)
+### Fixed
+- **Switching the Task/Comments tab (or opening a card) no longer reloads the page behind the sheet.** `AppShell` keyed the page container by the full `pathname`, and once the tab and the open task lived in the URL every tab click remounted the whole board with a fade. The container is now `PageFrame`, keyed by the route *section* (`lib/routeSection.ts`), so a page still fades in when you change page but opening a task or switching its tab keeps it mounted. Regression from the shareable-URL change.
+
+Verified: a component test mounts the real `PageFrame` and counts page mounts (1 across task → comments → task; 2 when the section changes) and fails with the old key (4 mounts) — checked by putting the old key back; in a real browser a marker set on the board's rail survived opening a card, both tab clicks and closing the sheet. `tsc -b` 0, eslint 0.
+
 ## 2026-09-18 (20)
 ### Changed
 - **Every workspace has the same seven task statuses: Backlog, On hold, Pendente, Em progresso, QA, Client review, Closed.** A new workspace already got them (`DEFAULT_STATUSES`), but databases that predate that were seeded by migration 0038 with five (Backlog, To do, In progress, Feedback, Done) and could have been edited since. Migration `0047` brings any of them to the seven: a live status that already has a canonical name is normalised (colour, category, position), missing ones are created, tasks in any other workspace-wide status move to the closest one (To do → Pendente, In progress → Em progresso, Feedback → Client review, Done → Closed, anything else by category), the leftovers are archived — not deleted — and Pendente is the single default. A project's own fork is left alone. `lib/task-statuses.test.ts` checks the migration's literals against `DEFAULT_STATUSES` so the two cannot drift.
