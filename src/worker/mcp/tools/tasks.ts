@@ -10,7 +10,7 @@ import { createTask, moveTaskStatus } from "../../routes/tasks";
 import { actorDisplayName, notifyAssigneesOfStatusChange, notifyNewAssignees } from "../../lib/notifications";
 import { appUrl } from "../../lib/app-url";
 import { segment } from "../rest-bridge";
-import { DESTRUCTIVE, IdArg, MUTATES, READ_ONLY, ROW_LIMIT, fromBridge, hours, json, richTextToPlain, text, type ToolDeps } from "../shared";
+import { DESTRUCTIVE, IdArg, MUTATES, READ_ONLY, ROW_LIMIT, fromBridge, hours, json, refuse, richTextToPlain, type ToolDeps } from "../shared";
 
 /** Largest image a tool accepts, matching the upload route's own limit. */
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
@@ -57,23 +57,31 @@ export function registerTaskReads(d: ToolDeps): void {
     {
       title: "List tasks",
       description:
-        "Tasks in the workspace — the plan, not tracked time. Open tasks only unless `includeDone`. Filter by project, status or assignee (`me` for the key's owner). Use this to find a taskId before editing, moving, commenting or attaching.",
+        "Tasks in the workspace — the plan, not tracked time. Open tasks only unless `includeDone`. Filter by project, status, assignee (`me` for the key's owner) or due day. Use this to find a taskId before editing, moving, commenting or attaching, and with assignee `me` + dueBy today for \"what do I have today\".",
       inputSchema: {
         projectId: z.string().optional().describe("From list_projects"),
         statusId: z.string().optional().describe("From list_task_statuses"),
         assignee: z.string().optional().describe("A member's userId from list_members, or `me`"),
         includeDone: z.boolean().default(false).describe("Also return completed tasks"),
+        dueBy: z
+          .string()
+          .regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD")
+          .optional()
+          .describe("Only tasks due on or before this local day, overdue included — pass today for 'what do I have today'"),
       },
       annotations: READ_ONLY,
     },
-    async ({ projectId, statusId, assignee, includeDone }) => {
+    async ({ projectId, statusId, assignee, includeDone, dueBy }) => {
       const query = new URLSearchParams();
       if (projectId) query.set("projectId", projectId);
       if (statusId) query.set("statusId", statusId);
       if (assignee) query.set("assignee", assignee);
       if (includeDone) query.set("includeInactive", "true");
       return fromBridge(await bridge<Task[]>("GET", `/api/tasks?${query}`), (tasks) =>
-        tasks.slice(0, ROW_LIMIT).map(taskView)
+        tasks
+          .filter((t) => !dueBy || (t.dueDate !== null && t.dueDate <= dueBy))
+          .slice(0, ROW_LIMIT)
+          .map(taskView)
       );
     }
   );
@@ -90,7 +98,7 @@ export function registerTaskReads(d: ToolDeps): void {
       const result = await bridge<Task[]>("GET", "/api/tasks?includeInactive=true");
       if (!result.ok) return fromBridge(result);
       const task = result.data.find((t) => t.id === taskId);
-      if (!task) return text(`No task with id ${taskId} in this workspace. Call list_tasks to find it.`);
+      if (!task) return refuse(`No task with id ${taskId} in this workspace. Call list_tasks to find it.`);
       return json({
         ...taskView(task),
         subtaskList: result.data.filter((t) => t.parentId === taskId).map(taskView),
@@ -104,7 +112,7 @@ export function registerTaskReads(d: ToolDeps): void {
       title: "List task statuses",
       description:
         "The board's columns in order, with each one's category (not_started, active, completed) and which is the default for new tasks. Pass projectId to get that project's own columns when it has forked them.",
-      inputSchema: { projectId: z.string().optional() },
+      inputSchema: { projectId: z.string().optional().describe("Return this project's own columns when it has forked them (from list_projects)") },
       annotations: READ_ONLY,
     },
     async ({ projectId }) =>
@@ -157,17 +165,17 @@ export function registerTaskWrites(d: ToolDeps): void {
     async (data) => {
       const project = await findActiveProject(db, workspaceId, data.projectId);
       if (!project) {
-        return text(`No active project with id ${data.projectId} in this workspace. Call list_projects and ask the person which project this task belongs to.`);
+        return refuse(`No active project with id ${data.projectId} in this workspace. Call list_projects and ask the person which project this task belongs to.`);
       }
       const result = await createTask(db, workspaceId, data, await scopeUserId(), userId);
-      if ("error" in result) return text(result.error);
+      if ("error" in result) return refuse(result.error);
       if (data.assigneeIds?.length) {
         await notifyNewAssignees(
           env, workspaceId, result.task.id, result.task.name, userId,
           await actorDisplayName(db, userId), data.assigneeIds
         );
       }
-      return json(result.task);
+      return json(taskView(result.task));
     }
   );
 
@@ -182,14 +190,14 @@ export function registerTaskWrites(d: ToolDeps): void {
     },
     async ({ taskId, statusId }) => {
       const result = await moveTaskStatus(db, workspaceId, taskId, statusId, await scopeUserId());
-      if ("error" in result) return text(result.error);
+      if ("error" in result) return refuse(result.error);
       if (result.task.statusId !== result.previousStatusId) {
         await notifyAssigneesOfStatusChange(
           env, workspaceId, taskId, result.task.name, userId,
           await actorDisplayName(db, userId), result.task.statusName ?? "a new status"
         );
       }
-      return json(result.task);
+      return json(taskView(result.task));
     }
   );
 
@@ -235,7 +243,7 @@ export function registerTaskWrites(d: ToolDeps): void {
     "edit_task_comment",
     {
       title: "Edit a comment",
-      description: "Rewrite a comment's text. Only the comment's author can.",
+      description: "Rewrite a comment's text (and its mentions or image). Only the comment's author can; ids come from list_task_comments.",
       inputSchema: { taskId: IdArg("task"), commentId: IdArg("comment"), ...UpdateTaskCommentSchema.shape },
       annotations: { ...MUTATES, idempotentHint: true },
     },
@@ -254,7 +262,7 @@ export function registerTaskWrites(d: ToolDeps): void {
     "delete_task_comment",
     {
       title: "Delete a comment",
-      description: "Remove a comment. Only the comment's author can.",
+      description: "Remove a comment for good. Only the comment's author can; confirm which one with the person first.",
       inputSchema: { taskId: IdArg("task"), commentId: IdArg("comment") },
       annotations: DESTRUCTIVE,
     },
@@ -280,9 +288,9 @@ export function registerTaskWrites(d: ToolDeps): void {
       try {
         bytes = Uint8Array.from(atob(contentBase64.replace(/^data:[^,]*,/, "")), (ch) => ch.charCodeAt(0));
       } catch {
-        return text("contentBase64 is not valid base64.");
+        return refuse("contentBase64 is not valid base64.");
       }
-      if (bytes.byteLength > MAX_ATTACHMENT_BYTES) return text("Image is larger than 10 MB.");
+      if (bytes.byteLength > MAX_ATTACHMENT_BYTES) return refuse("Image is larger than 10 MB.");
       const form = new FormData();
       form.set("file", new File([bytes], filename));
       return fromBridge(

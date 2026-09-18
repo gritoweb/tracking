@@ -1,4 +1,4 @@
-import { Play, Square, Clock, CalendarClock, ListTree, BarChart3, Trash2, Brain, Search } from "lucide-react";
+import { CalendarClock, Brain, Search } from "lucide-react";
 import { ToolResultCard } from "./ToolResultCard";
 import { toolMetaFor } from "./toolMeta";
 
@@ -17,53 +17,35 @@ function projectSuffix(o: Rec): string {
   return p ? ` · ${p}` : "";
 }
 
-/** Best-effort one-liner for a tool we don't have a bespoke card for. */
+/** First readable label of a catalog item: its name, description or title. */
+function itemLabel(item: unknown): string | null {
+  if (!item || typeof item !== "object") return null;
+  const o = item as Rec;
+  return str(o, "name") ?? str(o, "description") ?? str(o, "title") ?? null;
+}
+
+/** One-liner for a catalog tool's result: a refusal, a count with the first few names, or the item touched. */
 function genericSummary(o: Rec): string | null {
   if (o.ok === false) return String(o.reason ?? "Couldn't complete that.");
+  if (Array.isArray(o)) {
+    const names = o.map(itemLabel).filter(Boolean).slice(0, 3);
+    return `${o.length} result${o.length === 1 ? "" : "s"}${names.length ? ` · ${names.join(", ")}` : ""}`;
+  }
   const bits: string[] = [];
-  if (typeof o.project === "string" && o.project) bits.push(o.project);
-  if (typeof o.durationHours === "string") bits.push(`${o.durationHours}h`);
-  if (typeof o.totalHours === "string") bits.push(`${o.totalHours}h total`);
-  if (typeof o.note === "string" && o.note) bits.push(o.note);
+  const label = itemLabel(o);
+  if (label) bits.push(label);
+  if (typeof o.message === "string" && o.message) bits.push(o.message);
+  if (typeof o.totalHours === "number" || typeof o.totalHours === "string") bits.push(`${o.totalHours}h total`);
   return bits.join(" · ") || null;
 }
 
 // ---------------------------------------------------------------------------
-// Per-tool result cards. Each maps one tool's output shape (see
-// worker/lib/assistant-tools.ts) to a compact at-a-glance card.
+// Per-tool result cards for the chat-only tools; catalog tools use the generic card.
 // ---------------------------------------------------------------------------
 
 /** The finished/errored result card for a tool call, keyed by tool name. */
 export function renderToolResult(name: string, input: Rec, out: Rec): React.ReactNode {
   switch (name) {
-    case "startTimer":
-      return (
-        <ToolResultCard icon={Play} tone="ok" title={`Started timer${projectSuffix(out)}`}>
-          <span>{out.billable ? "Billable" : "Non-billable"}</span>
-          {str(out, "note") && <span> · {str(out, "note")}</span>}
-        </ToolResultCard>
-      );
-
-    case "stopTimer":
-      if (!isOk(out))
-        return <ToolResultCard icon={Square} tone="warn" title={str(out, "reason") ?? "No timer running"} />;
-      return (
-        <ToolResultCard icon={Square} tone="ok" title={`Stopped timer · ${str(out, "durationHours") ?? "0"}h`} />
-      );
-
-    case "logTimeEntry":
-      if (!isOk(out))
-        return <ToolResultCard icon={Clock} tone="error" title={str(out, "reason") ?? "Couldn't log entry"} />;
-      return (
-        <ToolResultCard
-          icon={Clock}
-          tone="ok"
-          title={`Logged ${str(out, "durationHours") ?? "0"}h${projectSuffix(out)}`}
-        >
-          {str(out, "note") && <span>{str(out, "note")}</span>}
-        </ToolResultCard>
-      );
-
     case "trackMeeting":
       if (!isOk(out))
         return (
@@ -76,55 +58,6 @@ export function renderToolResult(name: string, input: Rec, out: Rec): React.Reac
           title={`Tracked meeting · ${str(out, "durationHours") ?? "0"}h${projectSuffix(out)}`}
         />
       );
-
-    case "getTimeSummary": {
-      const byProject =
-        (out.byProject as Array<{ project?: string; hours?: string; entries?: number }> | undefined) ?? [];
-      return (
-        <ToolResultCard icon={BarChart3} title={`${str(out, "totalHours") ?? "0"}h tracked`}>
-          <div className="text-foreground/80">{str(out, "billableHours") ?? "0"}h billable</div>
-          {byProject.length > 0 && (
-            <ul className="mt-1.5 flex flex-col gap-1">
-              {byProject.slice(0, 6).map((r, i) => (
-                <li key={i} className="flex items-baseline justify-between gap-3">
-                  <span className="truncate text-foreground/90">{r.project ?? "No project"}</span>
-                  <span className="shrink-0 tabular-nums text-muted-foreground">{r.hours ?? "0"}h</span>
-                </li>
-              ))}
-              {byProject.length > 6 && (
-                <li className="text-micro italic text-muted-foreground/70">+{byProject.length - 6} more</li>
-              )}
-            </ul>
-          )}
-        </ToolResultCard>
-      );
-    }
-
-    case "listProjects": {
-      const projects = (out.projects as Array<{ name?: string; billable?: boolean }> | undefined) ?? [];
-      return (
-        <ToolResultCard icon={ListTree} title={`${projects.length} project${projects.length === 1 ? "" : "s"}`}>
-          {projects.length > 0 && (
-            <ul className="mt-0.5 flex flex-col gap-0.5">
-              {projects.slice(0, 8).map((p, i) => (
-                <li key={i} className="flex items-center gap-1.5 truncate">
-                  <span className="truncate text-foreground/90">{p.name ?? "?"}</span>
-                  {p.billable && <span className="text-micro text-success-ink">billable</span>}
-                </li>
-              ))}
-              {projects.length > 8 && (
-                <li className="text-micro italic text-muted-foreground/70">+{projects.length - 8} more</li>
-              )}
-            </ul>
-          )}
-        </ToolResultCard>
-      );
-    }
-
-    case "deleteEntry":
-      if (!isOk(out))
-        return <ToolResultCard icon={Trash2} tone="warn" title={str(out, "reason") ?? "Nothing deleted"} />;
-      return <ToolResultCard icon={Trash2} tone="ok" title="Deleted entry" />;
 
     case "rememberPreference":
       return (

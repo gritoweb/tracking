@@ -1,5 +1,41 @@
 # Changelog
 
+## 2026-09-18 (5)
+### Changed
+- **One tool catalog for the MCP server and the in-app Assistant.** `mcp/registry.ts` registers every
+  tool once; `mcp/server.ts` serves it over MCP and `mcp/chat-tools.ts` turns the same definitions into
+  AI SDK tools for the chat, so a tool added to the MCP reaches the Assistant with no porting. In the
+  chat every non-read-only tool waits for the user's approval. The Assistant keeps only three
+  chat-only tools (`trackMeeting` — now through the app's own route — `rememberPreference`,
+  `searchMemory`); its old duplicates (startTimer, stopTimer, logTimeEntry, getTimeSummary,
+  listProjects, deleteEntry, listMyTasks) are gone.
+- **Timers are app-only.** `start_timer`, `stop_timer` and `start_favorite` were removed from the MCP
+  (64 tools: 25 read + 39 write); logging and editing entries cover what an AI needs.
+- **Every MCP tool scores 10/10 on a live grader** (`tools/mcp-grade.mjs`): description, every input
+  field documented (`FIELD_DOCS` applied centrally), correct annotations, called for real and
+  succeeding, compact output (UI keys stripped), refusals returned with `isError`. `log_time` goes
+  through the app's route and returns the entry id; `list_tasks` gained `dueBy` for "what do I have
+  today".
+- The MCP connector card shows a **Claude Code setup prompt** after a key is created: it registers the
+  server with the key and installs a `/tracking` skill.
+### Fixed
+- **One unanswered approval broke the whole chat** (`MissingToolResultsError` → "An error occurred" on
+  every later message). Tool calls left open before the latest user message are now closed as denied
+  or interrupted (`lib/assistant-messages.ts`).
+- **The Assistant answered Portuguese questions in English**: Scout follows the language of the last
+  thing it read (an English tool result), so the reply language is detected and restated on every step.
+- **Assigning a task to someone with a duplicate `member` row crashed with a 500** (`UNIQUE constraint
+  failed: task_assignees`): `currentMemberIds` now selects `DISTINCT`. Production has no duplicates
+  (checked read-only); the local seed does.
+
+Verified: `npx tsc -b` 0, `pnpm lint` 0, `pnpm test` 477/477; `node tools/mcp-grade.mjs` against
+`pnpm dev` with owner, read-only and member keys → "GRADE: all 64 at 10" and 4/4 global checks (read key
+sees only reads; member gets the app's refusals on `update_project` and `delete_task`); through the
+real chat socket, "o que tenho pra hoje?" called `list_tasks` (assignee me, dueBy today) and answered in
+Portuguese, "crie uma tarefa…" stopped at the approval request with the right project and date, and a
+thread stuck on an unanswered approval answered again. Measured chat cost: the 64 tools add ~17,900
+prompt tokens (~440 neurons) per model call (`docs/IA.md`). The touched e2e specs run in CI.
+
 ## 2026-09-18 (4)
 ### Fixed
 - **The Assistant doubled every word and every tool call failed ("An error occurred").** Workers AI

@@ -14,7 +14,7 @@ const MCP_HEADERS = {
   Accept: "application/json, text/event-stream",
 };
 
-/** A read_write MCP key for the signed-in person; the caller returns the tool's text output. */
+/** A read_write MCP key for the signed-in person; `call` returns the tool's text, `callResult` also the refusal flag. */
 async function mcpTools(page: Page, headers: Record<string, string>) {
   const created = await page.request.post("/api/keys", {
     headers,
@@ -36,7 +36,7 @@ async function mcpTools(page: Page, headers: Record<string, string>) {
       .map((l) => l.replace(/^data:\s*/, "").trim())
       .find((l) => l.startsWith("{"));
     return JSON.parse(line ?? "{}") as {
-      result?: { content?: { text?: string }[] };
+      result?: { content?: { text?: string }[]; isError?: boolean };
       error?: { message: string };
     };
   };
@@ -46,10 +46,19 @@ async function mcpTools(page: Page, headers: Record<string, string>) {
     capabilities: {},
     clientInfo: { name: "e2e", version: "1" },
   });
-  return async (name: string, args: Record<string, unknown>) => {
+  const call = async (name: string, args: Record<string, unknown>) => {
     const body = await rpc("tools/call", { name, arguments: args });
     return body.result?.content?.[0]?.text ?? body.error?.message ?? "";
   };
+  /** Same call, but with the refusal flag a plain string throws away. */
+  const callResult = async (name: string, args: Record<string, unknown>) => {
+    const body = await rpc("tools/call", { name, arguments: args });
+    return {
+      text: body.result?.content?.[0]?.text ?? body.error?.message ?? "",
+      isError: body.result?.isError === true,
+    };
+  };
+  return { call, callResult };
 }
 
 test("the API refuses an entry without a project and a project without a client", async ({ page }) => {
@@ -158,19 +167,21 @@ test("MCP: a member's key needs a project to log and reads only their own hours"
   });
   expect(ownerEntry.status()).toBe(201);
 
-  const call = await mcpTools(member, memberHeaders);
+  const { call, callResult } = await mcpTools(member, memberHeaders);
 
   // Without a real, active project nothing is written.
-  await call("start_timer", { description: "No project" });
   const later = { start: "2026-05-04T11:00:00.000Z", stop: "2026-05-04T11:30:00.000Z" };
-  await call("log_time", { description: "No project", ...later });
-  await call("log_time", { description: "Forged project", ...later, projectId: "forged-project-id" });
+  const refused = await callResult("log_time", { description: "No project", ...later, projectId: "forged-project-id" });
+  expect(refused.isError).toBe(true);
+  expect(refused.text).toContain("active project");
   expect(await (await member.request.get("/api/time_entries/current")).json()).toBeNull();
   expect(await (await member.request.get(`/api/time_entries?${RANGE}`)).json()).toEqual([]);
 
-  expect(await call("log_time", { description: "Member via MCP", ...later, projectId: project.id })).toContain(
-    "Logged 30 minutes"
-  );
+  const logged = JSON.parse(
+    await call("log_time", { description: "Member via MCP", ...later, projectId: project.id })
+  ) as { description: string; duration: number };
+  expect(logged.description).toBe("Member via MCP");
+  expect(logged.duration).toBe(1800);
 
   const listed = await call("list_time_entries", { since: "2026-05-01", until: "2026-05-31" });
   expect(listed).toContain("Member via MCP");
@@ -298,7 +309,7 @@ test("MCP: a refusal sends the model back to the person instead of letting it pi
   await signUp(page);
   const origin = new URL(page.url()).origin;
   const project = await createProject(page);
-  const call = await mcpTools(page, { origin });
+  const { call } = await mcpTools(page, { origin });
 
   const forged = await call("log_time", {
     description: "Forged project",
@@ -306,7 +317,7 @@ test("MCP: a refusal sends the model back to the person instead of letting it pi
     stop: STOP,
     projectId: "forged-project-id",
   });
-  expect(forged).toContain("ask the person which project");
+  expect(forged).toContain("active project");
 
   const noClient = await call("create_project", {
     name: "Invented client",

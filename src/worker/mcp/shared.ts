@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z, type ZodRawShape } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ApiKeyScope } from "../lib/api-keys";
 import type { BridgeResult, RestBridge } from "./rest-bridge";
@@ -34,9 +34,12 @@ export interface McpContext {
   executionCtx: ExecutionContext;
 }
 
-/** What every tool module receives: the server to register on and this request's bindings. */
+/** Where a tool module registers: the MCP server itself, or the chat's recorder (mcp/chat-tools.ts). */
+export type ToolRegistrar = Pick<McpServer, "registerTool">;
+
+/** What every tool module receives: where to register and this request's bindings. */
 export interface ToolDeps {
-  server: McpServer;
+  server: ToolRegistrar;
   ctx: McpContext;
   env: Env;
   db: D1Database;
@@ -56,12 +59,106 @@ export function text(value: string) {
   return { content: [{ type: "text" as const, text: value }] };
 }
 
+/** A refusal the model should act on: marked as an error so clients show it as one. */
+export function refuse(message: string) {
+  return { content: [{ type: "text" as const, text: message }], isError: true };
+}
+
+/** Keys that are UI plumbing, not answers — stripped so a tool result spends its tokens on content. */
+const NOISE_KEYS = new Set(["workspaceId", "userImage", "image", "projectColor", "statusColor", "boardOrder", "sortOrder"]);
+
+export function compact(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(compact);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).filter(([k]) => !NOISE_KEYS.has(k)).map(([k, v]) => [k, compact(v)])
+    );
+  }
+  return value;
+}
+
 /** A bridged route's answer as a tool result: the data, or the server's own refusal marked as an error. */
 export function fromBridge<T>(result: BridgeResult<T>, shape?: (data: T) => unknown) {
-  if (!result.ok) {
-    return { content: [{ type: "text" as const, text: result.error }], isError: true };
-  }
-  return json(shape ? shape(result.data) : result.data);
+  if (!result.ok) return refuse(result.error);
+  return json(compact(shape ? shape(result.data) : result.data));
+}
+
+/** One description per field name, applied to every tool's input that doesn't carry its own. */
+const FIELD_DOCS: Record<string, string> = {
+  name: "Display name",
+  description: "Free text: an entry's work description, a task's notes (plain text), a template's description",
+  notes: "Free-text notes about the client",
+  email: "Contact email",
+  phone: "Contact phone",
+  address: "Postal address",
+  projectId: "Project id from list_projects",
+  clientId: "Client id from list_clients",
+  taskId: "Task id from list_tasks; null clears it",
+  parentId: "Parent task id from list_tasks to make this a subtask (one level only); null makes it top-level",
+  statusId: "Opaque status id from list_task_statuses — never a name or category; omit to use the default column",
+  assigneeIds: "Member userIds from list_members; replaces the whole list",
+  mentionedUserIds: "Member userIds from list_members to notify",
+  attachmentId: "An attachment id from upload_task_attachment to show with the comment; null removes it",
+  tags: "Tag names (not ids); unknown names are created. Replaces the whole list",
+  billable: "Whether the time is billable to the client; entries are billable unless this says false",
+  color: "A #rrggbb colour",
+  dueDate: "Local due day, YYYY-MM-DD; null clears it",
+  priority: "1 = urgent … 4 = none; omit unless the person set a priority",
+  estimatedSeconds: "Time estimate in seconds (3600 = 1h); null clears it",
+  recurRule: "Repeat rule: daily | weekdays | weekly:0,2,4 (0 = Sunday) | monthly:15; null stops repeating",
+  completedOn: "The person's local date (YYYY-MM-DD) when marking a task done — a repeating task schedules its next occurrence from it",
+  active: "false completes a task / pauses a template / archives a project; true restores it",
+  archived: "true archives the client, false restores it",
+  sortOrder: "Position in the project's list (fractional index); leave out unless reordering",
+  start: "ISO 8601 instant with offset, e.g. 2026-09-18T14:00:00-03:00",
+  stop: "ISO 8601 instant after start",
+  rate: "Hourly rate in the workspace currency; null clears it",
+  startDate: "First day of the project, YYYY-MM-DD; null clears it",
+  endDate: "Last day of the project, YYYY-MM-DD; null clears it",
+  estimatedHours: "Hour budget for the project; null clears it",
+  integrationId: "Workfront/Dynamics link — configured in the app; leave out",
+  externalProjectId: "Workfront/Dynamics project id — configured in the app; leave out",
+  externalTaskId: "Workfront/Dynamics task id — configured in the app; leave out",
+  category: "not_started | active | completed — what a task in this column counts as",
+  isDefault: "true makes this the column new tasks land in",
+  moveTo: "Status id that receives this column's tasks; required when it still holds any",
+  body: "The comment text, plain, up to 4000 characters",
+  filename: "File name shown in the app, e.g. screenshot.png",
+  durationMinutes: "Length of each logged entry, in minutes",
+  config: "The report filters, with the same keys run_report takes (e.g. {\"projectIds\":[\"…\"],\"billable\":\"billable\"})",
+  date: "Local day, YYYY-MM-DD",
+  plannedSeconds: "Planned time in seconds (3600 = 1h); 0 clears the cell",
+  enabled: "true turns auto-track on, false off",
+  provider: "Which calendar: google or microsoft",
+  kind: "summary (totals + series) | grouped (tree) | weekly (project × day) | detailed (every entry)",
+  projectIds: "Only these project ids",
+  clientIds: "Only these client ids",
+  taskIds: "Only these task ids",
+  tagIds: "Only these tag ids (from list_tags)",
+  userIds: "Only these members' userIds (owners/admins only)",
+  search: "Case-insensitive text to find in entry descriptions",
+  roundMode: "Per-entry rounding before totals: off | nearest | up | down",
+  roundMinutes: "Rounding step in minutes, e.g. 15",
+  currency: "3-letter currency code, e.g. BRL",
+  timeFormat: "12h or 24h",
+  weekStart: "First weekday: 0 = Sunday, 1 = Monday",
+  showWeekends: "Show Saturday and Sunday in week views",
+  autoAssignColors: "Colour new projects automatically",
+  digestDaily: "Email a morning briefing",
+  digestWeekly: "Email a Monday weekly summary",
+  digestHour: "Local hour (0–23) the digests arrive",
+  digestTimezoneOffsetMinutes: "UTC offset for the digests, JS getTimezoneOffset sign (west of UTC positive)",
+};
+
+/** The shape with FIELD_DOCS applied to every field that has no description of its own. */
+export function documented(shape: ZodRawShape): ZodRawShape {
+  return Object.fromEntries(
+    Object.entries(shape).map(([key, field]) => {
+      const doc = FIELD_DOCS[key];
+      const schema = field as z.ZodType;
+      return [key, schema.description || !doc ? schema : schema.describe(doc)];
+    })
+  );
 }
 
 export const DateArg = z

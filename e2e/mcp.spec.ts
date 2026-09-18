@@ -107,6 +107,8 @@ test("mcp: a read-only key gets the read tools and none of the write tools", asy
   const names = (tools.result as { tools: { name: string }[] }).tools.map((t) => t.name);
   expect(names).toContain("get_time_summary");
   expect(names).toContain("get_project_pacing");
+  // The full catalog is 25 read + 39 write tools; a read key sees only the reads.
+  expect(names).toHaveLength(25);
 
   // Every read tool must advertise itself as read-only, so a client can badge
   // it and skip the approval prompt it would otherwise raise.
@@ -116,8 +118,61 @@ test("mcp: a read-only key gets the read tools and none of the write tools", asy
     expect(tool.annotations?.openWorldHint).toBe(false);
   }
   // A read key isn't shown the write tools at all — not shown-then-refused.
-  expect(names).not.toContain("start_timer");
   expect(names).not.toContain("log_time");
+  // Timers are app-only (decision 2026-09-18): removed from the catalog entirely, not just gated behind read_write.
+  expect(names).not.toContain("start_timer");
+  expect(names).not.toContain("stop_timer");
+  expect(names).not.toContain("start_favorite");
+});
+
+test("mcp: a read_write key gets the full catalog, 25 read tools plus 39 write tools", async ({
+  page,
+}) => {
+  await signUp(page);
+  const origin = new URL(page.url()).origin;
+
+  const created = await page.request.post("/api/keys", {
+    headers: { origin },
+    data: { name: "e2e read_write", scope: "read_write" },
+  });
+  expect(created.status()).toBe(201);
+  const { plaintext } = (await created.json()) as { plaintext: string };
+  const auth = { ...MCP_HEADERS, Authorization: `Bearer ${plaintext}` };
+
+  await page.request.post("/mcp", {
+    headers: auth,
+    data: {
+      jsonrpc: "2.0",
+      id: 1,
+      method: "initialize",
+      params: {
+        protocolVersion: "2025-06-18",
+        capabilities: {},
+        clientInfo: { name: "e2e", version: "1" },
+      },
+    },
+  });
+
+  const tools = parseRpc(
+    await (
+      await page.request.post("/mcp", {
+        headers: auth,
+        data: { jsonrpc: "2.0", id: 2, method: "tools/list" },
+      })
+    ).text()
+  );
+  const list = (tools.result as { tools: { name: string; annotations?: Record<string, boolean> }[] })
+    .tools;
+  expect(list).toHaveLength(64);
+  expect(list.filter((t) => t.annotations?.readOnlyHint === true)).toHaveLength(25);
+  expect(list.filter((t) => t.annotations?.readOnlyHint !== true)).toHaveLength(39);
+
+  const names = list.map((t) => t.name);
+  expect(names).toContain("log_time");
+  expect(names).toContain("get_running_timer");
+  expect(names).not.toContain("start_timer");
+  expect(names).not.toContain("stop_timer");
+  expect(names).not.toContain("start_favorite");
 });
 
 test("mcp: a revoked key stops working immediately", async ({ page }) => {

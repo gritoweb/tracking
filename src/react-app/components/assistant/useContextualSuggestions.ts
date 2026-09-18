@@ -5,8 +5,8 @@ import { useTimerStore } from "@/stores/timerStore";
 /**
  * Suggestion chips follow the user's context: the reports page leads with
  * summaries, project/client/task pages with per-project breakdowns, and the
- * timer views with tracking gaps. A running timer swaps the "start a timer"
- * chip for a check-in on the current one.
+ * timer views with tracking gaps. A running timer swaps the "what do I have
+ * today" chip for a check-in on the current one.
  */
 export function useContextualSuggestions(): string[] {
   const { pathname } = useLocation();
@@ -15,7 +15,7 @@ export function useContextualSuggestions(): string[] {
   return useMemo(() => {
     const timerChip = runningEntry
       ? "How long has my timer been running?"
-      : "Start a timer for my current meeting";
+      : "What do I have today?";
     if (pathname.startsWith("/reports")) {
       return [
         "Summarize my time this week",

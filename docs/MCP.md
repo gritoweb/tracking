@@ -6,7 +6,7 @@ your time in plain language — then act on it.
 > *"Which clients were most profitable per hour last quarter?"*
 > *"Is the Meridian project going to blow its budget?"*
 > *"What did I actually work on last Thursday?"*
-> *"Start a timer on the Acme redesign."*
+> *"Log two hours on the Acme redesign this morning."*
 
 The server speaks **Streamable HTTP** at `https://tracking.gritoweb.com.br/mcp` and
 authenticates with a workspace **API key**. It is stateless — no session, no
@@ -21,7 +21,7 @@ Durable Object — so a client can reconnect at any time without losing anything
 | Scope | What the assistant can do |
 |---|---|
 | **Read only** | Projects, clients, entries, summaries, budgets, the running timer, drafts |
-| **Read + write** | All of the above, plus start/stop timers, log entries, and draft a day |
+| **Read + write** | All of the above, plus log entries, edit or delete them, and draft a day |
 
 The key is shown **once** and cannot be recovered — only its SHA-256 is stored.
 If you lose it, revoke it and make another. Revocation takes effect on the very
@@ -106,7 +106,7 @@ A healthy server answers with an SSE frame containing:
 ```
 
 Swap `"method":"tools/list"` (and drop `params`) to see the tools your key can
-reach — 25 on a read key, 67 on read+write.
+reach — 25 on a read key, 64 on read+write (25 read + 39 write).
 
 ---
 
@@ -114,17 +114,40 @@ reach — 25 on a read key, 67 on read+write.
 
 | Group | Read (any key) | Write (read+write key only) |
 |---|---|---|
-| Time | `get_running_timer`, `list_time_entries`, `get_time_entry`, `get_time_summary`, `run_report`, `list_drafts` | `start_timer`, `stop_timer`, `log_time`, `update_time_entry`, `delete_time_entry`, `copy_week`, `draft_day` |
+| Time | `get_running_timer`, `list_time_entries`, `get_time_entry`, `get_time_summary`, `run_report`, `list_drafts` | `log_time`, `update_time_entry`, `delete_time_entry`, `copy_week`, `draft_day` |
 | Catalog | `list_projects`, `list_clients`, `list_tags`, `get_project_pacing` | `create_project`, `update_project`, `archive_project`, `create_client`, `update_client`, `archive_client`, `create_tag`, `update_tag`, `delete_tag` |
 | Tasks | `list_tasks`, `get_task`, `list_task_statuses`, `list_task_comments`, `list_task_attachments` | `create_task`, `update_task`, `move_task`, `delete_task`, `create_task_status`, `update_task_status`, `archive_task_status`, `add_task_comment`, `edit_task_comment`, `delete_task_comment`, `upload_task_attachment`, `delete_task_attachment` |
-| Productivity | `list_favorites`, `list_recurring`, `list_saved_reports`, `get_planner` | `create_favorite`, `delete_favorite`, `start_favorite`, `create_recurring`, `update_recurring`, `delete_recurring`, `create_saved_report`, `delete_saved_report`, `set_planner_hours` |
+| Productivity | `list_favorites`, `list_recurring`, `list_saved_reports`, `get_planner` | `create_favorite`, `delete_favorite`, `create_recurring`, `update_recurring`, `delete_recurring`, `create_saved_report`, `delete_saved_report`, `set_planner_hours` |
 | Account | `whoami`, `list_members`, `list_api_keys`, `list_notifications`, `get_settings`, `get_calendar_status` | `mark_notification_read`, `mark_all_notifications_read`, `delete_notification`, `update_settings`, `set_calendar_auto_track` |
 
+25 read tools + 39 write tools = 64 total. `start_timer`, `stop_timer` and
+`start_favorite` were removed on purpose (decision 2026-09-18): timers are
+app-only, and logging/editing entries already covers what the AI needs to do.
+`get_running_timer` stays — reading the timer is still useful, starting or
+stopping it from a chat isn't.
+
 Every tool obeys the app's permissions for the key's owner: most run through
-`src/worker/mcp/rest-bridge.ts`, which calls the same routers the screens use, so
-a member's key gets the same 403 the app would show. Members and API keys are
-read-only here; inviting, removing and key management stay in the app. Coverage
-checklist: `docs/MCP_INTEGRATIONS.md`.
+`src/worker/mcp/rest-bridge.ts`, which calls the app's own routers (the same
+ones the screens use), so a member's key gets the same 403 the app would show,
+and a chat answer can't disagree with the Reports page. Members and API keys are
+read-only here; inviting, removing and key management stay in the app. Refusals
+come back with `isError: true` and a next step (`refuse()` in
+`src/worker/mcp/shared.ts`); results are compacted to drop UI-only keys like
+`workspaceId` (`compact()`); every input field carries a description
+(`FIELD_DOCS`). Coverage checklist: `docs/MCP_INTEGRATIONS.md`.
+
+## Same tools in the in-app Assistant
+
+`src/worker/mcp/registry.ts` (`registerAllTools`) is the one catalog: both the
+MCP server (`mcp/server.ts`) and the in-app Assistant's chat
+(`mcp/chat-tools.ts` → `buildChatTools`, used by
+`src/worker/durable-objects/ChatAgent.ts`) register from it, so a tool added
+here reaches the chat with no porting. In the chat every non-read-only tool
+needs the person's approval before it runs (AI SDK `needsApproval`) — the same
+"ask, don't assume" posture as the refusals below. The Assistant keeps 3
+chat-only tools that aren't part of the MCP catalog, in
+`src/worker/lib/assistant-tools.ts`: `trackMeeting`, `rememberPreference` and
+`searchMemory`.
 
 Each tool declares `readOnlyHint` / `destructiveHint` / `idempotentHint` /
 `openWorldHint`, so a client can badge them and stop prompting for harmless
@@ -181,8 +204,10 @@ the connection made at launch. Quit the client fully and reopen.
 **Answers are a few hours out on "yesterday" / "last week".** The client is
 probably not passing `timezoneOffsetMinutes`. See above.
 
-**A tool the docs list isn't there.** You're on a read-only key; the four write
-tools are only registered for read+write.
+**A tool the docs list isn't there.** You're on a read-only key; the 39 write
+tools are only registered for read+write. If it's `start_timer`, `stop_timer`
+or `start_favorite`, it's not a key issue — those were removed (see Tools
+above).
 
 ## Security model
 
@@ -203,7 +228,10 @@ tools are only registered for read+write.
 
 | Concern | Where |
 |---|---|
-| Tool definitions, `serverInfo`, `instructions` | `src/worker/mcp/server.ts` |
+| Tool definitions, by subject | `src/worker/mcp/tools/*.ts` |
+| The one catalog (MCP + chat share it) | `src/worker/mcp/registry.ts` |
+| `serverInfo`, `instructions`, MCP server build | `src/worker/mcp/server.ts` |
+| Chat's version of the catalog | `src/worker/mcp/chat-tools.ts` |
 | Key creation, hashing, resolution | `src/worker/lib/api-keys.ts` |
 | Key management API (session-only) | `src/worker/routes/api-keys.ts` |
 | `/mcp` request gate | `handleMcpRequest` in `src/worker/index.ts` |

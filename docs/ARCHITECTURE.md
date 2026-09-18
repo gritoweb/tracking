@@ -117,7 +117,7 @@ Deliberately AI-free — pacing goes in front of a client, so it must be reprodu
 
 `/mcp` speaks Streamable HTTP via `agents/mcp`'s `createMcpHandler` — stateless, no Durable Object. A fresh `McpServer` is built per request, bound to the workspace resolved from the API key.
 
-- **Eleven tools**, each a thin wrapper over the helpers the REST API already uses (report builder, pacing, draft pipeline), so a chat answer and a Reports page answer come from one implementation. A key acts as the person who created it: a member's key reads only their own hours and no budgets, and `start_timer`/`log_time`/`create_project` require an active project/client.
+- **64 tools (25 read, 39 write)** from one catalog (`mcp/registry.ts`) that also feeds the in-app Assistant. Most run through `mcp/rest-bridge.ts`, the app's own routers with the key's workspace and person, so a tool gets the screen's validation, role checks and broadcasts. A key acts as the person who created it: a member's key reads only their own hours and no budgets, and `log_time`/`create_project` require an active project/client. Timers are app-only (no start/stop tools).
 - **No tool takes a workspace id** — it is fixed at construction, so nothing a model can invent reaches a tenant boundary.
 - **Write tools are registered only for a `read_write` key.** A read key isn't shown them at all; a tool a client can see but can never call is worse than one never advertised.
 - **Auth is a workspace API key** (`tt_live_…`), not a session bearer: only the SHA-256 is stored, the plaintext is shown once and is unrecoverable, and membership is re-verified against `member` on every call (a key outlives the session that minted it).

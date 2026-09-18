@@ -20,6 +20,7 @@ import {
 import { useApiKeys, useCreateApiKey, useRevokeApiKey } from "@/hooks/useApiKeys";
 import { formatShortDate } from "@/lib/dateUtils";
 import type { ApiKey, ApiKeyScope } from "@shared/schemas";
+import { buildClaudeCodeSetupPrompt } from "@/lib/mcpSetupPrompt";
 
 const MCP_URL = `${window.location.origin}/mcp`;
 
@@ -129,7 +130,7 @@ export function McpConnectorCard() {
             Connect Claude, ChatGPT, or any MCP client to this workspace and ask about
             your time in plain language — hours by client, where a project stands
             against its budget, what you worked on last Thursday. A read + write key
-            can also start and stop timers and log entries.
+            can also log and edit entries, and manage tasks, projects and clients.
           </p>
           <div className="mt-3">
             <Label>Server URL</Label>
@@ -159,6 +160,22 @@ export function McpConnectorCard() {
                   {freshKey}
                 </code>
                 <CopyButton value={freshKey} label="Copy the new API key" />
+              </div>
+              <div className="space-y-1 pt-2">
+                <Label>Claude Code setup</Label>
+                <p>
+                  Paste this into Claude Code: it connects this server with your key and adds a{" "}
+                  <code className="font-mono">/tracking</code> command.
+                </p>
+                <div className="flex items-start gap-2">
+                  <pre className="max-h-48 flex-1 overflow-auto whitespace-pre-wrap rounded-md border bg-background px-2 py-1.5 font-mono text-xs">
+                    {buildClaudeCodeSetupPrompt(MCP_URL, freshKey)}
+                  </pre>
+                  <CopyButton
+                    value={buildClaudeCodeSetupPrompt(MCP_URL, freshKey)}
+                    label="Copy the Claude Code setup prompt"
+                  />
+                </div>
               </div>
               <Button variant="outline" size="sm" onClick={() => setFreshKey(null)}>
                 Done

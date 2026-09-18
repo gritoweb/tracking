@@ -18,15 +18,9 @@
 // what is allowed.
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { entryScopeUserId, getMemberRole } from "../lib/permissions";
 import { appUrl } from "../lib/app-url";
-import { createRestBridge } from "./rest-bridge";
-import type { McpContext, ToolDeps } from "./shared";
-import { registerEntryReads, registerEntryWrites } from "./tools/entries";
-import { registerTaskReads, registerTaskWrites } from "./tools/tasks";
-import { registerCatalogReads, registerCatalogWrites } from "./tools/catalog";
-import { registerProductivityReads, registerProductivityWrites } from "./tools/productivity";
-import { registerAccountReads, registerAccountWrites } from "./tools/account";
+import type { McpContext } from "./shared";
+import { registerAllTools } from "./registry";
 
 export type { McpContext } from "./shared";
 
@@ -86,33 +80,7 @@ Working with it:
 - Call \`list_clients\`/\`list_projects\` before \`create_client\`/\`create_project\` to check one doesn't already exist under a slightly different name — neither tool is idempotent, so a retry makes a duplicate.`;
 
 export function buildMcpServer(ctx: McpContext): McpServer {
-  const { env, workspaceId, userId, scope, executionCtx } = ctx;
-  const db = env.DB;
-  const server = new McpServer(serverInfo(env), { instructions: SERVER_INSTRUCTIONS });
-  // Owner/admin keys read the whole workspace; a member's key reads only their own hours (D3).
-  let scopePromise: Promise<string | null> | null = null;
-  const scopeUserId = () =>
-    (scopePromise ??= getMemberRole(db, workspaceId, userId).then((role) => entryScopeUserId(role, userId)));
-
-  const deps: ToolDeps = {
-    server, ctx, env, db, workspaceId, userId, scopeUserId,
-    bridge: createRestBridge(env, executionCtx, workspaceId, userId),
-  };
-
-  registerCatalogReads(deps);
-  registerEntryReads(deps);
-  registerTaskReads(deps);
-  registerProductivityReads(deps);
-  registerAccountReads(deps);
-
-  // Write tools exist only for a read_write key: a read key is not told they exist, rather than refused.
-  if (scope !== "read_write") return server;
-
-  registerCatalogWrites(deps);
-  registerTaskWrites(deps);
-  registerEntryWrites(deps);
-  registerProductivityWrites(deps);
-  registerAccountWrites(deps);
-
+  const server = new McpServer(serverInfo(ctx.env), { instructions: SERVER_INSTRUCTIONS });
+  registerAllTools(server, ctx);
   return server;
 }

@@ -8,13 +8,19 @@ that model is no longer offered and its remaining variant cannot do what the app
 
 | Feature | Code | Model | Why this one |
 |---|---|---|---|
-| Assistant chat (start/stop timer, log time, track a meeting, delete, remember) | `src/worker/durable-objects/ChatAgent.ts` | `@cf/meta/llama-4-scout-17b-16e-instruct` | Needs **function calling** — the tools are how it acts |
+| Assistant chat (the MCP tool catalog + track a meeting, remember, recall) | `src/worker/durable-objects/ChatAgent.ts` | `@cf/meta/llama-4-scout-17b-16e-instruct` | Needs **function calling** — the tools are how it acts |
 | Quick-add, project recolor, calendar event → project, day-draft enrichment | `src/worker/lib/ai.ts` (`QUICK_ENTRY_MODEL`) | `@cf/meta/llama-4-scout-17b-16e-instruct` | Needs **`json_schema` response mode** |
 | AI summary, digest narrative | `src/worker/lib/ai.ts` (`SUMMARY_MODEL`) | `@cf/meta/llama-3.1-8b-instruct-fp8` | Plain text only — the cheaper model is enough |
 
 Every call goes through the `AI` binding (`wrangler.jsonc`, `"remote": true`) and the AI Gateway
 `default`. Every AI feature has a deterministic fallback: a failed or invalid AI answer never blocks
 the action.
+
+## Assistant tools
+
+The chat's tools are not its own — they come from the MCP catalog (`src/worker/mcp/registry.ts`,
+see `docs/MCP.md`), so a tool added to MCP reaches the chat with no porting. Every write among them
+needs the person's approval before it runs, the same as any other MCP write tool.
 
 ## Why not `llama-3.1-8b-instruct` for everything
 
@@ -36,9 +42,12 @@ Workers AI bills in neurons: 10,000 free per day, then $0.011 per 1,000.
 - Scout: $0.27 per million input tokens, $0.85 per million output tokens.
 - 8B-fp8: $0.152 per million input tokens, $0.287 per million output tokens.
 
-An Assistant message sends ~4k tokens of context (system prompt, current facts, memories, history),
-so one chat turn on Scout costs roughly **60–100 neurons** — about 100–150 turns a day inside the free
-allocation. Quick-add and the JSON calls are much smaller.
+**Measured 2026-09-18** (Workers AI `usage`, one call to Scout with and without the tools): the 64
+catalog tools add **~17,900 prompt tokens, ~440 neurons per model call**. A chat turn makes 1–3 model
+calls (the tool call, then the answer), plus ~4k tokens of context — roughly **500–1,300 neurons per
+turn**, so about 10–20 turns a day fit the free allocation and each turn beyond it costs about
+US$0.005–0.015. Quick-add and the JSON calls are small (tens of neurons). If chat volume grows, the
+levers are a cheaper function-calling model or sending the chat a smaller tool subset.
 
 ## If this needs to change later
 

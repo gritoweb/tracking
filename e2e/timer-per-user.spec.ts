@@ -91,10 +91,8 @@ test.describe("per-user timers", () => {
     expect((await stopped.json()).stop).not.toBeNull();
   });
 
-  test("the MCP stop_timer stops only the key holder's timer", async ({ browser }) => {
-    const { owner, member, memberHeaders, projectId } = await teamWithProject(browser);
-    const ownerEntry = await startTimer(owner, "Owner keeps going", projectId);
-    await startTimer(member, "Member via MCP", projectId);
+  test("the MCP catalog has no timer-control tools: timers are app-only", async ({ browser }) => {
+    const { member, memberHeaders } = await teamWithProject(browser);
 
     const created = await member.request.post("/api/keys", {
       headers: memberHeaders,
@@ -119,17 +117,20 @@ test.describe("per-user timers", () => {
     });
     expect(init.ok()).toBeTruthy();
 
-    const stop = await member.request.post("/mcp", {
+    const list = await member.request.post("/mcp", {
       headers: auth,
-      data: { jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "stop_timer", arguments: {} } },
+      data: { jsonrpc: "2.0", id: 2, method: "tools/list" },
     });
-    expect(stop.ok()).toBeTruthy();
-    expect(JSON.stringify(parseRpc(await stop.text()))).toContain("Stopped");
-
-    expect(await currentTimer(member)).toBeNull();
-    const ownerCurrent = await currentTimer(owner);
-    expect(ownerCurrent?.id).toBe(ownerEntry.id);
-    expect(ownerCurrent?.stop).toBeNull();
+    expect(list.ok()).toBeTruthy();
+    const names = (parseRpc(await list.text()).result as { tools: { name: string }[] }).tools.map(
+      (t) => t.name
+    );
+    // Decision 2026-09-18: timers are app-only; logging/editing entries covers the AI's needs.
+    expect(names).not.toContain("start_timer");
+    expect(names).not.toContain("stop_timer");
+    expect(names).not.toContain("start_favorite");
+    // The read-only running-timer lookup stays.
+    expect(names).toContain("get_running_timer");
   });
 
   test("a teammate's timer never shows up on your screen", async ({ browser }) => {

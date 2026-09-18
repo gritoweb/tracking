@@ -4,7 +4,7 @@ import { createClient, isActiveClient } from "../../lib/clients";
 import { createProject, memberProjectInput } from "../../lib/projects";
 import { CreateClientSchema, CreateProjectSchema, CreateTagSchema, UpdateClientSchema, UpdateProjectSchema, UpdateTagSchema } from "@shared/schemas";
 import { segment } from "../rest-bridge";
-import { DESTRUCTIVE, IdArg, MUTATES, READ_ONLY, fromBridge, hours, json, text, type ToolDeps } from "../shared";
+import { DESTRUCTIVE, IdArg, MUTATES, READ_ONLY, compact, fromBridge, hours, json, refuse, type ToolDeps } from "../shared";
 
 /** `list_projects`'s own projection: a project plus its client name and tracked total. */
 interface McpProjectRow {
@@ -115,7 +115,7 @@ export function registerCatalogReads(d: ToolDeps): void {
     },
     async () => {
       if ((await scopeUserId()) !== null) {
-        return text("Project budgets are visible to workspace owners and admins only.");
+        return refuse("Project budgets are visible to workspace owners and admins only.");
       }
       const pacing = await loadProjectPacing(db, workspaceId);
       return json(
@@ -165,7 +165,7 @@ export function registerCatalogWrites(d: ToolDeps): void {
     },
     async (data) => {
       const client = await createClient(db, workspaceId, data);
-      return json(client);
+      return json(compact(client));
     }
   );
 
@@ -180,11 +180,11 @@ export function registerCatalogWrites(d: ToolDeps): void {
     },
     async (data) => {
       if (!(await isActiveClient(db, workspaceId, data.clientId))) {
-        return text(`No active client with id ${data.clientId} in this workspace. Call list_clients and ask the person which client this project belongs to.`);
+        return refuse(`No active client with id ${data.clientId} in this workspace. Call list_clients and ask the person which client this project belongs to.`);
       }
       const manager = (await scopeUserId()) === null;
       const project = await createProject(db, workspaceId, manager ? data : memberProjectInput(data));
-      return json(project);
+      return json(compact(project));
     }
   );
 
@@ -250,7 +250,7 @@ export function registerCatalogWrites(d: ToolDeps): void {
     "update_tag",
     {
       title: "Recolour a tag",
-      description: "Set a tag's colour (#rrggbb).",
+      description: "Set a tag's colour (#rrggbb) — the colour it shows with on entries and reports. Get the tagId from list_tags.",
       inputSchema: { tagId: IdArg("tag"), ...UpdateTagSchema.shape },
       annotations: { ...MUTATES, idempotentHint: true },
     },

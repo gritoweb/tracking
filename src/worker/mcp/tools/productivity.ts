@@ -1,10 +1,10 @@
 // Favorites, recurring entries, saved reports and the Planner.
 import { z } from "zod";
-import type { Favorite, RecurringEntry } from "@shared/schemas";
+import type { RecurringEntry } from "@shared/schemas";
 import { CreateFavoriteSchema, CreateSavedReportSchema, UpsertAllocationSchema } from "@shared/schemas";
 import { localScheduleToUtcAt, utcScheduleToLocalAt } from "@shared/recurring-schedule";
 import { segment } from "../rest-bridge";
-import { DESTRUCTIVE, DateArg, IdArg, MUTATES, READ_ONLY, TimezoneArg, fromBridge, hours, text, type ToolDeps } from "../shared";
+import { DESTRUCTIVE, DateArg, IdArg, MUTATES, READ_ONLY, TimezoneArg, fromBridge, hours, refuse, type ToolDeps } from "../shared";
 
 const LocalDaysArg = z
   .array(z.number().int().min(0).max(6))
@@ -44,7 +44,7 @@ export function registerProductivityReads(d: ToolDeps): void {
     "list_favorites",
     {
       title: "List favorites",
-      description: "The person's saved timer presets — description, project, task, tags and billable flag. start_favorite starts one.",
+      description: "The person's saved presets — description, project, task, tags and billable flag — as used by the app's one-click start.",
       inputSchema: {},
       annotations: READ_ONLY,
     },
@@ -110,40 +110,11 @@ export function registerProductivityWrites(d: ToolDeps): void {
     "delete_favorite",
     {
       title: "Delete a favorite",
-      description: "Remove a saved timer preset. Tracked time is untouched.",
+      description: "Remove a saved preset from the person's favorites. Tracked time is untouched; ids come from list_favorites.",
       inputSchema: { favoriteId: IdArg("favorite") },
       annotations: DESTRUCTIVE,
     },
     async ({ favoriteId }) => fromBridge(await bridge("DELETE", `/api/favorites/${segment(favoriteId)}`))
-  );
-
-  server.registerTool(
-    "start_favorite",
-    {
-      title: "Start a timer from a favorite",
-      description: "Start the timer now with a favorite's description, project, task, tags and billable flag. Stops any timer the person already has running.",
-      inputSchema: { favoriteId: IdArg("favorite") },
-      annotations: MUTATES,
-    },
-    async ({ favoriteId }) => {
-      const favorites = await bridge<Favorite[]>("GET", "/api/favorites");
-      if (!favorites.ok) return fromBridge(favorites);
-      const favorite = favorites.data.find((f) => f.id === favoriteId);
-      if (!favorite) return text(`No favorite with id ${favoriteId}. Call list_favorites.`);
-      if (!favorite.projectId) {
-        return text("That favorite has no project, and every entry needs one. Ask the person which project to use and call start_timer.");
-      }
-      return fromBridge(
-        await bridge("POST", "/api/time_entries", {
-          description: favorite.description,
-          projectId: favorite.projectId,
-          taskId: favorite.taskId,
-          tags: favorite.tags,
-          billable: favorite.billable,
-          start: new Date().toISOString(),
-        })
-      );
-    }
   );
 
   server.registerTool(
@@ -201,7 +172,7 @@ export function registerProductivityWrites(d: ToolDeps): void {
     },
     async ({ recurringId, durationMinutes, localDays, localTime, timezoneOffsetMinutes, ...rest }) => {
       if ((localDays === undefined) !== (localTime === undefined)) {
-        return text("Pass localDays and localTime together — the stored UTC weekday depends on both.");
+        return refuse("Pass localDays and localTime together — the stored UTC weekday depends on both.");
       }
       const schedule =
         localDays && localTime
@@ -244,7 +215,7 @@ export function registerProductivityWrites(d: ToolDeps): void {
     "delete_saved_report",
     {
       title: "Delete a saved report",
-      description: "Remove a bookmarked report view.",
+      description: "Remove a bookmarked report view. The entries it reported on are untouched; ids come from list_saved_reports.",
       inputSchema: { reportId: IdArg("saved report") },
       annotations: DESTRUCTIVE,
     },

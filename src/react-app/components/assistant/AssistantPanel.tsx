@@ -158,7 +158,7 @@ export function AssistantPanel() {
               {messages.length === 0 && (
                 <div className="space-y-3">
                   <p className="text-xs text-muted-foreground">
-                    Ask about your day, or tell me to start a timer or track a meeting — or use
+                    Ask about your day, or tell me to log time or track a meeting — or use
                     “Log time…” for a reviewable entry form.
                   </p>
                   <SuggestionChips suggestions={suggestions} onSelect={send} disabled={busy} />

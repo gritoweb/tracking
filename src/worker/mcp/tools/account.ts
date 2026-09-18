@@ -100,7 +100,7 @@ export function registerAccountWrites(d: ToolDeps): void {
     "mark_notification_read",
     {
       title: "Mark a notification read",
-      description: "Mark one notification as read.",
+      description: "Mark one of the key owner's notifications as read, as opening it in the app does. Ids come from list_notifications.",
       inputSchema: { notificationId: IdArg("notification") },
       annotations: { ...MUTATES, idempotentHint: true },
     },
@@ -112,7 +112,7 @@ export function registerAccountWrites(d: ToolDeps): void {
     "mark_all_notifications_read",
     {
       title: "Mark all notifications read",
-      description: "Mark every notification of the key owner as read.",
+      description: "Mark every one of the key owner's notifications as read, like the bell's \"Mark all read\".",
       inputSchema: {},
       annotations: { ...MUTATES, idempotentHint: true },
     },
@@ -123,7 +123,7 @@ export function registerAccountWrites(d: ToolDeps): void {
     "delete_notification",
     {
       title: "Dismiss a notification",
-      description: "Delete one notification.",
+      description: "Dismiss one of the key owner's notifications for good. Ids come from list_notifications.",
       inputSchema: { notificationId: IdArg("notification") },
       annotations: DESTRUCTIVE,
     },

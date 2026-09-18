@@ -30,6 +30,7 @@ interface RunningEntry {
 
 /** `buildAssistantContext`'s own projection — a completed entry (`stop IS NOT NULL` in the WHERE) joined for its project name. */
 interface ContextEntryRow {
+  id: string;
   description: string | null;
   start: string;
   stop: string;
@@ -327,7 +328,7 @@ export async function buildAssistantContext(
     loadTodayFacts(env.DB, workspaceId, userId, dayStartIso, dayEndIso),
     loadTodayEvents(env, workspaceId, userId, dayStartIso, dayEndIso),
     env.DB.prepare(
-      `SELECT te.description, te.start, te.stop, te.duration, te.billable, p.name AS project_name
+      `SELECT te.id, te.description, te.start, te.stop, te.duration, te.billable, p.name AS project_name
        FROM time_entries te
        LEFT JOIN projects p ON p.id = te.project_id
        WHERE te.workspace_id = ? AND te.user_id = ? AND te.stop IS NOT NULL AND te.start >= ? AND te.start < ?
@@ -349,7 +350,7 @@ export async function buildAssistantContext(
     ? entries.results
         .map((e) => {
           const hours = ((e.duration ?? 0) / 3600).toFixed(2);
-          return `- ${t(e.start)}–${t(e.stop)} | ${e.project_name ?? "No project"} | ${hours}h | ${e.billable ? "billable" : "non-billable"} | ${e.description || "(no description)"}`;
+          return `- [ID: ${e.id}] ${t(e.start)}–${t(e.stop)} | ${e.project_name ?? "No project"} | ${hours}h | ${e.billable ? "billable" : "non-billable"} | ${e.description || "(no description)"}`;
         })
         .join("\n")
     : "(none yet)";

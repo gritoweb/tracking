@@ -1,346 +1,67 @@
-// The assistant's tools (Tier 1): the actions the chat agent can take on the user's
-// behalf. Each wraps the SAME D1 writes + WebSocket broadcasts the REST routes
-// use (see routes/time-entries.ts), so a timer the assistant starts/stops syncs
-// to every open tab and the extension exactly like a manual one. Project names
-// are resolved through the same grounded fuzzy matcher as quick-entry, so the
-// model can only ever land on a real project id (or none).
+// The Assistant's chat-only tools. Everything else it can do comes from the MCP catalog
+// (mcp/chat-tools.ts), so the chat and the MCP server share one set of tools.
 
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
-import { broadcast, getEntryById } from "../db/queries";
-import { loadGroundingProjects, resolveGrounding } from "./ai";
 import { rememberFact, searchMemories } from "./assistant-memory";
-import { canWriteEntry, getMemberRole } from "./permissions";
 import { inferProjectForTitle } from "./projects";
-import { resolveEntryBillable } from "@shared/billable";
+import { loadGroundingProjects, resolveGrounding } from "./ai";
+import { createRestBridge } from "../mcp/rest-bridge";
 
 export interface AssistantToolContext {
   env: Env;
   workspaceId: string;
   /** The person chatting: every tool reads and writes only their own time. */
   userId: string;
-  /** JS getTimezoneOffset() convention (minutes); used only for human-readable echoes. */
+  /** JS getTimezoneOffset() convention (minutes). */
   offsetMinutes: number;
+  executionCtx: ExecutionContext;
 }
 
 const ISO = z
   .string()
   .refine((s) => !Number.isNaN(Date.parse(s)), "must be an ISO 8601 timestamp");
 
-// Every entry needs a project (D3); the model is told to ask rather than log without one.
-const NEEDS_PROJECT =
-  "Every entry needs a project. Ask the user which project (listProjects has the names), then try again.";
-
-/** Resolve a free-text project name to a real id via the grounded matcher. */
-async function resolveProject(
-  env: Env,
-  workspaceId: string,
-  projectName: string | null | undefined
-): Promise<{ projectId: string | null; projectName: string | null; warning?: string }> {
-  if (!projectName) return { projectId: null, projectName: null };
-  const projects = await loadGroundingProjects(env.DB, workspaceId);
-  const r = resolveGrounding(projectName, null, projects);
-  if (!r.projectMatched) {
-    return { projectId: null, projectName: null, warning: r.warnings[0] };
-  }
-  const matched = projects.find((p) => p.id === r.projectId)!;
-  return { projectId: matched.id, projectName: matched.name };
-}
-
 export function buildAssistantTools(ctx: AssistantToolContext): ToolSet {
   const { env, workspaceId, userId } = ctx;
   const db = env.DB;
+  const bridge = createRestBridge(env, ctx.executionCtx, workspaceId, userId);
 
   return {
-    startTimer: tool({
-      description:
-        "Start a new running timer for the user. Automatically stops the user's timer that is already running (same as the app's Start button). Use when the user says they're starting or now working on something. Needs a project.",
-      inputSchema: z.object({
-        description: z.string().max(500).describe("What the user is working on"),
-        projectName: z
-          .string()
-          .nullish()
-          .describe("Exact name of a known project to bill it to — required; ask the user if unsure"),
-        billable: z
-          .boolean()
-          .nullish()
-          .describe("Override billable; every entry is billable by default"),
-      }),
-      execute: async ({ description, projectName, billable }) => {
-        const now = new Date().toISOString();
-        const proj = await resolveProject(env, workspaceId, projectName);
-        if (!proj.projectId) return { ok: false, reason: proj.warning ?? NEEDS_PROJECT };
-        // Stop the user's running timer first, mirroring POST /time_entries.
-        await db
-          .prepare(
-            `UPDATE time_entries
-             SET stop = ?, duration = CAST((julianday(?) - julianday(start)) * 86400 + 0.5 AS INTEGER), updated_at = ?
-             WHERE workspace_id = ? AND user_id = ? AND stop IS NULL`
-          )
-          .bind(now, now, now, workspaceId, userId)
-          .run();
-        const id = crypto.randomUUID();
-        await db
-          .prepare(
-            `INSERT INTO time_entries
-               (id, workspace_id, user_id, project_id, task_id, description, start, stop, duration, billable, calendar_event_id, created_at, updated_at)
-             VALUES (?, ?, ?, ?, NULL, ?, ?, NULL, NULL, ?, NULL, ?, ?)`
-          )
-          .bind(
-            id,
-            workspaceId,
-            userId,
-            proj.projectId,
-            description,
-            now,
-            resolveEntryBillable(billable) ? 1 : 0,
-            now,
-            now
-          )
-          .run();
-        const entry = await getEntryById(db, id, workspaceId);
-        await broadcast(env, workspaceId, "timer:start", entry, null, userId);
-        return {
-          ok: true,
-          startedAt: now,
-          project: proj.projectName,
-          billable: resolveEntryBillable(billable),
-        };
-      },
-    }),
-
-    stopTimer: tool({
-      description:
-        "Stop the user's running timer. No-op (ok:false) if nothing is running.",
-      inputSchema: z.object({}),
-      execute: async () => {
-        const running = await db
-          .prepare(
-            `SELECT id, start FROM time_entries
-             WHERE workspace_id = ? AND user_id = ? AND stop IS NULL ORDER BY start DESC LIMIT 1`
-          )
-          .bind(workspaceId, userId)
-          .first<{ id: string; start: string }>();
-        if (!running) return { ok: false, reason: "No timer is running." };
-        const now = new Date().toISOString();
-        await db
-          .prepare(
-            `UPDATE time_entries
-             SET stop = ?, duration = CAST((julianday(?) - julianday(start)) * 86400 + 0.5 AS INTEGER), updated_at = ?
-             WHERE id = ? AND workspace_id = ? AND user_id = ? AND stop IS NULL`
-          )
-          .bind(now, now, now, running.id, workspaceId, userId)
-          .run();
-        const entry = await getEntryById(db, running.id, workspaceId);
-        await broadcast(env, workspaceId, "timer:stop", entry, null, userId);
-        const seconds = Math.round((Date.parse(now) - Date.parse(running.start)) / 1000);
-        return { ok: true, stoppedAt: now, durationHours: (seconds / 3600).toFixed(2) };
-      },
-    }),
-
-    logTimeEntry: tool({
-      description:
-        "Log a COMPLETED past time entry (both start and stop known). Use for retroactively recording work, e.g. 'I worked on Acme from 2 to 4pm'. Do not use to start a live timer. Needs a project.",
-      inputSchema: z.object({
-        description: z.string().max(500),
-        start: ISO.describe("UTC ISO 8601 start"),
-        stop: ISO.describe("UTC ISO 8601 stop; must be after start"),
-        projectName: z.string().nullish().describe("Exact name of a known project — required"),
-        billable: z.boolean().nullish(),
-      }),
-      // Creates a billable record — require the user to confirm before it writes,
-      // so an instruction injected via calendar/entry text can't silently invent
-      // billable hours (native AI-SDK human-in-the-loop; see the ToolCard UI).
-      needsApproval: true,
-      execute: async ({ description, start, stop, projectName, billable }) => {
-        if (Date.parse(stop) <= Date.parse(start)) {
-          return { ok: false, reason: "Stop must be after start." };
-        }
-        const proj = await resolveProject(env, workspaceId, projectName);
-        if (!proj.projectId) return { ok: false, reason: proj.warning ?? NEEDS_PROJECT };
-        const now = new Date().toISOString();
-        const id = crypto.randomUUID();
-        const duration = Math.round((Date.parse(stop) - Date.parse(start)) / 1000);
-        await db
-          .prepare(
-            `INSERT INTO time_entries
-               (id, workspace_id, user_id, project_id, task_id, description, start, stop, duration, billable, calendar_event_id, created_at, updated_at)
-             VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, NULL, ?, ?)`
-          )
-          .bind(
-            id,
-            workspaceId,
-            userId,
-            proj.projectId,
-            description,
-            start,
-            stop,
-            duration,
-            resolveEntryBillable(billable) ? 1 : 0,
-            now,
-            now
-          )
-          .run();
-        const entry = await getEntryById(db, id, workspaceId);
-        await broadcast(env, workspaceId, "entries:changed", entry, null, userId);
-        return {
-          ok: true,
-          durationHours: (duration / 3600).toFixed(2),
-          project: proj.projectName,
-        };
-      },
-    }),
-
     trackMeeting: tool({
       description:
-        "Add a calendar meeting to the timesheet as a completed entry. Pass projectName when the user named one; otherwise the project is inferred from the title, and a meeting that matches no project is not logged.",
+        "Add a meeting from the user's calendar (listed in CURRENT FACTS) to the timesheet as a finished entry. Pass projectName when the user named one; otherwise the project is inferred from the title, and a meeting that matches no project is not logged — then ask which project.",
       inputSchema: z.object({
-        title: z.string().max(500),
-        start: ISO,
-        stop: ISO,
+        title: z.string().max(500).describe("The meeting title, as it appears in CURRENT FACTS"),
+        start: ISO.describe("Meeting start, UTC ISO 8601"),
+        stop: ISO.describe("Meeting end, UTC ISO 8601, after start"),
         projectName: z.string().nullish().describe("Exact project name, if the user gave one"),
       }),
-      // Creates a billable record — confirm before writing (see logTimeEntry).
+      // Creates a billable record: an instruction injected through calendar text must not log hours unconfirmed.
       needsApproval: true,
       execute: async ({ title, start, stop, projectName }) => {
-        if (Date.parse(stop) <= Date.parse(start)) {
-          return { ok: false, reason: "Stop must be after start." };
-        }
-        let project: { projectId: string | null; projectName: string | null } = {
-          projectId: null,
-          projectName: null,
-        };
+        if (Date.parse(stop) <= Date.parse(start)) return { ok: false, reason: "Stop must be after start." };
+        let projectId: string | null = null;
         if (projectName) {
-          project = await resolveProject(env, workspaceId, projectName);
+          const projects = await loadGroundingProjects(db, workspaceId);
+          const match = resolveGrounding(projectName, null, projects);
+          if (match.projectMatched) projectId = match.projectId;
         } else {
-          const match = await inferProjectForTitle(db, env.AI, workspaceId, title);
-          if (match) {
-            project = { projectId: match.projectId, projectName: match.projectName };
-          }
+          projectId = (await inferProjectForTitle(db, env.AI, workspaceId, title))?.projectId ?? null;
         }
-        if (!project.projectId) return { ok: false, reason: NEEDS_PROJECT };
-        const now = new Date().toISOString();
-        const id = crypto.randomUUID();
-        const duration = Math.round((Date.parse(stop) - Date.parse(start)) / 1000);
-        await db
-          .prepare(
-            `INSERT INTO time_entries
-               (id, workspace_id, user_id, project_id, task_id, description, start, stop, duration, billable, calendar_event_id, created_at, updated_at)
-             VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, NULL, ?, ?)`
-          )
-          .bind(id, workspaceId, userId, project.projectId, title, start, stop, duration, resolveEntryBillable() ? 1 : 0, now, now)
-          .run();
-        const entry = await getEntryById(db, id, workspaceId);
-        await broadcast(env, workspaceId, "entries:changed", entry, null, userId);
-        return { ok: true, project: project.projectName, durationHours: (duration / 3600).toFixed(2) };
-      },
-    }),
-
-    getTimeSummary: tool({
-      description:
-        "Summarize the user's tracked time over a date range: total hours, billable split, and per-project breakdown. Dates are UTC ISO. Use to answer 'how much did I bill this week?'.",
-      inputSchema: z.object({
-        since: ISO.describe("range start (inclusive)"),
-        until: ISO.describe("range end (exclusive)"),
-      }),
-      execute: async ({ since, until }) => {
-        const { results } = await db
-          .prepare(
-            `SELECT COALESCE(p.name, 'No project') AS project,
-                    SUM(te.duration) AS seconds,
-                    SUM(CASE WHEN te.billable = 1 THEN te.duration ELSE 0 END) AS billable_seconds,
-                    COUNT(*) AS entries
-             FROM time_entries te
-             LEFT JOIN projects p ON p.id = te.project_id
-             WHERE te.workspace_id = ? AND te.user_id = ? AND te.stop IS NOT NULL AND te.start >= ? AND te.start < ?
-             GROUP BY project ORDER BY seconds DESC`
-          )
-          .bind(workspaceId, userId, since, until)
-          .all<{ project: string; seconds: number; billable_seconds: number; entries: number }>();
-        const totalSeconds = results.reduce((s, r) => s + (r.seconds ?? 0), 0);
-        const billableSeconds = results.reduce((s, r) => s + (r.billable_seconds ?? 0), 0);
-        return {
-          totalHours: (totalSeconds / 3600).toFixed(2),
-          billableHours: (billableSeconds / 3600).toFixed(2),
-          byProject: results.map((r) => ({
-            project: r.project,
-            hours: ((r.seconds ?? 0) / 3600).toFixed(2),
-            entries: r.entries,
-          })),
-        };
-      },
-    }),
-
-    listMyTasks: tool({
-      description:
-        "The user's open tasks (assigned to them) due by a local day: overdue plus that day by default. Use for 'what do I have today', 'what's due', 'what's on my plate'.",
-      inputSchema: z.object({
-        daysAhead: z.number().int().min(0).max(30).default(0).describe("0 = due today or overdue; 7 = the coming week too"),
-      }),
-      execute: async ({ daysAhead }) => {
-        const localNow = new Date(Date.now() - ctx.offsetMinutes * 60_000);
-        const today = localNow.toISOString().slice(0, 10);
-        const until = new Date(localNow.getTime() + daysAhead * 86_400_000).toISOString().slice(0, 10);
-        const { results } = await db
-          .prepare(
-            `SELECT tk.name, tk.due_date, tk.priority, p.name AS project, ts.name AS status
-             FROM tasks tk
-             JOIN task_assignees ta ON ta.task_id = tk.id AND ta.user_id = ?
-             LEFT JOIN projects p ON p.id = tk.project_id
-             LEFT JOIN task_statuses ts ON ts.id = tk.status_id
-             WHERE tk.workspace_id = ? AND tk.active = 1 AND tk.due_date IS NOT NULL AND tk.due_date <= ?
-             ORDER BY tk.due_date ASC, tk.priority ASC LIMIT 50`
-          )
-          .bind(userId, workspaceId, until)
-          .all<{ name: string; due_date: string; priority: number; project: string | null; status: string | null }>();
-        return {
-          today,
-          tasks: results.map((r) => ({
-            name: r.name,
-            project: r.project,
-            status: r.status,
-            due: r.due_date,
-            overdue: r.due_date < today,
-            priority: r.priority,
-          })),
-        };
-      },
-    }),
-
-    listProjects: tool({
-      description: "List the workspace's active projects and whether each one is itself billable.",
-      inputSchema: z.object({}),
-      execute: async () => {
-        const projects = await loadGroundingProjects(db, workspaceId);
-        return {
-          projects: projects.map((p) => ({ name: p.name, billable: p.billable })),
-        };
-      },
-    }),
-
-    deleteEntry: tool({
-      description:
-        "Permanently delete a time entry by id. Destructive — requires user approval. Only call with an id the user clearly identified.",
-      inputSchema: z.object({ id: z.string() }),
-      // Native AI-SDK human-in-the-loop: the client must approve before execute runs.
-      needsApproval: true,
-      execute: async ({ id }) => {
-        const entry = await db
-          .prepare(`SELECT user_id, stop FROM time_entries WHERE id = ? AND workspace_id = ?`)
-          .bind(id, workspaceId)
-          .first<{ user_id: string | null; stop: string | null }>();
-        if (!entry) return { ok: false, reason: "No entry with that id." };
-        const role = await getMemberRole(db, workspaceId, userId);
-        if (!canWriteEntry(role, entry, userId)) {
-          return { ok: false, reason: "That entry isn't yours to delete." };
+        if (!projectId) {
+          return { ok: false, reason: "Every entry needs a project. Ask the user which project (list_projects has them), then try again." };
         }
-        const res = await db
-          .prepare(`DELETE FROM time_entries WHERE id = ? AND workspace_id = ?`)
-          .bind(id, workspaceId)
-          .run();
-        const deleted = (res.meta?.changes ?? 0) > 0;
-        if (deleted) await broadcast(env, workspaceId, "entries:changed", null, null, entry.user_id);
-        return { ok: deleted, reason: deleted ? undefined : "No entry with that id." };
+        const result = await bridge("POST", "/api/time_entries", {
+          description: title,
+          projectId,
+          start: new Date(start).toISOString(),
+          stop: new Date(stop).toISOString(),
+        });
+        if (!result.ok) return { ok: false, reason: result.error };
+        const entry = result.data as { id: string; projectName: string | null };
+        const durationHours = ((Date.parse(stop) - Date.parse(start)) / 3_600_000).toFixed(2);
+        return { ok: true, entryId: entry.id, project: entry.projectName, durationHours };
       },
     }),
 
@@ -348,12 +69,10 @@ export function buildAssistantTools(ctx: AssistantToolContext): ToolSet {
       description:
         "Remember a durable fact or preference about the user for future conversations, e.g. 'always mark Acme non-billable' or 'I start my day at 9am'. Use a short stable key.",
       inputSchema: z.object({
-        key: z.string().max(80).describe("short slug identifying the fact, e.g. 'acme-billing'"),
-        content: z.string().max(1000).describe("the fact, phrased so it's useful later"),
+        key: z.string().max(80).describe("Short slug identifying the fact, e.g. 'acme-billing'"),
+        content: z.string().max(1000).describe("The fact, phrased so it's useful later"),
       }),
-      // Persistent memory is replayed into every future prompt, so a poisoned
-      // entry outlives the turn that wrote it — require confirmation before it
-      // saves, so injected text can't silently plant a durable instruction.
+      // Memory is replayed into every future prompt, so injected text must not plant a durable instruction unconfirmed.
       needsApproval: true,
       execute: async ({ key, content }) => {
         const { key: saved } = await rememberFact(db, workspaceId, userId, key, content);
@@ -362,8 +81,8 @@ export function buildAssistantTools(ctx: AssistantToolContext): ToolSet {
     }),
 
     searchMemory: tool({
-      description: "Search previously remembered facts about the user by keyword.",
-      inputSchema: z.object({ query: z.string().max(200) }),
+      description: "Search the facts and preferences the user asked you to remember earlier, by keyword. Use before answering a question those facts might change.",
+      inputSchema: z.object({ query: z.string().max(200).describe("A keyword or short phrase to look for") }),
       execute: async ({ query }) => {
         const memories = await searchMemories(db, workspaceId, userId, query);
         return { memories: memories.map((m) => m.content) };

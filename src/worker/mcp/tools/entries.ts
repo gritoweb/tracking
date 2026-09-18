@@ -1,15 +1,13 @@
-// Time entries, timers, reports and drafts.
+// Time entries, the running timer (read-only), reports and drafts.
 import { z } from "zod";
-import { buildReportWhere, durationExpr, formatEntry, ENTRY_SELECT, broadcast } from "../../db/queries";
+import { buildReportWhere, durationExpr, formatEntry, ENTRY_SELECT } from "../../db/queries";
 import type { TimeEntryJoinRow } from "../../db/rows";
 import { generateDrafts, listDrafts } from "../../lib/drafts";
-import { findActiveProject } from "../../lib/projects";
-import { resolveEntryBillable } from "@shared/billable";
 import { UpdateTimeEntrySchema } from "@shared/schemas";
 import { segment } from "../rest-bridge";
 import {
   DESTRUCTIVE, DateArg, IdArg, MUTATES, READ_ONLY, ROW_LIMIT, TimezoneArg,
-  fromBridge, hours, json, rangeToIso, text, type ToolDeps,
+  fromBridge, hours, json, rangeToIso, refuse, type ToolDeps,
 } from "../shared";
 
 /** `get_time_summary`'s own aggregation, shared by the totals row and each breakdown row. */
@@ -297,149 +295,36 @@ export function registerEntryReads(d: ToolDeps): void {
 }
 
 export function registerEntryWrites(d: ToolDeps): void {
-  const { server, ctx, env, db, workspaceId, userId, bridge } = d;
-
-  server.registerTool(
-    "start_timer",
-    {
-      title: "Start a timer",
-      description:
-        "Start tracking time now. Stops any timer already running, exactly as the app's own timer bar does. Needs a project id from list_projects; ask the person which project when they didn't name one.",
-      inputSchema: {
-        description: z.string().max(2000).describe("What is being worked on"),
-        projectId: z.string().describe("A project id from list_projects — every entry needs one; ask the person rather than choosing for them"),
-      },
-      annotations: MUTATES,
-    },
-    async ({ description, projectId }) => {
-      const now = new Date().toISOString();
-      const id = crypto.randomUUID();
-
-      const project = await findActiveProject(db, workspaceId, projectId);
-      if (!project) return text(`No active project with id ${projectId} in this workspace, or it has no client yet. Call list_projects and ask the person which project to use — don't choose one for them.`);
-      const billable = resolveEntryBillable();
-
-      // Stops only the key holder's running timer; a teammate's keeps going.
-      await db
-        .prepare(
-          `UPDATE time_entries
-           SET stop = ?, duration = CAST((julianday(?) - julianday(start)) * 86400 + 0.5 AS INTEGER),
-               updated_at = ?
-           WHERE workspace_id = ? AND user_id = ? AND stop IS NULL`
-        )
-        .bind(now, now, now, workspaceId, userId)
-        .run();
-
-      await db
-        .prepare(
-          `INSERT INTO time_entries
-             (id, workspace_id, user_id, project_id, task_id, description, start, stop, duration, billable, created_at, updated_at)
-           VALUES (?, ?, ?, ?, NULL, ?, ?, NULL, NULL, ?, ?, ?)`
-        )
-        .bind(id, workspaceId, userId, project.id, description, now, billable ? 1 : 0, now, now)
-        .run();
-
-      await broadcast(env, workspaceId, "timer:start", { id }, null, userId);
-      return text(`Started "${description}" at ${now}.`);
-    }
-  );
-
-  server.registerTool(
-    "stop_timer",
-    {
-      title: "Stop the running timer",
-      description: "Stop whatever timer is currently running and keep the entry.",
-      inputSchema: {},
-      // Calling it twice is a no-op ("No timer is running"), not a second stop.
-      annotations: { ...MUTATES, idempotentHint: true },
-    },
-    async () => {
-      const now = new Date().toISOString();
-      // Only the key holder's own timer: a teammate's is never "whatever is running".
-      const running = await db
-        .prepare(
-          `SELECT id, description, start FROM time_entries
-           WHERE workspace_id = ? AND user_id = ? AND stop IS NULL ORDER BY start DESC LIMIT 1`
-        )
-        .bind(workspaceId, userId)
-        .first<{ id: string; description: string; start: string }>();
-      if (!running) return text("No timer is running.");
-
-      await db
-        .prepare(
-          `UPDATE time_entries
-           SET stop = ?, duration = CAST((julianday(?) - julianday(start)) * 86400 + 0.5 AS INTEGER),
-               updated_at = ?
-           WHERE id = ? AND workspace_id = ? AND user_id = ? AND stop IS NULL`
-        )
-        .bind(now, now, now, running.id, workspaceId, userId)
-        .run();
-
-      await broadcast(env, workspaceId, "timer:stop", { id: running.id }, null, userId);
-      const elapsed = Date.now() - new Date(running.start).getTime();
-      return text(
-        `Stopped "${running.description}" after ${Math.round(elapsed / 60_000)} minutes.`
-      );
-    }
-  );
+  const { server, ctx, env, workspaceId, bridge } = d;
 
   server.registerTool(
     "log_time",
     {
-      title: "Log a completed time entry",
+      title: "Log a time entry",
       description:
-        "Record work that has already happened. Times are ISO 8601 instants — resolve any relative phrasing before calling.",
+        "Record work that has already happened, exactly as the app's manual entry does. Times are ISO 8601 instants — resolve relative phrasing against the person's local time first. Needs a project from list_projects; ask which one rather than choosing. Returns the new entry, whose id update_time_entry and delete_time_entry take. Not idempotent: a second call logs a second entry.",
       inputSchema: {
         description: z.string().max(2000).describe("What the work was"),
-        start: z.string().describe("ISO 8601 start instant, e.g. 2026-08-24T14:00:00Z"),
+        start: z.string().describe("ISO 8601 start instant with offset, e.g. 2026-09-18T14:00:00-03:00"),
         stop: z.string().describe("ISO 8601 stop instant, after start"),
         projectId: z.string().describe("A project id from list_projects — every entry needs one; ask the person rather than choosing for them"),
-        billable: z
-          .boolean()
-          .optional()
-          .describe("Omit to log the entry as billable, the default for every entry"),
+        taskId: z.string().optional().describe("Task id from list_tasks, to count the time against a task"),
+        tags: z.array(z.string().max(100)).max(50).optional(),
+        billable: z.boolean().optional().describe("Omit to log the entry as billable, the default for every entry"),
       },
-      // Deliberately NOT idempotent: a second identical call logs a second
-      // entry, which is sometimes exactly what the user means.
       annotations: MUTATES,
     },
-    async ({ description, start, stop, projectId, billable }) => {
+    async ({ start, stop, ...rest }) => {
       const startMs = new Date(start).getTime();
       const stopMs = new Date(stop).getTime();
-      if (Number.isNaN(startMs) || Number.isNaN(stopMs)) {
-        return text("start and stop must be ISO 8601 timestamps.");
-      }
-      if (stopMs <= startMs) return text("stop must be after start.");
-
-      const project = await findActiveProject(db, workspaceId, projectId);
-      if (!project) return text(`No active project with id ${projectId} in this workspace, or it has no client yet. Call list_projects and ask the person which project to use — don't choose one for them.`);
-      const resolvedBillable = resolveEntryBillable(billable);
-
-      const now = new Date().toISOString();
-      await db
-        .prepare(
-          `INSERT INTO time_entries
-             (id, workspace_id, user_id, project_id, task_id, description, start, stop, duration, billable, created_at, updated_at)
-           VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?)`
-        )
-        .bind(
-          crypto.randomUUID(),
-          workspaceId,
-          userId,
-          project.id,
-          description,
-          new Date(startMs).toISOString(),
-          new Date(stopMs).toISOString(),
-          Math.round((stopMs - startMs) / 1000),
-          resolvedBillable ? 1 : 0,
-          now,
-          now
-        )
-        .run();
-
-      await broadcast(env, workspaceId, "entries:changed", null, null, userId);
-      return text(
-        `Logged ${Math.round((stopMs - startMs) / 60_000)} minutes: "${description}".`
+      if (Number.isNaN(startMs) || Number.isNaN(stopMs)) return refuse("start and stop must be ISO 8601 timestamps.");
+      if (stopMs <= startMs) return refuse("stop must be after start.");
+      return fromBridge(
+        await bridge("POST", "/api/time_entries", {
+          ...rest,
+          start: new Date(startMs).toISOString(),
+          stop: new Date(stopMs).toISOString(),
+        })
       );
     }
   );
