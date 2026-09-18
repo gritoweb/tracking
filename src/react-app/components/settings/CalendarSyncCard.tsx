@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { SettingsCardHeader } from "./SettingsCardHeader";
@@ -46,46 +45,40 @@ export function CalendarSyncCard() {
     setParams(params, { replace: true });
   }, [params, setParams]);
 
+  // A server with no calendar provider configured has nothing to offer here: no card, rather than a card saying so.
   const anyConfigured = providers.some((p) => p.configured);
+  if (isLoading || !anyConfigured) return null;
 
   return (
     <Card>
       <SettingsCardHeader icon={CalendarDays} title="Calendar sync" />
       <CardContent>
-        {isLoading ? (
-          <Skeleton className="h-4 w-64" />
-        ) : !anyConfigured ? (
+        <div className="space-y-5">
           <p className="text-sm leading-normal text-muted-foreground">
-            Calendar sync isn&apos;t configured on this server yet.
+            Your events show up on the <span className="font-medium">Calendar</span> as
+            dashed blocks — click one to track it. Read-only: we never change your
+            calendar. Connect more than one if your work and personal calendars are
+            separate.
           </p>
-        ) : (
-          <div className="space-y-5">
-            <p className="text-sm leading-normal text-muted-foreground">
-              Your events show up on the <span className="font-medium">Calendar</span> as
-              dashed blocks — click one to track it. Read-only: we never change your
-              calendar. Connect more than one if your work and personal calendars are
-              separate.
-            </p>
-            {providers
-              .filter((p) => p.configured)
-              .map((provider, i) => (
-                <div key={provider.provider} className="space-y-4">
-                  {i > 0 && <Separator />}
-                  <ProviderRow
-                    provider={provider}
-                    onDisconnect={() => setDisconnectTarget(provider)}
-                    disconnecting={
-                      disconnect.isPending && disconnect.variables === provider.provider
-                    }
-                    onAutoTrack={(enabled) =>
-                      setAutoTrack.mutate({ provider: provider.provider, enabled })
-                    }
-                    autoTrackPending={setAutoTrack.isPending}
-                  />
-                </div>
-              ))}
-          </div>
-        )}
+          {providers
+            .filter((p) => p.configured)
+            .map((provider, i) => (
+              <div key={provider.provider} className="space-y-4">
+                {i > 0 && <Separator />}
+                <ProviderRow
+                  provider={provider}
+                  onDisconnect={() => setDisconnectTarget(provider)}
+                  disconnecting={
+                    disconnect.isPending && disconnect.variables === provider.provider
+                  }
+                  onAutoTrack={(enabled) =>
+                    setAutoTrack.mutate({ provider: provider.provider, enabled })
+                  }
+                  autoTrackPending={setAutoTrack.isPending}
+                />
+              </div>
+            ))}
+        </div>
       </CardContent>
 
       <ConfirmDialog

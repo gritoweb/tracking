@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-18 (17)
+### Changed
+- **Settings hides the Calendar sync card when no calendar provider is configured** instead of showing a card that says so. The code stays: the card appears again as soon as the server configures Google or Microsoft. It also stays hidden while the status loads, so it no longer flashes and disappears.
+
+Verified in a real browser: with the provider status forced to `configured: false` the card and the "isn't configured" text are gone and the rest of the tab is intact; with the local server's real status (both configured) the card is shown. `tsc -b` 0, eslint 0.
+
 ## 2026-09-18 (16)
 ### Fixed
 - **Dark mode: board columns are a step lighter than their cards.** A column was its swatch at 6–10% over the page background, which for Backlog's low-chroma slate landed at the same lightness as the card on it (measured ~0.222 vs 0.228 in oklab), so the card vanished. In dark the column now mixes the swatch into `--muted` (`.dark .tt-swatch-column`); light mode is unchanged. Every column keeps its hue.
