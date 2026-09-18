@@ -1,4 +1,5 @@
 import { taskPath, type TaskTab } from "@shared/task-links";
+import { imageProblem } from "@/lib/taskCommentAttachments";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -31,8 +32,6 @@ import type { WorkspaceMember } from "@/hooks/useWorkspaceRole";
 import type { Task, TaskAttachment } from "@shared/schemas";
 import type { JSONContent } from "@tiptap/react";
 
-const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
-const ACCEPTED_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
 /** Past this, the description collapses behind a "Show more" — matching ClickUp's "Objetivo". */
 const DESCRIPTION_COLLAPSED_HEIGHT = 180;
 
@@ -182,13 +181,10 @@ export function TaskSheet({ open, onClose, task, tab, onTabChange, onRequestDele
   // The only way an image reaches this task: pasted/dropped into the description or a
   // comment. The "Attachments" section below is a read-only gallery of what lands here.
   const uploadImage = async (file: File): Promise<{ url: string; id: string }> => {
-    if (!ACCEPTED_TYPES.includes(file.type)) {
-      toast.error("Only PNG, JPEG, WebP and GIF images are accepted");
-      throw new Error("unsupported type");
-    }
-    if (file.size > MAX_ATTACHMENT_BYTES) {
-      toast.error("Image is larger than 10 MB");
-      throw new Error("too large");
+    const problem = imageProblem(file);
+    if (problem) {
+      toast.error(problem);
+      throw new Error(problem);
     }
     const attachment = await uploadAttachment.mutateAsync({ taskId: task.id, file });
     return { url: attachment.url, id: attachment.id };
@@ -268,6 +264,7 @@ export function TaskSheet({ open, onClose, task, tab, onTabChange, onRequestDele
                 loading={attachmentsLoading}
                 onOpenLightbox={setLightbox}
                 onDelete={(id) => deleteAttachment.mutate({ taskId: task.id, id })}
+                onUpload={uploadImage}
               />
             </TabsContent>
 

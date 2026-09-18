@@ -8,7 +8,7 @@ import { AttachmentPreview } from "./TaskCommentAttachment";
 import { MentionInput } from "./MentionInput";
 import { MentionText } from "./MentionText";
 import { useUploadTaskAttachment } from "@/hooks/useTasks";
-import { ACCEPTED_TYPES, MAX_ATTACHMENT_BYTES, imageFile } from "@/lib/taskCommentAttachments";
+import { imageFile, imageProblem } from "@/lib/taskCommentAttachments";
 import { decodeMentions, encodeMentions, taggedPeople, type MentionPerson } from "@shared/mentions";
 import type { WorkspaceMember } from "@/hooks/useWorkspaceRole";
 import type { TaskComment } from "@shared/schemas";
@@ -40,8 +40,8 @@ export function CommentRow({
 
   const attach = async (file: File | null) => {
     if (!file) return;
-    if (!ACCEPTED_TYPES.includes(file.type)) return toast.error("Only PNG, JPEG, WebP and GIF images are accepted");
-    if (file.size > MAX_ATTACHMENT_BYTES) return toast.error("Image is larger than 10 MB");
+    const problem = imageProblem(file);
+    if (problem) return toast.error(problem);
     const uploaded = await uploadAttachment.mutateAsync({ taskId, file });
     setAttachment({ id: uploaded.id, url: uploaded.url });
   };

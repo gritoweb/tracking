@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-18 (33)
+### Added
+- **D7: images can be attached from the task panel.** The Attachments section had no way in (images only arrived by pasting or dropping into the description or a comment, and the gallery was read-only). It now has an **Attach image** button (several files at once), accepts files dropped on the whole area, shows a spinner and disables the button while uploading, and says how to add images when there are none. One rule for every way an image gets in: `imageProblem` (png, jpeg, webp or gif, up to 10 MB) replaces three copies of the same check in the sheet, the comment composer and the comment editor.
+
+Verified in a real browser against the local R2: choosing 2 images stored 2, choosing a `.txt` stored none and toasted "Only PNG, JPEG, WebP and GIF images are accepted", dropping a file stored a third; deleting the task removed its attachments. Component tests (button, several files, wrong type, over 10 MB next to a valid one, drop, busy state, a failed upload not stopping the next) and unit tests for `imageProblem`. `tsc -b` 0, lint 0, vitest 578/578.
+
 ## 2026-09-18 (32)
 ### Added
 - **The board card shows how many comments a task has (D8).** A comment chip (speech bubble and the number) sits next to the subtask count on every card that has at least one comment, with a tooltip ("3 comments"). The count comes from the task list query itself (`comment_count`, one indexed subquery per task; `Task.commentCount`), so it costs no extra request, and it updates live: posting or deleting a comment, or another person's comment arriving over the socket, refetches the task list.
