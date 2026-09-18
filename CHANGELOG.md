@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-18 (26)
+### Fixed
+- **The task title no longer scrolls.** Its box was 1px shorter than its text (the fixed 50px line height leaves the content at 51px) and it had `overflow-y: auto`, so even a one-line title could scroll (a scrollbar on Linux/Chrome, a 1px shift from the keyboard). The `title` variant is now `overflow-hidden` with `pb-px` so the box is exactly as tall as the text and always grows to fit; where the browser lacks `field-sizing: content`, `Textarea` measures itself instead.
+
+Verified in a real browser with one-, two- and five-line titles: `overflow-y` hidden, `clientHeight` = `scrollHeight` (51/51, 101/101, 251/251) and `scrollTop` 0 after Ctrl+End and a mouse wheel. Component test for the variant. `tsc -b` 0, lint 0, vitest 560/560.
+
 ## 2026-09-18 (25)
 ### Fixed
 - **"Add a subtask": the `+` is a real button and the assign button is always visible.** The `+` at the left of the quick-add row was decoration; it now adds what is typed (like Enter) or, with nothing typed, puts the cursor in the field. The dashed assign button in that row was hover-only in both themes because `AssignButton` carried `tt-reveal`; it has a `reveal` variant now (`hover` stays the default for dense rows and board cards, `always` for a row whose job is to fill it) and the quick-add uses `always`, at full muted-foreground contrast.

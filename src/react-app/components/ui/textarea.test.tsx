@@ -20,7 +20,7 @@ describe("Textarea", () => {
   it("title variant is bare and sits at the display step on every breakpoint", () => {
     render(<Textarea aria-label="Name" variant="title" />)
     const el = screen.getByRole("textbox")
-    expect(el).toHaveClass("text-display", "md:text-display", "border-0", "bg-transparent")
+    expect(el).toHaveClass("text-display", "md:text-display", "border-0", "bg-transparent", "overflow-hidden", "pb-px")
     expect(el).not.toHaveClass("text-base")
     expect(el).not.toHaveClass("md:text-sm")
   })
@@ -28,5 +28,10 @@ describe("Textarea", () => {
   it("bare variant drops the box: no border, no fill, no ring", () => {
     render(<Textarea aria-label="Comment" variant="bare" />)
     expect(screen.getByRole("textbox")).toHaveClass("border-0", "bg-transparent", "rounded-none", "focus-visible:ring-0")
+  })
+
+  it("bare variant starts three lines tall, grows by itself and neither scrolls nor offers a resize handle", () => {
+    render(<Textarea aria-label="Comment" variant="bare" />)
+    expect(screen.getByRole("textbox")).toHaveClass("min-h-18", "resize-none", "overflow-hidden")
   })
 })

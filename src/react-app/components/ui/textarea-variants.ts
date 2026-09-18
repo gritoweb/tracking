@@ -7,11 +7,11 @@ export const textareaVariants = cva(
     variants: {
       variant: {
         default: "",
-        // Sits on a surface that is already the frame (a composer under a divider): no box of its own.
-        bare: "min-h-0 rounded-none border-0 bg-transparent px-0 py-0 shadow-none focus-visible:border-0 focus-visible:ring-0 dark:bg-transparent",
-        // A panel's own name (DESIGN.md §3 Display): a bare field that wraps, at the display step on every breakpoint.
+        // Sits on a surface that is already the frame (a composer in the conversation): no box, about three lines tall to start, grows with its text and never scrolls or shows a resize handle.
+        bare: "min-h-18 resize-none overflow-hidden rounded-none border-0 bg-transparent px-0 pb-px pt-0 shadow-none focus-visible:border-0 focus-visible:ring-0 dark:bg-transparent",
+        // A panel's own name (DESIGN.md §3 Display): a bare field that wraps and grows to fit, never scrolls, at the display step on every breakpoint. pb-px: the fixed line height leaves the text a pixel taller than the box, which is enough to make it scroll.
         title:
-          "min-h-0 resize-none rounded-none border-0 bg-transparent px-0 py-0 text-display font-semibold shadow-none focus-visible:border-0 focus-visible:ring-0 md:text-display dark:bg-transparent",
+          "min-h-0 resize-none overflow-hidden rounded-none border-0 bg-transparent px-0 pb-px pt-0 text-display font-semibold shadow-none focus-visible:border-0 focus-visible:ring-0 md:text-display dark:bg-transparent",
       },
     },
     defaultVariants: { variant: "default" },
