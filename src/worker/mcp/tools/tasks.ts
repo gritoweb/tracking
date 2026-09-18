@@ -234,7 +234,7 @@ export function registerTaskWrites(d: ToolDeps): void {
     {
       title: "Comment on a task",
       description:
-        "Add a comment to a task as the key's owner. `mentionedUserIds` (from list_members) notifies those people. Pass an `attachmentId` from upload_task_attachment to show an image with it.",
+        "Add a comment to a task as the key's owner. To tag a person write @[Name](user:ID) in the body, with the id from list_members: the app shows it as a clickable @Name and notifies them (`mentionedUserIds` still works and notifies without a tag in the text). A comment read back carries the same @[Name](user:ID) form. Pass an `attachmentId` from upload_task_attachment to show an image with it.",
       inputSchema: { taskId: IdArg("task"), ...CreateTaskCommentSchema.shape },
       annotations: MUTATES,
     },
