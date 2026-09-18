@@ -1,5 +1,46 @@
 # Changelog
 
+## 2026-09-17 (11)
+### Changed
+- **The front-end now gets its types from the worker's routes.** `src/react-app/lib/http-clients.ts`
+  builds one `hc` client per router (never a single `hc<AppType>`, which makes `tsc` and the editor
+  crawl at this size) and hands it the existing `appFetch`, so the offline queue, the client-id header
+  and `ApiError` are untouched. Renaming a field in a route now fails the **front-end** build —
+  verified by renaming `trackedSeconds` in `routes/tasks.ts` and watching `tsc -b tsconfig.app.json`
+  reject it. The coupling costs about 2.7s on the app's typecheck (10.5s → 13.2s) and is the price of
+  the compiler guarding that boundary. WebSockets, `/agents/*`, `/mcp` and the multipart upload stay
+  hand-written, each with its reason. The migration also surfaced real drift: entry create/update
+  returned `TimeEntry | null` where the handler already guaranteed the row.
+- **Every D1 row has a type.** `src/worker/db/rows.ts` declares one interface per table; the
+  `Record<string, unknown>` row type went from 65 occurrences to one (a Dynamics request body, not a
+  row), the 14 non-null assertions to zero and the 225 field-by-field casts to zero. A JSON column now
+  goes through `parseJsonColumn`, which logs when the stored JSON is invalid instead of silently
+  returning an empty default.
+- **`copy-week` moved to the server.** It used to be N sequential writes from the browser with a
+  manual rollback loop, so closing the tab halfway left half a week behind; it is one `DB.batch` now,
+  and Undo is a single bulk delete.
+### Fixed
+- **Failures stopped being silent.** The 45 `onError` handlers that threw the server's message away
+  now go through `toastApiError`; six worker fallbacks (the calendar read, four AI paths and the OAuth
+  callback) log with context; and a new `POST /api/client-errors` collects browser crashes from the
+  error boundaries and from `unhandledrejection`. The duplicated "resolve or infer the project" block
+  became one function.
+- **The editor no longer loses a pasted image.** The insert position is mapped through a ProseMirror
+  plugin instead of being captured before the upload, so typing during the upload cannot misplace it;
+  if the target text is deleted meanwhile, the orphaned attachment is removed from R2 and the user is
+  told, rather than the image silently vanishing.
+- **The offline queue stopped being a trap.** Only time-entry writes queue (comments, statuses and
+  attachments were never replay-safe), a 4xx leaves the queue and is reported, a 5xx retries up to five
+  times, and only a network `TypeError` counts as "offline". An `Idempotency-Key` was deliberately not
+  added: honouring one needs durable dedupe the worker does not have yet, and sending a header nobody
+  checks would promise a guarantee that does not exist.
+- **Stopping a timer from a task card works every time.** `offerTaskDone` read the task straight from
+  the query cache, so under concurrent invalidation it returned early and the "Mark done" prompt never
+  appeared — it fetches now. The suite went from failing this in roughly half the runs to 133/133.
+
+Verified: `npx tsc -b` exit 0, `pnpm lint` exit 0, `pnpm test` 356 passed, `pnpm build` exit 0,
+`npx playwright test` 133 passed in 4.3 min, exit 0.
+
 ## 2026-09-17 (10)
 ### Fixed
 - **Deleting a task only cleaned up its first subtask.** `task_id IN (?, (SELECT …))` is a scalar
