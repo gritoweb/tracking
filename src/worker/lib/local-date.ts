@@ -32,3 +32,11 @@ export function localDateInZone(iso: string, timeZone?: string | null): string {
     return iso.slice(0, 10);
   }
 }
+
+/** getTimezoneOffset minutes (west of UTC is positive) as an ISO suffix: 180 -> "-03:00". */
+export function isoOffset(offsetMinutes: number): string {
+  const east = -offsetMinutes;
+  const abs = Math.abs(east);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${east < 0 ? "-" : "+"}${pad(Math.floor(abs / 60))}:${pad(abs % 60)}`;
+}

@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-18 (11)
+### Fixed
+- **The Assistant logs the time the person asked for.** "Start at 10" was saved as 07:00: the chat prompt told the model to send UTC and it sent `10:00Z`, which the app shows as 07:00 in UTC-3. The prompt now gives the person's offset (`isoOffset`) and asks for local time *with* it (`2026-09-18T10:00:00-03:00`), which the tool already accepted. Also: "say X on that task" means a comment (glm had overwritten a task's description), and optional fields the person didn't mention (`billable`) are no longer invented.
+
+Verified through the app's chat socket: "2 horas no projeto API Development, comecei as 10" produced `log_time` with `start 2026-09-18T10:00:00-03:00`, `stop 2026-09-18T12:00:00-03:00`; unit test for `isoOffset`.
+
 ## 2026-09-18 (10)
 ### Fixed
 - **Comments and notifications no longer read as "in about 3 hours".** SQLite's `datetime('now')` is UTC with no zone marker, and the browser parsed the bare string as local time, so anyone west of UTC saw comment and notification times in the future. `lib/sqlite-time.ts` marks them UTC (`...Z`) at the API boundary for task comments (`createdAt`, `editedAt`) and notifications. Other `created_at` fields in the API have the same shape but are not shown as a time on any screen, so they are untouched.
