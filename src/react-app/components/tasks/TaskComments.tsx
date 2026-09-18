@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { AttachmentPreview } from "./TaskCommentAttachment";
 import { CommentRow } from "./TaskCommentRow";
@@ -84,37 +83,34 @@ export function TaskComments({ taskId, members }: { taskId: string; members: Wor
 
   return (
     <div className="space-y-2">
-      {/* One frame for the conversation: the messages, then, set apart by space and a line, the field. */}
-      <div className="rounded-md border">
+      {/* Two things, kept apart: the conversation in its frame, and below it, with a gap, the field in a frame of its own. */}
+      <div className="space-y-4">
         {feed.length > 0 && (
-          <>
-            <div className="divide-y">
-              {feed.map((item) =>
-              "comment" in item ? (
-                <CommentRow
-                  key={item.comment.id}
-                  comment={item.comment}
-                  taskId={taskId}
-                  members={members}
-                  isAuthor={item.comment.userId === user?.id && !item.comment.id.startsWith(PENDING_COMMENT_PREFIX)}
-                  onDelete={() => setPendingDelete(item.comment)}
-                  onSave={(nextBody, nextAttachmentId) =>
-                    updateComment.mutate({
-                      id: item.comment.id,
-                      data: { body: nextBody, attachmentId: nextAttachmentId },
-                    })
-                  }
-                />
-              ) : (
-                <TaskActivityRow key={item.entry.id} activity={item.entry} />
-              )
-              )}
-            </div>
-            <Separator className="my-3" />
-          </>
+          <div className="divide-y rounded-md border">
+            {feed.map((item) =>
+            "comment" in item ? (
+              <CommentRow
+                key={item.comment.id}
+                comment={item.comment}
+                taskId={taskId}
+                members={members}
+                isAuthor={item.comment.userId === user?.id && !item.comment.id.startsWith(PENDING_COMMENT_PREFIX)}
+                onDelete={() => setPendingDelete(item.comment)}
+                onSave={(nextBody, nextAttachmentId) =>
+                  updateComment.mutate({
+                    id: item.comment.id,
+                    data: { body: nextBody, attachmentId: nextAttachmentId },
+                  })
+                }
+              />
+            ) : (
+              <TaskActivityRow key={item.entry.id} activity={item.entry} />
+            )
+            )}
+          </div>
         )}
 
-        <div className="space-y-2 px-4 pb-3 pt-1">
+        <div className="space-y-2 rounded-md border px-4 py-3">
           <MentionInput
             variant="bare"
             value={body}
