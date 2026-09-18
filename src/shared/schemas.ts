@@ -868,6 +868,14 @@ export const TaskCommentSchema = z.object({
   editedAt: z.string().nullable(),
 });
 
+export const TASK_COMMENTS_PAGE_SIZE = 100;
+
+/** The newest `limit` comments; `before` (a comment id) pages back to the ones older than it. */
+export const TaskCommentsQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(200).default(TASK_COMMENTS_PAGE_SIZE),
+  before: z.string().min(1).optional(),
+});
+
 export const CreateTaskCommentSchema = z.object({
   body: z.string().min(1).max(4000),
   mentionedUserIds: z.array(z.string()).max(50).optional(),

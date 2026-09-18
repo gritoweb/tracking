@@ -70,6 +70,15 @@ export function canDeleteAttachment(
   return uploaderId !== null && uploaderId === requestingUserId;
 }
 
+/** Same author-or-manager rule as `canDeleteAttachment`, for a comment's author. */
+export function canDeleteComment(
+  role: WorkspaceRole | null,
+  authorId: string | null,
+  requestingUserId: string
+): boolean {
+  return canDeleteAttachment(role, authorId, requestingUserId);
+}
+
 export async function isManager(db: D1Database, workspaceId: string, userId: string): Promise<boolean> {
   return canManageWorkspace(await getMemberRole(db, workspaceId, userId));
 }

@@ -18,14 +18,19 @@ import {
 import { useUploadTaskAttachment } from "@/hooks/useTasks";
 import { imageFile, imageProblem } from "@/lib/taskCommentAttachments";
 import { useAuth } from "@/hooks/useAuth";
+import { useWorkspaceRole } from "@/hooks/useWorkspaceRole";
 import { encodeMentions, type MentionPerson } from "@shared/mentions";
 import type { WorkspaceMember } from "@/hooks/useWorkspaceRole";
-import type { TaskComment } from "@shared/schemas";
+import { TASK_COMMENTS_PAGE_SIZE, type TaskComment } from "@shared/schemas";
 
 /** Flat, single-level comments on one task — no reply/thread, same as a WhatsApp group chat. */
 export function TaskComments({ taskId, members }: { taskId: string; members: WorkspaceMember[] }) {
   const { user } = useAuth();
-  const { data: comments = [] } = useTaskComments(taskId);
+  const { canManage } = useWorkspaceRole();
+  // A full page means there may be older comments; each click asks for one more page.
+  const [limit, setLimit] = useState(TASK_COMMENTS_PAGE_SIZE);
+  const { data: comments = [], isFetching } = useTaskComments(taskId, limit);
+  const mayHaveOlder = comments.length >= limit;
   const { data: activity = [] } = useTaskActivity(taskId);
   // One timeline: comments and changes, oldest first. ISO strings sort by time.
   const feed = useMemo(
@@ -87,6 +92,18 @@ export function TaskComments({ taskId, members }: { taskId: string; members: Wor
       <div className="space-y-4">
         {feed.length > 0 && (
           <div className="divide-y rounded-md border">
+            {mayHaveOlder && (
+              <div className="flex justify-center p-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={isFetching}
+                  onClick={() => setLimit((current) => current + TASK_COMMENTS_PAGE_SIZE)}
+                >
+                  Load earlier comments
+                </Button>
+              </div>
+            )}
             {feed.map((item) =>
             "comment" in item ? (
               <CommentRow
@@ -95,6 +112,9 @@ export function TaskComments({ taskId, members }: { taskId: string; members: Wor
                 taskId={taskId}
                 members={members}
                 isAuthor={item.comment.userId === user?.id && !item.comment.id.startsWith(PENDING_COMMENT_PREFIX)}
+                canDelete={
+                  !item.comment.id.startsWith(PENDING_COMMENT_PREFIX) && (canManage || item.comment.userId === user?.id)
+                }
                 onDelete={() => setPendingDelete(item.comment)}
                 onSave={(nextBody, nextAttachmentId) =>
                   updateComment.mutate({

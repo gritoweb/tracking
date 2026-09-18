@@ -310,7 +310,8 @@ export const api = {
     activity: (taskId: string) => json(tasksClient[":id"].activity.$get({ param: { id: taskId } })),
     /** Flat, single-level — no reply/thread. */
     comments: {
-      list: (taskId: string) => json(tasksClient[":id"].comments.$get({ param: { id: taskId } })),
+      list: (taskId: string, limit?: number) =>
+        json(tasksClient[":id"].comments.$get({ param: { id: taskId }, query: limit ? { limit: String(limit) } : {} })),
       create: (taskId: string, body: CreateTaskComment) =>
         json(tasksClient[":id"].comments.$post({ param: { id: taskId }, json: body })),
       update: (taskId: string, commentId: string, body: UpdateTaskComment) =>

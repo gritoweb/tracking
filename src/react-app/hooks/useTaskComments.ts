@@ -2,18 +2,18 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api } from "@/lib/api-client";
 import { useAuth } from "@/hooks/useAuth";
-import type { CreateTaskComment, TaskComment, UpdateTaskComment } from "@shared/schemas";
+import { TASK_COMMENTS_PAGE_SIZE, type CreateTaskComment, type TaskComment, type UpdateTaskComment } from "@shared/schemas";
 
 export const PENDING_COMMENT_PREFIX = "pending-";
 
 /** What the composer sends: the API payload plus the image URL the optimistic row needs to show it. */
 export type NewTaskComment = CreateTaskComment & { attachmentUrl?: string | null };
 
-/** Flat, single-level comments on one task — no reply/thread. */
-export function useTaskComments(taskId: string | null) {
+/** Flat, single-level comments on one task — no reply/thread. Fetches the newest `limit`; the key's prefix is shared by every limit. */
+export function useTaskComments(taskId: string | null, limit = TASK_COMMENTS_PAGE_SIZE) {
   return useQuery({
-    queryKey: ["task-comments", taskId],
-    queryFn: () => api.tasks.comments.list(taskId as string),
+    queryKey: ["task-comments", taskId, limit],
+    queryFn: () => api.tasks.comments.list(taskId as string, limit),
     enabled: !!taskId,
   });
 }
@@ -46,7 +46,7 @@ export function useCreateTaskComment(taskId: string) {
     // The comment shows up the instant it is sent; the server's row replaces it on settle.
     onMutate: async (data) => {
       await queryClient.cancelQueries({ queryKey: key });
-      const previous = queryClient.getQueryData<TaskComment[]>(key);
+      const previous = queryClient.getQueriesData<TaskComment[]>({ queryKey: key });
       const pending: TaskComment = {
         id: `${PENDING_COMMENT_PREFIX}${crypto.randomUUID()}`,
         taskId,
@@ -61,11 +61,12 @@ export function useCreateTaskComment(taskId: string) {
         createdAt: new Date().toISOString(),
         editedAt: null,
       };
-      queryClient.setQueryData<TaskComment[]>(key, (old = []) => [...old, pending]);
+      queryClient.setQueriesData<TaskComment[]>({ queryKey: key }, (old = []) => [...old, pending]);
       return { previous };
     },
     // The composer owns the message (it has the text to put back), so only the cache rolls back here.
-    onError: (_error: Error, _data, context) => queryClient.setQueryData(key, context?.previous),
+    onError: (_error: Error, _data, context) =>
+      context?.previous.forEach(([queryKey, data]) => queryClient.setQueryData(queryKey, data)),
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: key });
       queryClient.invalidateQueries({ queryKey: ["tasks"] });

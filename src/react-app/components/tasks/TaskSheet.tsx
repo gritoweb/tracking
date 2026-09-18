@@ -197,7 +197,7 @@ export function TaskSheet({ open, onClose, task, tab, onTabChange, onRequestDele
               name={name}
               onNameChange={setName}
               onSaveName={saveName}
-              commentsCount={comments.length}
+              commentsCount={Math.max(task.commentCount, comments.length)}
               members={members}
               onDeleteTask={() => {
                 onRequestDelete(task);

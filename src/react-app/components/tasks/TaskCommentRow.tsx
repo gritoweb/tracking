@@ -19,6 +19,7 @@ export function CommentRow({
   taskId,
   members,
   isAuthor,
+  canDelete,
   onDelete,
   onSave,
 }: {
@@ -26,6 +27,7 @@ export function CommentRow({
   taskId: string;
   members: WorkspaceMember[];
   isAuthor: boolean;
+  canDelete: boolean;
   onDelete: () => void;
   onSave: (body: string, attachmentId: string | null) => void;
 }) {
@@ -105,24 +107,28 @@ export function CommentRow({
         )}
         <MentionText body={comment.body} members={members} />
       </div>
-      {isAuthor && (
+      {(isAuthor || canDelete) && (
         <div className="tt-reveal flex shrink-0 items-start gap-0.5">
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            aria-label="Edit comment"
-            onClick={() => {
-              // Members may have loaded since this row mounted, so decode when editing starts.
-              setBody(decodeMentions(comment.body, members));
-              setPicked(taggedPeople(comment.body, members));
-              setEditing(true);
-            }}
-          >
-            <Pencil className="h-3 w-3" />
-          </Button>
-          <Button variant="ghost" size="icon-xs" aria-label="Delete comment" onClick={onDelete}>
-            <Trash2 className="h-3 w-3" />
-          </Button>
+          {isAuthor && (
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              aria-label="Edit comment"
+              onClick={() => {
+                // Members may have loaded since this row mounted, so decode when editing starts.
+                setBody(decodeMentions(comment.body, members));
+                setPicked(taggedPeople(comment.body, members));
+                setEditing(true);
+              }}
+            >
+              <Pencil className="h-3 w-3" />
+            </Button>
+          )}
+          {canDelete && (
+            <Button variant="ghost" size="icon-xs" aria-label="Delete comment" onClick={onDelete}>
+              <Trash2 className="h-3 w-3" />
+            </Button>
+          )}
         </div>
       )}
     </div>

@@ -1,9 +1,10 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { canDeleteTask, currentMemberIds, entryScopeUserId, getMemberRole } from "../lib/permissions";
+import { canDeleteComment, canDeleteTask, currentMemberIds, entryScopeUserId, getMemberRole } from "../lib/permissions";
 import { zValidator } from "@hono/zod-validator";
 import {
   CreateTaskCommentSchema,
+  TaskCommentsQuerySchema,
   CreateTaskSchema,
   MoveTaskSchema,
   TaskAssigneeSchema,
@@ -810,18 +811,22 @@ export const tasksRouter = new Hono<{
     return c.json(formatAttachment(row), 201);
   })
   // ─── Comments (D8) — flat, one level, no reply/thread; @mention notifies, nothing else ────
-  .get("/:id/comments", async (c) => {
+  .get("/:id/comments", zValidator("query", TaskCommentsQuerySchema), async (c) => {
     const workspaceId = c.get("workspaceId");
     const taskId = c.req.param("id");
+    const { limit, before } = c.req.valid("query");
     const { results } = await c.env.DB.prepare(
       `SELECT tc.*, u.name AS user_name, u.email AS user_email, u.image AS user_image,
               ta.filename AS attachment_filename
          FROM task_comments tc
          JOIN "user" u ON u.id = tc.user_id
          LEFT JOIN task_attachments ta ON ta.id = tc.attachment_id
-        WHERE tc.task_id = ? AND tc.workspace_id = ? ORDER BY tc.created_at ASC`
-    ).bind(taskId, workspaceId).all<TaskCommentRow>();
-    return c.json(results.map(formatComment), 200);
+        WHERE tc.task_id = ? AND tc.workspace_id = ?
+          ${before ? "AND (tc.created_at, tc.id) < (SELECT created_at, id FROM task_comments WHERE id = ? AND workspace_id = ?)" : ""}
+        ORDER BY tc.created_at DESC, tc.id DESC LIMIT ?`
+    ).bind(taskId, workspaceId, ...(before ? [before, workspaceId] : []), limit).all<TaskCommentRow>();
+    // Newest page first from SQL, oldest first for the client.
+    return c.json(results.reverse().map(formatComment), 200);
   })
   .get("/:id/activity", async (c) => {
     const workspaceId = c.get("workspaceId");
@@ -927,7 +932,10 @@ export const tasksRouter = new Hono<{
       `SELECT user_id FROM task_comments WHERE id = ? AND workspace_id = ?`
     ).bind(commentId, workspaceId).first<{ user_id: string }>();
     if (!existing) return c.json({ error: "Not found" }, 404);
-    if (existing.user_id !== userId) return c.json({ error: "Only the author can delete this comment" }, 403);
+    const role = await getMemberRole(c.env.DB, workspaceId, userId);
+    if (!canDeleteComment(role, existing.user_id, userId)) {
+      return c.json({ error: "Only the author, or a workspace owner or admin, can delete this comment" }, 403);
+    }
 
     await c.env.DB.prepare(`DELETE FROM task_comments WHERE id = ?`).bind(commentId).run();
     c.executionCtx.waitUntil(
