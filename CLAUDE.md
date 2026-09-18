@@ -24,11 +24,11 @@ No unit test framework is configured. Playwright e2e tests live in `e2e/` and dr
 
 ### CI / merging
 
-`.github/workflows/e2e.yml` runs the Playwright suite on every push to `main` and every PR (applies local D1 migrations, then `pnpm test:e2e`). This `e2e` check is a **required branch-protection check** — `gh pr merge` is blocked until it reports `pass`; poll `gh pr checks <PR#>` rather than assuming an immediate merge succeeds.
+`.github/workflows/ci.yml` runs on every push to `master`/`refactor` and every PR: install → `tsc -b` → lint → build → vitest with coverage. **Playwright is not in CI** (removed 2026-09-18 at Luis's request: it stalled and cost minutes per push) — run `pnpm test:e2e` locally when a change touches a flow it covers. If GitHub branch protection still lists an `e2e` required check, remove it in the repo settings, or merges wait for a check that no longer exists.
 
 ### Deploy sequence
 
-1. Land the PR (CI green, then merge + `git pull --ff-only` on `main`).
+1. Land the change on `master` (CI green).
 2. If the change added a file in `migrations/`, apply it to the **remote** D1 database first: `npx wrangler d1 migrations apply time-tracker --remote` (the `db`/`migrate` skills default to local).
 3. `pnpm check` (dry-run validation), then `pnpm run deploy`.
 4. Smoke-check: `curl -s -o /dev/null -w "%{http_code}" https://tracking.gritoweb.com.br/` should be `200`.

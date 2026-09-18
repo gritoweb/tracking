@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-09-18 (6)
+### Changed
+- **CI runs only the quality job** (`.github/workflows/ci.yml`: install, typecheck, lint, build, vitest
+  with coverage). Playwright left CI at Luis's request — it stalled and cost minutes per push; the
+  specs stay in `e2e/` for `pnpm test:e2e` by hand.
+
+Verified: workflow file reviewed; takes effect on the next push.
+
 ## 2026-09-18 (5)
 ### Changed
 - **One tool catalog for the MCP server and the in-app Assistant.** `mcp/registry.ts` registers every
