@@ -20,7 +20,13 @@ import {
 import { useApiKeys, useCreateApiKey, useRevokeApiKey } from "@/hooks/useApiKeys";
 import { formatShortDate } from "@/lib/dateUtils";
 import type { ApiKey, ApiKeyScope } from "@shared/schemas";
-import { buildClaudeCodeSetupPrompt } from "@/lib/mcpSetupPrompt";
+import {
+  buildClaudeCodeSetupPrompt,
+  buildClaudeDesktopConfig,
+  buildCursorConfig,
+  buildGenericAiInstructions,
+} from "@/lib/mcpSetupPrompt";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const MCP_URL = `${window.location.origin}/mcp`;
 
@@ -43,6 +49,40 @@ function CopyButton({ value, label }: { value: string; label: string }) {
     </Button>
   );
 }
+
+interface SetupTab {
+  id: string;
+  label: string;
+  hint: string;
+  text: (apiKey: string) => string;
+}
+
+const SETUP_TABS: SetupTab[] = [
+  {
+    id: "claude-code",
+    label: "Claude Code",
+    hint: "Paste this into Claude Code: it connects this server with your key and adds a /tracking command.",
+    text: (key) => buildClaudeCodeSetupPrompt(MCP_URL, key),
+  },
+  {
+    id: "cursor",
+    label: "Cursor / Windsurf / VS Code",
+    hint: "Add this to your mcp.json (Cursor, Windsurf) or .vscode/mcp.json, then reload the editor.",
+    text: (key) => buildCursorConfig(MCP_URL, key),
+  },
+  {
+    id: "claude-desktop",
+    label: "Claude Desktop",
+    hint: "Add this to claude_desktop_config.json, then quit Claude Desktop completely and reopen it.",
+    text: (key) => buildClaudeDesktopConfig(MCP_URL, key),
+  },
+  {
+    id: "other",
+    label: "Any other AI",
+    hint: "Paste this into any assistant or agent that supports MCP.",
+    text: (key) => buildGenericAiInstructions(MCP_URL, key),
+  },
+];
 
 function KeyRow({ apiKey, onRevoke }: { apiKey: ApiKey; onRevoke: (id: string) => void }) {
   const [confirming, setConfirming] = useState(false);
@@ -161,22 +201,26 @@ export function McpConnectorCard() {
                 </code>
                 <CopyButton value={freshKey} label="Copy the new API key" />
               </div>
-              <div className="space-y-1 pt-2">
-                <Label>Claude Code setup</Label>
-                <p>
-                  Paste this into Claude Code: it connects this server with your key and adds a{" "}
-                  <code className="font-mono">/tracking</code> command.
-                </p>
-                <div className="flex items-start gap-2">
-                  <pre className="max-h-48 flex-1 overflow-auto whitespace-pre-wrap rounded-md border bg-background px-2 py-1.5 font-mono text-xs">
-                    {buildClaudeCodeSetupPrompt(MCP_URL, freshKey)}
-                  </pre>
-                  <CopyButton
-                    value={buildClaudeCodeSetupPrompt(MCP_URL, freshKey)}
-                    label="Copy the Claude Code setup prompt"
-                  />
-                </div>
-              </div>
+              <Tabs defaultValue={SETUP_TABS[0].id} className="pt-2">
+                <TabsList className="flex-wrap">
+                  {SETUP_TABS.map((tab) => (
+                    <TabsTrigger key={tab.id} value={tab.id}>
+                      {tab.label}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+                {SETUP_TABS.map((tab) => (
+                  <TabsContent key={tab.id} value={tab.id} className="space-y-1">
+                    <p>{tab.hint}</p>
+                    <div className="flex items-start gap-2">
+                      <pre className="max-h-48 flex-1 overflow-auto whitespace-pre-wrap rounded-md border bg-background px-2 py-1.5 font-mono text-xs">
+                        {tab.text(freshKey)}
+                      </pre>
+                      <CopyButton value={tab.text(freshKey)} label={`Copy the ${tab.label} setup`} />
+                    </div>
+                  </TabsContent>
+                ))}
+              </Tabs>
               <Button variant="outline" size="sm" onClick={() => setFreshKey(null)}>
                 Done
               </Button>
