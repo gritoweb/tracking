@@ -196,7 +196,7 @@ export function TaskSheet({ open, onClose, task, tab, onTabChange, onRequestDele
   return (
     <>
       <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
-        <SheetContent className="flex w-full flex-col gap-0 rounded-l-none p-0 sm:max-w-lg sm:rounded-l-container">
+        <SheetContent className="flex w-full flex-col gap-0 rounded-l-none p-0 sm:max-w-xl sm:rounded-l-container">
           <Tabs value={tab} onValueChange={(v) => onTabChange(v as TaskTab)} className="min-h-0 flex-1">
             <TaskSheetHeader
               task={task}
