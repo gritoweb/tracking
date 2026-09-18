@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -6,11 +6,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { AttachmentPreview } from "./TaskCommentAttachment";
 import { CommentRow } from "./TaskCommentRow";
+import { TaskActivityRow } from "./TaskActivityRow";
 import { MentionPicker } from "./TaskCommentMentionPicker";
 import {
   PENDING_COMMENT_PREFIX,
   useCreateTaskComment,
   useDeleteTaskComment,
+  useTaskActivity,
   useTaskComments,
   useUpdateTaskComment,
 } from "@/hooks/useTaskComments";
@@ -30,6 +32,16 @@ export interface Member {
 export function TaskComments({ taskId, members }: { taskId: string; members: Member[] }) {
   const { user } = useAuth();
   const { data: comments = [] } = useTaskComments(taskId);
+  const { data: activity = [] } = useTaskActivity(taskId);
+  // One timeline: comments and changes, oldest first. ISO strings sort by time.
+  const feed = useMemo(
+    () =>
+      [
+        ...comments.map((comment) => ({ at: comment.createdAt, comment })),
+        ...activity.map((entry) => ({ at: entry.createdAt, entry })),
+      ].sort((a, b) => a.at.localeCompare(b.at)),
+    [comments, activity]
+  );
   const createComment = useCreateTaskComment(taskId);
   const updateComment = useUpdateTaskComment(taskId);
   const deleteComment = useDeleteTaskComment(taskId);
@@ -73,7 +85,8 @@ export function TaskComments({ taskId, members }: { taskId: string; members: Mem
         attachmentUrl: sent.attachment?.url ?? null,
       },
       {
-        onError: () => {
+        onError: (error) => {
+          toast.error(error.message || "Failed to post comment");
           setBody((current) => current || text);
           setMentioned((current) => (current.length ? current : sent.mentioned));
           setAttachment((current) => current ?? sent.attachment);
@@ -84,28 +97,32 @@ export function TaskComments({ taskId, members }: { taskId: string; members: Mem
 
   return (
     <div className="space-y-2">
-      {comments.length > 0 && (
+      {feed.length > 0 && (
         <div className="divide-y rounded-md border">
-          {comments.map((c) => (
-            <CommentRow
-              key={c.id}
-              comment={c}
-              taskId={taskId}
-              members={members}
-              isAuthor={c.userId === user?.id && !c.id.startsWith(PENDING_COMMENT_PREFIX)}
-              onDelete={() => setPendingDelete(c)}
-              onSave={(nextBody, nextMentioned, nextAttachmentId) =>
-                updateComment.mutate({
-                  id: c.id,
-                  data: { body: nextBody, mentionedUserIds: nextMentioned, attachmentId: nextAttachmentId },
-                })
-              }
-            />
-          ))}
+          {feed.map((item) =>
+            "comment" in item ? (
+              <CommentRow
+                key={item.comment.id}
+                comment={item.comment}
+                taskId={taskId}
+                members={members}
+                isAuthor={item.comment.userId === user?.id && !item.comment.id.startsWith(PENDING_COMMENT_PREFIX)}
+                onDelete={() => setPendingDelete(item.comment)}
+                onSave={(nextBody, nextMentioned, nextAttachmentId) =>
+                  updateComment.mutate({
+                    id: item.comment.id,
+                    data: { body: nextBody, mentionedUserIds: nextMentioned, attachmentId: nextAttachmentId },
+                  })
+                }
+              />
+            ) : (
+              <TaskActivityRow key={item.entry.id} activity={item.entry} />
+            )
+          )}
         </div>
       )}
 
-      <div className={cn("space-y-1.5 rounded-md border p-2", comments.length === 0 && "border-dashed")}>
+      <div className={cn("space-y-1.5 rounded-md border p-2", feed.length === 0 && "border-dashed")}>
         <Textarea
           value={body}
           onChange={(e) => handleBodyChange(e.target.value)}

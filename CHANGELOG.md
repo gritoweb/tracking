@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-09-18 (19)
+### Added
+- **A task's comments tab now shows what changed on it, like ClickUp.** Status changes (from the sheet, the checkbox, or a board drop), due date, priority and assignees appear between the comments as quiet lines ("Luis changed status from To do to In progress · 2 minutes ago"). New table `task_activity` (migration `0046`; names are stored, not ids, so a renamed status or a departed member still reads right), written by `PUT /tasks/:id` and `PATCH /tasks/:id/move` only when a value actually changed, read by `GET /tasks/:id/activity`, refreshed live for other sessions through the existing `task-comments:changed` broadcast. Deleting the task deletes its history. Recording is best-effort: if it fails (for instance the migration has not reached a database yet) the error is logged and the edit still succeeds.
+- Also fixes two lint errors from the optimistic-comment change (an unused destructured variable and an `onError` that discarded its argument): the failure toast now lives in the composer, which also owns restoring the text.
+
+Verified: migration applied to the local D1 only. API run: a status change, a due date + priority, an assignee added then removed and a board move each wrote one line, repeating the same value wrote nothing, an unknown task answers 404, and the history disappears with the task. In a real browser the comment appeared 382 ms after clicking Comment, and a status/priority/due-date change made from another session showed up in the open sheet within 2.5 s. `tsc -b` 0, `eslint src` 0, unit tests for the sentence builder. **Remote D1 still needs `npx wrangler d1 migrations apply time-tracker --remote` before this reaches production.**
+
 ## 2026-09-18 (18)
 ### Added
 - **The Assistant and the MCP give links to what they touched.** Task, comment and time-entry results now carry a `url` (`mcp/links.ts`; a task opens its tab, a comment its comments tab, an entry the Timer on its day via the new `/?date=YYYY-MM-DD`). The panel shows those links under each tool result straight from the data — not left to the model, which (glm) ignored a prompt rule to add them — and its markdown renders `[text](url)` too: same-origin links navigate inside the app, other `https` links open in a new tab, anything else (`javascript:`) is plain text. The MCP instructions and the chat prompt tell a model to hand the `url` over. Entry links use the entry's UTC date, so near midnight they can land a day off — the week view still contains the entry.

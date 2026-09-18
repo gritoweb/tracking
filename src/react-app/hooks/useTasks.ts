@@ -94,7 +94,11 @@ export function useUpdateTask() {
       }
       toastApiError(err, "Failed to update task");
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ["tasks"] }),
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      // A change to the task is a new line in its comments feed.
+      queryClient.invalidateQueries({ queryKey: ["task-activity"] });
+    },
   });
 }
 
@@ -137,7 +141,11 @@ export function useMoveTask() {
       }
       toastApiError(err, "Failed to move task");
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ["tasks"] }),
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      // A change to the task is a new line in its comments feed.
+      queryClient.invalidateQueries({ queryKey: ["task-activity"] });
+    },
   });
 }
 

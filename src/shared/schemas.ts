@@ -878,6 +878,23 @@ export const UpdateTaskCommentSchema = z.object({
   attachmentId: z.string().nullable().optional(),
 });
 
+export const TaskActivityKindSchema = z.enum(["status", "due_date", "priority", "assignees"]);
+
+/** One change to a task, shown in the comments feed. For `assignees`, `from` is who was removed and `to` who was added. */
+export const TaskActivitySchema = z.object({
+  id: z.string(),
+  taskId: z.string(),
+  userId: z.string().nullable(),
+  userName: z.string(),
+  userImage: z.string().nullable(),
+  kind: TaskActivityKindSchema,
+  from: z.string().nullable(),
+  to: z.string().nullable(),
+  createdAt: z.string(),
+});
+
+export type TaskActivityKind = z.infer<typeof TaskActivityKindSchema>;
+export type TaskActivity = z.infer<typeof TaskActivitySchema>;
 export type TaskComment = z.infer<typeof TaskCommentSchema>;
 export type CreateTaskComment = z.infer<typeof CreateTaskCommentSchema>;
 export type UpdateTaskComment = z.infer<typeof UpdateTaskCommentSchema>;

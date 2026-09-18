@@ -18,6 +18,15 @@ export function useTaskComments(taskId: string | null) {
   });
 }
 
+/** What changed on the task (status, due date, priority, assignees), shown between its comments. */
+export function useTaskActivity(taskId: string | null) {
+  return useQuery({
+    queryKey: ["task-activity", taskId],
+    queryFn: () => api.tasks.activity(taskId as string),
+    enabled: !!taskId,
+  });
+}
+
 function useCommentInvalidation(taskId: string) {
   const queryClient = useQueryClient();
   return () => queryClient.invalidateQueries({ queryKey: ["task-comments", taskId] });
@@ -28,7 +37,8 @@ export function useCreateTaskComment(taskId: string) {
   const { user } = useAuth();
   const key = ["task-comments", taskId];
   return useMutation({
-    mutationFn: ({ attachmentUrl: _url, ...data }: NewTaskComment) => api.tasks.comments.create(taskId, data),
+    mutationFn: ({ body, mentionedUserIds, attachmentId }: NewTaskComment) =>
+      api.tasks.comments.create(taskId, { body, mentionedUserIds, attachmentId }),
     // The comment shows up the instant it is sent; the server's row replaces it on settle.
     onMutate: async (data) => {
       await queryClient.cancelQueries({ queryKey: key });
@@ -50,10 +60,8 @@ export function useCreateTaskComment(taskId: string) {
       queryClient.setQueryData<TaskComment[]>(key, (old = []) => [...old, pending]);
       return { previous };
     },
-    onError: (error: Error, _data, context) => {
-      queryClient.setQueryData(key, context?.previous);
-      toast.error(error.message || "Failed to post comment");
-    },
+    // The composer owns the message (it has the text to put back), so only the cache rolls back here.
+    onError: (_error: Error, _data, context) => queryClient.setQueryData(key, context?.previous),
     onSettled: () => queryClient.invalidateQueries({ queryKey: key }),
   });
 }

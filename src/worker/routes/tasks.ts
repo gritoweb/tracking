@@ -13,6 +13,7 @@ import {
 import { nextOccurrence, normalizeRecurRule } from "@shared/task-recurrence";
 import { taskPath } from "@shared/task-links";
 import { sqliteUtcToIso, sqliteUtcToIsoOrNull } from "../lib/sqlite-time";
+import { listActivity, memberNames, recordActivity, statusName, type ActivityInput } from "../lib/task-activity";
 import { broadcast, requestOrigin } from "../db/queries";
 import type { TaskAttachmentRow, TaskChildRow, TaskCommentRow, TaskJoinRow, TaskRow } from "../db/rows";
 import { parseJsonColumn } from "../lib/json";
@@ -450,13 +451,21 @@ export const tasksRouter = new Hono<{
       ).bind(...values, id, workspaceId).run();
     }
 
+    const activity: ActivityInput[] = [];
     if (change && change.status.id !== existing.status_id) {
+      activity.push({ kind: "status", from: await statusName(c.env.DB, workspaceId, existing.status_id ?? null), to: change.status.name });
       c.executionCtx.waitUntil(
         notifyAssigneesOfStatusChange(
           c.env, workspaceId, id, existing.name, userId,
           await actorDisplayName(c.env.DB, userId), change.status.name
         )
       );
+    }
+    if (data.dueDate !== undefined && (data.dueDate ?? null) !== (existing.due_date ?? null)) {
+      activity.push({ kind: "due_date", from: existing.due_date ?? null, to: data.dueDate ?? null });
+    }
+    if (data.priority !== undefined && data.priority !== (existing.priority ?? 4)) {
+      activity.push({ kind: "priority", from: String(existing.priority ?? 4), to: String(data.priority) });
     }
 
     if (data.assigneeIds !== undefined) {
@@ -467,6 +476,11 @@ export const tasksRouter = new Hono<{
 
       const previousIds = new Set(previous.map((r) => r.userId));
       const newAssigneeIds = data.assigneeIds.filter((assigneeId) => !previousIds.has(assigneeId));
+      const removedIds = [...previousIds].filter((assigneeId) => !data.assigneeIds!.includes(assigneeId));
+      if (newAssigneeIds.length || removedIds.length) {
+        const [added, removed] = await Promise.all([memberNames(c.env.DB, newAssigneeIds), memberNames(c.env.DB, removedIds)]);
+        activity.push({ kind: "assignees", from: removed.join(", ") || null, to: added.join(", ") || null });
+      }
       if (newAssigneeIds.length) {
         c.executionCtx.waitUntil(
           notifyNewAssignees(
@@ -580,6 +594,13 @@ export const tasksRouter = new Hono<{
       }
     }
 
+    await recordActivity(c.env.DB, workspaceId, id, userId, activity);
+    if (activity.length) {
+      c.executionCtx.waitUntil(
+        broadcast(c.env, workspaceId, "task-comments:changed", { taskId: id }, requestOrigin(c))
+      );
+    }
+
     const row = await readTask(c.env.DB, id, workspaceId, await taskScope(c));
     if (!row) return c.json({ error: "Not found" }, 404);
     c.executionCtx.waitUntil(
@@ -613,6 +634,12 @@ export const tasksRouter = new Hono<{
     ).bind(change.status.id, boardOrder, change.active, change.completedAt, id, workspaceId).run();
 
     if (change.status.id !== existing.status_id) {
+      await recordActivity(c.env.DB, workspaceId, id, userId, [
+        { kind: "status", from: await statusName(c.env.DB, workspaceId, existing.status_id ?? null), to: change.status.name },
+      ]);
+      c.executionCtx.waitUntil(
+        broadcast(c.env, workspaceId, "task-comments:changed", { taskId: id }, requestOrigin(c))
+      );
       c.executionCtx.waitUntil(
         notifyAssigneesOfStatusChange(
           c.env, workspaceId, id, existing.name, userId,
@@ -774,6 +801,14 @@ export const tasksRouter = new Hono<{
         WHERE tc.task_id = ? AND tc.workspace_id = ? ORDER BY tc.created_at ASC`
     ).bind(taskId, workspaceId).all<TaskCommentRow>();
     return c.json(results.map(formatComment), 200);
+  })
+  .get("/:id/activity", async (c) => {
+    const workspaceId = c.get("workspaceId");
+    const taskId = c.req.param("id");
+    const task = await c.env.DB.prepare(`SELECT id FROM tasks WHERE id = ? AND workspace_id = ?`)
+      .bind(taskId, workspaceId).first();
+    if (!task) return c.json({ error: "Not found" }, 404);
+    return c.json(await listActivity(c.env.DB, workspaceId, taskId), 200);
   })
   .post("/:id/comments", zValidator("json", CreateTaskCommentSchema), async (c) => {
     const workspaceId = c.get("workspaceId");

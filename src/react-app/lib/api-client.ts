@@ -307,6 +307,7 @@ export const api = {
       },
       delete: (id: string) => json(attachmentsClient[":id"].$delete({ param: { id } })),
     },
+    activity: (taskId: string) => json(tasksClient[":id"].activity.$get({ param: { id: taskId } })),
     /** Flat, single-level — no reply/thread. */
     comments: {
       list: (taskId: string) => json(tasksClient[":id"].comments.$get({ param: { id: taskId } })),
