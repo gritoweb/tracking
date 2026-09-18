@@ -12,5 +12,5 @@ export const meRouter = new Hono<{
     workspaceId: c.get("workspaceId"),
     role,
     canManage: canManageWorkspace(role),
-  });
+  }, 200);
 });

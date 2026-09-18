@@ -10,5 +10,5 @@
       "@shared/*": ["./src/shared/*"]
     }
   },
-  "include": ["src/react-app", "src/shared"]
+  "include": ["src/react-app", "src/shared", "worker-configuration.d.ts"]
 }

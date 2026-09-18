@@ -41,7 +41,7 @@ export const clientsRouter = new Hono<{
       .bind(workspaceId)
       .all<ClientRow>();
 
-    return c.json(results.map(formatClient));
+    return c.json(results.map(formatClient), 200);
   })
   .post("/", zValidator("json", CreateClientSchema), async (c) => {
     const workspaceId = c.get("workspaceId");
@@ -104,7 +104,8 @@ export const clientsRouter = new Hono<{
             projectCount: r.project_count ?? 0,
             lastTracked: r.last_tracked ?? null,
           })
-        )
+        ),
+        200
       );
     }
   )
@@ -116,7 +117,7 @@ export const clientsRouter = new Hono<{
       .all<ClientRow>();
 
     if (!results.length) return c.json({ error: "Not found" }, 404);
-    return c.json(formatClient(results[0]));
+    return c.json(formatClient(results[0]), 200);
   })
   .put("/:id", zValidator("json", UpdateClientSchema), async (c) => {
     const workspaceId = c.get("workspaceId");
@@ -152,7 +153,7 @@ export const clientsRouter = new Hono<{
       .all<ClientRow>();
 
     if (!results.length) return c.json({ error: "Not found" }, 404);
-    return c.json(formatClient(results[0]));
+    return c.json(formatClient(results[0]), 200);
   })
   .delete("/:id", async (c) => {
     const workspaceId = c.get("workspaceId");
@@ -164,5 +165,5 @@ export const clientsRouter = new Hono<{
     )
       .bind(c.req.param("id"), workspaceId)
       .run();
-    return c.json({ ok: true });
+    return c.json({ ok: true }, 200);
   });

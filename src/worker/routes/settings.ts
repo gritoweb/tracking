@@ -49,7 +49,7 @@ export const settingsRouter = new Hono<{
   .get("/", async (c) => {
     const userId = c.get("userId");
     const row = await c.env.DB.prepare(SELECT).bind(userId).first<Row>();
-    return c.json(toSettings(row));
+    return c.json(toSettings(row), 200);
   })
   .patch("/", zValidator("json", UpdateSettingsSchema), async (c) => {
     const userId = c.get("userId");
@@ -122,7 +122,7 @@ export const settingsRouter = new Hono<{
     }
 
     const row = await c.env.DB.prepare(SELECT).bind(userId).first<Row>();
-    return c.json(toSettings(row));
+    return c.json(toSettings(row), 200);
   })
   /**
    * Send one digest immediately, to the signed-in user's own address.
@@ -186,7 +186,7 @@ export const settingsRouter = new Hono<{
           kind,
           yesterday
         );
-        return c.json({ sent: true, subject: content.subject });
+        return c.json({ sent: true, subject: content.subject }, 200);
       } catch (e) {
         console.error("digest: manual send failed", { userId, error: String(e) });
         return c.json({ error: "Couldn't send the email — check the address is verified" }, 502);

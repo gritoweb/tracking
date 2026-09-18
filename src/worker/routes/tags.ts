@@ -24,7 +24,8 @@ export const tagsRouter = new Hono<{
           name: r.name,
           color: r.color ?? "#64748b",
         })
-      )
+      ),
+      200
     );
   })
   .post("/", zValidator("json", CreateTagSchema), async (c) => {
@@ -37,7 +38,7 @@ export const tagsRouter = new Hono<{
       .bind(workspaceId, name)
       .first<{ id: string; color: string | null }>();
     if (existing) {
-      return c.json({ id: existing.id, workspaceId, name, color: existing.color ?? "#64748b" });
+      return c.json({ id: existing.id, workspaceId, name, color: existing.color ?? "#64748b" }, 200);
     }
 
     const { results: inUse } = await c.env.DB.prepare(
@@ -64,7 +65,7 @@ export const tagsRouter = new Hono<{
     )
       .bind(color, c.req.param("id"), workspaceId)
       .run();
-    return c.json({ ok: true });
+    return c.json({ ok: true }, 200);
   })
   .delete("/:id", async (c) => {
     const workspaceId = c.get("workspaceId");
@@ -73,5 +74,5 @@ export const tagsRouter = new Hono<{
     )
       .bind(c.req.param("id"), workspaceId)
       .run();
-    return c.json({ ok: true });
+    return c.json({ ok: true }, 200);
   });

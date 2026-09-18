@@ -81,7 +81,7 @@ export const timeEntriesRouter = new Hono<{
       const { results } = await c.env.DB.prepare(
         `${ENTRY_SELECT} WHERE te.workspace_id = ? AND te.user_id = ? AND te.stop IS NULL GROUP BY te.id LIMIT 1`
       ).bind(workspaceId, userId).all<TimeEntryJoinRow>();
-      return c.json(results.map(formatEntry));
+      return c.json(results.map(formatEntry), 200);
     }
 
     const now = new Date();
@@ -103,7 +103,7 @@ export const timeEntriesRouter = new Hono<{
       .bind(workspaceId, scopeUserId, since ?? defaultSince, until ?? defaultUntil)
       .all<TimeEntryJoinRow>();
 
-    return c.json(results.map(formatEntry));
+    return c.json(results.map(formatEntry), 200);
   })
   // ─── Description suggestions (autocomplete) ───────────────────────────────
   // Distinct past descriptions plus the project/task/billable combo each was
@@ -188,7 +188,8 @@ export const timeEntriesRouter = new Hono<{
           uses: r.uses,
           lastUsed: r.last_used,
         })
-      )
+      ),
+      200
     );
   })
   // ─── Create ───────────────────────────────────────────────────────────────
@@ -236,6 +237,7 @@ export const timeEntriesRouter = new Hono<{
     }
 
     const entry = await getEntryById(c.env.DB, id, workspaceId);
+    if (!entry) return c.json({ error: "entry insert did not produce a readable row" }, 500);
     c.executionCtx.waitUntil(
       broadcast(c.env, workspaceId, data.stop ? "entries:changed" : "timer:start", entry, requestOrigin(c), userId)
     );
@@ -254,7 +256,7 @@ export const timeEntriesRouter = new Hono<{
     }
     const { statements, createdIds, tagsByCreatedId } = outcome.plan;
     if (!statements.length) {
-      return c.json({ created: [] } satisfies CopyWeekEntriesResult);
+      return c.json({ created: [] } satisfies CopyWeekEntriesResult, 200);
     }
 
     await c.env.DB.batch(statements);
@@ -281,8 +283,8 @@ export const timeEntriesRouter = new Hono<{
       `${ENTRY_SELECT} WHERE te.workspace_id = ? AND te.user_id = ? AND te.stop IS NULL GROUP BY te.id ORDER BY te.start DESC LIMIT 1`
     ).bind(c.get("workspaceId"), c.get("userId")).all<TimeEntryJoinRow>();
 
-    if (!results.length) return c.json(null);
-    return c.json(formatEntry(results[0]));
+    if (!results.length) return c.json(null, 200);
+    return c.json(formatEntry(results[0]), 200);
   })
   // ─── Bulk update ──────────────────────────────────────────────────────────
   .patch("/bulk", zValidator("json", BulkUpdateTimeEntriesSchema), async (c) => {
@@ -336,7 +338,7 @@ export const timeEntriesRouter = new Hono<{
     }
 
     c.executionCtx.waitUntil(broadcast(c.env, workspaceId, "entries:changed", null, requestOrigin(c)));
-    return c.json({ ok: true, updated: ids.length });
+    return c.json({ ok: true, updated: ids.length }, 200);
   })
   // ─── Bulk delete ──────────────────────────────────────────────────────────
   .delete("/bulk", zValidator("json", BulkDeleteTimeEntriesSchema), async (c) => {
@@ -359,7 +361,7 @@ export const timeEntriesRouter = new Hono<{
     ).bind(workspaceId, ...ids).run();
 
     c.executionCtx.waitUntil(broadcast(c.env, workspaceId, "entries:changed", null, requestOrigin(c)));
-    return c.json({ ok: true, deleted: ids.length });
+    return c.json({ ok: true, deleted: ids.length }, 200);
   })
   // ─── Get by ID ────────────────────────────────────────────────────────────
   .get("/:id", async (c) => {
@@ -371,7 +373,7 @@ export const timeEntriesRouter = new Hono<{
     if (entry.userId !== userId && !canManageWorkspace(await getMemberRole(c.env.DB, workspaceId, userId))) {
       return c.json({ error: "Not found" }, 404);
     }
-    return c.json(entry);
+    return c.json(entry, 200);
   })
   // ─── Update ───────────────────────────────────────────────────────────────
   .put("/:id", zValidator("json", UpdateTimeEntrySchema), async (c) => {
@@ -448,10 +450,11 @@ export const timeEntriesRouter = new Hono<{
     }
 
     const entry = await getEntryById(c.env.DB, id, workspaceId);
+    if (!entry) return c.json({ error: "Not found" }, 404);
     c.executionCtx.waitUntil(
       broadcast(c.env, workspaceId, "entries:changed", entry, requestOrigin(c), owned.user_id)
     );
-    return c.json(entry);
+    return c.json(entry, 200);
   })
   // ─── Delete ───────────────────────────────────────────────────────────────
   .delete("/:id", async (c) => {
@@ -478,7 +481,7 @@ export const timeEntriesRouter = new Hono<{
     c.executionCtx.waitUntil(
       broadcast(c.env, workspaceId, "entries:changed", null, requestOrigin(c), owned.user_id)
     );
-    return c.json({ ok: true });
+    return c.json({ ok: true }, 200);
   })
   // ─── Stop running ─────────────────────────────────────────────────────────
   .patch("/:id/stop", async (c) => {
@@ -491,7 +494,7 @@ export const timeEntriesRouter = new Hono<{
       `SELECT user_id FROM time_entries WHERE id = ? AND workspace_id = ?`
     ).bind(id, workspaceId).first<{ user_id: string | null }>();
     // A stale id (the extension after a reload) keeps answering null, as it always has.
-    if (!owned) return c.json(null);
+    if (!owned) return c.json(null, 200);
     if (owned.user_id !== userId) {
       return c.json({ error: "Only the person tracking can stop this timer" }, 403);
     }
@@ -508,5 +511,5 @@ export const timeEntriesRouter = new Hono<{
     if (result.meta.changes > 0) {
       c.executionCtx.waitUntil(broadcast(c.env, workspaceId, "timer:stop", entry, requestOrigin(c), userId));
     }
-    return c.json(entry);
+    return c.json(entry, 200);
   });

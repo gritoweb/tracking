@@ -117,7 +117,7 @@ export const aiRouter = new Hono<{
     const totalSeconds = entries.reduce((sum, e) => sum + (e.duration ?? 0), 0);
 
     if (entries.length === 0) {
-      return c.json({ summary: "", entryCount: 0, totalSeconds: 0 } satisfies AiSummaryResult);
+      return c.json({ summary: "", entryCount: 0, totalSeconds: 0 } satisfies AiSummaryResult, 200);
     }
 
     let summary: string;
@@ -127,5 +127,5 @@ export const aiRouter = new Hono<{
       return c.json({ error: "AI is unavailable right now — try again shortly." }, 502);
     }
 
-    return c.json({ summary, entryCount: entries.length, totalSeconds } satisfies AiSummaryResult);
+    return c.json({ summary, entryCount: entries.length, totalSeconds } satisfies AiSummaryResult, 200);
   });

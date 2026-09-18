@@ -57,7 +57,7 @@ export const projectsRouter = new Hono<{
 
     const { results } = await stmt.all<ProjectRow>();
 
-    return c.json(results.map((row) => formatProject(row, { hideBudget: !manager })));
+    return c.json(results.map((row) => formatProject(row, { hideBudget: !manager })), 200);
   })
   .post("/", zValidator("json", CreateProjectSchema), async (c) => {
     const workspaceId = c.get("workspaceId");
@@ -81,7 +81,7 @@ export const projectsRouter = new Hono<{
       `SELECT id, name FROM projects WHERE workspace_id = ? ORDER BY name ASC`
     ).bind(workspaceId).all<{ id: string; name: string }>();
 
-    if (!results.length) return c.json({ recolored: 0, usedAI: false });
+    if (!results.length) return c.json({ recolored: 0, usedAI: false }, 200);
 
     // AI suggestion (best-effort) keyed by exact project name.
     let aiColors = new Map<string, string>();
@@ -123,7 +123,7 @@ export const projectsRouter = new Hono<{
     );
     await c.env.DB.batch(assignments.map((a) => stmt.bind(a.color, a.id, workspaceId)));
 
-    return c.json({ recolored: assignments.length, usedAI });
+    return c.json({ recolored: assignments.length, usedAI }, 200);
   })
   // Budget pacing for every active project: share of budget spent, burn rate
   // over the trailing window, and where that rate lands the project by its end
@@ -132,10 +132,10 @@ export const projectsRouter = new Hono<{
   .get("/pacing", async (c) => {
     const workspaceId = c.get("workspaceId");
     if (!canManageWorkspace(await getMemberRole(c.env.DB, workspaceId, c.get("userId")))) {
-      return c.json([]);
+      return c.json([], 200);
     }
     const pacing = await loadProjectPacing(c.env.DB, workspaceId);
-    return c.json(pacing);
+    return c.json(pacing, 200);
   })
   .get("/:id", async (c) => {
     const workspaceId = c.get("workspaceId");
@@ -146,7 +146,7 @@ export const projectsRouter = new Hono<{
     ).bind(...(manager ? [] : [userId]), c.req.param("id"), workspaceId).all<ProjectRow>();
 
     if (!results.length) return c.json({ error: "Not found" }, 404);
-    return c.json(formatProject(results[0], { hideBudget: !manager }));
+    return c.json(formatProject(results[0], { hideBudget: !manager }), 200);
   })
   .put("/:id", zValidator("json", UpdateProjectSchema), async (c) => {
     const workspaceId = c.get("workspaceId");
@@ -192,7 +192,7 @@ export const projectsRouter = new Hono<{
     ).bind(id, workspaceId).all<ProjectRow>();
 
     if (!results.length) return c.json({ error: "Not found" }, 404);
-    return c.json(formatProject(results[0]));
+    return c.json(formatProject(results[0]), 200);
   })
   .delete("/:id", async (c) => {
     const workspaceId = c.get("workspaceId");
@@ -202,5 +202,5 @@ export const projectsRouter = new Hono<{
     await c.env.DB.prepare(
       `UPDATE projects SET active = 0 WHERE id = ? AND workspace_id = ?`
     ).bind(c.req.param("id"), workspaceId).run();
-    return c.json({ ok: true });
+    return c.json({ ok: true }, 200);
   });

@@ -43,13 +43,13 @@ export const draftsRouter = new Hono<{
 
     if (date) {
       if (!DATE_RE.test(date)) return c.json({ error: "date must be YYYY-MM-DD" }, 400);
-      return c.json(await listDrafts(c.env.DB, workspaceId, userId, date));
+      return c.json(await listDrafts(c.env.DB, workspaceId, userId, date), 200);
     }
     if (since && until) {
       if (!DATE_RE.test(since) || !DATE_RE.test(until)) {
         return c.json({ error: "since and until must be YYYY-MM-DD" }, 400);
       }
-      return c.json(await listDraftRange(c.env.DB, workspaceId, userId, since, until));
+      return c.json(await listDraftRange(c.env.DB, workspaceId, userId, since, until), 200);
     }
     return c.json({ error: "Pass date=YYYY-MM-DD, or since= and until=" }, 400);
   })
@@ -63,7 +63,7 @@ export const draftsRouter = new Hono<{
       date,
       timezoneOffsetMinutes
     );
-    return c.json(result);
+    return c.json(result, 200);
   })
   // ─── Confirm into real entries ────────────────────────────────────────────
   //
@@ -165,7 +165,7 @@ export const draftsRouter = new Hono<{
     return c.json({
       confirmed: results.length,
       totalSeconds: finalDurations.reduce((sum, d) => sum + d, 0),
-    });
+    }, 200);
   })
   // ─── Discard a whole day's drafts ─────────────────────────────────────────
   .delete("/", async (c) => {
@@ -178,7 +178,7 @@ export const draftsRouter = new Hono<{
     )
       .bind(c.get("workspaceId"), c.get("userId"), date)
       .run();
-    return c.json({ deleted: result.meta.changes ?? 0 });
+    return c.json({ deleted: result.meta.changes ?? 0 }, 200);
   })
   // ─── Edit a draft before confirming ───────────────────────────────────────
   .patch("/:id", zValidator("json", UpdateDraftSchema), async (c) => {
@@ -230,7 +230,7 @@ export const draftsRouter = new Hono<{
       .run();
 
     const draft = await getDraft(c.env.DB, workspaceId, userId, id);
-    return c.json(draft);
+    return c.json(draft, 200);
   })
   // ─── Discard one draft ────────────────────────────────────────────────────
   .delete("/:id", async (c) => {
@@ -239,5 +239,5 @@ export const draftsRouter = new Hono<{
     )
       .bind(c.req.param("id"), c.get("workspaceId"), c.get("userId"))
       .run();
-    return c.json({ ok: true });
+    return c.json({ ok: true }, 200);
   });

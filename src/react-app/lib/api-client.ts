@@ -1,81 +1,70 @@
 import { addPendingMutation } from "@/lib/idb";
+import type { InferResponseType } from "hono/client";
+import {
+  meClient,
+  timeEntriesClient,
+  projectsClient,
+  clientsClient,
+  tagsClient,
+  tasksClient,
+  attachmentsClient,
+  taskStatusesClient,
+  favoritesClient,
+  recurringClient,
+  draftsClient,
+  reportsClient,
+  savedReportsClient,
+  plannerClient,
+  settingsClient,
+  integrationsClient,
+  calendarClient,
+  aiClient,
+  assistantClient,
+  adminClient,
+  apiKeysClient,
+  notificationsClient,
+  json,
+} from "@/lib/http-clients";
 import type {
-  Settings,
   UpdateSettings,
-  AssistantMemory,
   AssistantTrackEventRequest,
-  AssistantTrackEventResult,
-  AssistantNudge,
-  ProjectPacing,
-  DraftEntry,
-  UpdateDraft,
-  ConfirmDrafts,
-  GenerateDraftsResult,
-  ApiKey,
   CreateApiKey,
-  CreatedApiKey,
-  TimeEntry,
-  EntrySuggestion,
   CreateTimeEntry,
+  CopyWeekEntriesRequest,
   UpdateTimeEntry,
   BulkUpdateTimeEntries,
-  Project,
   CreateProject,
   UpdateProject,
-  Task,
   CreateTask,
   UpdateTask,
   MoveTask,
   TaskAttachment,
-  TaskComment,
   CreateTaskComment,
   UpdateTaskComment,
-  Notification,
-  TaskStatus,
   CreateTaskStatus,
   UpdateTaskStatus,
   ArchiveTaskStatus,
-  Client,
   CreateClient,
   UpdateClient,
-  ClientStats,
-  Tag,
-  Favorite,
   CreateFavorite,
-  RecurringEntry,
   CreateRecurringEntry,
   UpdateRecurringEntry,
-  Integration,
   CreateIntegration,
   UpdateIntegration,
-  PushResult,
   AiQuickEntryRequest,
-  AiQuickEntryResult,
   AiSummaryRequest,
-  AiSummaryResult,
-  Allocation,
   UpsertAllocation,
   BulkUpsertAllocations,
-  SavedReport,
   CreateSavedReport,
-  ReportSummary,
-  GroupedReport,
-  ReportWeekly,
-  ReportDetailedEntry,
+  ConfirmDrafts,
+  UpdateDraft,
+  GroupDimension,
+  SubGroupDimension,
+  CalendarProviderId,
 } from "@shared/schemas";
 
-export type CalendarProviderId = "google" | "microsoft";
-
-/** What `GET /api/calendar/status` returns for each supported provider. */
-export interface CalendarProviderStatus {
-  provider: CalendarProviderId;
-  label: string;
-  /** False when this deployment has no OAuth client configured for it. */
-  configured: boolean;
-  connected: boolean;
-  accountEmail: string | null;
-  autoTrack: boolean;
-}
+// Re-exported so hooks/components keep importing from `@/lib/api-client`, though the shape now lives in `src/worker/routes/calendar.ts`.
+export type { CalendarProviderId, CalendarProviderStatus } from "@shared/schemas";
 
 const API_BASE = "/api";
 
@@ -172,7 +161,7 @@ export function errorMessage(raw: string, statusText: string): string {
 const QUEUEABLE_PATH = /^\/time_entries(\/|$)/;
 
 /** The one place every request goes through: credentials, the client-id header, the offline queue and `ApiError` mapping. */
-async function appFetch(path: string, init?: RequestInit): Promise<Response> {
+export async function appFetch(path: string, init?: RequestInit): Promise<Response> {
   const method = (init?.method ?? "GET").toUpperCase();
   const isFormData = init?.body instanceof FormData; // needs its own multipart boundary and can't be queued as JSON offline
 
@@ -229,24 +218,22 @@ export interface ReportParams {
   clientIds?: string;
   taskIds?: string;
   tagIds?: string;
-  billable?: string;
+  billable?: "billable" | "nonbillable";
   search?: string;
-  roundMode?: string;
+  roundMode?: "off" | "nearest" | "up" | "down";
   roundMinutes?: string;
-  groupBy?: string;
-  // Allows passing the object straight to reportQuery() (all values stringy).
+  groupBy?: "day" | "week" | "month";
+  // Allows passing the object straight to hc's `query` (all values stringy).
   [k: string]: string | undefined;
 }
 
-// Build a query string, dropping undefined/empty values (same pattern as the
-// list endpoints) so unselected filters aren't sent as empty params.
-function reportQuery(params: Record<string, string | undefined>): string {
-  return new URLSearchParams(
-    Object.entries(params).filter(([, v]) => v !== undefined && v !== "") as [
-      string,
-      string,
-    ][]
-  ).toString();
+// hc's query serializer keeps an empty string (`?search=`) unlike `queryString()` below — strip both the same way.
+function cleanQuery<T extends Record<string, string | undefined>>(params: T): T {
+  const out = { ...params };
+  for (const key of Object.keys(out) as (keyof T)[]) {
+    if (out[key] === undefined || out[key] === "") delete out[key];
+  }
+  return out;
 }
 
 function queryString(params?: Record<string, string | undefined>): string {
@@ -257,349 +244,283 @@ function queryString(params?: Record<string, string | undefined>): string {
   return qs ? `?${qs}` : "";
 }
 
-export interface WorkspaceMe {
-  userId: string;
-  workspaceId: string;
-  role: "owner" | "admin" | "member" | null;
-  canManage: boolean;
-}
+// ─── Response types for routes whose query isn't `zValidator`-typed — request built by hand, response still inferred from the route ──
+export type WorkspaceMe = InferResponseType<typeof meClient.index.$get>;
+type TasksListResponse = InferResponseType<typeof tasksClient.index.$get>;
+type ProjectsListResponse = InferResponseType<typeof projectsClient.index.$get>;
+type ClientsListResponse = InferResponseType<typeof clientsClient.index.$get>;
+type TimeEntriesListResponse = InferResponseType<typeof timeEntriesClient.index.$get>;
+type CalendarEventsResponse = InferResponseType<typeof calendarClient.events.$get>;
+type TaskStatusesListResponse = InferResponseType<typeof taskStatusesClient.index.$get>;
+type DraftsListResponse = InferResponseType<typeof draftsClient.index.$get>;
+type DraftsDiscardDayResponse = InferResponseType<typeof draftsClient.index.$delete>;
 
 export const api = {
-  me: () => request<WorkspaceMe>("/me"),
+  me: () => json(meClient.index.$get()),
   // ─── Time entries ──────────────────────────────────────────────────────────
   timeEntries: {
     list: (params: { since?: string; until?: string }) =>
-      request<TimeEntry[]>(`/time_entries${queryString(params)}`),
-    current: () => request<TimeEntry | null>("/time_entries/current"),
-    suggestions: () => request<EntrySuggestion[]>("/time_entries/suggestions"),
-    create: (body: CreateTimeEntry) =>
-      request<TimeEntry>("/time_entries", { method: "POST", body: JSON.stringify(body) }),
+      request<TimeEntriesListResponse>(`/time_entries${queryString(params)}`),
+    current: () => json(timeEntriesClient.current.$get()),
+    suggestions: () => json(timeEntriesClient.suggestions.$get()),
+    create: (body: CreateTimeEntry) => json(timeEntriesClient.index.$post({ json: body })),
     update: (id: string, body: UpdateTimeEntry) =>
-      request<TimeEntry>(`/time_entries/${id}`, { method: "PUT", body: JSON.stringify(body) }),
-    stop: (id: string) =>
-      request<TimeEntry | null>(`/time_entries/${id}/stop`, { method: "PATCH" }),
-    delete: (id: string) =>
-      request<{ ok: boolean }>(`/time_entries/${id}`, { method: "DELETE" }),
-    bulkUpdate: (body: BulkUpdateTimeEntries) =>
-      request<{ ok: boolean; updated: number }>("/time_entries/bulk", {
-        method: "PATCH",
-        body: JSON.stringify(body),
-      }),
-    bulkDelete: (ids: string[]) =>
-      request<{ ok: boolean; deleted: number }>("/time_entries/bulk", {
-        method: "DELETE",
-        body: JSON.stringify({ ids }),
-      }),
+      json(timeEntriesClient[":id"].$put({ param: { id }, json: body })),
+    stop: (id: string) => json(timeEntriesClient[":id"].stop.$patch({ param: { id } })),
+    delete: (id: string) => json(timeEntriesClient[":id"].$delete({ param: { id } })),
+    bulkUpdate: (body: BulkUpdateTimeEntries) => json(timeEntriesClient.bulk.$patch({ json: body })),
+    bulkDelete: (ids: string[]) => json(timeEntriesClient.bulk.$delete({ json: { ids } })),
+    copyWeek: (body: CopyWeekEntriesRequest) =>
+      json(timeEntriesClient["copy-week"].$post({ json: body })),
   },
 
   // ─── Projects ─────────────────────────────────────────────────────────────
   projects: {
     list: (params?: { includeArchived?: string; since?: string; until?: string }) =>
-      request<Project[]>(`/projects${queryString(params)}`),
-    create: (body: CreateProject) =>
-      request<Project>("/projects", { method: "POST", body: JSON.stringify(body) }),
+      request<ProjectsListResponse>(`/projects${queryString(params)}`),
+    create: (body: CreateProject) => json(projectsClient.index.$post({ json: body })),
     update: (id: string, body: UpdateProject) =>
-      request<Project>(`/projects/${id}`, { method: "PUT", body: JSON.stringify(body) }),
-    delete: (id: string) =>
-      request<{ ok: boolean }>(`/projects/${id}`, { method: "DELETE" }),
-    pacing: () => request<ProjectPacing[]>("/projects/pacing"),
-    recolor: () =>
-      request<{ recolored: number; usedAI: boolean }>("/projects/recolor", {
-        method: "POST",
-      }),
+      json(projectsClient[":id"].$put({ param: { id }, json: body })),
+    delete: (id: string) => json(projectsClient[":id"].$delete({ param: { id } })),
+    pacing: () => json(projectsClient.pacing.$get()),
+    recolor: () => json(projectsClient.recolor.$post()),
   },
 
   // ─── Tasks ────────────────────────────────────────────────────────────────
   tasks: {
     list: (params?: { projectId?: string; includeInactive?: string }) =>
-      request<Task[]>(`/tasks${queryString(params)}`),
-    create: (body: CreateTask) =>
-      request<Task>("/tasks", { method: "POST", body: JSON.stringify(body) }),
-    update: (id: string, body: UpdateTask) =>
-      request<Task>(`/tasks/${id}`, { method: "PUT", body: JSON.stringify(body) }),
+      request<TasksListResponse>(`/tasks${queryString(params)}`),
+    create: (body: CreateTask) => json(tasksClient.index.$post({ json: body })),
+    update: (id: string, body: UpdateTask) => json(tasksClient[":id"].$put({ param: { id }, json: body })),
     /** A board drop: the column and the position inside it, in one write. */
     move: (id: string, body: MoveTask) =>
-      request<Task>(`/tasks/${id}/move`, { method: "PATCH", body: JSON.stringify(body) }),
-    delete: (id: string) =>
-      request<{ ok: boolean }>(`/tasks/${id}`, { method: "DELETE" }),
+      json(tasksClient[":id"].move.$patch({ param: { id }, json: body })),
+    delete: (id: string) => json(tasksClient[":id"].$delete({ param: { id } })),
     attachments: {
-      list: (taskId: string) => request<TaskAttachment[]>(`/tasks/${taskId}/attachments`),
-      // Own call, not request<T>(): a FormData body needs appFetch's raw Response, not its JSON assumption.
+      list: (taskId: string) => json(tasksClient[":id"].attachments.$get({ param: { id: taskId } })),
+      // Own call, not hc: a FormData body needs appFetch's raw Response, not JSON args.
       upload: async (taskId: string, file: File): Promise<TaskAttachment> => {
         const body = new FormData();
         body.append("file", file);
         const res = await appFetch(`/tasks/${taskId}/attachments`, { method: "POST", body });
         return (await res.json()) as TaskAttachment;
       },
-      delete: (id: string) => request<{ ok: boolean }>(`/attachments/${id}`, { method: "DELETE" }),
+      delete: (id: string) => json(attachmentsClient[":id"].$delete({ param: { id } })),
     },
     /** Flat, single-level — no reply/thread. */
     comments: {
-      list: (taskId: string) => request<TaskComment[]>(`/tasks/${taskId}/comments`),
+      list: (taskId: string) => json(tasksClient[":id"].comments.$get({ param: { id: taskId } })),
       create: (taskId: string, body: CreateTaskComment) =>
-        request<TaskComment>(`/tasks/${taskId}/comments`, {
-          method: "POST",
-          body: JSON.stringify(body),
-        }),
+        json(tasksClient[":id"].comments.$post({ param: { id: taskId }, json: body })),
       update: (taskId: string, commentId: string, body: UpdateTaskComment) =>
-        request<TaskComment>(`/tasks/${taskId}/comments/${commentId}`, {
-          method: "PATCH",
-          body: JSON.stringify(body),
-        }),
+        json(
+          tasksClient[":id"].comments[":commentId"].$patch({
+            param: { id: taskId, commentId },
+            json: body,
+          })
+        ),
       delete: (taskId: string, commentId: string) =>
-        request<{ ok: boolean }>(`/tasks/${taskId}/comments/${commentId}`, { method: "DELETE" }),
+        json(
+          tasksClient[":id"].comments[":commentId"].$delete({ param: { id: taskId, commentId } })
+        ),
     },
   },
 
   // ─── Notifications (the header bell) ──────────────────────────────────────
   notifications: {
-    list: () =>
-      request<{ notifications: Notification[]; unreadCount: number }>("/notifications"),
-    markRead: (id: string) =>
-      request<{ ok: boolean }>(`/notifications/${id}/read`, { method: "PATCH" }),
-    markAllRead: () => request<{ ok: boolean }>("/notifications/read-all", { method: "PATCH" }),
-    delete: (id: string) => request<{ ok: boolean }>(`/notifications/${id}`, { method: "DELETE" }),
-    clearAll: () => request<{ ok: boolean }>("/notifications", { method: "DELETE" }),
+    list: () => json(notificationsClient.index.$get()),
+    markRead: (id: string) => json(notificationsClient[":id"].read.$patch({ param: { id } })),
+    markAllRead: () => json(notificationsClient["read-all"].$patch()),
+    delete: (id: string) => json(notificationsClient[":id"].$delete({ param: { id } })),
+    clearAll: () => json(notificationsClient.index.$delete()),
   },
 
   // ─── Task statuses (the board's columns) ──────────────────────────────────
   taskStatuses: {
     /** `projectId` omitted (or falsy) returns the workspace's global default set. */
     list: (projectId?: string | null) =>
-      request<TaskStatus[]>(`/task-statuses${projectId ? `?projectId=${projectId}` : ""}`),
-    create: (body: CreateTaskStatus) =>
-      request<TaskStatus>("/task-statuses", { method: "POST", body: JSON.stringify(body) }),
+      request<TaskStatusesListResponse>(
+        `/task-statuses${projectId ? `?projectId=${projectId}` : ""}`
+      ),
+    create: (body: CreateTaskStatus) => json(taskStatusesClient.index.$post({ json: body })),
     update: (id: string, body: UpdateTaskStatus) =>
-      request<TaskStatus>(`/task-statuses/${id}`, { method: "PUT", body: JSON.stringify(body) }),
+      json(taskStatusesClient[":id"].$put({ param: { id }, json: body })),
     /** Archive, never delete. `moveTo` is required when the status still holds tasks. */
     archive: (id: string, body: ArchiveTaskStatus) =>
-      request<{ ok: boolean; moved: number }>(`/task-statuses/${id}/archive`, {
-        method: "POST",
-        body: JSON.stringify(body),
-      }),
+      json(taskStatusesClient[":id"].archive.$post({ param: { id }, json: body })),
     /** Clones the global set into a project's own fork — idempotent. */
+    // The route parses its body with a bare `c.req.json()`, so `init.body` (not hc's `json` arg) is what carries it through `appFetch`.
     fork: (projectId: string) =>
-      request<TaskStatus[]>("/task-statuses/fork", {
-        method: "POST",
-        body: JSON.stringify({ projectId }),
-      }),
+      json(
+        taskStatusesClient.fork.$post({}, { init: { body: JSON.stringify({ projectId }) } })
+      ),
   },
 
   // ─── Clients ──────────────────────────────────────────────────────────────
   clients: {
     list: (params?: { includeArchived?: string; since?: string; until?: string }) =>
-      request<Client[]>(`/clients${queryString(params)}`),
+      request<ClientsListResponse>(`/clients${queryString(params)}`),
     stats: (params: { since: string; until: string }) =>
-      request<ClientStats[]>(`/clients/stats?${new URLSearchParams(params).toString()}`),
-    get: (id: string) => request<Client>(`/clients/${id}`),
-    create: (body: CreateClient) =>
-      request<Client>("/clients", { method: "POST", body: JSON.stringify(body) }),
+      json(clientsClient.stats.$get({ query: params })),
+    get: (id: string) => json(clientsClient[":id"].$get({ param: { id } })),
+    create: (body: CreateClient) => json(clientsClient.index.$post({ json: body })),
     update: (id: string, body: UpdateClient) =>
-      request<Client>(`/clients/${id}`, { method: "PUT", body: JSON.stringify(body) }),
-    delete: (id: string) =>
-      request<{ ok: boolean }>(`/clients/${id}`, { method: "DELETE" }),
+      json(clientsClient[":id"].$put({ param: { id }, json: body })),
+    delete: (id: string) => json(clientsClient[":id"].$delete({ param: { id } })),
   },
 
   // ─── Tags ─────────────────────────────────────────────────────────────────
   tags: {
-    list: () => request<Tag[]>("/tags"),
-    create: (name: string) =>
-      request<Tag>("/tags", {
-        method: "POST",
-        body: JSON.stringify({ name }),
-      }),
+    list: () => json(tagsClient.index.$get()),
+    create: (name: string) => json(tagsClient.index.$post({ json: { name } })),
     update: (id: string, body: { color: string }) =>
-      request<{ ok: boolean }>(`/tags/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify(body),
-      }),
+      json(tagsClient[":id"].$patch({ param: { id }, json: body })),
   },
 
   // ─── Favorites ────────────────────────────────────────────────────────────
   favorites: {
-    list: () => request<Favorite[]>("/favorites"),
-    create: (body: CreateFavorite) =>
-      request<Favorite>("/favorites", { method: "POST", body: JSON.stringify(body) }),
-    delete: (id: string) =>
-      request<{ ok: boolean }>(`/favorites/${id}`, { method: "DELETE" }),
+    list: () => json(favoritesClient.index.$get()),
+    create: (body: CreateFavorite) => json(favoritesClient.index.$post({ json: body })),
+    delete: (id: string) => json(favoritesClient[":id"].$delete({ param: { id } })),
   },
 
   // ─── Recurring entries ────────────────────────────────────────────────────
   recurring: {
-    list: () => request<RecurringEntry[]>("/recurring"),
-    create: (body: CreateRecurringEntry) =>
-      request<RecurringEntry>("/recurring", { method: "POST", body: JSON.stringify(body) }),
+    list: () => json(recurringClient.index.$get()),
+    create: (body: CreateRecurringEntry) => json(recurringClient.index.$post({ json: body })),
     update: (id: string, body: UpdateRecurringEntry) =>
-      request<RecurringEntry>(`/recurring/${id}`, { method: "PUT", body: JSON.stringify(body) }),
-    delete: (id: string) =>
-      request<{ ok: boolean }>(`/recurring/${id}`, { method: "DELETE" }),
+      json(recurringClient[":id"].$put({ param: { id }, json: body })),
+    delete: (id: string) => json(recurringClient[":id"].$delete({ param: { id } })),
   },
 
   // ─── Integrations ────────────────────────────────────────────────────────
   integrations: {
-    list: () => request<Integration[]>("/integrations"),
-    create: (body: CreateIntegration) =>
-      request<Integration>("/integrations", { method: "POST", body: JSON.stringify(body) }),
+    list: () => json(integrationsClient.index.$get()),
+    create: (body: CreateIntegration) => json(integrationsClient.index.$post({ json: body })),
     update: (id: string, body: UpdateIntegration) =>
-      request<Integration>(`/integrations/${id}`, { method: "PUT", body: JSON.stringify(body) }),
-    delete: (id: string) =>
-      request<{ ok: boolean }>(`/integrations/${id}`, { method: "DELETE" }),
-    test: (id: string) =>
-      request<{ ok: boolean; error?: string }>(`/integrations/${id}/test`, { method: "POST" }),
+      json(integrationsClient[":id"].$put({ param: { id }, json: body })),
+    delete: (id: string) => json(integrationsClient[":id"].$delete({ param: { id } })),
+    // Not `json()`: ok/failed are different literal shapes at the same 200 status, which `json<T>`'s single type param can't unify.
+    test: async (id: string) => {
+      const res = await integrationsClient[":id"].test.$post({ param: { id } });
+      return res.json();
+    },
     push: (body: { entryIds: string[]; comment?: string; timezone?: string }) =>
-      request<{ results: PushResult[] }>("/integrations/push", {
-        method: "POST",
-        body: JSON.stringify(body),
-      }),
+      json(integrationsClient.push.$post({ json: body })),
   },
 
   // ─── Calendar sync (Google / Microsoft) ────────────────────────────────────
   calendar: {
     // One row per calendar provider the server supports — a workspace can hold
     // a work calendar and a personal one at the same time.
-    status: () => request<CalendarProviderStatus[]>("/calendar/status"),
+    status: () => json(calendarClient.status.$get()),
     setAutoTrack: (provider: CalendarProviderId, enabled: boolean) =>
-      request<{ ok: boolean; autoTrack: boolean }>("/calendar/auto-track", {
-        method: "PATCH",
-        body: JSON.stringify({ enabled, provider }),
-      }),
+      json(calendarClient["auto-track"].$patch({ json: { enabled, provider } })),
     convert: (params: { since: string; until: string }) =>
-      request<{ created: number }>("/calendar/convert", {
-        method: "POST",
-        body: JSON.stringify(params),
-      }),
-    events: (params: { since: string; until: string }) => {
-      const qs = new URLSearchParams();
-      qs.set("since", params.since);
-      qs.set("until", params.until);
-      return request<
-        { calendarEventId: string; title: string; start: string; stop: string }[]
-      >(`/calendar/events?${qs}`);
-    },
+      json(calendarClient.convert.$post({ json: params })),
+    events: (params: { since: string; until: string }) =>
+      request<CalendarEventsResponse>(`/calendar/events?${new URLSearchParams(params)}`),
     disconnect: (provider: CalendarProviderId) =>
-      request<{ ok: boolean }>(`/calendar/${provider}`, { method: "DELETE" }),
+      json(calendarClient[":provider"].$delete({ param: { provider } })),
   },
 
   // ─── AI ───────────────────────────────────────────────────────────────────
   ai: {
-    quickEntry: (body: AiQuickEntryRequest) =>
-      request<AiQuickEntryResult>("/ai/quick-entry", { method: "POST", body: JSON.stringify(body) }),
-    summary: (body: AiSummaryRequest) =>
-      request<AiSummaryResult>("/ai/summary", { method: "POST", body: JSON.stringify(body) }),
+    quickEntry: (body: AiQuickEntryRequest) => json(aiClient["quick-entry"].$post({ json: body })),
+    summary: (body: AiSummaryRequest) => json(aiClient.summary.$post({ json: body })),
   },
 
   // ─── Assistant ─────────────────────────────────────────────────────
   assistant: {
     nudges: (timezoneOffsetMinutes: number) =>
-      request<AssistantNudge[]>(
-        `/assistant/nudges?timezoneOffsetMinutes=${timezoneOffsetMinutes}`
+      json(
+        assistantClient.nudges.$get({
+          query: { timezoneOffsetMinutes: String(timezoneOffsetMinutes) },
+        })
       ),
     // Chat moved to the ChatAgent Durable Object (streaming over WebSocket via
     // useAgentChat); there's no longer a REST chat endpoint.
-    trackEvent: (body: AssistantTrackEventRequest) =>
-      request<AssistantTrackEventResult>("/assistant/track-event", {
-        method: "POST",
-        body: JSON.stringify(body),
-      }),
+    // Not `json()`: same reasoning as `integrations.test` (created true/false differ at one status).
+    trackEvent: async (body: AssistantTrackEventRequest) => {
+      const res = await assistantClient["track-event"].$post({ json: body });
+      return res.json();
+    },
     // What the assistant has remembered about the user (Settings management card).
-    memory: () => request<AssistantMemory[]>("/assistant/memory"),
+    memory: () => json(assistantClient.memory.$get()),
     deleteMemory: (key: string) =>
-      request<void>(`/assistant/memory/${encodeURIComponent(key)}`, { method: "DELETE" }),
-    clearMemory: () => request<void>("/assistant/memory", { method: "DELETE" }),
+      assistantClient.memory[":key"].$delete({ param: { key } }).then(() => undefined),
+    clearMemory: () => assistantClient.memory.$delete().then(() => undefined),
   },
 
   // ─── API keys (MCP + programmatic access) ─────────────────────────────────
   apiKeys: {
-    list: () => request<ApiKey[]>("/keys"),
+    list: () => json(apiKeysClient.index.$get()),
     // The only response that ever carries the secret — it cannot be re-fetched.
-    create: (body: CreateApiKey) =>
-      request<CreatedApiKey>("/keys", { method: "POST", body: JSON.stringify(body) }),
-    revoke: (id: string) => request<{ ok: boolean }>(`/keys/${id}`, { method: "DELETE" }),
+    create: (body: CreateApiKey) => json(apiKeysClient.index.$post({ json: body })),
+    revoke: (id: string) => json(apiKeysClient[":id"].$delete({ param: { id } })),
   },
 
   // ─── Admin ────────────────────────────────────────────────────────────────
   admin: {
-    removeUser: (id: string) =>
-      request<{ ok: boolean; purgedWorkspaces: number }>(
-        `/admin/users/${encodeURIComponent(id)}`,
-        { method: "DELETE" }
-      ),
+    removeUser: (id: string) => json(adminClient.users[":id"].$delete({ param: { id } })),
   },
 
   // ─── Settings ─────────────────────────────────────────────────────────────
   settings: {
-    get: () => request<Settings>("/settings"),
-    update: (body: UpdateSettings) =>
-      request<Settings>("/settings", {
-        method: "PATCH",
-        body: JSON.stringify(body),
-      }),
+    get: () => json(settingsClient.index.$get()),
+    update: (body: UpdateSettings) => json(settingsClient.index.$patch({ json: body })),
     sendDigest: (kind: "daily" | "weekly") =>
-      request<{ sent: boolean; subject: string }>("/settings/digest/send", {
-        method: "POST",
-        // The server has no other way to know which day "yesterday" is for
-        // this person, or whether it's their morning.
-        body: JSON.stringify({
-          kind,
-          timezoneOffsetMinutes: new Date().getTimezoneOffset(),
-        }),
-      }),
+      json(
+        settingsClient.digest.send.$post({
+          // The server has no other way to know which day "yesterday" is for
+          // this person, or whether it's their morning.
+          json: { kind, timezoneOffsetMinutes: new Date().getTimezoneOffset() },
+        })
+      ),
   },
 
   // ─── Drafted entries ──────────────────────────────────────────────────────
   drafts: {
-    list: (date: string) => request<DraftEntry[]>(`/drafts?date=${date}`),
+    list: (date: string) => request<DraftsListResponse>(`/drafts?date=${date}`),
     listRange: (since: string, until: string) =>
-      request<DraftEntry[]>(`/drafts?since=${since}&until=${until}`),
+      request<DraftsListResponse>(`/drafts?since=${since}&until=${until}`),
     generate: (body: { date: string; timezoneOffsetMinutes: number }) =>
-      request<GenerateDraftsResult>("/drafts/generate", {
-        method: "POST",
-        body: JSON.stringify(body),
-      }),
+      json(draftsClient.generate.$post({ json: body })),
     update: (id: string, body: UpdateDraft) =>
-      request<DraftEntry>(`/drafts/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
-    discard: (id: string) => request<{ ok: boolean }>(`/drafts/${id}`, { method: "DELETE" }),
+      json(draftsClient[":id"].$patch({ param: { id }, json: body })),
+    discard: (id: string) => json(draftsClient[":id"].$delete({ param: { id } })),
     discardDay: (date: string) =>
-      request<{ deleted: number }>(`/drafts?date=${date}`, { method: "DELETE" }),
-    confirm: (body: ConfirmDrafts) =>
-      request<{ confirmed: number; totalSeconds: number }>("/drafts/confirm", {
-        method: "POST",
-        body: JSON.stringify(body),
-      }),
+      request<DraftsDiscardDayResponse>(`/drafts?date=${date}`, { method: "DELETE" }),
+    confirm: (body: ConfirmDrafts) => json(draftsClient.confirm.$post({ json: body })),
   },
 
   // ─── Reports ──────────────────────────────────────────────────────────────
   reports: {
-    summary: (params: ReportParams & { groupBy?: string }) =>
-      request<ReportSummary>(`/reports/summary?${reportQuery(params)}`),
-    grouped: (params: ReportParams & { group?: string; subGroup?: string }) =>
-      request<GroupedReport>(`/reports/grouped?${reportQuery(params)}`),
-    detailed: (params: ReportParams) =>
-      request<ReportDetailedEntry[]>(`/reports/detailed?${reportQuery(params)}`),
-    weekly: (params: ReportParams) =>
-      request<ReportWeekly[]>(`/reports/weekly?${reportQuery(params)}`),
+    summary: (params: ReportParams & { groupBy?: "day" | "week" | "month" }) =>
+      json(reportsClient.summary.$get({ query: cleanQuery(params) })),
+    grouped: (params: ReportParams & { group?: GroupDimension; subGroup?: SubGroupDimension }) =>
+      json(reportsClient.grouped.$get({ query: cleanQuery(params) })),
+    detailed: (params: ReportParams) => json(reportsClient.detailed.$get({ query: cleanQuery(params) })),
+    weekly: (params: ReportParams) => json(reportsClient.weekly.$get({ query: cleanQuery(params) })),
   },
 
   // ─── Planner (planned allocations) ────────────────────────────────────────
   planner: {
     list: (params: { since: string; until: string }) =>
-      request<Allocation[]>(`/planner?since=${params.since}&until=${params.until}`),
+      json(plannerClient.index.$get({ query: params })),
     // 204 (no body) when plannedSeconds clears the cell, an Allocation otherwise.
-    upsert: (body: UpsertAllocation) =>
-      request<Allocation | null>("/planner", { method: "PUT", body: JSON.stringify(body) }),
-    bulkUpsert: (body: BulkUpsertAllocations) =>
-      request<{ upserted: number; deleted: number }>("/planner/bulk", {
-        method: "POST",
-        body: JSON.stringify(body),
-      }),
+    upsert: async (body: UpsertAllocation) => {
+      const res = await plannerClient.index.$put({ json: body });
+      return res.status === 204 ? null : await res.json();
+    },
+    bulkUpsert: (body: BulkUpsertAllocations) => json(plannerClient.bulk.$post({ json: body })),
   },
 
   // ─── Saved reports ────────────────────────────────────────────────────────
   savedReports: {
-    list: () => request<SavedReport[]>("/saved-reports"),
-    create: (body: CreateSavedReport) =>
-      request<SavedReport>("/saved-reports", { method: "POST", body: JSON.stringify(body) }),
+    list: () => json(savedReportsClient.index.$get()),
+    create: (body: CreateSavedReport) => json(savedReportsClient.index.$post({ json: body })),
     delete: (id: string) =>
-      request<{ ok: boolean }>(`/saved-reports/${id}`, { method: "DELETE" }),
+      savedReportsClient[":id"].$delete({ param: { id } }).then(() => undefined),
   },
 };

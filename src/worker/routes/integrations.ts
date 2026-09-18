@@ -87,7 +87,7 @@ export const integrationsRouter = new Hono<{
          AND type NOT IN ('google_calendar', 'microsoft_calendar')
        ORDER BY name ASC`
     ).bind(c.get("workspaceId")).all<IntegrationRow>();
-    return c.json(results.map(formatIntegration));
+    return c.json(results.map(formatIntegration), 200);
   })
   .post("/", zValidator("json", CreateIntegrationSchema), async (c) => {
     if (!(await isManagerRequest(c))) return c.json({ error: MANAGER_ONLY_ERROR }, 403);
@@ -149,7 +149,7 @@ export const integrationsRouter = new Hono<{
       `SELECT * FROM integrations WHERE id = ? AND workspace_id = ?`
     ).bind(id, workspaceId).all<IntegrationRow>();
     if (!results.length) return c.json({ error: "Not found" }, 404);
-    return c.json(formatIntegration(results[0]));
+    return c.json(formatIntegration(results[0]), 200);
   })
   .delete("/:id", async (c) => {
     if (!(await isManagerRequest(c))) return c.json({ error: MANAGER_ONLY_ERROR }, 403);
@@ -157,7 +157,7 @@ export const integrationsRouter = new Hono<{
       `DELETE FROM integrations WHERE id = ? AND workspace_id = ?
          AND type NOT IN ('google_calendar', 'microsoft_calendar')`
     ).bind(c.req.param("id"), c.get("workspaceId")).run();
-    return c.json({ ok: true });
+    return c.json({ ok: true }, 200);
   })
   .post("/:id/test", async (c) => {
     if (!(await isManagerRequest(c))) return c.json({ error: MANAGER_ONLY_ERROR }, 403);
@@ -169,10 +169,10 @@ export const integrationsRouter = new Hono<{
     try {
       const conn = await toConnection(c.env.AUTH_SECRET, row);
       await getAdapter(conn.type).test(conn);
-      return c.json({ ok: true });
+      return c.json({ ok: true }, 200);
     } catch (err) {
       const msg = err instanceof IntegrationError ? err.message : "Connection test failed";
-      return c.json({ ok: false, error: msg });
+      return c.json({ ok: false, error: msg }, 200);
     }
   })
   .post("/push", zValidator("json", PushTimeEntriesSchema), async (c) => {
@@ -280,5 +280,5 @@ export const integrationsRouter = new Hono<{
     }
 
     if (anyChanged) c.executionCtx.waitUntil(broadcast(c.env, workspaceId, "entries:changed", null));
-    return c.json({ results });
+    return c.json({ results }, 200);
   });

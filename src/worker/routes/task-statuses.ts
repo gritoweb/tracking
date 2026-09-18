@@ -51,7 +51,7 @@ export const taskStatusesRouter = new Hono<{
   // ─── List — a project's effective set (its own fork, else the workspace global) ─────
   .get("/", async (c) => {
     const projectId = c.req.query("projectId") || null;
-    return c.json(await listStatuses(c.env.DB, c.get("workspaceId"), projectId));
+    return c.json(await listStatuses(c.env.DB, c.get("workspaceId"), projectId), 200);
   })
   // ─── Fork the global set for a project — idempotent, a no-op if already forked ──────
   .post("/fork", async (c) => {
@@ -62,7 +62,7 @@ export const taskStatusesRouter = new Hono<{
     const { projectId } = await c.req.json<{ projectId?: string }>();
     if (!projectId) return c.json({ error: "projectId is required" }, 400);
     const forked = await ensureProjectFork(c.env.DB, workspaceId, projectId);
-    return c.json(forked);
+    return c.json(forked, 200);
   })
   // ─── Create — global by default; with projectId, forks that project first if needed ──
   .post("/", zValidator("json", CreateTaskStatusSchema), async (c) => {
@@ -189,7 +189,7 @@ export const taskStatusesRouter = new Hono<{
     );
     const updated = await resolveStatus(c.env.DB, workspaceId, id);
     if (!updated) return c.json({ error: "Not found" }, 404);
-    return c.json(updated);
+    return c.json(updated, 200);
   })
   // ─── Archive — never delete; tasks still there must say where they go ───────
   .post("/:id/archive", zValidator("json", ArchiveTaskStatusSchema), async (c) => {
@@ -267,5 +267,5 @@ export const taskStatusesRouter = new Hono<{
     c.executionCtx.waitUntil(
       broadcast(c.env, workspaceId, "tasks:changed", null, requestOrigin(c))
     );
-    return c.json({ ok: true, moved: target ? count : 0 });
+    return c.json({ ok: true, moved: target ? count : 0 }, 200);
   });

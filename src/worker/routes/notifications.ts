@@ -16,7 +16,7 @@ export const notificationsRouter = new Hono<{
     const unread = await c.env.DB.prepare(
       `SELECT COUNT(*) AS n FROM notifications WHERE user_id = ? AND workspace_id = ? AND is_read = 0`
     ).bind(userId, workspaceId).first<{ n: number }>();
-    return c.json({ notifications: results.map(formatNotification), unreadCount: unread?.n ?? 0 });
+    return c.json({ notifications: results.map(formatNotification), unreadCount: unread?.n ?? 0 }, 200);
   })
   .patch("/:id/read", async (c) => {
     const workspaceId = c.get("workspaceId");
@@ -24,7 +24,7 @@ export const notificationsRouter = new Hono<{
     await c.env.DB.prepare(
       `UPDATE notifications SET is_read = 1 WHERE id = ? AND user_id = ? AND workspace_id = ?`
     ).bind(c.req.param("id"), userId, workspaceId).run();
-    return c.json({ ok: true });
+    return c.json({ ok: true }, 200);
   })
   .patch("/read-all", async (c) => {
     const workspaceId = c.get("workspaceId");
@@ -32,7 +32,7 @@ export const notificationsRouter = new Hono<{
     await c.env.DB.prepare(
       `UPDATE notifications SET is_read = 1 WHERE user_id = ? AND workspace_id = ? AND is_read = 0`
     ).bind(userId, workspaceId).run();
-    return c.json({ ok: true });
+    return c.json({ ok: true }, 200);
   })
   .delete("/:id", async (c) => {
     const workspaceId = c.get("workspaceId");
@@ -40,7 +40,7 @@ export const notificationsRouter = new Hono<{
     await c.env.DB.prepare(
       `DELETE FROM notifications WHERE id = ? AND user_id = ? AND workspace_id = ?`
     ).bind(c.req.param("id"), userId, workspaceId).run();
-    return c.json({ ok: true });
+    return c.json({ ok: true }, 200);
   })
   .delete("/", async (c) => {
     const workspaceId = c.get("workspaceId");
@@ -48,7 +48,7 @@ export const notificationsRouter = new Hono<{
     await c.env.DB.prepare(
       `DELETE FROM notifications WHERE user_id = ? AND workspace_id = ?`
     ).bind(userId, workspaceId).run();
-    return c.json({ ok: true });
+    return c.json({ ok: true }, 200);
   })
   // A user's own live inbox — separate Durable Object from the workspace's TimerRoom.
   .get("/ws", async (c) => {

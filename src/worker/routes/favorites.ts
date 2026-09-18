@@ -45,7 +45,7 @@ export const favoritesRouter = new Hono<{
       .bind(workspaceId)
       .all<FavoriteRow>();
 
-    return c.json(results.map(formatFavorite));
+    return c.json(results.map(formatFavorite), 200);
   })
   .post("/", zValidator("json", CreateFavoriteSchema), async (c) => {
     const workspaceId = c.get("workspaceId");
@@ -85,5 +85,5 @@ export const favoritesRouter = new Hono<{
     )
       .bind(c.req.param("id"), c.get("workspaceId"))
       .run();
-    return c.json({ ok: true });
+    return c.json({ ok: true }, 200);
   });

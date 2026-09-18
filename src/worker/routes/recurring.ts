@@ -57,7 +57,7 @@ export const recurringRouter = new Hono<{
     )
       .bind(c.get("workspaceId"), c.get("userId"))
       .all<RecurringEntryJoinRow>();
-    return c.json(results.map(formatRecurring));
+    return c.json(results.map(formatRecurring), 200);
   })
   .post("/", zValidator("json", CreateRecurringEntrySchema), async (c) => {
     const workspaceId = c.get("workspaceId");
@@ -134,7 +134,7 @@ export const recurringRouter = new Hono<{
       .bind(id, workspaceId, userId)
       .all<RecurringEntryJoinRow>();
     if (!results.length) return c.json({ error: "Not found" }, 404);
-    return c.json(formatRecurring(results[0]));
+    return c.json(formatRecurring(results[0]), 200);
   })
   .delete("/:id", async (c) => {
     await c.env.DB.prepare(
@@ -142,5 +142,5 @@ export const recurringRouter = new Hono<{
     )
       .bind(c.req.param("id"), c.get("workspaceId"), c.get("userId"))
       .run();
-    return c.json({ ok: true });
+    return c.json({ ok: true }, 200);
   });

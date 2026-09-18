@@ -25,7 +25,7 @@ export const assistantRouter = new Hono<{
   .get("/nudges", zValidator("query", NudgesQuerySchema), async (c) => {
     const { timezoneOffsetMinutes } = c.req.valid("query");
     const nudges = await computeNudges(c.env, c.get("workspaceId"), c.get("userId"), timezoneOffsetMinutes);
-    return c.json(nudges);
+    return c.json(nudges, 200);
   })
   // One-click "Add to timesheet" from an untracked-meeting nudge. Server-side
   // so the entry can be pre-categorized via grounded AI project inference.
@@ -47,7 +47,7 @@ export const assistantRouter = new Hono<{
         projectId: null,
         projectName: null,
         billable: resolveEntryBillable(),
-      } satisfies AssistantTrackEventResult);
+      } satisfies AssistantTrackEventResult, 200);
     }
 
     let project: { id: string; name: string } | null = null;
@@ -100,12 +100,12 @@ export const assistantRouter = new Hono<{
       projectId: project.id,
       projectName: project.name,
       billable: resolveEntryBillable(),
-    } satisfies AssistantTrackEventResult);
+    } satisfies AssistantTrackEventResult, 200);
   })
   // ─── Memory management (what the assistant has remembered about the user) ─────────────
   .get("/memory", async (c) => {
     const memories = await listMemories(c.env.DB, c.get("workspaceId"), c.get("userId"));
-    return c.json(memories);
+    return c.json(memories, 200);
   })
   .delete("/memory", async (c) => {
     await clearMemories(c.env.DB, c.get("workspaceId"), c.get("userId"));

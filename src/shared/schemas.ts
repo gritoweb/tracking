@@ -897,6 +897,28 @@ export const CreatedApiKeySchema = z.object({
   plaintext: z.string(),
 });
 
+// ─── Calendar sync ───────────────────────────────────────────────────────────
+
+export const CalendarProviderIdSchema = z.enum(["google", "microsoft"]);
+
+// One row per provider the server supports, whether or not this person connected it.
+export const CalendarProviderStatusSchema = z.object({
+  provider: CalendarProviderIdSchema,
+  label: z.string(),
+  // False when this deployment has no OAuth client configured for it.
+  configured: z.boolean(),
+  connected: z.boolean(),
+  accountEmail: z.string().nullable(),
+  autoTrack: z.boolean(),
+});
+
+export const CalendarEventPreviewSchema = z.object({
+  calendarEventId: z.string(),
+  title: z.string(),
+  start: z.string(),
+  stop: z.string(),
+});
+
 // ─── Integrations ──────────────────────────────────────────────────────────────
 
 export const IntegrationTypeSchema = z.enum(["workfront", "dynamics"]);
@@ -1133,6 +1155,9 @@ export type IntegrationType = z.infer<typeof IntegrationTypeSchema>;
 export type Integration = z.infer<typeof IntegrationSchema>;
 export type CreateIntegration = z.infer<typeof CreateIntegrationSchema>;
 export type UpdateIntegration = z.infer<typeof UpdateIntegrationSchema>;
+export type CalendarProviderId = z.infer<typeof CalendarProviderIdSchema>;
+export type CalendarProviderStatus = z.infer<typeof CalendarProviderStatusSchema>;
+export type CalendarEventPreview = z.infer<typeof CalendarEventPreviewSchema>;
 export type WorkfrontCredentials = z.infer<typeof WorkfrontCredentialsSchema>;
 export type DynamicsCredentials = z.infer<typeof DynamicsCredentialsSchema>;
 export type IntegrationCredentials = z.infer<typeof IntegrationCredentialsSchema>;

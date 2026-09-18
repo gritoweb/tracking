@@ -14,7 +14,7 @@ export const apiKeysRouter = new Hono<{
   Variables: { workspaceId: string; userId: string };
 }>()
   .get("/", async (c) => {
-    return c.json(await listApiKeys(c.env.DB, c.get("workspaceId")));
+    return c.json(await listApiKeys(c.env.DB, c.get("workspaceId")), 200);
   })
   .post("/", zValidator("json", CreateApiKeySchema), async (c) => {
     const { name, scope } = c.req.valid("json");
@@ -31,5 +31,5 @@ export const apiKeysRouter = new Hono<{
   .delete("/:id", async (c) => {
     const revoked = await revokeApiKey(c.env.DB, c.get("workspaceId"), c.req.param("id"));
     if (!revoked) return c.json({ error: "Not found" }, 404);
-    return c.json({ ok: true });
+    return c.json({ ok: true }, 200);
   });

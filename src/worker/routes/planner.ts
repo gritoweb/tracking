@@ -84,7 +84,7 @@ export const plannerRouter = new Hono<{
     )
       .bind(workspaceId, userId, since, until)
       .all<AllocationRow>();
-    return c.json(results.map(formatAllocation));
+    return c.json(results.map(formatAllocation), 200);
   })
   // Per-cell upsert: plannedSeconds 0 clears the cell.
   .put("/", zValidator("json", UpsertAllocationSchema), async (c) => {
@@ -122,7 +122,7 @@ export const plannerRouter = new Hono<{
       .bind(workspaceId, userId, data.projectId, taskId, data.date)
       .first<AllocationRow>();
     if (!row) return c.json({ error: "allocation upsert did not produce a readable row" }, 500);
-    return c.json(formatAllocation(row));
+    return c.json(formatAllocation(row), 200);
   })
   // Bulk upsert — serves CSV import and copy-last-week in one D1 batch.
   .post("/bulk", zValidator("json", BulkUpsertAllocationsSchema), async (c) => {
@@ -161,5 +161,5 @@ export const plannerRouter = new Hono<{
     await c.env.DB.batch(statements);
 
     const deleted = [...byCell.values()].filter((a) => a.plannedSeconds === 0).length;
-    return c.json({ upserted: byCell.size - deleted, deleted });
+    return c.json({ upserted: byCell.size - deleted, deleted }, 200);
   });

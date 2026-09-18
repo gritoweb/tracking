@@ -36,7 +36,7 @@ export const savedReportsRouter = new Hono<{
       .bind(workspaceId, userId)
       .all<SavedReportRow>();
 
-    return c.json(results.map(formatSavedReport));
+    return c.json(results.map(formatSavedReport), 200);
   })
   .post("/", zValidator("json", CreateSavedReportSchema), async (c) => {
     const workspaceId = c.get("workspaceId");

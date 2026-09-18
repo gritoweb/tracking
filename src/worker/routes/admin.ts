@@ -55,5 +55,5 @@ export const adminRouter = new Hono<{
   // Their saved reports in workspaces they were merely a member of.
   await c.env.DB.prepare(`DELETE FROM saved_reports WHERE user_id = ?`).bind(targetId).run();
 
-  return c.json({ ok: true, purgedWorkspaces: purged });
+  return c.json({ ok: true, purgedWorkspaces: purged }, 200);
 });

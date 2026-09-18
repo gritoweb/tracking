@@ -56,7 +56,7 @@ export const attachmentsRouter = new Hono<{
 
     await c.env.DB.prepare(`DELETE FROM task_attachments WHERE id = ?`).bind(id).run();
     c.executionCtx.waitUntil(c.env.ATTACHMENTS.delete(row.r2_key));
-    return c.json({ ok: true });
+    return c.json({ ok: true }, 200);
   });
 
 export { formatAttachment };

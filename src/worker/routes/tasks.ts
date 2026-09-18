@@ -349,7 +349,7 @@ export const tasksRouter = new Hono<{
       `${taskSelect(scopeUserId !== null)} ${where} ORDER BY tk.sort_order ASC, tk.name ASC`
     ).bind(...(scopeUserId ? [scopeUserId] : []), ...bindings).all<TaskJoinRow>();
 
-    return c.json(results.map(formatTask));
+    return c.json(results.map(formatTask), 200);
   })
   // ─── Create ───────────────────────────────────────────────────────────────
   .post("/", zValidator("json", CreateTaskSchema), async (c) => {
@@ -583,7 +583,7 @@ export const tasksRouter = new Hono<{
     c.executionCtx.waitUntil(
       broadcast(c.env, workspaceId, "tasks:changed", null, requestOrigin(c))
     );
-    return c.json(formatTask(row));
+    return c.json(formatTask(row), 200);
   })
   // ─── Move on the board — status and order in one write, never two ───────────
   .patch("/:id/move", zValidator("json", MoveTaskSchema), async (c) => {
@@ -664,7 +664,7 @@ export const tasksRouter = new Hono<{
     c.executionCtx.waitUntil(
       broadcast(c.env, workspaceId, "tasks:changed", null, requestOrigin(c))
     );
-    return c.json(formatTask(row));
+    return c.json(formatTask(row), 200);
   })
   // ─── Delete ───────────────────────────────────────────────────────────────
   .delete("/:id", async (c) => {
@@ -701,7 +701,7 @@ export const tasksRouter = new Hono<{
     c.executionCtx.waitUntil(
       broadcast(c.env, workspaceId, "tasks:changed", null, requestOrigin(c))
     );
-    return c.json({ ok: true });
+    return c.json({ ok: true }, 200);
   })
   // ─── Attachments (D7) ────────────────────────────────────────────────────
   .get("/:id/attachments", async (c) => {
@@ -710,7 +710,7 @@ export const tasksRouter = new Hono<{
     const { results } = await c.env.DB.prepare(
       `SELECT * FROM task_attachments WHERE task_id = ? AND workspace_id = ? ORDER BY created_at ASC`
     ).bind(taskId, workspaceId).all<TaskAttachmentRow>();
-    return c.json(results.map(formatAttachment));
+    return c.json(results.map(formatAttachment), 200);
   })
   .post("/:id/attachments", async (c) => {
     const workspaceId = c.get("workspaceId");
@@ -771,7 +771,7 @@ export const tasksRouter = new Hono<{
          LEFT JOIN task_attachments ta ON ta.id = tc.attachment_id
         WHERE tc.task_id = ? AND tc.workspace_id = ? ORDER BY tc.created_at ASC`
     ).bind(taskId, workspaceId).all<TaskCommentRow>();
-    return c.json(results.map(formatComment));
+    return c.json(results.map(formatComment), 200);
   })
   .post("/:id/comments", zValidator("json", CreateTaskCommentSchema), async (c) => {
     const workspaceId = c.get("workspaceId");
@@ -858,7 +858,7 @@ export const tasksRouter = new Hono<{
     c.executionCtx.waitUntil(
       broadcast(c.env, workspaceId, "task-comments:changed", { taskId }, requestOrigin(c))
     );
-    return c.json(formatComment(row));
+    return c.json(formatComment(row), 200);
   })
   .delete("/:id/comments/:commentId", async (c) => {
     const workspaceId = c.get("workspaceId");
@@ -875,5 +875,5 @@ export const tasksRouter = new Hono<{
     c.executionCtx.waitUntil(
       broadcast(c.env, workspaceId, "task-comments:changed", { taskId }, requestOrigin(c))
     );
-    return c.json({ ok: true });
+    return c.json({ ok: true }, 200);
   });

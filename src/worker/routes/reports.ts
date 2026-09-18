@@ -298,7 +298,7 @@ export const reportsRouter = new Hono<{
         billableSeconds: r.billable_seconds ?? 0,
         entryCount: r.entry_count ?? 0,
       })),
-    } satisfies ReportSummary);
+    } satisfies ReportSummary, 200);
   })
   .get(
     "/grouped",
@@ -414,7 +414,7 @@ export const reportsRouter = new Hono<{
         billableAmount: totals[0]?.billable_amount ?? 0,
         entryCount: totals[0]?.entry_count ?? 0,
         groups: [...groups.values()],
-      } satisfies GroupedReport);
+      } satisfies GroupedReport, 200);
     }
   )
   .get(
@@ -460,7 +460,7 @@ export const reportsRouter = new Hono<{
         });
       }
 
-      return c.json([...weekMap.values()] satisfies ReportWeekly[]);
+      return c.json([...weekMap.values()] satisfies ReportWeekly[], 200);
     }
   )
   .get(
@@ -524,7 +524,8 @@ export const reportsRouter = new Hono<{
               ? String(r.tag_names).split(",").filter(Boolean)
               : [],
           };
-        })
+        }),
+        200
       );
     }
   );

@@ -15,6 +15,7 @@ import {
   fetchUserEvents,
 } from "../lib/calendar-connections";
 import { convertRange } from "../lib/calendar-autotrack";
+import type { CalendarEventPreview, CalendarProviderStatus } from "@shared/schemas";
 
 const STATE_COOKIE = "tt_cal_state";
 
@@ -43,7 +44,7 @@ export const calendarRouter = new Hono<{
     const connections = await loadCalendarConnections(c.env, c.get("workspaceId"), c.get("userId"));
 
     return c.json(
-      PROVIDER_IDS.map((id) => {
+      PROVIDER_IDS.map((id): CalendarProviderStatus => {
         const provider = CALENDAR_PROVIDERS[id];
         const conn = connections.find((x) => x.provider.id === id);
         return {
@@ -54,7 +55,8 @@ export const calendarRouter = new Hono<{
           accountEmail: conn?.tokens.accountEmail || null,
           autoTrack: conn?.autoTrack ?? false,
         };
-      })
+      }),
+      200
     );
   })
   // ── Toggle auto-track for one provider's connection ───────────────────────
@@ -80,7 +82,7 @@ export const calendarRouter = new Hono<{
           CALENDAR_PROVIDERS[provider].integrationType
         )
         .run();
-      return c.json({ ok: true, autoTrack: enabled, provider });
+      return c.json({ ok: true, autoTrack: enabled, provider }, 200);
     }
   )
   // ── Convert all events in a range into entries (user-triggered) ───────────
@@ -91,7 +93,7 @@ export const calendarRouter = new Hono<{
       const { since, until } = c.req.valid("json");
       try {
         const created = await convertRange(c.env, c.get("workspaceId"), c.get("userId"), since, until);
-        return c.json({ created });
+        return c.json({ created }, 200);
       } catch {
         return c.json({ error: "Couldn't convert calendar events" }, 502);
       }
@@ -102,10 +104,10 @@ export const calendarRouter = new Hono<{
     const workspaceId = c.get("workspaceId");
     const userId = c.get("userId");
     const { since, until } = c.req.query();
-    if (!since || !until) return c.json([]);
+    if (!since || !until) return c.json([] as CalendarEventPreview[], 200);
 
     const events = await fetchUserEvents(c.env, workspaceId, userId, since, until);
-    if (!events.length) return c.json([]);
+    if (!events.length) return c.json([] as CalendarEventPreview[], 200);
 
     // Drop events this person already confirmed into an entry so they don't double up.
     const { results } = await c.env.DB.prepare(
@@ -117,7 +119,7 @@ export const calendarRouter = new Hono<{
       .all<{ calendar_event_id: string }>();
     const confirmed = new Set(results.map((r) => r.calendar_event_id));
 
-    return c.json(events.filter((e) => !confirmed.has(e.calendarEventId)));
+    return c.json(events.filter((e): e is CalendarEventPreview => !confirmed.has(e.calendarEventId)), 200);
   })
   // ── Begin OAuth: redirect to the provider's consent screen ────────────────
   .get("/:provider/connect", (c) => {
@@ -226,5 +228,5 @@ export const calendarRouter = new Hono<{
     )
       .bind(c.get("workspaceId"), c.get("userId"), CALENDAR_PROVIDERS[provider].integrationType)
       .run();
-    return c.json({ ok: true });
+    return c.json({ ok: true }, 200);
   });
