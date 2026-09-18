@@ -79,7 +79,7 @@ export async function currentMemberIds(db: D1Database, workspaceId: string, ids:
   const unique = [...new Set(ids)];
   if (!unique.length) return [];
   const { results } = await db
-    .prepare(`SELECT userId FROM "member" WHERE organizationId = ? AND userId IN (${unique.map(() => "?").join(",")})`)
+    .prepare(`SELECT DISTINCT userId FROM "member" WHERE organizationId = ? AND userId IN (${unique.map(() => "?").join(",")})`)
     .bind(workspaceId, ...unique)
     .all<{ userId: string }>();
   return results.map((r) => r.userId);
