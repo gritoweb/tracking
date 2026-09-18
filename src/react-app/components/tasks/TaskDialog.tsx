@@ -19,8 +19,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ProjectPicker } from "@/components/entries/ProjectPicker";
-import { MultiSelect } from "@/components/reports/MultiSelect";
+import { ProjectPicker } from "@/components/pickers/ProjectPicker";
+import { MultiSelect } from "@/components/pickers/MultiSelect";
 import { useCreateTask, useUpdateTask } from "@/hooks/useTasks";
 import { useTaskStatuses } from "@/hooks/useTaskStatuses";
 import { useWorkspaceMembers } from "@/hooks/useWorkspaceRole";

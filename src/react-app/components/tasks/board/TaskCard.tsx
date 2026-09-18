@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ProjectBadge } from "@/components/ProjectBadge";
 import { UserAvatar } from "@/components/layout/UserAvatar";
-import { MultiSelect } from "@/components/reports/MultiSelect";
+import { MultiSelect } from "@/components/pickers/MultiSelect";
 import { TaskStatusChip } from "../TaskStatusChip";
 import { useTimer } from "@/hooks/useTimer";
 import { useTimerStore } from "@/stores/timerStore";

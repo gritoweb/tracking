@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Spinner } from "@/components/ui/spinner";
-import { AssignProjectChip } from "./ProjectPicker";
+import { AssignProjectChip } from "@/components/pickers/ProjectPicker";
 import { TimeRangePopover } from "./TimeRangePopover";
 import { useUpdateEntry, useDeleteEntry, useCreateEntry } from "@/hooks/useEntries";
 import { useProjects, useTagColors } from "@/hooks/useProjects";

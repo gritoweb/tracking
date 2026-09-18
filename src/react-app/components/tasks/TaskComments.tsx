@@ -5,7 +5,7 @@ import { AtSign, Pencil, Send, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { UserAvatar } from "@/components/layout/UserAvatar";
-import { MultiSelect } from "@/components/reports/MultiSelect";
+import { MultiSelect } from "@/components/pickers/MultiSelect";
 import {
   useCreateTaskComment,
   useDeleteTaskComment,

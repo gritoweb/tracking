@@ -12,9 +12,9 @@ import {
   SheetFooter,
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
-import { ProjectPicker } from "./ProjectPicker";
-import { TaskPicker } from "./TaskPicker";
-import { TagPicker } from "./TagPicker";
+import { ProjectPicker } from "@/components/pickers/ProjectPicker";
+import { TaskPicker } from "@/components/pickers/TaskPicker";
+import { TagPicker } from "@/components/pickers/TagPicker";
 import { TimeOfDayInput } from "./TimeOfDayInput";
 import type { useEntryDraft } from "@/hooks/useEntryDraft";
 

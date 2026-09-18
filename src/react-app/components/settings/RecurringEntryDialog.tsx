@@ -10,9 +10,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { ProjectPicker } from "@/components/entries/ProjectPicker";
-import { TaskPicker } from "@/components/entries/TaskPicker";
-import { TagPicker } from "@/components/entries/TagPicker";
+import { ProjectPicker } from "@/components/pickers/ProjectPicker";
+import { TaskPicker } from "@/components/pickers/TaskPicker";
+import { TagPicker } from "@/components/pickers/TagPicker";
 import { cn } from "@/lib/utils";
 import { useCreateRecurring, useUpdateRecurring } from "@/hooks/useRecurring";
 import {

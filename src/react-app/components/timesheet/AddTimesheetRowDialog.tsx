@@ -9,8 +9,8 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { ProjectPicker } from "@/components/entries/ProjectPicker";
-import { TaskPicker } from "@/components/entries/TaskPicker";
+import { ProjectPicker } from "@/components/pickers/ProjectPicker";
+import { TaskPicker } from "@/components/pickers/TaskPicker";
 import { useProjects } from "@/hooks/useProjects";
 import { useTasks } from "@/hooks/useTasks";
 

@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { MultiSelect, type MultiSelectOption } from "./MultiSelect";
+import { MultiSelect, type MultiSelectOption } from "@/components/pickers/MultiSelect";
 import { useAllClients, useAllProjects, useTags } from "@/hooks/useProjects";
 import { useAllTasks } from "@/hooks/useTasks";
 import { useWorkspaceMembers } from "@/hooks/useWorkspaceRole";

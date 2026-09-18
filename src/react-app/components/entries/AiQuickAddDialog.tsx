@@ -14,9 +14,9 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/spinner";
-import { ProjectPicker } from "./ProjectPicker";
-import { TaskPicker } from "./TaskPicker";
-import { TagPicker } from "./TagPicker";
+import { ProjectPicker } from "@/components/pickers/ProjectPicker";
+import { TaskPicker } from "@/components/pickers/TaskPicker";
+import { TagPicker } from "@/components/pickers/TagPicker";
 import { useAiQuickEntry } from "@/hooks/useAi";
 import { useCreateEntry } from "@/hooks/useEntries";
 import { DEFAULT_ENTRY_BILLABLE } from "@shared/billable";

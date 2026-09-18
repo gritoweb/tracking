@@ -36,8 +36,8 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ProjectPicker } from "@/components/entries/ProjectPicker";
-import { MultiSelect } from "@/components/reports/MultiSelect";
+import { ProjectPicker } from "@/components/pickers/ProjectPicker";
+import { MultiSelect } from "@/components/pickers/MultiSelect";
 import { UserAvatar } from "@/components/layout/UserAvatar";
 import { ColorDot } from "@/components/ColorDot";
 import { Skeleton } from "@/components/ui/skeleton";

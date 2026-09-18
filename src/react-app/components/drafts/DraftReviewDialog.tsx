@@ -20,7 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ProjectPicker } from "@/components/entries/ProjectPicker";
+import { ProjectPicker } from "@/components/pickers/ProjectPicker";
 import { BillableToggle } from "@/components/timer/BillableToggle";
 import {
   useDrafts,

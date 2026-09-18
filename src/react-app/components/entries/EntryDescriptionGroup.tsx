@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { EntryRow } from "./EntryRow";
-import { AssignProjectChip } from "./ProjectPicker";
+import { AssignProjectChip } from "@/components/pickers/ProjectPicker";
 import { formatDurationShort } from "@/lib/dateUtils";
 import { useTimer } from "@/hooks/useTimer";
 import { useBulkDeleteEntries, useBulkUpdateEntries, useCreateEntry } from "@/hooks/useEntries";
