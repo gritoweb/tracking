@@ -119,7 +119,7 @@ export const ProjectSchema = z.object({
   createdAt: z.string(),
 });
 
-export const CreateProjectSchema = z.object({
+const ProjectFieldsSchema = z.object({
   name: z.string().min(1).max(255),
   // Deliberately no default: when the caller omits it the server assigns the
   // next distinct palette colour (see routes/projects.ts). A fixed default
@@ -129,7 +129,7 @@ export const CreateProjectSchema = z.object({
   color: z.string().regex(/^#[0-9a-f]{6}$/i).optional(),
   // Every project belongs to a client (D3).
   clientId: z.string().min(1, "Choose a client"),
-  billable: z.boolean().default(false),
+  billable: z.boolean(),
   rate: z.number().nullable().optional(),
   startDate: z.string().nullable().optional(),
   endDate: z.string().nullable().optional(),
@@ -139,7 +139,12 @@ export const CreateProjectSchema = z.object({
   externalTaskId: z.string().max(255).nullable().optional(),
 });
 
-export const UpdateProjectSchema = CreateProjectSchema.partial().extend({
+export const CreateProjectSchema = ProjectFieldsSchema.extend({
+  billable: z.boolean().default(false),
+});
+
+// Built from the default-free fields: zod 4's partial() keeps defaults, so an edit would reset `billable`.
+export const UpdateProjectSchema = ProjectFieldsSchema.partial().extend({
   active: z.boolean().optional(),
 });
 
@@ -410,18 +415,25 @@ export const RecurringEntrySchema = z.object({
   createdAt: z.string(),
 });
 
-export const CreateRecurringEntrySchema = z.object({
-  description: z.string().max(2000).default(""),
+const RecurringEntryFieldsSchema = z.object({
+  description: z.string().max(2000),
   projectId: z.string().min(1, "Choose a project"),
   taskId: z.string().nullable().optional(),
-  tags: z.array(z.string().max(100)).max(50).default([]),
-  billable: z.boolean().default(true),
+  tags: z.array(z.string().max(100)).max(50),
+  billable: z.boolean(),
   durationSeconds: z.number().int().min(60).max(86_400),
   daysOfWeek: z.array(z.number().int().min(0).max(6)).min(1),
   timeUtcMinutes: z.number().int().min(0).max(1439),
 });
 
-export const UpdateRecurringEntrySchema = CreateRecurringEntrySchema.partial().extend({
+export const CreateRecurringEntrySchema = RecurringEntryFieldsSchema.extend({
+  description: RecurringEntryFieldsSchema.shape.description.default(""),
+  tags: RecurringEntryFieldsSchema.shape.tags.default([]),
+  billable: RecurringEntryFieldsSchema.shape.billable.default(true),
+});
+
+// Built from the default-free fields: zod 4's partial() keeps defaults, so a pause would wipe description and tags.
+export const UpdateRecurringEntrySchema = RecurringEntryFieldsSchema.partial().extend({
   active: z.boolean().optional(),
 });
 

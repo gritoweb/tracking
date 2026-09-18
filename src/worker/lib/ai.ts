@@ -30,6 +30,21 @@ function extractJson(raw: unknown): unknown {
   }
 }
 
+/** JS getTimezoneOffset sign (west of UTC positive) → "UTC-03:00"; a raw "+180" reads to a model as UTC+3. */
+export function utcOffsetLabel(timezoneOffsetMinutes: number): string {
+  const east = -timezoneOffsetMinutes;
+  const abs = Math.abs(east);
+  const hh = String(Math.floor(abs / 60)).padStart(2, "0");
+  const mm = String(abs % 60).padStart(2, "0");
+  return `UTC${east < 0 ? "-" : "+"}${hh}:${mm}`;
+}
+
+/** The user's wall-clock time, without a zone suffix, so the model never mistakes it for UTC. */
+export function localWallClock(referenceDateIso: string, timezoneOffsetMinutes: number): string {
+  const local = new Date(new Date(referenceDateIso).getTime() - timezoneOffsetMinutes * 60_000);
+  return local.toISOString().slice(0, 16).replace("T", " ");
+}
+
 export function buildQuickEntrySystemPrompt(
   referenceDateIso: string,
   timezoneOffsetMinutes: number,
@@ -50,7 +65,7 @@ export function buildQuickEntrySystemPrompt(
 
 Rules:
 - Output ONLY JSON matching the given schema — no prose, no markdown code fences.
-- The user's current local date/time is ${referenceDateIso} (UTC offset ${timezoneOffsetMinutes} minutes). Resolve relative phrases ("yesterday afternoon", "this morning", "2pm") against that local time, then output "start" and "stop" as UTC ISO 8601 timestamps.
+- The user's current local date/time is ${localWallClock(referenceDateIso, timezoneOffsetMinutes)} (${utcOffsetLabel(timezoneOffsetMinutes)}). Every time the user writes is in that local zone. Resolve relative phrases ("yesterday afternoon", "this morning", "2pm") against that local time, then convert to UTC and output "start" and "stop" as UTC ISO 8601 timestamps.
 - If the text states a duration (e.g. "2h") without an explicit end time, pick a specific start and stop within the described period that spans that duration.
 - If there is truly no end time or duration implied (work still in progress), set "stop" to null.
 - For "projectName" and "taskName", choose ONLY an exact name from the list below, or null if nothing matches well. Never invent a name that isn't listed.

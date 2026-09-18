@@ -1,5 +1,35 @@
 # Changelog
 
+## 2026-09-18 (3)
+### Added
+- **The MCP server covers the app's day-to-day work: 67 tools, up from 15.** Tasks (list, read, edit,
+  delete, statuses, comments, image attachments), time entries (read, edit, delete, copy a week, the
+  Reports queries), tags, project and client edits/archiving, favorites (including starting one),
+  recurring entries in local weekday/time, saved reports, the Planner, notifications, the key owner's
+  settings and calendar auto-track. Members and API keys are listed read-only; inviting, removing
+  and key management stay in the app. New tools run through `mcp/rest-bridge.ts`, which mounts the
+  app's own routers with the key's workspace and person, so a tool gets exactly the screen's
+  validation, role checks and broadcasts instead of a second copy of them. `server.ts` was split into
+  `mcp/tools/*` by subject; the 15 existing tools keep their names and behaviour.
+### Fixed
+- **Editing a project reset its `billable` flag, and pausing a recurring entry wiped its description
+  and tags.** zod 4's `.partial()` keeps `.default()`s, so `UpdateProjectSchema` always carried
+  `billable: false` and `UpdateRecurringEntrySchema` `description: ""`, `tags: []`, `billable: true`.
+  The same default also meant a member could never fill in a project's missing client (the
+  "exactly one field" check never matched). Update schemas are now built from default-free fields.
+- **AI quick-add put times six hours off for anyone west of UTC.** The prompt passed the JS
+  `getTimezoneOffset` value as "UTC offset 180 minutes", which a model reads as UTC+3. It now states
+  the local wall-clock time and a `UTC-03:00` label.
+### Changed
+- Recurring schedule conversion (local ↔ UTC) moved to `src/shared/recurring-schedule.ts` with the
+  offset as a parameter, shared by the dialog and the MCP.
+
+Verified: `npx tsc -b` 0, `pnpm lint` 0, `pnpm test` 467/467; against `pnpm dev` with a `read_write`
+key, an MCP client listed 67 tools and called each new one end to end (create → edit → delete of a
+task, comment, attachment, entry, tag, favorite, recurring entry, planner cell) with no error, and
+`update_project` with only `name` kept `billable`; quick-add of "das 14h às 15h ontem" at UTC-3
+returned 17:00Z–18:00Z twice (was 11:00Z). Not yet run: the full e2e suite.
+
 ## 2026-09-18 (2)
 ### Changed
 - **Every screen now composes the design-system primitives instead of restyling them.** The four
