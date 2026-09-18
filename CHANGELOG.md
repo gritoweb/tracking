@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-18 (14)
+### Fixed
+- **Tasks rail: clients and projects are the same size and their "…" buttons line up.** A client row was a small `text-xs` heading inside a `px-2` wrapper while a project row was a full `text-sm` row, so the action buttons sat at different x positions. `TaskRailRow` is now the one row for "All tasks", clients and projects (fixed icon slot, same padding, an always-reserved actions column) and `RailActionsMenu` the one Edit/Archive menu, with a tooltip. Clients keep a users icon and a heavier label so they still read as headings.
+
+Verified in a real browser: every row is 32 px high and starts at the same x, and the "…" buttons of client and project rows end at the same x. `tsc -b` 0, eslint 0.
+
 ## 2026-09-18 (13)
 ### Fixed
 - **Dragging a board card no longer paints the whole column grey.** The drop region is full column height (so an empty column still accepts a drop) and it tinted itself `bg-muted/60` while a card hovered over it, which read as a shadow running to the bottom. The tint is gone; the dimmed placeholder card already shows where the drop lands.
