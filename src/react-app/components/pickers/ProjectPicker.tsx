@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import { ChevronDown, FolderOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { NO_CLIENT, hasClient, resolveClientId, type ClientChoice } from "@/lib/clientChoice";
 import { ColorDot } from "@/components/ColorDot";
 import { cn } from "@/lib/utils";
@@ -143,10 +144,10 @@ export function ProjectPicker({
     select(project.id);
   };
 
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        {children ?? (
+  const triggerLabel = selected ? `Project: ${selected.name}` : "Select project";
+  const trigger = (
+    <PopoverTrigger asChild>
+      {children ?? (
           <Button
             type="button"
             variant={field ? "outline" : "ghost"}
@@ -154,7 +155,7 @@ export function ProjectPicker({
             // Compact + unselected renders icons only, so the button would have no
             // accessible name at all. Label it unconditionally: even when the name
             // is visible, "ERP Migration" alone doesn't say it's a project picker.
-            aria-label={selected ? `Project: ${selected.name}` : "Select project"}
+            aria-label={triggerLabel}
             className={cn(
               "gap-1.5 text-sm",
               !selected && "text-muted-foreground",
@@ -180,8 +181,21 @@ export function ProjectPicker({
             )}
             <ChevronDown className="h-3 w-3 opacity-50" />
           </Button>
-        )}
-      </PopoverTrigger>
+      )}
+    </PopoverTrigger>
+  );
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      {/* The default trigger can render as bare icons, so it always carries a tooltip; a caller's own child owns its labelling. */}
+      {children ? (
+        trigger
+      ) : (
+        <Tooltip>
+          <TooltipTrigger asChild>{trigger}</TooltipTrigger>
+          <TooltipContent>{triggerLabel}</TooltipContent>
+        </Tooltip>
+      )}
       <PopoverContent
         className="w-72 p-0"
         align="start"

@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-18 (15)
+### Fixed
+- **The project picker's default trigger has a tooltip.** In compact form an unselected picker is a folder icon and a chevron with nothing saying what it is (the Timer header's project button). `ProjectPicker` now wraps its own trigger in a tooltip ("Select project" / "Project: <name>"); a caller that passes its own child keeps owning its labelling.
+
+Verified in a real browser: hovering the Timer header's project button shows the tooltip and a click still opens the picker. `tsc -b` 0, eslint 0.
+
 ## 2026-09-18 (14)
 ### Fixed
 - **Tasks rail: clients and projects are the same size and their "…" buttons line up.** A client row was a small `text-xs` heading inside a `px-2` wrapper while a project row was a full `text-sm` row, so the action buttons sat at different x positions. `TaskRailRow` is now the one row for "All tasks", clients and projects (fixed icon slot, same padding, an always-reserved actions column) and `RailActionsMenu` the one Edit/Archive menu, with a tooltip. Clients keep a users icon and a heavier label so they still read as headings.
