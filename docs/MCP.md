@@ -106,29 +106,25 @@ A healthy server answers with an SSE frame containing:
 ```
 
 Swap `"method":"tools/list"` (and drop `params`) to see the tools your key can
-reach — 7 on a read key, 13 on read+write.
+reach — 25 on a read key, 67 on read+write.
 
 ---
 
 ## Tools
 
-| Tool | Scope | Notes |
+| Group | Read (any key) | Write (read+write key only) |
 |---|---|---|
-| `list_projects` | read | Ids, client, whether the project itself is billable, rate, budget, tracked total; `needsClient` marks one that can't take time yet |
-| `list_clients` | read | With project counts |
-| `get_time_summary` | read | Totals over a range, grouped by project/client/task/tag; a member's key counts only their own time |
-| `list_time_entries` | read | Individual entries, optional description search; a member's key lists only their own |
-| `get_project_pacing` | read | Budget spent, burn rate, projected overrun; owners and admins only |
-| `get_running_timer` | read | What's running now, and for how long |
-| `list_drafts` | read | Proposals awaiting review, with why each was proposed |
-| `create_client` | read+write | New client, only when the person asked for it; **not** idempotent — check `list_clients` first |
-| `create_project` | read+write | New project under an active client (required, never invented); a member's rate and budget are dropped; **not** idempotent |
-| `create_task` | read+write | New task under an active project (required, never invented); `assigneeIds` must already be workspace members; **not** idempotent |
-| `move_task` | read+write | Changes a task's status/column; notifies its assignees except the caller; idempotent — moving to the same status is a no-op |
-| `start_timer` | read+write | Needs a `projectId`; stops your own running timer first, as the app does |
-| `stop_timer` | read+write | Idempotent — a second call is a no-op |
-| `log_time` | read+write | A completed entry; needs a `projectId`; **not** idempotent by design |
-| `draft_day` | read+write | Proposes a day's missing entries; idempotent |
+| Time | `get_running_timer`, `list_time_entries`, `get_time_entry`, `get_time_summary`, `run_report`, `list_drafts` | `start_timer`, `stop_timer`, `log_time`, `update_time_entry`, `delete_time_entry`, `copy_week`, `draft_day` |
+| Catalog | `list_projects`, `list_clients`, `list_tags`, `get_project_pacing` | `create_project`, `update_project`, `archive_project`, `create_client`, `update_client`, `archive_client`, `create_tag`, `update_tag`, `delete_tag` |
+| Tasks | `list_tasks`, `get_task`, `list_task_statuses`, `list_task_comments`, `list_task_attachments` | `create_task`, `update_task`, `move_task`, `delete_task`, `create_task_status`, `update_task_status`, `archive_task_status`, `add_task_comment`, `edit_task_comment`, `delete_task_comment`, `upload_task_attachment`, `delete_task_attachment` |
+| Productivity | `list_favorites`, `list_recurring`, `list_saved_reports`, `get_planner` | `create_favorite`, `delete_favorite`, `start_favorite`, `create_recurring`, `update_recurring`, `delete_recurring`, `create_saved_report`, `delete_saved_report`, `set_planner_hours` |
+| Account | `whoami`, `list_members`, `list_api_keys`, `list_notifications`, `get_settings`, `get_calendar_status` | `mark_notification_read`, `mark_all_notifications_read`, `delete_notification`, `update_settings`, `set_calendar_auto_track` |
+
+Every tool obeys the app's permissions for the key's owner: most run through
+`src/worker/mcp/rest-bridge.ts`, which calls the same routers the screens use, so
+a member's key gets the same 403 the app would show. Members and API keys are
+read-only here; inviting, removing and key management stay in the app. Coverage
+checklist: `docs/MCP_INTEGRATIONS.md`.
 
 Each tool declares `readOnlyHint` / `destructiveHint` / `idempotentHint` /
 `openWorldHint`, so a client can badge them and stop prompting for harmless
