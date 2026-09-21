@@ -97,6 +97,13 @@ const app = new Hono<{ Bindings: Env }>()
   .use("/api/auth/update-user", requireFreshSession)
   .use("/api/auth/unlink-account", requireFreshSession)
   .use("/api/auth/delete-user", requireFreshSession)
+  // Same freshAge:0 gap applies here: revoke-session(s)/revoke-other-sessions
+  // use Better Auth's own sensitiveSessionMiddleware, which also reads
+  // freshAge — with it at 0, ANY session (however old or partially leaked)
+  // could kill every other session/device with no re-auth (SECURITY.md S-07).
+  .use("/api/auth/revoke-session", requireFreshSession)
+  .use("/api/auth/revoke-sessions", requireFreshSession)
+  .use("/api/auth/revoke-other-sessions", requireFreshSession)
   .on(["GET", "POST"], "/api/auth/*", (c) => {
     const origin = new URL(c.req.url).origin;
     return createAuth(c.env, origin).handler(c.req.raw);
