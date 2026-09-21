@@ -222,7 +222,7 @@ export const reportsRouter = new Hono<{
         ${e.amount} as billable_amount
       FROM time_entries te
       LEFT JOIN projects p ON p.id = te.project_id
-      LEFT JOIN tasks tk ON tk.id = te.task_id
+      LEFT JOIN tasks tk ON tk.id = te.task_id AND tk.workspace_id = te.workspace_id
       WHERE ${where}
       GROUP BY te.task_id
       ORDER BY total_seconds DESC
@@ -319,7 +319,7 @@ export const reportsRouter = new Hono<{
       if (needs.has("clients"))
         joins.push("LEFT JOIN clients cl ON cl.id = p.client_id");
       if (needs.has("tasks"))
-        joins.push("LEFT JOIN tasks tk ON tk.id = te.task_id");
+        joins.push("LEFT JOIN tasks tk ON tk.id = te.task_id AND tk.workspace_id = te.workspace_id");
       if (needs.has("tags")) {
         joins.push("LEFT JOIN time_entry_tags tet ON tet.time_entry_id = te.id");
         joins.push("LEFT JOIN tags t ON t.id = tet.tag_id");
@@ -485,7 +485,7 @@ export const reportsRouter = new Hono<{
       FROM time_entries te
       LEFT JOIN projects p ON p.id = te.project_id
       LEFT JOIN clients c ON c.id = p.client_id
-      LEFT JOIN tasks tk ON tk.id = te.task_id
+      LEFT JOIN tasks tk ON tk.id = te.task_id AND tk.workspace_id = te.workspace_id
       LEFT JOIN "user" u ON u.id = te.user_id
       LEFT JOIN time_entry_tags tet ON tet.time_entry_id = te.id
       LEFT JOIN tags t ON t.id = tet.tag_id

@@ -29,6 +29,11 @@ function world() {
       ('e-B', 'ws-B', 'u-eve', 'p-B', 'eve work', '2026-01-05T09:00:00.000Z', '2026-01-05T11:00:00.000Z', 7200, 1);
     INSERT INTO time_entries (id, workspace_id, user_id, project_id, description, start, billable) VALUES
       ('e-run', 'ws-A', 'u-ana', 'p1', 'still running', '2026-01-07T09:00:00.000Z', 1);
+    -- Outside RANGE (2026-01-01..02-01) on purpose, so it never touches the totals asserted above —
+    -- a dedicated describe block below queries a wider range just for this row.
+    INSERT INTO tasks (id, workspace_id, project_id, name) VALUES ('t-B-secret', 'ws-B', 'p-B', 'Elsewhere Secret Task');
+    INSERT INTO time_entries (id, workspace_id, user_id, project_id, task_id, description, start, stop, duration, billable) VALUES
+      ('e-cross', 'ws-A', 'u-ana', 'p1', 't-B-secret', 'cross-tenant task_id', '2026-03-01T12:00:00.000Z', '2026-03-01T12:30:00.000Z', 1800, 1);
   `);
   const as = (userId: string, workspaceId = "ws-A") => routeClient(reportsRouter, db, { workspaceId, userId });
   return { as };
@@ -166,5 +171,36 @@ describe("GET /weekly and GET /detailed", () => {
     const rows = (await (await as("u-owner").get(`/detailed?${RANGE}&roundMode=up&roundMinutes=60`)).json()) as { id: string; duration: number; amount: number }[];
     const e3 = rows.find((r) => r.id === "e3");
     expect(e3).toMatchObject({ duration: 3600, amount: 100 });
+  });
+});
+
+// SECURITY.md S-03: task_id isn't validated against workspace_id on write (a separate, known gap —
+// see time-entries.ts), so a time entry can end up pointing at a task from another workspace. These
+// three reports must never resolve that foreign id back to a name — only "No task"/null.
+describe("tenant isolation — a foreign task_id never resolves to that task's name", () => {
+  const CROSS_RANGE = "since=2026-03-01T00:00:00.000Z&until=2026-03-02T00:00:00.000Z";
+
+  it("GET /detailed shows no task name for the cross-workspace row", async () => {
+    const { as } = world();
+    const rows = (await (await as("u-owner").get(`/detailed?${CROSS_RANGE}`)).json()) as { id: string; taskId: string | null; taskName: string | null }[];
+    const row = rows.find((r) => r.id === "e-cross");
+    expect(row?.taskId).toBe("t-B-secret"); // the raw id is still there — only the joined name must not leak
+    expect(row?.taskName).not.toBe("Elsewhere Secret Task");
+    expect(row?.taskName ?? null).toBeNull();
+  });
+
+  it("GET /summary byTask never shows the other workspace's task name", async () => {
+    const { as } = world();
+    const raw = (await (await as("u-owner").get(`/summary?${CROSS_RANGE}`)).json()) as { byTask: { id: string; name: string }[] };
+    const row = raw.byTask.find((t) => t.id === "t-B-secret");
+    expect(row?.name).not.toBe("Elsewhere Secret Task");
+    expect(row?.name).toBe("No task");
+  });
+
+  it("GET /grouped?group=task never shows the other workspace's task name", async () => {
+    const { as } = world();
+    const raw = (await (await as("u-owner").get(`/grouped?${CROSS_RANGE}&group=task`)).json()) as { groups: { id: string | null; name?: string }[] };
+    const row = raw.groups.find((g) => g.id === "t-B-secret");
+    expect(row?.name).not.toBe("Elsewhere Secret Task");
   });
 });
