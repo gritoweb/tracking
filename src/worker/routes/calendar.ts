@@ -19,6 +19,12 @@ import type { CalendarEventPreview, CalendarProviderStatus } from "@shared/schem
 
 const STATE_COOKIE = "tt_cal_state";
 
+// Over https the cookie is `__Host-` prefixed: browsers then refuse to let another subdomain (the parent domain hosts other sites) set or overwrite it.
+function stateCookieScope(reqUrl: string) {
+  const secure = new URL(reqUrl).protocol === "https:";
+  return { secure, prefix: secure ? ("host" as const) : undefined };
+}
+
 function redirectUri(reqUrl: string, provider: CalendarProviderId): string {
   return `${new URL(reqUrl).origin}/api/calendar/${provider}/callback`;
 }
@@ -139,10 +145,10 @@ export const calendarRouter = new Hono<{
       .join(".");
     setCookie(c, STATE_COOKIE, cookieValue, {
       httpOnly: true,
-      secure: new URL(c.req.url).protocol === "https:",
       sameSite: "Lax",
       path: "/",
       maxAge: 600,
+      ...stateCookieScope(c.req.url),
     });
     return c.redirect(
       CALENDAR_PROVIDERS[provider].buildConsentUrl({
@@ -161,8 +167,9 @@ export const calendarRouter = new Hono<{
     if (!provider) return c.redirect("/settings?calendar=error");
 
     const { code, state, error } = c.req.query();
-    const expected = getCookie(c, STATE_COOKIE);
-    deleteCookie(c, STATE_COOKIE, { path: "/" });
+    const scope = stateCookieScope(c.req.url);
+    const expected = scope.prefix ? getCookie(c, STATE_COOKIE, scope.prefix) : getCookie(c, STATE_COOKIE);
+    deleteCookie(c, STATE_COOKIE, { path: "/", ...scope });
 
     // Cookie is "<state>.<provider>.<initiating workspace>.<initiating user>", each part URI-encoded.
     const [expectedState, expectedProvider, expectedWorkspace, expectedUser] = (expected ?? "")

@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-09-18 (44)
+### Security
+- **The calendar OAuth state cookie is `__Host-` prefixed over https.** `tt_cal_state` carries the random state, the provider, the workspace and the person who started the connection, and the callback trusts it. It was already `httpOnly`, `SameSite=Lax`, short-lived and bound to the session that comes back, so it was not forgeable from the page. What it could not stop is a cookie set from another subdomain of the same parent domain (which hosts other sites): browsers let a sibling subdomain plant a plain cookie for the whole domain. With the `__Host-` prefix (Secure, `Path=/`, no `Domain`) they refuse that outright, which is why this is preferred over signing the value: the fix is enforced by the browser, not by our code. Over http (local dev) the name stays plain, because a Secure cookie cannot be set there.
+
+Not a vulnerability that was exploitable as found: it needed a foothold on a sibling subdomain and the victim's ids, and its worst outcome was linking the attacker's own calendar into the victim's timesheet. Treated as hardening.
+
+Tests (the calendar route had none): the cookie is `__Host-`, Secure, `Path=/`, HttpOnly, `SameSite=Lax` and has no `Domain` over https, and keeps the plain name over http; the callback accepts the matching cookie and clears it; a plain-named cookie sent over https is ignored; and it refuses a wrong state, another person's, another workspace's, the other provider's, and no cookie. `tsc -b` 0.
+
 ## 2026-09-18 (43)
 ### Security
 - **Request limits are shared across isolates, and `/mcp` finally has one.** The limiter was a `Map` inside each Worker isolate, so an attacker whose requests landed on different isolates (or locations) got a fresh allowance each time, and the 10-a-minute login limit was closer to a suggestion. It now also asks a Workers Rate Limiting binding (one counter per location, shared by every isolate there) for the sign-in and auth endpoints (`AUTH_LIMITER`, 10/min), the AI endpoints (`AI_LIMITER`, 20/min) and `/mcp` (`MCP_LIMITER`, 120/min per address). The local count still runs first, so a hot source is stopped without a network call; if the binding itself fails the request goes on with the local count and a warning in the log, so an outage there cannot lock everyone out. The bindings are declared under `ratelimits` in `wrangler.jsonc` (with unusual `namespace_id`s, which must be unique in the whole account) and typed by `pnpm cf-typegen`. They are switched off in the dev server, where the local limits stay relaxed for the e2e suite.
