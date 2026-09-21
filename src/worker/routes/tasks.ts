@@ -822,9 +822,10 @@ export const tasksRouter = new Hono<{
          JOIN "user" u ON u.id = tc.user_id
          LEFT JOIN task_attachments ta ON ta.id = tc.attachment_id
         WHERE tc.task_id = ? AND tc.workspace_id = ?
-          ${before ? "AND (tc.created_at, tc.rowid) < (SELECT created_at, rowid FROM task_comments WHERE id = ? AND workspace_id = ?)" : ""}
+          ${before ? "AND (tc.created_at, tc.rowid) < (SELECT created_at, rowid FROM task_comments WHERE id = ? AND task_id = ? AND workspace_id = ?)" : ""}
         ORDER BY tc.created_at DESC, tc.rowid DESC LIMIT ?`
-    ).bind(taskId, workspaceId, ...(before ? [before, workspaceId] : []), limit).all<TaskCommentRow>();
+      // task_id now bound on the `before` subquery too — SECURITY.md S-20/C-4.
+    ).bind(taskId, workspaceId, ...(before ? [before, taskId, workspaceId] : []), limit).all<TaskCommentRow>();
     // Newest page first from SQL, oldest first for the client.
     return c.json(results.reverse().map(formatComment), 200);
   })
@@ -893,9 +894,10 @@ export const tasksRouter = new Hono<{
     const userId = c.get("userId");
     const taskId = c.req.param("id");
     const commentId = c.req.param("commentId");
+    // task_id now bound too, not just workspace_id — SECURITY.md S-08.
     const existing = await c.env.DB.prepare(
-      `SELECT user_id FROM task_comments WHERE id = ? AND workspace_id = ?`
-    ).bind(commentId, workspaceId).first<{ user_id: string }>();
+      `SELECT user_id FROM task_comments WHERE id = ? AND task_id = ? AND workspace_id = ?`
+    ).bind(commentId, taskId, workspaceId).first<{ user_id: string }>();
     if (!existing) return c.json({ error: "Not found" }, 404);
     if (existing.user_id !== userId) return c.json({ error: "Only the author can edit this comment" }, 403);
 
@@ -928,9 +930,10 @@ export const tasksRouter = new Hono<{
     const userId = c.get("userId");
     const taskId = c.req.param("id");
     const commentId = c.req.param("commentId");
+    // See the matching comment on PATCH above (SECURITY.md S-08).
     const existing = await c.env.DB.prepare(
-      `SELECT user_id FROM task_comments WHERE id = ? AND workspace_id = ?`
-    ).bind(commentId, workspaceId).first<{ user_id: string }>();
+      `SELECT user_id FROM task_comments WHERE id = ? AND task_id = ? AND workspace_id = ?`
+    ).bind(commentId, taskId, workspaceId).first<{ user_id: string }>();
     if (!existing) return c.json({ error: "Not found" }, 404);
     const role = await getMemberRole(c.env.DB, workspaceId, userId);
     if (!canDeleteComment(role, existing.user_id, userId)) {

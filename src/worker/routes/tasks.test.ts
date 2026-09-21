@@ -304,6 +304,51 @@ describe("DELETE /:id/comments/:commentId — author, owner or admin (D8)", () =
     const res = await app.request("/task-1/comments/missing", { method: "DELETE" }, env);
     expect(res.status).toBe(404);
   });
+
+  // Proves the query is shaped to reject a comment borrowed from another task — SECURITY.md S-08.
+  it("binds task_id (not just workspace_id) on the ownership lookup", async () => {
+    const { db, calls } = createD1Stub({ first: () => ({ user_id: "user-1" }), run: () => ({ success: true }) });
+    const app = new Hono<{ Bindings: Env; Variables: { workspaceId: string; userId: string } }>()
+      .use("*", async (c, next) => {
+        c.set("workspaceId", "workspace-A");
+        c.set("userId", "user-1");
+        await next();
+      })
+      .route("/", tasksRouter);
+    await app.request("/task-1/comments/c1", { method: "DELETE" }, { DB: db } as unknown as Env);
+    const selectCall = calls.find((c) => c.sql.includes("FROM task_comments WHERE id"));
+    expect(selectCall?.params).toEqual(["c1", "task-1", "workspace-A"]);
+  });
+});
+
+describe("PATCH /:id/comments/:commentId — same task_id/workspace_id/author rules as DELETE (S-08)", () => {
+  it("answers 404 for a real comment that belongs to a DIFFERENT task in the same workspace", async () => {
+    const { app, env } = mountedApp({ first: () => null });
+    const res = await app.request(
+      "/task-1/comments/c1",
+      { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ body: "edited" }) },
+      env,
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it("binds task_id (not just workspace_id) on the ownership lookup", async () => {
+    const { db, calls } = createD1Stub({ first: () => ({ user_id: "user-1" }), run: () => ({ success: true }) });
+    const app = new Hono<{ Bindings: Env; Variables: { workspaceId: string; userId: string } }>()
+      .use("*", async (c, next) => {
+        c.set("workspaceId", "workspace-A");
+        c.set("userId", "user-1");
+        await next();
+      })
+      .route("/", tasksRouter);
+    await app.request(
+      "/task-1/comments/c1",
+      { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ body: "edited" }) },
+      { DB: db } as unknown as Env,
+    );
+    const selectCall = calls.find((c) => c.sql.includes("FROM task_comments WHERE id"));
+    expect(selectCall?.params).toEqual(["c1", "task-1", "workspace-A"]);
+  });
 });
 
 describe("GET /:id/comments — paging (D8)", () => {
@@ -333,11 +378,12 @@ describe("GET /:id/comments — paging (D8)", () => {
     expect(calls[0].params).toEqual(["task-1", "workspace-A", 100]);
   });
 
-  it("pages back from a comment id, scoped to the workspace so another tenant's id is no cursor", async () => {
+  // The cursor subquery is now scoped to the same task too, not just the workspace — SECURITY.md S-20/C-4.
+  it("pages back from a comment id, scoped to the same task AND workspace so another task's (or tenant's) id is no cursor", async () => {
     const { calls, request } = list("?limit=20&before=c9");
     expect((await request()).status).toBe(200);
-    expect(calls[0].sql).toContain("(tc.created_at, tc.rowid) < (SELECT created_at, rowid FROM task_comments WHERE id = ? AND workspace_id = ?)");
-    expect(calls[0].params).toEqual(["task-1", "workspace-A", "c9", "workspace-A", 20]);
+    expect(calls[0].sql).toContain("(tc.created_at, tc.rowid) < (SELECT created_at, rowid FROM task_comments WHERE id = ? AND task_id = ? AND workspace_id = ?)");
+    expect(calls[0].params).toEqual(["task-1", "workspace-A", "c9", "task-1", "workspace-A", 20]);
   });
 
   it.each(["0", "201", "abc"])("rejects limit=%s", async (limit) => {
