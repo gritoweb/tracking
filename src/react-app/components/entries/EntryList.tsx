@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   useGroupedEntriesRange,
   useBulkDeleteEntries,
@@ -36,6 +37,7 @@ export function EntryList({ since, until, onAddEntry }: EntryListProps) {
   );
   const { runningEntry } = useTimerStore();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [confirmingBulkDelete, setConfirmingBulkDelete] = useState(false);
   const bulkDelete = useBulkDeleteEntries();
   const bulkUpdate = useBulkUpdateEntries();
   const pushEntries = usePushEntries();
@@ -76,6 +78,11 @@ export function EntryList({ since, until, onAddEntry }: EntryListProps) {
         onClick: () => payloads.forEach((p) => createEntry.mutate(p)),
       },
     });
+  };
+
+  const confirmBulkDelete = () => {
+    setConfirmingBulkDelete(false);
+    handleBulkDelete();
   };
 
   const handleBulkBillable = (billable: boolean) => {
@@ -181,7 +188,7 @@ export function EntryList({ since, until, onAddEntry }: EntryListProps) {
               variant="ghost"
               size="sm"
               className="h-7 gap-1.5 text-xs text-destructive hover:text-destructive"
-              onClick={handleBulkDelete}
+              onClick={() => setConfirmingBulkDelete(true)}
               disabled={bulkDelete.isPending}
             >
               <Trash2 className="h-3 w-3" />
@@ -234,6 +241,14 @@ export function EntryList({ since, until, onAddEntry }: EntryListProps) {
           onClose={closeEntryEditor}
         />
       )}
+
+      <ConfirmDialog
+        open={confirmingBulkDelete}
+        onOpenChange={setConfirmingBulkDelete}
+        title={`Delete ${selectedIds.size} ${selectedIds.size === 1 ? "entry" : "entries"}?`}
+        description="This will be permanently deleted."
+        onConfirm={confirmBulkDelete}
+      />
     </div>
   );
 }

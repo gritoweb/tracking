@@ -48,6 +48,7 @@ interface TaskBoardProps {
   /** "status" and "none" render flat — the columns already group by status. */
   groupBy: GroupBy;
   onOpenTask: (task: Task) => void;
+  onRequestDelete: (task: Task) => void;
 }
 
 /** Which column a droppable id names — a column's own background, or the task sitting in it. */
@@ -68,6 +69,7 @@ export function TaskBoard({
   sortBy,
   groupBy,
   onOpenTask,
+  onRequestDelete,
 }: TaskBoardProps) {
   const { data: statuses = [], isLoading } = useTaskStatuses(projectId);
   const { canManage } = useWorkspaceRole();
@@ -248,6 +250,7 @@ export function TaskBoard({
             defaultProjectId={projectId}
             groupBy={groupBy}
             onOpenTask={onOpenTask}
+            onRequestDelete={onRequestDelete}
           />
         ))}
         {canManage && <AddStatusColumn statuses={statuses} projectId={projectId} />}

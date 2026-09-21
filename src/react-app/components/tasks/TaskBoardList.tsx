@@ -228,6 +228,7 @@ export function TaskBoardList({ openTaskId = null, openTab = "task" }: TaskBoard
               sortBy={sortBy}
               groupBy={boardGroupBy}
               onOpenTask={openSheet}
+              onRequestDelete={setDeleteTarget}
             />
           ) : (
             <TaskListView

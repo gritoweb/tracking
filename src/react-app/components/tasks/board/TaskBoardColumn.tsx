@@ -21,6 +21,7 @@ interface TaskBoardColumnProps {
   defaultProjectId: string | null;
   groupBy: GroupBy;
   onOpenTask: (task: Task) => void;
+  onRequestDelete: (task: Task) => void;
 }
 
 /** One column of the board — `useDroppable` here (not just the sortable list) is what lets an empty column receive a card. */
@@ -32,6 +33,7 @@ export function TaskBoardColumn({
   defaultProjectId,
   groupBy,
   onOpenTask,
+  onRequestDelete,
 }: TaskBoardColumnProps) {
   const { setNodeRef } = useDroppable({ id: `column:${status.id}` });
   const [adding, setAdding] = useState(false);
@@ -75,7 +77,7 @@ export function TaskBoardColumn({
                     </h3>
                   )}
                   {cluster.tasks.map((task) => (
-                    <TaskCard key={task.id} task={task} onOpen={onOpenTask} />
+                    <TaskCard key={task.id} task={task} onOpen={onOpenTask} onRequestDelete={onRequestDelete} />
                   ))}
                 </div>
               ))}

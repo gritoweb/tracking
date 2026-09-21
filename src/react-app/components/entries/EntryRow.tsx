@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useUpdateEntry, useDeleteEntry, useCreateEntry } from "@/hooks/useEntries";
 import { useProjects, useTagColors } from "@/hooks/useProjects";
 import { usePushEntries, useIntegrations } from "@/hooks/useIntegrations";
@@ -34,6 +35,7 @@ export function EntryRow({ entry, isSelected = false, onToggleSelect }: EntryRow
   const [durationInput, setDurationInput] = useState("");
   const [durationInvalid, setDurationInvalid] = useState(false);
   const [removing, setRemoving] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   // Flushed if the row unmounts before its exit animation finishes — see handleDelete.
   const pendingDelete = useRef<(() => void) | null>(null);
   useEffect(() => () => pendingDelete.current?.(), []);
@@ -274,7 +276,22 @@ export function EntryRow({ entry, isSelected = false, onToggleSelect }: EntryRow
         onContinue={handleContinue}
         onEdit={() => openEntryEditor(entry.id)}
         onPush={handlePush}
-        onDelete={handleDelete}
+        onDelete={() => setConfirmingDelete(true)}
+      />
+
+      <ConfirmDialog
+        open={confirmingDelete}
+        onOpenChange={setConfirmingDelete}
+        title="Delete entry?"
+        description={
+          entry.description
+            ? `"${entry.description}" will be permanently deleted.`
+            : "This entry will be permanently deleted."
+        }
+        onConfirm={() => {
+          setConfirmingDelete(false);
+          handleDelete();
+        }}
       />
     </div>
   );

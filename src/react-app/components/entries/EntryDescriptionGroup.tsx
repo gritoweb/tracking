@@ -15,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EntryRow } from "./EntryRow";
 import { AssignProjectChip } from "@/components/pickers/ProjectPicker";
 import { formatDurationShort } from "@/lib/dateUtils";
@@ -40,6 +41,7 @@ export function EntryDescriptionGroup({
   onToggleSelect,
 }: EntryDescriptionGroupProps) {
   const [open, setOpen] = useState(false);
+  const [confirmingDeleteAll, setConfirmingDeleteAll] = useState(false);
   const { startTimer } = useTimer();
   const bulkDelete = useBulkDeleteEntries();
   const bulkUpdate = useBulkUpdateEntries();
@@ -71,10 +73,8 @@ export function EntryDescriptionGroup({
     });
   };
 
-  // Deleting a whole group is the most destructive action in the list, and it
-  // was the only delete path with no undo: the single-row menu, the bulk bar,
-  // and the timesheet's clear-a-cell all offer one. The app's convention for
-  // destructive actions is undo rather than a confirm dialog — match it.
+  // Deleting a whole group is the most destructive action in the list — it now
+  // confirms first, like every other delete on the Timer (Luis, 21/09/2026).
   const handleDeleteAll = () => {
     const payloads = group.entries.flatMap((e) => toCreatePayload(e) ?? []);
     bulkDelete.mutate(group.entries.map((e) => e.id));
@@ -200,7 +200,7 @@ export function EntryDescriptionGroup({
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="text-destructive"
-                onClick={handleDeleteAll}
+                onClick={() => setConfirmingDeleteAll(true)}
                 disabled={bulkDelete.isPending}
               >
                 <Trash2 className="mr-2 h-3.5 w-3.5" />
@@ -223,6 +223,17 @@ export function EntryDescriptionGroup({
           ))}
         </div>
       </CollapsibleContent>
+
+      <ConfirmDialog
+        open={confirmingDeleteAll}
+        onOpenChange={setConfirmingDeleteAll}
+        title={`Delete all ${group.entries.length} entries?`}
+        description={`Every entry in "${group.description || "(no description)"}" will be permanently deleted.`}
+        onConfirm={() => {
+          setConfirmingDeleteAll(false);
+          handleDeleteAll();
+        }}
+      />
     </Collapsible>
   );
 }

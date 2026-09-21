@@ -1,7 +1,13 @@
 import { useState } from "react";
-import { ChevronRight, Play, Square } from "lucide-react";
+import { ChevronRight, Pencil, Play, Square, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import { TaskRowIdentity } from "./TaskRowIdentity";
 import { TaskRowMeta } from "./TaskRowMeta";
 import { TaskRowActions } from "./TaskRowActions";
@@ -208,7 +214,7 @@ export function TaskRow({
     );
   }
 
-  return (
+  const row = (
     <div
       className={cn(
         "group flex items-center gap-2 rounded-md px-2 py-2 transition-colors duration-fast ease-out-quart hover:bg-muted/50",
@@ -294,5 +300,23 @@ export function TaskRow({
         {startControl}
       </div>
     </div>
+  );
+
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>{row}</ContextMenuTrigger>
+      <ContextMenuContent>
+        {onEdit && (
+          <ContextMenuItem onSelect={() => onEdit(task)}>
+            <Pencil />
+            Edit task…
+          </ContextMenuItem>
+        )}
+        <ContextMenuItem variant="destructive" onSelect={() => onRequestDelete(task)}>
+          <Trash2 />
+          Delete
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }

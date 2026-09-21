@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { MessageCircle, Play, Repeat, Square } from "lucide-react";
+import { MessageCircle, Pencil, Play, Repeat, Square, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -12,6 +12,12 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import { ProjectBadge } from "@/components/ProjectBadge";
 import { AssignButton } from "@/components/ui/assign-button";
 import { AvatarStack } from "@/components/ui/avatar";
@@ -46,12 +52,14 @@ const DUE_TONE_CLASS: Record<string, string> = {
 interface TaskCardProps {
   task: Task;
   onOpen: (task: Task) => void;
+  /** Right-click → Delete; opens the same confirm dialog as the list's "…" menu. */
+  onRequestDelete?: (task: Task) => void;
   /** Rendered inside the DragOverlay — no sortable wiring, no transform. */
   overlay?: boolean;
 }
 
 /** One task on the board — a dense cell (`rounded-lg`), never a pill; grab anywhere on it to drag. */
-export function TaskCard({ task, onOpen, overlay = false }: TaskCardProps) {
+export function TaskCard({ task, onOpen, onRequestDelete, overlay = false }: TaskCardProps) {
   const { startTimer, stopTimer } = useTimer();
   const runningEntry = useTimerStore((s) => s.runningEntry);
   const running = runningEntry?.taskId === task.id;
@@ -77,7 +85,7 @@ export function TaskCard({ task, onOpen, overlay = false }: TaskCardProps) {
   const repeats = task.recurRule ? describeRecurRule(task.recurRule) : null;
   const done = task.statusCategory === "completed";
 
-  return (
+  const card = (
     <div
       ref={overlay ? undefined : sortable.setNodeRef}
       style={
@@ -277,5 +285,23 @@ export function TaskCard({ task, onOpen, overlay = false }: TaskCardProps) {
         )}
       </div>
     </div>
+  );
+
+  if (overlay || !onRequestDelete) return card;
+
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>{card}</ContextMenuTrigger>
+      <ContextMenuContent>
+        <ContextMenuItem onSelect={() => onOpen(task)}>
+          <Pencil />
+          Edit task…
+        </ContextMenuItem>
+        <ContextMenuItem variant="destructive" onSelect={() => onRequestDelete(task)}>
+          <Trash2 />
+          Delete
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }
