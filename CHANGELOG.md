@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-09-21 (65)
+### Deployed
+- **All 37 `SECURITY.md` findings (S-01 through S-34) are live in production.** `security` fast-forwarded into `master` (`501c47b`); remote D1 migrations `0051_keep_one_owner.sql` and `0052_saved_reports_workspace_fk.sql` applied before the deploy (bookmark `00000af4-00000000-000050ed-c298fa9d8899e5596822f4a28f32a531` taken first). `pnpm check` (0) then `pnpm run deploy`: Version ID `4ce4b931-e7b6-4262-9b44-7e5c1696eaff`. Smoke check: `GET /` → 200, `GET /api/me` (no session) → 401.
+
 ## 2026-09-21 (64)
 ### Fixed
 - **Every remaining `SECURITY.md` finding (S-08 through S-34) is now fixed, tested, and re-verified.** Five agents (one file-owner each), a blind re-exploitation pass by an independent pentest agent against a live `pnpm dev`, and manual browser confirmation by Luis on the highest-risk items. Full regression after all fixes: `tsc -b` (0), `lint` (0), `vitest run` (973/973), `pnpm build` (0), `wrangler deploy --dry-run` (0).
