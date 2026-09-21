@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-18 (54)
+### Changed
+- **The @ list in the comment field opens beside the "@" being typed, not under the whole field.** In a comment of several lines the list appeared below the entire box, far from the caret. `MentionInput` now anchors it to the position of the "@" (`caretRect`, which lays the text before it out in a hidden copy of the field with the same font, width and wrapping) and asks for that position again whenever the popover repositions, so it follows a scroll. It is the same behaviour as the description editor, and the helper that anchors a popover to a rectangle (`anchorAt`) is now shared by both instead of living inside one.
+
+Verified in a real browser with a six-line comment, typing `@De` at the start of line two: the field spans y 220 to 341 and the list opens at y 270, right under line two (it used to open at the field's bottom edge). Tests for `caretRect` (leaves nothing in the DOM, is a zero-width line-high box starting from the field, works at the end of the text and on an empty field) and `anchorAt`; the existing `MentionInput` tests still pass. `tsc -b` 0, lint 0.
+
 ## 2026-09-18 (53)
 ### Changed
 - **Editing a comment looks like writing one.** The in-place edit form was the default field (its own rounded box, a fixed two-line height and a resize handle) while the composer below the thread is a frame around a bare field with the button inside. The edit form now uses the same: a `rounded-md border` frame holding a `bare` field that grows with its text, no handle, and Cancel/Save inside the frame.

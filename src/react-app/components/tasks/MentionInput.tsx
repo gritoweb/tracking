@@ -3,6 +3,7 @@ import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover"
 import { Textarea } from "@/components/ui/textarea";
 import { MentionOptions } from "./MentionOptions";
 import { filterMembers } from "@/lib/mentionSearch";
+import { caretRect } from "@/lib/caret";
 import type { WorkspaceMember } from "@/hooks/useWorkspaceRole";
 
 const TRIGGER = /(^|\s)@([^\s@]*)$/;
@@ -28,6 +29,10 @@ export function MentionInput({ value, onValueChange, members, onPick, onKeyDown,
 
   const matches = useMemo(() => (trigger ? filterMembers(members, trigger.query) : []), [members, trigger]);
   const open = trigger !== null && matches.length > 0;
+  const anchor = useMemo(
+    () => ({ current: { getBoundingClientRect: () => (ref.current && trigger ? caretRect(ref.current, trigger.start) : new DOMRect()) } }),
+    [trigger]
+  );
 
   const readTrigger = (text: string, caret: number) => {
     const found = TRIGGER.exec(text.slice(0, caret));
@@ -75,26 +80,26 @@ export function MentionInput({ value, onValueChange, members, onPick, onKeyDown,
 
   return (
     <Popover open={open} onOpenChange={(next) => !next && setTrigger(null)}>
-      <PopoverAnchor asChild>
-        <div>
-          <Textarea
-            {...props}
-            ref={ref}
-            value={value}
-            role="combobox"
-            aria-autocomplete="list"
-            aria-expanded={open}
-            aria-haspopup="listbox"
-            onChange={(e) => {
-              onValueChange(e.target.value);
-              setTrigger(readTrigger(e.target.value, e.target.selectionStart));
-              setActive(0);
-            }}
-            onSelect={(e) => setTrigger(readTrigger(e.currentTarget.value, e.currentTarget.selectionStart))}
-            onKeyDown={handleKeyDown}
-          />
-        </div>
-      </PopoverAnchor>
+      {/* The list opens beside the "@" being typed, not under the whole field; asked again on scroll, so it follows. */}
+      <PopoverAnchor virtualRef={anchor} />
+      <div>
+        <Textarea
+          {...props}
+          ref={ref}
+          value={value}
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded={open}
+          aria-haspopup="listbox"
+          onChange={(e) => {
+            onValueChange(e.target.value);
+            setTrigger(readTrigger(e.target.value, e.target.selectionStart));
+            setActive(0);
+          }}
+          onSelect={(e) => setTrigger(readTrigger(e.currentTarget.value, e.currentTarget.selectionStart))}
+          onKeyDown={handleKeyDown}
+        />
+      </div>
       <PopoverContent
         align="start"
         className="w-64 p-1"

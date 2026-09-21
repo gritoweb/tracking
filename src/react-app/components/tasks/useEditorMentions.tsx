@@ -5,6 +5,7 @@ import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover"
 import { MemberProfile } from "./MemberProfile";
 import { MentionOptions } from "./MentionOptions";
 import { filterMembers } from "@/lib/mentionSearch";
+import { anchorAt } from "@/lib/caret";
 import type { WorkspaceMember } from "@/hooks/useWorkspaceRole";
 
 interface Suggest {
@@ -13,9 +14,6 @@ interface Suggest {
   index: number;
   command: (attrs: MentionNodeAttrs) => void;
 }
-
-/** Radix anchors a popover to anything that can say where it is, which is all a caret or a chip is. */
-const anchorAt = (rect: DOMRect | null) => ({ current: { getBoundingClientRect: () => rect ?? new DOMRect() } });
 
 /** "@" inside the description editor: the extension, the list beside the caret and the profile a chip opens. */
 export function useEditorMentions(members: WorkspaceMember[]) {
