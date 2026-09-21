@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-09-18 (50)
+### Fixed
+- **A person can be a member of a workspace only once (migration `0050`), which ends the duplicate demo membership.** `member` had no uniqueness rule, and the seed's `INSERT OR IGNORE` only ignores a repeated `id`, so a demo user who already had a membership under another id got a second row for the same workspace. The Assistant and the workspace list then rendered the workspace twice, which React reported as `Encountered two children with the same key` in the console (three of them on every page load). `idx_member_org_user` is a unique index on `(organizationId, userId)`: the same `INSERT OR IGNORE` now does what the seed meant, and a real duplicate would be refused instead of stored. The read-only check of the production database on 21/09 found 3 members and 3 distinct pairs, so nothing needs cleaning there. Not applied to the remote database.
+- **The dev seed no longer breaks on the "horas só com projeto" rule.** Writing the test for the item above ran the real `seeds/dev-seed.sql` on a fresh database and it aborted with "A time entry needs a project": three of its entries (`entry014`, `entry026`, `entry037`) had no project, which was allowed until migration `0049` made the database refuse it. They now belong to a project with a client, so `wrangler d1 execute --local --file=seeds/dev-seed.sql` works on a new database again.
+
+Verified: the migration applied to the local D1 (after removing the one duplicate row that test data had left); a page load of the timer, tasks and reports pages shows 0 duplicate-key errors (it was 3). Tests on a real SQLite: a second membership for the same pair is refused, one person can join two workspaces and two people can share one, `INSERT OR IGNORE` with a different id is a no-op, and the real seed file run twice leaves one membership and no error. `tsc -b` 0.
+
 ## 2026-09-18 (49)
 ### Added
 - **Tests for the API key lookup and the API key, tag and favorite routes, on a real database.** `lib/api-keys` is the whole authentication path of `/mcp` and had no test.

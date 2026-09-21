@@ -87,7 +87,7 @@ INSERT OR IGNORE INTO time_entries (id, workspace_id, project_id, description, s
   ('entry011', 'seeddemowrkspc00000000000000001', 'proj001', 'Homepage hero section — revisions from client','2026-03-12 10:00:00', '2026-03-12 11:30:00', 5400, 1, '2026-03-12 11:30:00', '2026-03-12 11:30:00'),
   ('entry012', 'seeddemowrkspc00000000000000001', 'proj003', 'Design email newsletter header',               '2026-03-13 09:00:00', '2026-03-13 10:30:00', 5400, 0, '2026-03-13 10:30:00', '2026-03-13 10:30:00'),
   ('entry013', 'seeddemowrkspc00000000000000001', 'proj002', 'Write OpenAPI spec for user endpoints',        '2026-03-13 13:00:00', '2026-03-13 15:00:00', 7200, 1, '2026-03-13 15:00:00', '2026-03-13 15:00:00'),
-  ('entry014', 'seeddemowrkspc00000000000000001', NULL,       'Research accessibility guidelines',            '2026-03-14 09:00:00', '2026-03-14 10:00:00', 3600, 0, '2026-03-14 10:00:00', '2026-03-14 10:00:00'),
+  ('entry014', 'seeddemowrkspc00000000000000001', 'proj001', 'Research accessibility guidelines',            '2026-03-14 09:00:00', '2026-03-14 10:00:00', 3600, 0, '2026-03-14 10:00:00', '2026-03-14 10:00:00'),
   ('entry015', 'seeddemowrkspc00000000000000001', 'proj001', 'Build product listing page layout',            '2026-03-14 11:00:00', '2026-03-14 14:00:00', 10800, 1, '2026-03-14 14:00:00', '2026-03-14 14:00:00'),
 
   -- Week 3: March 17–21
@@ -103,7 +103,7 @@ INSERT OR IGNORE INTO time_entries (id, workspace_id, project_id, description, s
   -- Week 4: March 24–28
   ('entry024', 'seeddemowrkspc00000000000000001', 'proj001', 'Implement dark mode toggle',                   '2026-03-24 09:00:00', '2026-03-24 11:00:00', 7200, 1, '2026-03-24 11:00:00', '2026-03-24 11:00:00'),
   ('entry025', 'seeddemowrkspc00000000000000001', 'proj004', 'Weekly team standup',                          '2026-03-26 09:00:00', '2026-03-26 09:30:00', 1800, 0, '2026-03-26 09:30:00', '2026-03-26 09:30:00'),
-  ('entry026', 'seeddemowrkspc00000000000000001', NULL,       'Write sprint retrospective notes',             '2026-03-26 10:00:00', '2026-03-26 10:45:00', 2700, 0, '2026-03-26 10:45:00', '2026-03-26 10:45:00'),
+  ('entry026', 'seeddemowrkspc00000000000000001', 'proj001', 'Write sprint retrospective notes',             '2026-03-26 10:00:00', '2026-03-26 10:45:00', 2700, 0, '2026-03-26 10:45:00', '2026-03-26 10:45:00'),
   ('entry027', 'seeddemowrkspc00000000000000001', 'proj002', 'Write integration tests for auth flow',        '2026-03-26 11:00:00', '2026-03-26 13:30:00', 9000, 1, '2026-03-26 13:30:00', '2026-03-26 13:30:00'),
   ('entry028', 'seeddemowrkspc00000000000000001', 'proj001', 'Cross-browser testing and bug fixes',          '2026-03-27 09:00:00', '2026-03-27 12:00:00', 10800, 1, '2026-03-27 12:00:00', '2026-03-27 12:00:00'),
   ('entry029', 'seeddemowrkspc00000000000000001', 'proj003', 'Design trade show booth graphics',             '2026-03-27 13:00:00', '2026-03-27 15:00:00', 7200, 0, '2026-03-27 15:00:00', '2026-03-27 15:00:00'),
@@ -116,6 +116,6 @@ INSERT OR IGNORE INTO time_entries (id, workspace_id, project_id, description, s
   ('entry034', 'seeddemowrkspc00000000000000001', 'proj002', 'Fix CORS headers for production domain',       '2026-04-03 09:00:00', '2026-04-03 10:00:00', 3600, 1, '2026-04-03 10:00:00', '2026-04-03 10:00:00'),
   ('entry035', 'seeddemowrkspc00000000000000001', 'proj003', 'Finalize brand guidelines PDF export',         '2026-04-03 13:00:00', '2026-04-03 14:30:00', 5400, 0, '2026-04-03 14:30:00', '2026-04-03 14:30:00'),
   ('entry036', 'seeddemowrkspc00000000000000001', 'proj001', 'Address post-review design revisions',         '2026-04-04 09:00:00', '2026-04-04 11:30:00', 9000, 1, '2026-04-04 11:30:00', '2026-04-04 11:30:00'),
-  ('entry037', 'seeddemowrkspc00000000000000001', NULL,       'Plan Q2 roadmap items',                        '2026-04-04 13:00:00', '2026-04-04 14:00:00', 3600, 0, '2026-04-04 14:00:00', '2026-04-04 14:00:00'),
+  ('entry037', 'seeddemowrkspc00000000000000001', 'proj002', 'Plan Q2 roadmap items',                        '2026-04-04 13:00:00', '2026-04-04 14:00:00', 3600, 0, '2026-04-04 14:00:00', '2026-04-04 14:00:00'),
   ('entry038', 'seeddemowrkspc00000000000000001', 'proj002', 'Add webhook support for project events',       '2026-04-05 09:00:00', '2026-04-05 11:30:00', 9000, 1, '2026-04-05 11:30:00', '2026-04-05 11:30:00'),
   ('entry039', 'seeddemowrkspc00000000000000001', 'proj004', 'Update internal documentation wiki',           '2026-04-05 13:00:00', '2026-04-05 14:00:00', 3600, 0, '2026-04-05 14:00:00', '2026-04-05 14:00:00');
