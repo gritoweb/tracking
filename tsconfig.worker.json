@@ -9,5 +9,5 @@
       "@shared/*": ["./src/shared/*"]
     }
   },
-  "include": ["src/worker", "src/shared"]
+  "include": ["src/worker", "src/shared", "src/test/node-sqlite.d.ts"]
 }

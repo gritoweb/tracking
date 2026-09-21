@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-09-18 (36)
+### Added
+- **A test that runs the real SQL for "removing a member takes them off the tasks" (D6).** The existing tests only compared the SQL text a stub received. `src/test/sqlite-d1.ts` now gives tests a real in-memory SQLite with every migration applied, behind the slice of the D1 API the worker uses (`prepare/bind/run/all/first`), and `removeMemberFromTasks` is tested against it: the person disappears from every task they were on, other people's assignments stay, their notifications in that workspace go, the same person's assignments in another workspace stay, and their tracked hours are kept. Nothing in the worker changed.
+- The helper reads the migrations with `import.meta.glob` and declares only the `node:sqlite` surface it uses (`src/test/node-sqlite.d.ts`, added to `tsconfig.worker.json`), so the worker project still has no Node typings.
+
+Verified: with the assignee `DELETE` switched off the tests fail (2 of 4), restored they pass. All 48 migrations apply to the in-memory database. `tsc -b` 0, lint 0.
+
 ## 2026-09-18 (35)
 ### Added
 - **Owners and admins can delete any comment, and long threads load in pages (D8).** Deleting a comment was author-only, so a stray or wrong comment could only be removed by whoever wrote it. `DELETE /:id/comments/:commentId` now follows the same author-or-manager rule as attachments (`canDeleteComment`); editing stays author-only. The panel shows the delete button to the author or a manager, and only the author gets the edit button. `GET /:id/comments` returns the newest 100 (`limit` up to 200) and takes `before=<commentId>` for the ones older than it; the panel shows "Load earlier comments" while a page came back full, and the MCP `list_task_comments` tool takes the same `limit`/`before` (its description no longer says "every comment").
