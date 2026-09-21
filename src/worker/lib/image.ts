@@ -108,6 +108,85 @@ function assertSafeDimensions(bytes: Uint8Array, kind: ImageKind): void {
 
 const MAX_EDGE = 2000;
 
+const GIF_TRAILER = 0x3b;
+const GIF_IMAGE_DESCRIPTOR = 0x2c;
+const GIF_EXTENSION = 0x21;
+const GIF_LABEL_GRAPHIC_CONTROL = 0xf9;
+const GIF_LABEL_PLAIN_TEXT = 0x01;
+const GIF_LABEL_APPLICATION = 0xff;
+const NETSCAPE_LOOP_ID = "NETSCAPE2.0";
+
+const gifTableBytes = (packed: number) => (packed & 0x80 ? 3 * 2 ** ((packed & 0x07) + 1) : 0);
+
+/** Position just past the 0-terminated sub-block chain starting at `pos`; throws if it runs off the file. */
+function endOfGifSubBlocks(bytes: Uint8Array, pos: number): number {
+  for (;;) {
+    if (pos >= bytes.length) throw new ImageDecodeError("Could not decode this image");
+    const size = bytes[pos];
+    if (size === 0) return pos + 1;
+    pos += 1 + size;
+  }
+}
+
+/** Rebuilds a GIF from its blocks, keeping frames and the loop count only — no comments, foreign extensions or trailing bytes. */
+export function sanitizeGif(bytes: Uint8Array): Uint8Array {
+  const malformed = () => new ImageDecodeError("Could not decode this image");
+  const version = String.fromCharCode(...bytes.subarray(0, 6));
+  if ((version !== "GIF87a" && version !== "GIF89a") || bytes.length < 13) throw malformed();
+
+  let pos = 13 + gifTableBytes(bytes[10]);
+  if (pos > bytes.length) throw malformed();
+  const chunks: Uint8Array[] = [bytes.subarray(0, pos)];
+  let frames = 0;
+
+  for (;;) {
+    if (pos >= bytes.length) throw malformed();
+    const introducer = bytes[pos];
+
+    if (introducer === GIF_TRAILER) {
+      if (frames === 0) throw malformed();
+      chunks.push(bytes.subarray(pos, pos + 1));
+      break;
+    }
+
+    if (introducer === GIF_IMAGE_DESCRIPTOR) {
+      if (pos + 10 > bytes.length) throw malformed();
+      const dataStart = pos + 10 + gifTableBytes(bytes[pos + 9]) + 1; // +1: LZW minimum code size
+      if (dataStart > bytes.length) throw malformed();
+      const next = endOfGifSubBlocks(bytes, dataStart);
+      chunks.push(bytes.subarray(pos, next));
+      frames++;
+      pos = next;
+      continue;
+    }
+
+    if (introducer === GIF_EXTENSION) {
+      if (pos + 2 > bytes.length) throw malformed();
+      const label = bytes[pos + 1];
+      const next = endOfGifSubBlocks(bytes, pos + 2);
+      if (label === GIF_LABEL_GRAPHIC_CONTROL || label === GIF_LABEL_PLAIN_TEXT) {
+        chunks.push(bytes.subarray(pos, next));
+      } else if (label === GIF_LABEL_APPLICATION && bytes[pos + 2] === 0x0b) {
+        const id = String.fromCharCode(...bytes.subarray(pos + 3, pos + 14));
+        const hasLoopCount = bytes[pos + 14] === 0x03 && bytes[pos + 15] === 0x01;
+        // Only the 3-byte loop sub-block is rebuilt; any other sub-block in the extension is dropped.
+        if (id === NETSCAPE_LOOP_ID && hasLoopCount) {
+          chunks.push(bytes.subarray(pos, pos + 18), new Uint8Array([0x00]));
+        }
+      }
+      pos = next;
+      continue;
+    }
+
+    throw malformed();
+  }
+
+  const out = new Uint8Array(chunks.reduce((n, chunk) => n + chunk.length, 0));
+  let at = 0;
+  for (const chunk of chunks) { out.set(chunk, at); at += chunk.length; }
+  return out;
+}
+
 interface ProcessedImage {
   bytes: Uint8Array;
   contentType: string;
@@ -115,10 +194,10 @@ interface ProcessedImage {
   height: number;
 }
 
-/** Resize (long edge capped at 2000px) and re-encode to webp; GIF passes through unchanged to keep its animation. */
+/** Resize (long edge capped at 2000px) and re-encode to webp; GIF keeps its frames (animation) but is rebuilt without non-frame bytes. */
 export function processImage(bytes: Uint8Array, kind: ImageKind): ProcessedImage {
   assertSafeDimensions(bytes, kind);
-  if (kind.ext === "gif") return { bytes, contentType: kind.contentType, ...gifDimensions(bytes) };
+  if (kind.ext === "gif") return { bytes: sanitizeGif(bytes), contentType: kind.contentType, ...gifDimensions(bytes) };
 
   let input: PhotonImage | undefined;
   let output: PhotonImage | undefined;

@@ -44,6 +44,11 @@ async function nameTaken(
   return Boolean(row);
 }
 
+async function projectInWorkspace(db: D1Database, workspaceId: string, projectId: string) {
+  const row = await db.prepare(`SELECT id FROM projects WHERE id = ? AND workspace_id = ?`).bind(projectId, workspaceId).first();
+  return Boolean(row);
+}
+
 export const taskStatusesRouter = new Hono<{
   Bindings: Env;
   Variables: { workspaceId: string; userId: string };
@@ -61,6 +66,7 @@ export const taskStatusesRouter = new Hono<{
     }
     const { projectId } = await c.req.json<{ projectId?: string }>();
     if (!projectId) return c.json({ error: "projectId is required" }, 400);
+    if (!(await projectInWorkspace(c.env.DB, workspaceId, projectId))) return c.json({ error: "Project not found" }, 404);
     const forked = await ensureProjectFork(c.env.DB, workspaceId, projectId);
     return c.json(forked, 200);
   })
@@ -71,7 +77,10 @@ export const taskStatusesRouter = new Hono<{
       return c.json({ error: MANAGER_ONLY_ERROR }, 403);
     }
     const { name, color, category, projectId = null } = c.req.valid("json");
-    if (projectId) await ensureProjectFork(c.env.DB, workspaceId, projectId);
+    if (projectId) {
+      if (!(await projectInWorkspace(c.env.DB, workspaceId, projectId))) return c.json({ error: "Project not found" }, 404);
+      await ensureProjectFork(c.env.DB, workspaceId, projectId);
+    }
     if (await nameTaken(c.env.DB, workspaceId, projectId, name)) {
       return c.json({ error: NAME_TAKEN }, 409);
     }

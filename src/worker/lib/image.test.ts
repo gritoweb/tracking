@@ -255,10 +255,18 @@ describe("processImage — decode failures always free the input", () => {
 describe("processImage — GIF branch (gifDimensions)", () => {
   const gifKind = sniffImage(bytes(...ascii("GIF89a")))!;
 
-  it("reads width/height little-endian from the logical screen descriptor and passes bytes through unchanged", () => {
-    // "GIF89a" (6) + width=320 (2, LE) + height=240 (2, LE) + 2 more bytes of padding.
-    const gif = bytes(...ascii("GIF89a"), 0x40, 0x01, 0xf0, 0x00, 0, 0);
+  it("reads width/height little-endian from the logical screen descriptor and passes a clean GIF through unchanged", () => {
+    // "GIF89a" + 320x240 (LE) + no color table + one 1x1 frame + trailer.
+    const gif = bytes(
+      ...ascii("GIF89a"), 0x40, 0x01, 0xf0, 0x00, 0, 0, 0,
+      0x2c, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0x02, 0x02, 0x44, 0x01, 0x00, 0x3b
+    );
     const result = processImage(gif, gifKind);
     expect(result).toEqual({ bytes: gif, contentType: "image/gif", width: 320, height: 240 });
+  });
+
+  it("rejects a header-only GIF with no frames as ImageDecodeError", () => {
+    const gif = bytes(...ascii("GIF89a"), 0x40, 0x01, 0xf0, 0x00, 0, 0);
+    expect(() => processImage(gif, gifKind)).toThrow(ImageDecodeError);
   });
 });

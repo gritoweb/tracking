@@ -31,6 +31,11 @@ import { actorDisplayName, notifyAssigneesOfStatusChange, notifyMentions, notify
 import type { CreateTask, Task, TaskComment, TaskStatus } from "@shared/schemas";
 
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+// Multipart framing (boundary + part headers) rides on top of the file itself.
+const MULTIPART_SLACK_BYTES = 64 * 1024;
+// Generous for screenshots on one task; bounds R2 growth per task to a known ceiling.
+const MAX_ATTACHMENTS_PER_TASK = 50;
+const TOO_MANY_ATTACHMENTS = `A task can hold at most ${MAX_ATTACHMENTS_PER_TASK} images`;
 
 const taskAssigneeArray = z.array(TaskAssigneeSchema);
 
@@ -136,6 +141,12 @@ async function readTask(
   return results.length ? results[0] : null;
 }
 
+/** True when the project exists in this workspace — a bare id from a client is never trusted. */
+async function projectInWorkspace(db: D1Database, projectId: string, workspaceId: string): Promise<boolean> {
+  const row = await db.prepare(`SELECT id FROM projects WHERE id = ? AND workspace_id = ?`).bind(projectId, workspaceId).first();
+  return Boolean(row);
+}
+
 /** The REST `POST /` handler and the MCP `create_task` tool both go through this — one implementation. */
 export async function createTask(
   db: D1Database,
@@ -156,6 +167,8 @@ export async function createTask(
     // A subtask always belongs to its parent's project — the row inherits the
     // project badge, so letting the two diverge would render a lie.
     projectId = parent.projectId;
+  } else if (!(await projectInWorkspace(db, projectId, workspaceId))) {
+    return { error: "Project not found" };
   }
 
   // Recurrence lives on the thing you actually schedule. A repeating subtask
@@ -409,9 +422,7 @@ export const tasksRouter = new Hono<{
 
     // A subtask's project always follows its parent's (set via parentId below, never directly).
     if (data.projectId !== undefined && !isSubtask) {
-      const project = await c.env.DB.prepare(`SELECT id FROM projects WHERE id = ? AND workspace_id = ?`)
-        .bind(data.projectId, workspaceId).first();
-      if (!project) return c.json({ error: "Project not found" }, 400);
+      if (!(await projectInWorkspace(c.env.DB, data.projectId, workspaceId))) return c.json({ error: "Project not found" }, 400);
       set("project_id", data.projectId);
     }
 
@@ -772,6 +783,16 @@ export const tasksRouter = new Hono<{
       .bind(taskId, workspaceId).first();
     if (!task) return c.json({ error: "Not found" }, 404);
 
+    // Refuse on the declared size first: parseBody() would buffer the whole upload before any check could run.
+    const declaredBytes = Number(c.req.header("content-length"));
+    if (Number.isFinite(declaredBytes) && declaredBytes > MAX_ATTACHMENT_BYTES + MULTIPART_SLACK_BYTES) {
+      return c.json({ error: "Image is larger than 10 MB" }, 413);
+    }
+
+    const existingCount = await c.env.DB.prepare(`SELECT COUNT(*) AS n FROM task_attachments WHERE task_id = ? AND workspace_id = ?`)
+      .bind(taskId, workspaceId).first<{ n: number }>();
+    if ((existingCount?.n ?? 0) >= MAX_ATTACHMENTS_PER_TASK) return c.json({ error: TOO_MANY_ATTACHMENTS }, 409);
+
     const body = await c.req.parseBody();
     const file = body.file;
     if (!(file instanceof File)) return c.json({ error: "Missing file" }, 400);
@@ -797,14 +818,21 @@ export const tasksRouter = new Hono<{
     });
 
     const id = crypto.randomUUID();
-    await c.env.DB.prepare(
+    // The count is re-checked inside the INSERT so parallel uploads can't all slip past the pre-check.
+    const inserted = await c.env.DB.prepare(
       `INSERT INTO task_attachments (id, workspace_id, task_id, user_id, r2_key, filename, content_type, size, width, height)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+       WHERE (SELECT COUNT(*) FROM task_attachments WHERE task_id = ? AND workspace_id = ?) < ?`
     ).bind(
       id, workspaceId, taskId, userId, key,
       file.name || "attachment", processed.contentType, processed.bytes.byteLength,
-      processed.width, processed.height
+      processed.width, processed.height,
+      taskId, workspaceId, MAX_ATTACHMENTS_PER_TASK
     ).run();
+    if (!inserted.meta.changes) {
+      await c.env.ATTACHMENTS.delete(key);
+      return c.json({ error: TOO_MANY_ATTACHMENTS }, 409);
+    }
 
     const row = await c.env.DB.prepare(`SELECT * FROM task_attachments WHERE id = ?`).bind(id).first<TaskAttachmentRow>();
     if (!row) return c.json({ error: "attachment insert did not produce a readable row" }, 500);
