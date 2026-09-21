@@ -36,6 +36,7 @@ import { pruneNotifications } from "./lib/notifications";
 import { routeAgentRequest } from "agents";
 import { createMcpHandler } from "agents/mcp";
 import { buildMcpServer } from "./mcp/server";
+import { mcpGate } from "./mcp/gate";
 import { resolveApiKey, touchApiKey } from "./lib/api-keys";
 export { TimerRoom } from "./durable-objects/TimerRoom";
 export { ChatAgent } from "./durable-objects/ChatAgent";
@@ -44,9 +45,9 @@ export { NotificationRoom } from "./durable-objects/NotificationRoom";
 // 10 attempts per minute on auth endpoints. Relaxed in the Vite dev server
 // (which is what `pnpm dev` and the CI e2e run use) so the Playwright suite's
 // one-signup-per-test pattern can't trip it — production builds keep 10/min.
-const authRateLimit = rateLimit(import.meta.env.DEV ? 1000 : 10, 60_000);
+const authRateLimit = rateLimit(import.meta.env.DEV ? 1000 : 10, 60_000, import.meta.env.DEV ? undefined : "AUTH_LIMITER");
 // AI calls have real latency/cost — cap per-workspace request rate
-const aiRateLimit = rateLimit(20, 60_000);
+const aiRateLimit = rateLimit(20, 60_000, "AI_LIMITER");
 // Nudges are deterministic but read through to Google Calendar. The client
 // polls at 5-minute intervals, so 6/min is pure headroom — this only guards
 // against a runaway poller re-introducing a tight refetch loop. Relaxed in
@@ -189,6 +190,9 @@ async function handleMcpRequest(
   env: Env,
   ctx: ExecutionContext
 ): Promise<Response> {
+  const refused = await mcpGate(request, env);
+  if (refused) return refused;
+
   const resolved = await resolveApiKey(env.DB, request.headers.get("Authorization"));
   if (!resolved) {
     return new Response(
