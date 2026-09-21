@@ -186,6 +186,10 @@ export function createAuth(env: Env, baseURL: string) {
               .bind(organization.id, user.id)
               .run();
           },
+          // Delete the row first so its member cascade passes migration 0051's last-owner guard; better-auth's own member-by-member delete would not.
+          beforeDeleteOrganization: async ({ organization }) => {
+            await env.DB.prepare(`DELETE FROM workspaces WHERE id = ?`).bind(organization.id).run();
+          },
           // Owner/admin removal path; the voluntary-leave counterpart is the top-level `hooks.after` above.
           afterRemoveMember: async ({ organization, member }) => {
             await removeMemberFromTasks(env, organization.id, member.userId);
