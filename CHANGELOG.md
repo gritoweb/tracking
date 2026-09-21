@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-09-18 (49)
+### Added
+- **Tests for the API key lookup and the API key, tag and favorite routes, on a real database.** `lib/api-keys` is the whole authentication path of `/mcp` and had no test.
+  - **`resolveApiKey` (15):** the plaintext is returned once and only its SHA-256 is stored; two keys are never the same; a key resolves to its workspace, the person who minted it and its scope; no header, an empty one, another scheme, a bearer with no token, a session-style token and a never-issued key are all refused; the scheme is case-insensitive; **a key stops working when its owner leaves the workspace (and only that person's keys do)**; a revoked key stops working; listing carries no secret; another workspace's key cannot be revoked.
+  - **Routes:** a key is shown in the one response that creates it and never again, an unknown scope is refused, each workspace sees only its own keys and a foreign key answers 404 and survives; tags and favorites are listed by workspace, created with the right owner (a tag gets a colour, a repeated name returns the existing tag, two workspaces may share a name), and recolouring or deleting another workspace's tag or favorite changes nothing. A favorite that points at another workspace's project does not disclose that project's name.
+- **The coverage floor rises again, to 44% lines / 41% branches** (measured 44.2% / 41.8%).
+
+Verified by breaking the code and restoring it: dropping the member join from the key lookup and the workspace filter from revoke fails 3 tests (the leaving owner's key still working, and both cross-workspace revokes). `tsc -b` 0, lint 0, vitest 778/778.
+
 ## 2026-09-18 (48)
 ### Changed
 - **Four patterns that were pasted into several screens are now one thing each.** A scan of every screen found only six long class strings repeated three or more times, so the code was already tidy; these are the ones worth naming:

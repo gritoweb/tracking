@@ -25,8 +25,8 @@ export default defineConfig({
       ],
       // Floored to the measured value (target is 80/80) - many files under the globs above still have no test.
       thresholds: {
-        lines: 42,
-        branches: 40,
+        lines: 44,
+        branches: 41,
       },
     },
   },
