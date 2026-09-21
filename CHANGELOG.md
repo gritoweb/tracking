@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-18 (41)
+### Security
+- **The API no longer answers `Access-Control-Allow-Origin: *`.** When a request carried no `Origin`, the CORS middleware replied with a wildcard. A browser's cross-origin call always carries an `Origin`, so nothing was reachable through it, but a wildcard on an authenticated API is one refactor away from mattering. No `Origin` now means no CORS header; the app's own origin is still echoed and any other gets nothing. The origin check is exported (`isAllowedOrigin`) so `/mcp` can use the same list.
+
+Verified against the dev server before and after: with no `Origin` the response had `access-control-allow-origin: *`, and now has no CORS header; the allowed origin is still echoed and a foreign one gets none. The middleware had no test at all: 5 now (own origin echoed, foreign origin refused, prefix and suffix look-alikes refused, no wildcard, the shared check). `tsc -b` 0.
+
 ## 2026-09-18 (40)
 ### Security
 - **The integration URL guard no longer lets an IPv4 address hide inside an IPv6 literal.** `safeIntegrationOrigin` blocked `[::1]`, unique-local and link-local IPv6 but let `[::ffff:a9fe:a9fe]` through, which is `169.254.169.254` (the cloud metadata address), and likewise `[::ffff:7f00:1]` (loopback), the mapped private ranges, `[::7f00:1]`, NAT64 `[64:ff9b::7f00:1]`, 6to4 and Teredo. IPv6 is now an allow-list: only global unicast (`2000::/3`) minus the protocol-assignment, documentation and 6to4 ranges is accepted, so anything that embeds or reserves an address is refused. Its test used `2001:db8::1` as the example of a "public" address, but that is the documentation range; it now uses a real one.
