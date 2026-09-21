@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { mcpGate } from "./gate";
+import { MCP_REQUESTS_PER_MINUTE, mcpGate } from "./gate";
+
+const WRANGLER = Object.values(import.meta.glob<string>("../../../wrangler.jsonc", { query: "?raw", import: "default", eager: true }))[0];
 
 const env = (extra: object = {}) => ({ APP_URL: "https://tracking.example.com", ...extra }) as unknown as Env;
 const request = (headers: Record<string, string> = {}) => new Request("https://tracking.example.com/mcp", { method: "POST", headers });
@@ -40,5 +42,19 @@ describe("mcpGate", () => {
     const res = await mcpGate(from("20.0.0.6"), env({ MCP_LIMITER: limiter }), { max: 5, shared: "MCP_LIMITER" });
     expect(res?.status).toBe(429);
     expect(limiter.limit).toHaveBeenCalledWith({ key: "/mcp:20.0.0.6" });
+  });
+
+  it("lets the production limit of requests through and refuses the next one", async () => {
+    const env600 = env();
+    for (let i = 0; i < MCP_REQUESTS_PER_MINUTE; i++) {
+      if ((await mcpGate(from("20.0.1.1"), env600, { max: MCP_REQUESTS_PER_MINUTE })) !== null) throw new Error(`refused request ${i + 1}`);
+    }
+    expect((await mcpGate(from("20.0.1.1"), env600, { max: MCP_REQUESTS_PER_MINUTE }))?.status).toBe(429);
+  });
+
+  it("is high enough that normal use never meets it, and equals the limit declared in wrangler.jsonc", () => {
+    expect(MCP_REQUESTS_PER_MINUTE).toBeGreaterThanOrEqual(600);
+    const declared = /"name":\s*"MCP_LIMITER"[^}]*"limit":\s*(\d+)/.exec(WRANGLER)?.[1];
+    expect(Number(declared)).toBe(MCP_REQUESTS_PER_MINUTE);
   });
 });

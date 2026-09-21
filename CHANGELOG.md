@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-18 (57)
+### Changed
+- **The `/mcp` limit goes from 120 to 600 requests a minute per address.** The ordinary `/api` routes (time entries, tasks, reports) have no blanket limit at all; only the sensitive endpoints do (sign-in, AI, e-mail, outbound). `/mcp` had a blanket one, and 120 a minute is easy to reach for legitimate use: an agent fires several tools a second, and a whole office leaves through one address. 600 (ten a second) is only reached by a script or an attack, and the limit exists to keep key guessing and floods off the database, not to pace real use. `MCP_REQUESTS_PER_MINUTE` in `mcp/gate.ts` and `MCP_LIMITER` in `wrangler.jsonc` are the same number, and a test fails if they drift apart. This supersedes the 120 written in entry (43) and in the docs, which now say 600.
+
+Verified: the gate lets exactly 600 requests from one address through and refuses the 601st (test), the test that reads `wrangler.jsonc` finds `MCP_LIMITER` at 600, and the wrangler dry run lists `env.MCP_LIMITER (600 requests/60s)`. `pnpm check` 0.
+
 ## 2026-09-18 (55)
 ### Changed
 - **Two people with the same name can be told apart in the @ list.** The list showed an avatar and a name, so two members called "Sam" looked identical when picking one. Rows whose name repeats within the list now also show the e-mail underneath (and only those rows, so the usual list stays as compact as before). In a comment the pick is remembered by id, so choosing the right row is enough to tag the right person.

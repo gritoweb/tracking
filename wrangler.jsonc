@@ -86,7 +86,7 @@
   "ratelimits": [
     { "name": "AUTH_LIMITER", "namespace_id": "540101", "simple": { "limit": 10, "period": 60 } },
     { "name": "AI_LIMITER", "namespace_id": "540102", "simple": { "limit": 20, "period": 60 } },
-    { "name": "MCP_LIMITER", "namespace_id": "540103", "simple": { "limit": 120, "period": 60 } }
+    { "name": "MCP_LIMITER", "namespace_id": "540103", "simple": { "limit": 600, "period": 60 } }
   ],
   "migrations": [
     {
