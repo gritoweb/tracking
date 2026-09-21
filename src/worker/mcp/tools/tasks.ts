@@ -128,14 +128,25 @@ export function registerTaskReads(d: ToolDeps): void {
     "list_task_comments",
     {
       title: "List a task's comments",
-      description: "Every comment on a task, oldest first. Comments are flat — there are no replies or threads.",
-      inputSchema: { taskId: IdArg("task") },
+      description:
+        "A task's comments, oldest first — the newest 100 by default. Comments are flat, there are no replies or threads. " +
+        "To read further back, pass `before` with the id of the oldest comment you already have.",
+      inputSchema: {
+        taskId: IdArg("task"),
+        limit: z.number().int().min(1).max(200).optional().describe("How many of the newest comments to return (default 100)."),
+        before: z.string().min(1).optional().describe("A comment id: return only comments older than it."),
+      },
       annotations: READ_ONLY,
     },
-    async ({ taskId }) =>
-      fromBridge(await bridge<TaskComment[]>("GET", `/api/tasks/${segment(taskId)}/comments`), (list) =>
+    async ({ taskId, limit, before }) => {
+      const query = new URLSearchParams();
+      if (limit) query.set("limit", String(limit));
+      if (before) query.set("before", before);
+      const suffix = query.size ? `?${query}` : "";
+      return fromBridge(await bridge<TaskComment[]>("GET", `/api/tasks/${segment(taskId)}/comments${suffix}`), (list) =>
         list.map((c) => commentView(c, appUrl(env)))
-      )
+      );
+    }
   );
 
   server.registerTool(

@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-09-18 (35)
+### Added
+- **Owners and admins can delete any comment, and long threads load in pages (D8).** Deleting a comment was author-only, so a stray or wrong comment could only be removed by whoever wrote it. `DELETE /:id/comments/:commentId` now follows the same author-or-manager rule as attachments (`canDeleteComment`); editing stays author-only. The panel shows the delete button to the author or a manager, and only the author gets the edit button. `GET /:id/comments` returns the newest 100 (`limit` up to 200) and takes `before=<commentId>` for the ones older than it; the panel shows "Load earlier comments" while a page came back full, and the MCP `list_task_comments` tool takes the same `limit`/`before` (its description no longer says "every comment").
+
+### Fixed
+- Comments written in the same second keep their order across pages: the paging tie-break is the row's insertion order (`rowid`), not the random comment id, which had shuffled them on the older page.
+
+Verified against the local D1 and in a real browser with 105 comments on one task: the first page held the newest 100 in order, `limit=10&before=` returned exactly the 6 older ones with no overlap, `limit=500` answered 400, "Load earlier comments" appeared, loaded the rest and then disappeared, and the owner deleted a comment written by another member. A plain member's 403 is covered by route tests only (the seeded member cannot sign in here). Route tests for author, owner, admin, non-member and missing comment on delete, and for the paging SQL and its limits. `tsc -b` 0, lint 0.
+
 ## 2026-09-18 (34)
 ### Fixed
 - **The task panel follows edits made elsewhere (D5).** The panel copied the task's name and estimate into local state only when the task id changed, so a rename by a teammate (or from the MCP, the Assistant or another tab) never showed while the panel stayed open. Both fields now go through `useSyncedField`: they follow the server's value unless the person has typed something of their own, and start over when another task opens.

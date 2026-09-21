@@ -822,8 +822,8 @@ export const tasksRouter = new Hono<{
          JOIN "user" u ON u.id = tc.user_id
          LEFT JOIN task_attachments ta ON ta.id = tc.attachment_id
         WHERE tc.task_id = ? AND tc.workspace_id = ?
-          ${before ? "AND (tc.created_at, tc.id) < (SELECT created_at, id FROM task_comments WHERE id = ? AND workspace_id = ?)" : ""}
-        ORDER BY tc.created_at DESC, tc.id DESC LIMIT ?`
+          ${before ? "AND (tc.created_at, tc.rowid) < (SELECT created_at, rowid FROM task_comments WHERE id = ? AND workspace_id = ?)" : ""}
+        ORDER BY tc.created_at DESC, tc.rowid DESC LIMIT ?`
     ).bind(taskId, workspaceId, ...(before ? [before, workspaceId] : []), limit).all<TaskCommentRow>();
     // Newest page first from SQL, oldest first for the client.
     return c.json(results.reverse().map(formatComment), 200);

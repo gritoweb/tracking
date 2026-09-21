@@ -253,3 +253,95 @@ describe("PUT /:id — people tagged in the description", () => {
     expect(t.notified).toHaveLength(0);
   });
 });
+
+describe("DELETE /:id/comments/:commentId — author, owner or admin (D8)", () => {
+  function remove(role: string | null, author: string) {
+    const deletes: unknown[][] = [];
+    const { app, env } = mountedApp({
+      first: (call) => {
+        if (call.sql.includes("FROM task_comments WHERE id")) return { user_id: author };
+        if (call.sql.includes('FROM "member"')) return role ? { role } : null;
+        return null;
+      },
+      run: (call) => {
+        if (call.sql.includes("DELETE FROM task_comments")) deletes.push(call.params);
+        return { success: true };
+      },
+    });
+    const ctx = { waitUntil: () => {}, passThroughOnException: () => {} } as unknown as ExecutionContext;
+    const timerRoom = { idFromName: () => "room", get: () => ({ fetch: async () => new Response("ok") }) };
+    const request = () =>
+      app.request("/task-1/comments/c1", { method: "DELETE" }, { ...env, TIMER_ROOM: timerRoom } as unknown as Env, ctx);
+    return { deletes, request };
+  }
+
+  it("lets the author delete their own comment, whatever their role", async () => {
+    const { deletes, request } = remove("member", "user-1");
+    expect((await request()).status).toBe(200);
+    expect(deletes).toEqual([["c1"]]);
+  });
+
+  it.each(["owner", "admin"])("lets a workspace %s delete someone else's comment", async (role) => {
+    const { deletes, request } = remove(role, "someone-else");
+    expect((await request()).status).toBe(200);
+    expect(deletes).toEqual([["c1"]]);
+  });
+
+  it("refuses a plain member deleting someone else's comment", async () => {
+    const { deletes, request } = remove("member", "someone-else");
+    expect((await request()).status).toBe(403);
+    expect(deletes).toEqual([]);
+  });
+
+  it("refuses someone who is no longer a member of the workspace", async () => {
+    const { deletes, request } = remove(null, "someone-else");
+    expect((await request()).status).toBe(403);
+    expect(deletes).toEqual([]);
+  });
+
+  it("answers 404 for a comment that is not in this workspace, before looking at roles", async () => {
+    const { app, env } = mountedApp({ first: () => null });
+    const res = await app.request("/task-1/comments/missing", { method: "DELETE" }, env);
+    expect(res.status).toBe(404);
+  });
+});
+
+describe("GET /:id/comments — paging (D8)", () => {
+  const row = (id: string) => ({
+    id, workspace_id: "workspace-A", task_id: "task-1", user_id: "user-1", body: id, mentioned_user_ids: "",
+    attachment_id: null, created_at: "2026-01-01 00:00:00", edited_at: null,
+    user_name: "Author", user_email: "a@x.test", user_image: null, attachment_filename: null,
+  });
+
+  function list(query = "") {
+    const { app, env, calls } = mountedApp({ all: () => ({ results: [row("c3"), row("c2"), row("c1")] }) });
+    return { calls, request: () => app.request(`/task-1/comments${query}`, {}, env) };
+  }
+
+  it("breaks ties on the insertion order, not on the random id, so comments in one second keep their sequence", async () => {
+    const { calls, request } = list();
+    await request();
+    expect(calls[0].sql).not.toContain("tc.id DESC");
+  });
+
+  it("asks for the newest 100 by default and returns them oldest first", async () => {
+    const { calls, request } = list();
+    const res = await request();
+    expect(((await res.json()) as { id: string }[]).map((c) => c.id)).toEqual(["c1", "c2", "c3"]);
+    expect(calls[0].sql).toContain("ORDER BY tc.created_at DESC, tc.rowid DESC LIMIT ?");
+    expect(calls[0].sql).not.toContain("SELECT created_at, rowid FROM task_comments");
+    expect(calls[0].params).toEqual(["task-1", "workspace-A", 100]);
+  });
+
+  it("pages back from a comment id, scoped to the workspace so another tenant's id is no cursor", async () => {
+    const { calls, request } = list("?limit=20&before=c9");
+    expect((await request()).status).toBe(200);
+    expect(calls[0].sql).toContain("(tc.created_at, tc.rowid) < (SELECT created_at, rowid FROM task_comments WHERE id = ? AND workspace_id = ?)");
+    expect(calls[0].params).toEqual(["task-1", "workspace-A", "c9", "workspace-A", 20]);
+  });
+
+  it.each(["0", "201", "abc"])("rejects limit=%s", async (limit) => {
+    const { request } = list(`?limit=${limit}`);
+    expect((await request()).status).toBe(400);
+  });
+});
