@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-09-21 (70)
+### Deployed
+- **The tool-approval signature fix (and everything since the last deploy) is live in production.** `pnpm check` (0) then `pnpm run deploy`: Version ID `46d1f22c-2909-4e65-a64a-7d2e52229a6d`. Smoke check: `GET /` → 200, `GET /api/me` (no session) → 401.
+
 ## 2026-09-21 (69)
 ### Fixed
 - **Every real tool approval in the Assistant chat was silently broken — only forged ones were ever actually tested against the S-02 fix.** Asked to log time and clicking the real "Approve" button, nothing was created. Root cause, found by driving the real WebSocket protocol against local dev: `agents@0.17.4` persists a `tool-approval-request` part as `{id, approved}`, dropping the `signature` the `ai` SDK itself issued in the same event — so `validateApprovedToolApprovals` rejected every genuine approval with "missing signature", not just forged ones (S-02's fix closed the security hole but broke the entire legitimate approval path for every `MUTATES`/`DESTRUCTIVE` tool). `ChatAgent` now taps its own outgoing stream (`toUIMessageStream().pipeThrough(...)`, since `streamText`'s `onChunk` doesn't expose this event type) to cache each signature it issues, and a new `restoreApprovalSignatures()` (`assistant-messages.ts`) re-attaches it before the message is converted for the model — only for a `toolCallId` this server actually emitted, so a forged approval still fails closed exactly as before. Verified end-to-end against local dev: a real approve now creates the entry (confirmed in D1); a forged pre-approved `delete_time_entry` (fabricated toolCallId, no matching cache entry) still gets rejected and the target entry survives. `tsc -b` (0), `lint` (0), `vitest run` (978/978, +4 new tests).
