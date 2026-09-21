@@ -29,8 +29,7 @@ function world() {
       ('e-B', 'ws-B', 'u-eve', 'p-B', 'eve work', '2026-01-05T09:00:00.000Z', '2026-01-05T11:00:00.000Z', 7200, 1);
     INSERT INTO time_entries (id, workspace_id, user_id, project_id, description, start, billable) VALUES
       ('e-run', 'ws-A', 'u-ana', 'p1', 'still running', '2026-01-07T09:00:00.000Z', 1);
-    -- Outside RANGE (2026-01-01..02-01) on purpose, so it never touches the totals asserted above —
-    -- a dedicated describe block below queries a wider range just for this row.
+    -- Outside RANGE on purpose, so it never touches the totals above; a wider-range block below covers it.
     INSERT INTO tasks (id, workspace_id, project_id, name) VALUES ('t-B-secret', 'ws-B', 'p-B', 'Elsewhere Secret Task');
     INSERT INTO time_entries (id, workspace_id, user_id, project_id, task_id, description, start, stop, duration, billable) VALUES
       ('e-cross', 'ws-A', 'u-ana', 'p1', 't-B-secret', 'cross-tenant task_id', '2026-03-01T12:00:00.000Z', '2026-03-01T12:30:00.000Z', 1800, 1);
@@ -174,9 +173,7 @@ describe("GET /weekly and GET /detailed", () => {
   });
 });
 
-// SECURITY.md S-03: task_id isn't validated against workspace_id on write (a separate, known gap —
-// see time-entries.ts), so a time entry can end up pointing at a task from another workspace. These
-// three reports must never resolve that foreign id back to a name — only "No task"/null.
+// A foreign task_id (never validated on write — see time-entries.ts) must never resolve to a name — SECURITY.md S-03.
 describe("tenant isolation — a foreign task_id never resolves to that task's name", () => {
   const CROSS_RANGE = "since=2026-03-01T00:00:00.000Z&until=2026-03-02T00:00:00.000Z";
 

@@ -1,18 +1,12 @@
 import { DurableObject } from "cloudflare:workers";
 
-// The real client sends at most one "activity" heartbeat per 30s per tab
-// (ACTIVITY_HEARTBEAT_MS in useWebSocket.ts) — both bounds below are still
-// generous headroom over that, but close off the flood a same-workspace
-// member could otherwise send (SECURITY.md S-05: 20 MB messages and ~99,000
-// msgs/2s were accepted with no cap before this).
+// Generous headroom over the real ~1 msg/30s client heartbeat, closes the flood — SECURITY.md S-05.
 const MAX_MESSAGE_BYTES = 1024;
 const RATE_LIMIT_MAX = 20;
 const RATE_LIMIT_WINDOW_MS = 60_000;
 
 export class TimerRoom extends DurableObject<Env> {
-  // Per-connection sliding window. In-memory (keyed by the live WebSocket
-  // object), so it resets on hibernation — the same accepted trade-off as
-  // ChatAgent's own rate limiter.
+  // Per-connection sliding window; resets on hibernation, same trade-off as ChatAgent's limiter.
   private messageTimestamps = new WeakMap<WebSocket, number[]>();
 
   constructor(ctx: DurableObjectState, env: Env) {

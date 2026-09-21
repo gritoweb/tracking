@@ -15,23 +15,13 @@ type ResolvedWorkspace =
  * indexed D1 lookup); a no-longer-member falls back to their first remaining
  * organization.
  *
- * `disableCookieCache: true` forces every request through this gate to read
- * the session row from D1 instead of trusting the signed `session_data`
- * cookie cache — that cache is a self-contained, signed blob that stays valid
- * for its own `maxAge` (5 min) regardless of what happens server-side, so a
- * sign-out or a `revoke-sessions` call left a stale copy of the cookie
- * authenticating for up to 5 minutes after the session row was deleted
- * (SECURITY.md S-04). Every route that matters goes through this one gate, so
- * disabling the cache here closes the hole app-wide for one extra indexed
- * lookup per request — the same D1 round trip the membership check below
- * already pays for.
- *
  * Shared by workspaceMiddleware (/api/*) and the /agents/* gate in index.ts.
  */
 export async function resolveWorkspace(env: Env, request: Request): Promise<ResolvedWorkspace> {
   const origin = new URL(request.url).origin;
   const auth = createAuth(env, origin);
 
+  // disableCookieCache: forces a real D1 check instead of trusting the stale signed cookie — SECURITY.md S-04.
   const result = await auth.api.getSession({
     headers: request.headers,
     query: { disableCookieCache: true },
