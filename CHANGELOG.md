@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-09-18 (51)
+### Changed
+- **`Input` has a `bare` variant, so the "transparent field" trick lives in one place.** The base `Input` fills itself in the dark theme (`dark:bg-input/30`), and a `dark:` class beats `bg-transparent`, so every borderless field had to remember to add `dark:bg-transparent` too; two of them forgot once and showed a lighter box in dark mode (fixed in an earlier entry, but nothing kept it from happening again). `variant="bare"` (no fill, border or shadow, dark included) now does it, matching the `Textarea` variant of the same name; the timer bar's description field and the "Add a subtask" field use it and keep their own padding and focus ring.
+
+A scan of every `Input` that forces a transparent fill found three: the two above, and the task panel's Estimate field, which stays as it was because it needs a transparent border that is still there (so it does not change size on hover).
+
+Verified in a real browser by measuring 14 computed properties (background, border, radius, padding, size, shadow, outline, font and colour) of the three fields in light and dark, at rest, hovered and focused, before and after: 18 snapshots, 0 differences. Tests for the variant (dark fill gone, default look untouched, a screen's own padding and ring survive). `tsc -b` 0.
+
 ## 2026-09-18 (50)
 ### Fixed
 - **A person can be a member of a workspace only once (migration `0050`), which ends the duplicate demo membership.** `member` had no uniqueness rule, and the seed's `INSERT OR IGNORE` only ignores a repeated `id`, so a demo user who already had a membership under another id got a second row for the same workspace. The Assistant and the workspace list then rendered the workspace twice, which React reported as `Encountered two children with the same key` in the console (three of them on every page load). `idx_member_org_user` is a unique index on `(organizationId, userId)`: the same `INSERT OR IGNORE` now does what the seed meant, and a real duplicate would be refused instead of stored. The read-only check of the production database on 21/09 found 3 members and 3 distinct pairs, so nothing needs cleaning there. Not applied to the remote database.

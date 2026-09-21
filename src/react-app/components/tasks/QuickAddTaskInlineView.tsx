@@ -91,6 +91,7 @@ export function QuickAddTaskInlineView({
           <Plus className="h-3.5 w-3.5" />
         </Button>
         <Input
+          variant="bare"
           ref={inputRef}
           autoFocus={autoFocus}
           value={value}
@@ -98,7 +99,7 @@ export function QuickAddTaskInlineView({
           onKeyDown={onKeyDown}
           placeholder={placeholder}
           aria-label="Add a task"
-          className="h-6 border-0 bg-transparent px-0 py-0 text-sm shadow-none focus-visible:ring-0 dark:bg-transparent"
+          className="h-6 px-0 py-0 text-sm focus-visible:ring-0"
         />
         {showProjectField && (
           <ProjectPicker value={projectId} onChange={onProjectChange} className="shrink-0 rounded-md" />

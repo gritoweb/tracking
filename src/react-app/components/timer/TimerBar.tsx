@@ -197,6 +197,7 @@ export function TimerBar() {
     <header aria-label="Timer controls" className="flex flex-wrap items-center gap-2 bg-card px-4 py-2 xl:h-14 xl:flex-nowrap xl:gap-3 xl:py-0">
       {/* Plain description field: free text, no suggestions dropdown. */}
       <Input
+        variant="bare"
         ref={descRef}
         value={description}
         onChange={(e) => setDescription(e.target.value)}
@@ -209,9 +210,8 @@ export function TimerBar() {
         className={cn(
           // Inset + full opacity: border-0 leaves this ring as the input's only focus signal (WCAG 2.4.7).
           // min-w-0 lets flex-1 yield at xl; without it the overflow pushes the rightmost control off-screen.
-          // dark:bg-transparent overrides Input's dark:bg-input/30 fill to keep the borderless look in both themes.
           // eslint-disable-next-line no-restricted-syntax -- an inset ring: the house ring would draw outside this borderless field
-          "tt-touch basis-full border-0 bg-transparent text-sm shadow-none placeholder:text-muted-foreground focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:ring-inset dark:bg-transparent xl:min-w-0 xl:flex-1 xl:basis-auto",
+          "tt-touch basis-full text-sm placeholder:text-muted-foreground focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:ring-inset xl:min-w-0 xl:flex-1 xl:basis-auto",
           isRunning && "font-medium"
         )}
       />

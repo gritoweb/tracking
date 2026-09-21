@@ -9,9 +9,15 @@ export const inputVariants = cva(
         default: "h-9 py-1",
         sm: "h-8 py-0.5",
       },
+      variant: {
+        default: "",
+        // Sits on a surface that is already the frame: no fill, border or shadow of its own. dark:bg-transparent is part of it because the base's dark fill would otherwise beat bg-transparent.
+        bare: "border-0 bg-transparent shadow-none dark:bg-transparent",
+      },
     },
     defaultVariants: {
       size: "default",
+      variant: "default",
     },
   }
 )
