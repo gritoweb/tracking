@@ -164,7 +164,12 @@ export function createAuth(env: Env, baseURL: string) {
       },
     },
     plugins: [
-      bearer(),
+      // requireSignature: the extension's real bearer token is always the SIGNED
+      // cookie value (setSignedCookie in better-auth's session route, contains a
+      // "."), captured verbatim from the `set-auth-token` header. Without this
+      // flag, an unsigned raw session.token (e.g. leaked via list-sessions) gets
+      // auto-signed on the fly and authenticates on its own — see SECURITY.md S-01.
+      bearer({ requireSignature: true }),
       organization({
         // Reuse the existing `workspaces` table instead of creating a parallel
         // `organization` table — avoids migrating every workspace_id FK.

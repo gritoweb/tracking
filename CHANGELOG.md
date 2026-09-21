@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-09-21 (63)
+### Fixed
+- **`bearer()` no longer auto-signs a raw session token.** The security audit (`SECURITY.md` S-01, CRITICAL) found `GET /api/auth/list-sessions` returning each session's raw, unsigned `token` — and better-auth's `bearer()` plugin re-signing any unsigned token on the fly (`requireSignature` was never set), so that raw value alone authenticated as a full session, without ever having been issued to whoever held it. The extension's real bearer flow already sends the *signed* cookie value (`setSignedCookie`, contains a `.`), so `bearer({ requireSignature: true })` in `src/worker/auth.ts` closes the hole with no regression: confirmed with `pnpm exec vitest run` (812/812) and a live re-run of the original hijack PoC against the dev server (now `401` where it used to be `200`), plus a control proving the extension's signed-token flow still authenticates. `list-sessions` still returns the raw `token` in its response (hardening left for a follow-up), but it is no longer sufficient on its own.
+
 ## 2026-09-21 (62)
 ### Changed
 - **1.0.0 is in production.** `refactor` was fast-forwarded into `master` (`e058e10`, 39 commits) and deployed to the support Cloudflare account (the only one of the four this login sees that holds the `time-tracker` database).
