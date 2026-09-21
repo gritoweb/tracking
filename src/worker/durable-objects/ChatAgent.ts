@@ -138,6 +138,13 @@ LANGUAGE: ${language}`;
       system,
       messages: await convertToModelMessages(bounded),
       tools,
+      // Signs every tool-approval-request the model emits, and rejects any
+      // approval reply that doesn't carry a valid signature back — without
+      // this, the `needsApproval: true` on write tools is enforced only by
+      // the client UI, so a raw WebSocket message forging an
+      // already-approved tool call executes it with no human ever having
+      // clicked anything (SECURITY.md S-02).
+      experimental_toolApprovalSecret: this.env.AUTH_SECRET,
       stopWhen: stepCountIs(5),
       // Scout answers in the language of the last thing it read, usually an English tool result; restate the reply language last.
       prepareStep: ({ messages }) => ({ messages: [...messages, { role: "system" as const, content: language }] }),
