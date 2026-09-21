@@ -24,7 +24,7 @@ test("posting, editing and deleting a comment through the panel", async ({ page 
   await expect(panel.getByText("Test User")).toBeVisible();
 
   await panel.getByRole("button", { name: "Edit comment" }).click();
-  const editBox = panel.getByRole("textbox", { name: "Edit comment" });
+  const editBox = panel.getByRole("combobox", { name: "Edit comment" });
   await editBox.fill("First pass looks good — ship it");
   await panel.getByRole("button", { name: "Save" }).click();
   await expect(panel.getByText("First pass looks good — ship it")).toBeVisible();

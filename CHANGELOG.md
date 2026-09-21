@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-18 (61)
+### Fixed
+- **The comments e2e spec looks for the edit field by its real role.** `e2e/task-comments.spec.ts` asked for `getByRole("textbox", { name: "Edit comment" })`, but the field became a `combobox` (the `@` list) in the mention-chip commit `eec4b44`, which is already on `master`; Playwright is not in CI, so the spec had been failing unnoticed. It looks for the `combobox` now.
+
+Verified by running the whole Playwright suite against the local dev server for the first time this round: 134 specs, 130 passed and 4 failed. The comments spec was the stale selector above. The other three (an invitation being accepted, the sign-in page load and "stopping in one tab refreshes Reports in the other") failed on 30-second timeouts and a 5-second visibility wait while two workers loaded one dev server; run alone, with one worker, all 13 specs of those three files and the comments file pass (`report-per-person`, `task-comments`, `timer-cross-tab-sync`).
+
 ## 2026-09-18 (60)
 ### Changed
 - **E-mails, the extension popup and the success/warning labels now follow the same colour tokens.**
