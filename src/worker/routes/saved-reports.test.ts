@@ -44,3 +44,28 @@ describe("GET / — saved report config (TYPE-2: typed row, parsed via parseJson
     warn.mockRestore();
   });
 });
+
+describe("POST / — config size (S-31)", () => {
+  const post = (config: unknown) => {
+    const { app, env } = mountedApp({ run: () => ({ meta: { changes: 1 } }), first: () => ({ id: "r1", name: "n", config: "{}", created_at: "now", updated_at: "now" }) });
+    return app.request("/", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: "big", config }) }, env);
+  };
+  const ids = (n: number) => Array.from({ length: n }, (_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, "0")}`);
+  // Shape the app really saves (useSavedReports.ts), with a filter list far larger than a person picks.
+  const realistic = (n: number) => ({
+    range: { since: "2026-01-01T00:00:00.000Z", until: "2026-02-01T00:00:00.000Z", label: "This month" },
+    filters: { clientIds: ids(n), projectIds: ids(n), taskIds: ids(n), tagIds: ids(n), userIds: ids(n), billable: "all", search: "" },
+    rounding: { mode: "off", minutes: 0 },
+    group: "project",
+    subGroup: "none",
+  });
+
+  it("refuses a multi-megabyte config", async () => {
+    expect((await post({ blob: "x".repeat(2_000_000) })).status).toBe(400);
+  });
+
+  it("accepts a real config, even with 200 ids in every filter", async () => {
+    expect((await post(realistic(3))).status).toBe(201);
+    expect((await post(realistic(200))).status).toBe(201);
+  });
+});

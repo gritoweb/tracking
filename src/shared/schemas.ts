@@ -535,19 +535,28 @@ export const UpdateTimeEntrySchema = z
     { message: "Stop time must be after start time", path: ["stop"] }
   );
 
-export const BulkUpdateTimeEntriesSchema = z.object({
-  ids: z.array(z.string()).min(1),
-  patch: z.object({
-    projectId: z.string().min(1, "Choose a project").optional(),
-    taskId: z.string().nullable().optional(),
-    billable: z.boolean().optional(),
-    tags: z.array(z.string()).optional(),
-    description: z.string().optional(),
-  }),
-});
+// Same as DETAILED_ROW_LIMIT (routes/reports.ts): the Reports table's select-all can carry every row it shows.
+export const BULK_ENTRY_IDS_MAX = 10_000;
+const BULK_TAGS_IDS_MAX = 500;
+
+export const BulkUpdateTimeEntriesSchema = z
+  .object({
+    ids: z.array(z.string()).min(1).max(BULK_ENTRY_IDS_MAX),
+    patch: z.object({
+      projectId: z.string().min(1, "Choose a project").optional(),
+      taskId: z.string().nullable().optional(),
+      billable: z.boolean().optional(),
+      tags: z.array(z.string().max(100)).max(50).optional(),
+      description: z.string().optional(),
+    }),
+  })
+  .refine((body) => body.patch.tags === undefined || body.ids.length <= BULK_TAGS_IDS_MAX, {
+    message: `Replacing tags is limited to ${BULK_TAGS_IDS_MAX} entries per request`,
+    path: ["ids"],
+  });
 
 export const BulkDeleteTimeEntriesSchema = z.object({
-  ids: z.array(z.string()).min(1),
+  ids: z.array(z.string()).min(1).max(BULK_ENTRY_IDS_MAX),
 });
 
 // Source week is a fixed 7-day window from `sourceWeekStart`; every copied entry shifts by (targetWeekStart - sourceWeekStart).
@@ -637,11 +646,15 @@ export const GenerateDraftsResultSchema = z.object({
 
 // ─── Reports ─────────────────────────────────────────────────────────────────
 
+const CSV_IDS_MAX = 200;
+
 // Optional comma-separated list of IDs → string[] (e.g. "a,b,c"). Undefined when absent.
 const csvIds = z
   .string()
+  .max(CSV_IDS_MAX * 64)
   .optional()
-  .transform((v) => (v ? v.split(",").filter(Boolean) : undefined));
+  .transform((v) => (v ? v.split(",").filter(Boolean) : undefined))
+  .pipe(z.array(z.string()).max(CSV_IDS_MAX).optional());
 
 export const RoundingModeSchema = z.enum(["off", "nearest", "up", "down"]);
 
@@ -781,18 +794,25 @@ export const ReportDetailedEntrySchema = z.object({
 
 // ─── Saved reports ───────────────────────────────────────────────────────────
 
-// Config is a serialized report view; validated loosely (client owns the shape).
+// Config is a serialized report view; validated loosely (client owns the shape), but bounded: 5 filter lists of 200 uuids are ~40 KB.
+const SAVED_REPORT_CONFIG_MAX_CHARS = 65_536;
+const savedReportConfig = z
+  .record(z.string(), z.unknown())
+  .refine((config) => JSON.stringify(config).length <= SAVED_REPORT_CONFIG_MAX_CHARS, {
+    message: "Report configuration is too large",
+  });
+
 export const SavedReportSchema = z.object({
   id: z.string(),
   name: z.string(),
-  config: z.record(z.string(), z.unknown()),
+  config: savedReportConfig,
   createdAt: z.string(),
   updatedAt: z.string(),
 });
 
 export const CreateSavedReportSchema = z.object({
   name: z.string().min(1).max(120),
-  config: z.record(z.string(), z.unknown()),
+  config: savedReportConfig,
 });
 
 export type DraftSource = z.infer<typeof DraftSourceSchema>;

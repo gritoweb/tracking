@@ -131,3 +131,19 @@ describe("splitPlainMentions", () => {
     expect(splitPlainMentions("", [luis])).toEqual([]);
   });
 });
+
+describe("docMentions on hostile nesting (S-30)", () => {
+  const nested = (depth: number) => '{"type":"doc","content":['.repeat(depth) + '{"type":"mention","attrs":{"id":"deep","label":"Deep"}}' + "]}".repeat(depth);
+
+  it("does not overflow the stack on a 50,000-level document", () => {
+    expect(() => docMentions(nested(50_000))).not.toThrow();
+  });
+
+  it("still finds a mention nested at a normal depth", () => {
+    expect(docMentions(nested(30))).toEqual([{ userId: "deep", label: "Deep" }]);
+  });
+
+  it("gives up on a document nested past the cap instead of walking it", () => {
+    expect(docMentions(nested(50_000))).toEqual([]);
+  });
+});

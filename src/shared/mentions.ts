@@ -75,6 +75,9 @@ export function taggedPeople(body: string, people: MentionPerson[]): MentionPers
   });
 }
 
+// A real description nests a few dozen levels at most (lists in lists); deeper is hostile.
+const MAX_DOC_DEPTH = 100;
+
 interface DocNode {
   type?: string;
   attrs?: { id?: unknown; label?: unknown };
@@ -91,13 +94,18 @@ export function docMentions(raw: string | null | undefined): { userId: string; l
     return [];
   }
   const found = new Map<string, string>();
-  const walk = (node: DocNode) => {
+  // Explicit stack with a depth cap: a hostile document must not grow the call stack.
+  const stack: { node: DocNode; depth: number }[] = [{ node: doc, depth: 0 }];
+  while (stack.length) {
+    const { node, depth } = stack.pop()!;
+    if (!node || typeof node !== "object") continue;
     if (node.type === "mention" && typeof node.attrs?.id === "string" && !found.has(node.attrs.id)) {
       found.set(node.attrs.id, typeof node.attrs.label === "string" ? node.attrs.label : node.attrs.id);
     }
-    node.content?.forEach(walk);
-  };
-  walk(doc);
+    if (depth >= MAX_DOC_DEPTH || !Array.isArray(node.content)) continue;
+    // Pushed in reverse so children pop in document order.
+    for (let i = node.content.length - 1; i >= 0; i--) stack.push({ node: node.content[i], depth: depth + 1 });
+  }
   return [...found].map(([userId, label]) => ({ userId, label }));
 }
 

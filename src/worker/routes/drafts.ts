@@ -15,6 +15,7 @@ import {
 import { broadcast } from "../db/queries";
 import type { DraftConfirmRow } from "../db/rows";
 import { findActiveProject, PROJECT_REQUIRED_ERROR } from "../lib/projects";
+import { TASK_NOT_FOUND_ERROR, taskInWorkspace } from "./time-entries";
 
 const clientId = (c: { req: { header: (n: string) => string | undefined } }) =>
   c.req.header("X-Client-Id") ?? null;
@@ -122,15 +123,13 @@ export const draftsRouter = new Hono<{
         : durations;
 
     const now = new Date().toISOString();
-    const insert = c.env.DB.prepare(
-      `INSERT INTO time_entries
+    // Gated on the draft still existing; a task outside this workspace is dropped to NULL.
+    const insertSql = `INSERT INTO time_entries
          (id, workspace_id, user_id, project_id, task_id, description, start, stop, duration,
           billable, calendar_event_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    );
-    const remove = c.env.DB.prepare(
-      `DELETE FROM draft_entries WHERE id = ? AND workspace_id = ? AND user_id = ?`
-    );
+       SELECT ?, ?, ?, ?, (SELECT id FROM tasks WHERE id = ? AND workspace_id = ?), ?, ?, ?, ?, ?, ?, ?, ?
+       WHERE EXISTS (SELECT 1 FROM draft_entries WHERE id = ? AND workspace_id = ? AND user_id = ?)`;
+    const removeSql = `DELETE FROM draft_entries WHERE id = ? AND workspace_id = ? AND user_id = ?`;
 
     const statements = results.flatMap((row, i) => {
       const startMs = new Date(row.start).getTime();
@@ -138,12 +137,13 @@ export const draftsRouter = new Hono<{
       // an observed fact, how long it ran is the estimate being corrected.
       const stop = new Date(startMs + finalDurations[i] * 1000).toISOString();
       return [
-        insert.bind(
+        c.env.DB.prepare(insertSql).bind(
           crypto.randomUUID(),
           workspaceId,
           userId,
           row.project_id ?? null,
           row.task_id ?? null,
+          workspaceId,
           row.description ?? "",
           row.start,
           stop,
@@ -151,20 +151,26 @@ export const draftsRouter = new Hono<{
           row.billable ? 1 : 0,
           row.calendar_event_id ?? null,
           now,
-          now
+          now,
+          row.id,
+          workspaceId,
+          userId
         ),
-        remove.bind(row.id, workspaceId, userId),
+        c.env.DB.prepare(removeSql).bind(row.id, workspaceId, userId),
       ];
     });
 
-    await c.env.DB.batch(statements);
+    const outcomes = await c.env.DB.batch(statements);
+    // Even positions are the inserts: a draft another request consumed first changed no row.
+    const confirmedIdx = results.map((_, i) => i).filter((i) => (outcomes[i * 2].meta.changes ?? 0) > 0);
+    if (!confirmedIdx.length) return c.json({ error: "No matching drafts" }, 404);
 
     c.executionCtx.waitUntil(
       broadcast(c.env, workspaceId, "entries:changed", null, clientId(c))
     );
     return c.json({
-      confirmed: results.length,
-      totalSeconds: finalDurations.reduce((sum, d) => sum + d, 0),
+      confirmed: confirmedIdx.length,
+      totalSeconds: confirmedIdx.reduce((sum, i) => sum + finalDurations[i], 0),
     }, 200);
   })
   // ─── Discard a whole day's drafts ─────────────────────────────────────────
@@ -204,6 +210,9 @@ export const draftsRouter = new Hono<{
     }
     if (data.projectId && !(await findActiveProject(c.env.DB, workspaceId, data.projectId))) {
       return c.json({ error: PROJECT_REQUIRED_ERROR }, 400);
+    }
+    if (data.taskId && !(await taskInWorkspace(c.env.DB, workspaceId, data.taskId))) {
+      return c.json({ error: TASK_NOT_FOUND_ERROR }, 400);
     }
 
     const fields: string[] = [];

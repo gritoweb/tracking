@@ -15,6 +15,7 @@ import {
 const SUGGESTION_LOOKBACK_DAYS = 90;
 // Fetched once and filtered client-side, so this is the whole candidate set.
 const SUGGESTION_LIMIT = 200;
+import { nextUnusedColor } from "@shared/colors";
 import {
   broadcast,
   formatEntry,
@@ -44,6 +45,84 @@ interface SuggestionRow {
   last_used: string;
 }
 
+// D1 allows 100 bound parameters per statement; a chunk plus the fixed binds of a bulk statement stays under it.
+const BULK_CHUNK_SIZE = 90;
+
+export const TASK_NOT_FOUND_ERROR = "Task not found in this workspace";
+
+function chunked<T>(items: T[]): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += BULK_CHUNK_SIZE) chunks.push(items.slice(i, i + BULK_CHUNK_SIZE));
+  return chunks;
+}
+
+const placeholdersFor = (ids: string[]) => ids.map(() => "?").join(",");
+
+export async function taskInWorkspace(db: D1Database, workspaceId: string, taskId: string): Promise<boolean> {
+  const row = await db
+    .prepare(`SELECT id FROM tasks WHERE id = ? AND workspace_id = ?`)
+    .bind(taskId, workspaceId)
+    .first<{ id: string }>();
+  return row !== null;
+}
+
+/**
+ * Statements that make every listed entry carry exactly `tagNames`: create the missing tags once, drop the
+ * old links, link the new ones. Entry ids are re-scoped to the workspace inside each statement, so a foreign
+ * id is ignored. Colour choice mirrors `upsertTags`.
+ */
+async function replaceTagStatements(
+  db: D1Database,
+  workspaceId: string,
+  entryIds: string[],
+  tagNames: string[]
+): Promise<D1PreparedStatement[]> {
+  const names = [...new Set(tagNames)];
+  const statements: D1PreparedStatement[] = [];
+
+  if (names.length) {
+    const { results: inUse } = await db
+      .prepare(`SELECT DISTINCT color FROM tags WHERE workspace_id = ?`)
+      .bind(workspaceId)
+      .all<{ color: string | null }>();
+    const taken = new Set(inUse.map((r) => r.color).filter((c): c is string => Boolean(c)));
+    const insertTag = `INSERT OR IGNORE INTO tags (id, workspace_id, name, color) VALUES (?, ?, ?, ?)`;
+    for (const name of names) {
+      const color = nextUnusedColor(taken);
+      taken.add(color);
+      statements.push(db.prepare(insertTag).bind(crypto.randomUUID(), workspaceId, name, color));
+    }
+  }
+
+  for (const part of chunked(entryIds)) {
+    statements.push(
+      db
+        .prepare(
+          `DELETE FROM time_entry_tags WHERE time_entry_id IN
+             (SELECT id FROM time_entries WHERE workspace_id = ? AND id IN (${placeholdersFor(part)}))`
+        )
+        .bind(workspaceId, ...part)
+    );
+  }
+
+  // 2 fixed binds + the tag names + the ids must stay within 100 per statement.
+  const linkChunk = Math.max(1, Math.min(BULK_CHUNK_SIZE, 98 - names.length));
+  for (let i = 0; names.length && i < entryIds.length; i += linkChunk) {
+    const part = entryIds.slice(i, i + linkChunk);
+    statements.push(
+      db
+        .prepare(
+          `INSERT OR IGNORE INTO time_entry_tags (time_entry_id, tag_id)
+           SELECT te.id, tg.id FROM time_entries te, tags tg
+           WHERE te.workspace_id = ? AND te.id IN (${placeholdersFor(part)})
+             AND tg.workspace_id = ? AND tg.name IN (${placeholdersFor(names)})`
+        )
+        .bind(workspaceId, ...part, workspaceId, ...names)
+    );
+  }
+  return statements;
+}
+
 /** Ids (already workspace-scoped) the caller may not change: someone else's entry for a member, or anyone else's running timer. */
 async function forbiddenEntryIds(
   db: D1Database,
@@ -54,15 +133,18 @@ async function forbiddenEntryIds(
   if (!ids.length) return [];
   const role = await getMemberRole(db, workspaceId, userId);
 
-  const placeholders = ids.map(() => "?").join(",");
-  const { results } = await db
-    .prepare(
-      `SELECT id, user_id, stop FROM time_entries WHERE workspace_id = ? AND id IN (${placeholders})`
+  const batches = await db.batch<{ id: string; user_id: string | null; stop: string | null }>(
+    chunked(ids).map((part) =>
+      db
+        .prepare(`SELECT id, user_id, stop FROM time_entries WHERE workspace_id = ? AND id IN (${placeholdersFor(part)})`)
+        .bind(workspaceId, ...part)
     )
-    .bind(workspaceId, ...ids)
-    .all<{ id: string; user_id: string | null; stop: string | null }>();
+  );
 
-  return results.filter((r) => !canWriteEntry(role, r, userId)).map((r) => r.id);
+  return batches
+    .flatMap((b) => b.results)
+    .filter((r) => !canWriteEntry(role, r, userId))
+    .map((r) => r.id);
 }
 
 export const timeEntriesRouter = new Hono<{
@@ -201,6 +283,9 @@ export const timeEntriesRouter = new Hono<{
 
     const project = await findActiveProject(c.env.DB, workspaceId, data.projectId);
     if (!project) return c.json({ error: PROJECT_REQUIRED_ERROR }, 400);
+    if (data.taskId && !(await taskInWorkspace(c.env.DB, workspaceId, data.taskId))) {
+      return c.json({ error: TASK_NOT_FOUND_ERROR }, 400);
+    }
     const billable = resolveEntryBillable(data.billable);
 
     // Stop the caller's running timer; a teammate's keeps going.
@@ -289,7 +374,8 @@ export const timeEntriesRouter = new Hono<{
   .patch("/bulk", zValidator("json", BulkUpdateTimeEntriesSchema), async (c) => {
     const workspaceId = c.get("workspaceId");
     const userId = c.get("userId");
-    const { ids, patch } = c.req.valid("json");
+    const { ids: requestedIds, patch } = c.req.valid("json");
+    const ids = [...new Set(requestedIds)];
     const now = new Date().toISOString();
 
     const forbidden = await forbiddenEntryIds(c.env.DB, workspaceId, userId, ids);
@@ -302,6 +388,9 @@ export const timeEntriesRouter = new Hono<{
     if (patch.projectId !== undefined && !(await findActiveProject(c.env.DB, workspaceId, patch.projectId))) {
       return c.json({ error: PROJECT_REQUIRED_ERROR }, 400);
     }
+    if (patch.taskId && !(await taskInWorkspace(c.env.DB, workspaceId, patch.taskId))) {
+      return c.json({ error: TASK_NOT_FOUND_ERROR }, 400);
+    }
 
     const fields: string[] = [];
     const values: unknown[] = [];
@@ -313,37 +402,43 @@ export const timeEntriesRouter = new Hono<{
     fields.push("updated_at = ?");
     values.push(now);
 
-    const placeholders = ids.map(() => "?").join(",");
+    let updated = 0;
     if (fields.length > 1) {
-      await c.env.DB.prepare(
-        `UPDATE time_entries SET ${fields.join(", ")} WHERE workspace_id = ? AND id IN (${placeholders})`
-      ).bind(...values, workspaceId, ...ids).run();
+      const outcomes = await c.env.DB.batch(
+        chunked(ids).map((part) =>
+          c.env.DB.prepare(
+            `UPDATE time_entries SET ${fields.join(", ")} WHERE workspace_id = ? AND id IN (${placeholdersFor(part)})`
+          ).bind(...values, workspaceId, ...part)
+        )
+      );
+      updated = outcomes.reduce((sum, o) => sum + (o.meta.changes ?? 0), 0);
     }
 
-    // Replace tags on all affected entries. `time_entry_tags` has no
-    // workspace_id, so restrict the delete/insert to entries proven to belong to
-    // this workspace — otherwise a caller could rewrite another workspace's tags
-    // by passing foreign ids.
+    // Replace tags on all affected entries, in one batch. `time_entry_tags` has no
+    // workspace_id, so every statement re-scopes the ids to this workspace —
+    // otherwise a caller could rewrite another workspace's tags with foreign ids.
     if (patch.tags !== undefined) {
-      const { results: ownedEntries } = await c.env.DB.prepare(
-        `SELECT id FROM time_entries WHERE workspace_id = ? AND id IN (${placeholders})`
-      ).bind(workspaceId, ...ids).all<{ id: string }>();
-      for (const { id } of ownedEntries) {
-        await c.env.DB.prepare(`DELETE FROM time_entry_tags WHERE time_entry_id = ?`).bind(id).run();
-        if (patch.tags.length) {
-          await upsertTags(c.env.DB, workspaceId, id, patch.tags);
-        }
+      const statements = await replaceTagStatements(c.env.DB, workspaceId, ids, patch.tags);
+      // A tags-only patch runs no UPDATE, so its count is the entries reached.
+      const counts = chunked(ids).map((part) =>
+        c.env.DB.prepare(
+          `SELECT COUNT(*) AS n FROM time_entries WHERE workspace_id = ? AND id IN (${placeholdersFor(part)})`
+        ).bind(workspaceId, ...part)
+      );
+      const outcomes = await c.env.DB.batch<{ n: number }>([...counts, ...statements]);
+      if (fields.length <= 1) {
+        updated = outcomes.slice(0, counts.length).reduce((sum, o) => sum + (o.results[0]?.n ?? 0), 0);
       }
     }
 
     c.executionCtx.waitUntil(broadcast(c.env, workspaceId, "entries:changed", null, requestOrigin(c)));
-    return c.json({ ok: true, updated: ids.length }, 200);
+    return c.json({ ok: true, updated }, 200);
   })
   // ─── Bulk delete ──────────────────────────────────────────────────────────
   .delete("/bulk", zValidator("json", BulkDeleteTimeEntriesSchema), async (c) => {
     const workspaceId = c.get("workspaceId");
     const userId = c.get("userId");
-    const { ids } = c.req.valid("json");
+    const ids = [...new Set(c.req.valid("json").ids)];
 
     const forbidden = await forbiddenEntryIds(c.env.DB, workspaceId, userId, ids);
     if (forbidden.length) {
@@ -353,14 +448,17 @@ export const timeEntriesRouter = new Hono<{
       );
     }
 
-    const placeholders = ids.map(() => "?").join(",");
-
-    await c.env.DB.prepare(
-      `DELETE FROM time_entries WHERE workspace_id = ? AND id IN (${placeholders})`
-    ).bind(workspaceId, ...ids).run();
+    const outcomes = await c.env.DB.batch(
+      chunked(ids).map((part) =>
+        c.env.DB.prepare(
+          `DELETE FROM time_entries WHERE workspace_id = ? AND id IN (${placeholdersFor(part)})`
+        ).bind(workspaceId, ...part)
+      )
+    );
+    const deleted = outcomes.reduce((sum, o) => sum + (o.meta.changes ?? 0), 0);
 
     c.executionCtx.waitUntil(broadcast(c.env, workspaceId, "entries:changed", null, requestOrigin(c)));
-    return c.json({ ok: true, deleted: ids.length }, 200);
+    return c.json({ ok: true, deleted }, 200);
   })
   // ─── Get by ID ────────────────────────────────────────────────────────────
   .get("/:id", async (c) => {
@@ -403,6 +501,9 @@ export const timeEntriesRouter = new Hono<{
     }
     if (data.projectId !== undefined && !(await findActiveProject(c.env.DB, workspaceId, data.projectId))) {
       return c.json({ error: PROJECT_REQUIRED_ERROR }, 400);
+    }
+    if (data.taskId && !(await taskInWorkspace(c.env.DB, workspaceId, data.taskId))) {
+      return c.json({ error: TASK_NOT_FOUND_ERROR }, 400);
     }
 
     // Validate the range the row will actually have after the patch. The schema's
