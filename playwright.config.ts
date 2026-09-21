@@ -14,11 +14,11 @@ export default defineConfig({
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
-    // NODE_ENV=development keeps auth.ts's disableSignUp compiled out; CI=true skips vite.config.ts's remote AI binding, which no e2e test needs.
+    // NODE_ENV=development keeps auth.ts's disableSignUp compiled out; CI=true skips vite.config.ts's remote AI binding, which no e2e test needs; KEEP_DEV_VARS keeps .dev.vars in dist/ for this local preview only.
     command: "pnpm run build && vite preview --port 5173 --strictPort",
     url: "http://localhost:5173",
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
-    env: { NODE_ENV: "development", CI: "true" },
+    env: { NODE_ENV: "development", CI: "true", KEEP_DEV_VARS: "1" },
   },
 });

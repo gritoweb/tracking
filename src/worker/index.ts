@@ -5,6 +5,7 @@ import { rateLimit, sharedRateLimit } from "./middleware/rate-limit";
 import { workspaceMiddleware, resolveWorkspace } from "./middleware/workspace";
 import { meRouter } from "./routes/me";
 import { requireFreshSession } from "./middleware/fresh-session";
+import { lastOwnerRaceGuard } from "./middleware/last-owner-guard";
 import { timeEntriesRouter } from "./routes/time-entries";
 import { projectsRouter } from "./routes/projects";
 import { clientsRouter } from "./routes/clients";
@@ -101,6 +102,8 @@ const app = new Hono<{ Bindings: Env }>()
   .use("/api/auth/revoke-session", requireFreshSession)
   .use("/api/auth/revoke-sessions", requireFreshSession)
   .use("/api/auth/revoke-other-sessions", requireFreshSession)
+  .use("/api/auth/organization/update-member-role", lastOwnerRaceGuard)
+  .use("/api/auth/organization/remove-member", lastOwnerRaceGuard)
   .on(["GET", "POST"], "/api/auth/*", (c) => {
     const origin = new URL(c.req.url).origin;
     return createAuth(c.env, origin).handler(c.req.raw);
