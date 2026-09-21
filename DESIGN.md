@@ -2,21 +2,21 @@
 name: Time Tracker
 description: A soft-toned, red-accented time tracker for consultants billing across clients, projects, and tasks.
 colors:
-  primary: "oklch(0.588 0.207 27.33)"
-  primary-dark: "oklch(0.65 0.207 27.33)"
-  bg-light: "oklch(0.988 0.0015 30)"
-  bg-dark: "oklch(0.185 0.006 265)"
-  surface-light: "oklch(0.995 0.001 30)"
-  surface-dark: "oklch(0.228 0.007 265)"
-  ink-light: "oklch(0.22 0.006 30)"
-  ink-dark: "oklch(0.96 0.003 265)"
-  muted-light: "oklch(0.965 0.003 30)"
-  muted-dark: "oklch(0.28 0.008 265)"
-  border-light: "oklch(0.912 0.004 30)"
-  border-dark: "oklch(1 0 0 / 9%)"
-  destructive: "oklch(0.45 0.19 18)"
-  success: "oklch(0.596 0.145 163.225)"
-  warning: "oklch(0.666 0.179 58.318)"
+  primary: "#dd322e"
+  primary-dark: "#f34a42"
+  bg-light: "#fcfbfa"
+  bg-dark: "#111315"
+  surface-light: "#fefdfd"
+  surface-dark: "#1b1c20"
+  ink-light: "#1d1a19"
+  ink-dark: "#f1f2f4"
+  muted-light: "#ece9e9"
+  muted-dark: "#27292d"
+  border-light: "#dfdddc"
+  border-dark: "#ffffff17"
+  destructive: "#a5002a"
+  success: "#009966"
+  warning: "#e17100"
 typography:
   body:
     fontFamily: "Geist Variable, ui-sans-serif, system-ui, sans-serif"
@@ -98,34 +98,34 @@ The system explicitly rejects the generic SaaS-cream dashboard: no near-white cr
 The palette is a warm-neutral ramp (chroma nudged toward the brand's own red hue, not a generic warm/cream default) with one saturated primary and a hue-alternated set of secondary colors for projects and tags.
 
 ### Primary
-- **Ledger Red** (`oklch(0.588 0.207 27.33)` light / `oklch(0.65 0.207 27.33)` dark): primary buttons, the running-timer indicator and pulse, active nav item, links. Used sparingly — most screens show it in one or two places, never as a background fill.
-- **`--primary-foreground` is pure white**, not `oklch(0.985 0 0)`. On the brand red, `#fafafa` measures 4.40:1 and fails AA for every primary button label; white measures 4.59:1 — and `#ffffff` is what the button-primary spec below already documented, so the token had drifted off its own page.
-- **Ledger Red as text** (`--primary-ink`, `oklch(0.5 0.19 27.33)` light / `oklch(0.76 0.19 27.33)` dark): the same brand red retuned for small text. `--primary` is calibrated as a *fill* behind white and fails WCAG AA as 11–12px type (3.59:1 on its own `/10` tint in light, 4.27:1 in dark). `--primary-ink` holds the hue and chroma and moves only lightness. Use it for the active nav label, the running-timer elapsed readout, and the billable indicator — anywhere the brand red is the text rather than the ground.
+- **Ledger Red** (`#dd322e` light / `#f34a42` dark): primary buttons, the running-timer indicator and pulse, active nav item, links. Used sparingly — most screens show it in one or two places, never as a background fill.
+- **`--primary-foreground` is pure white**, not `#fafafa`. On the brand red, `#fafafa` measures 4.40:1 and fails AA for every primary button label; white measures 4.59:1 — and `#ffffff` is what the button-primary spec below already documented, so the token had drifted off its own page.
+- **Ledger Red as text** (`--primary-ink`, `#b71a1b` light / `#ff796b` dark): the same brand red retuned for small text. `--primary` is calibrated as a *fill* behind white and fails WCAG AA as 11–12px type (3.59:1 on its own `/10` tint in light, 4.27:1 in dark). `--primary-ink` holds the hue and chroma and moves only lightness. Use it for the active nav label, the running-timer elapsed readout, and the billable indicator — anywhere the brand red is the text rather than the ground.
 
 ### Secondary
 - **Project & Tag Palette** (18-color hue-alternated set, `worker/lib/colors.ts` `DISTINCT_COLORS` / `react-app/lib/colorUtils.ts`): red, blue, green, amber, violet, teal, pink, lime, indigo, orange, cyan, purple, rose, sky, emerald, yellow, slate, stone — deliberately ordered so consecutive auto-assigned colors alternate warm/cool instead of drifting through a single hue family. Applied to project swatches, tag dots, calendar event blocks (translucent fill + solid left border), and report breakdown legends.
 
 ### Tertiary
-- **Semantic status** — success (`oklch(0.596 0.145 163.225)`, billable progress / confirmations), warning (`oklch(0.666 0.179 58.318)`, avg/day and caution states), destructive (`oklch(0.45 0.19 18)` light / `oklch(0.72 0.17 12)` dark, delete / discard actions and error states). Each has a paired `-foreground` token for on-color text.
-- **`--success-ink`** (`oklch(0.468 0.145 163.225)` light / same as `--success` dark): success used as *text*. `--success` is calibrated as a fill and fails AA as small type on every light ground — 3.61:1 on card, 3.31:1 on muted/accent, 3.15:1 on its own /10 tint — and some call sites are 10px. Icon-only uses stay on `--success`; icons need 3:1 and clear it. Third of the same family as `--primary-ink` and `--warning-ink`, for the same measured reason.
-- **`--warning-ink`** (`oklch(0.505 0.179 58.318)` light / same as `--warning` dark): warning used as *text*, exactly as `--primary-ink` is for the brand red. `--warning` is calibrated as a fill and fails AA as small type — 3.15:1 on card (the "Unverified" badge), 2.77:1 on its own `/10` tint (the warning Alert). Holds hue and chroma, moves lightness only. Worst measured ground is that `/10` tint at 5.36:1.
+- **Semantic status** — success (`#009966`, billable progress / confirmations), warning (`#e17100`, avg/day and caution states), destructive (`#a5002a` light / `#fb7188` dark, delete / discard actions and error states). Each has a paired `-foreground` token for on-color text.
+- **`--success-ink`** (`#007242` light / same as `--success` dark): success used as *text*. `--success` is calibrated as a fill and fails AA as small type on every light ground — 3.61:1 on card, 3.31:1 on muted/accent, 3.15:1 on its own /10 tint — and some call sites are 10px. Icon-only uses stay on `--success`; icons need 3:1 and clear it. Third of the same family as `--primary-ink` and `--warning-ink`, for the same measured reason.
+- **`--warning-ink`** (`#aa3e00` light / same as `--warning` dark): warning used as *text*, exactly as `--primary-ink` is for the brand red. `--warning` is calibrated as a fill and fails AA as small type — 3.15:1 on card (the "Unverified" badge), 2.77:1 on its own `/10` tint (the warning Alert). Holds hue and chroma, moves lightness only. Worst measured ground is that `/10` tint at 5.36:1.
 
 ### Chart marks
 Charts encode **billable**, not category: both bar charts stack `--success` (the part you invoice) under `--chart-ink-soft` (the remainder). Green means the same thing it means on the KPI strip's billable bar.
 
-- **`--chart-ink-soft`** (`oklch(0.84 0.012 30)` light / `oklch(0.40 0.014 265)` dark) is the de-emphasized half of that stack. It must stay distinguishable from `--success` on **luminance alone**, since hue is the channel a colour-blind reader loses: measured 2.23:1 greyscale in light, 3.74:1 in dark, with stack position and a legend carrying the rest.
+- **`--chart-ink-soft`** (`#d2c8c6` light / `#44484f` dark) is the de-emphasized half of that stack. It must stay distinguishable from `--success` on **luminance alone**, since hue is the channel a colour-blind reader loses: measured 2.23:1 greyscale in light, 3.74:1 in dark, with stack position and a legend carrying the rest.
 - There is **no `--chart-1..5`**. Those were stock shadcn values acting as a second categorical palette against `DISTINCT_COLORS`, and `--chart-1` flipped hue family between themes (orange in light, blue-violet in dark). Categorical colour comes from `DISTINCT_COLORS` everywhere, including the breakdown donut's client/task/tag fallback.
 - Projects created without an explicit colour are assigned the first unused `DISTINCT_COLORS` entry **server-side** (`routes/projects.ts`). The schema deliberately has no colour default: a fixed one meant every project created via API, extension or seed came out the same sky blue.
 
 ### Neutral
-- **Ground** (`oklch(0.988 0.0015 30)` light / `oklch(0.185 0.006 265)` dark): the page background. Warm-tinted off-white in light; soft charcoal with a faint cool tint in dark — never pure white or near-black.
-- **Card** (`oklch(0.962 0.0025 30)` light / `oklch(0.228 0.007 265)` dark): a tonal step *away* from the ground, and the only thing separating a card from the page — cards carry no border and no shadow (§4). The direction differs per theme on purpose: in light a card **recedes** below the ground, in dark it **lifts** above it, because a card darker than an already-dark page reads as a hole.
-- **Popover** (`oklch(0.995 0.001 30)` light / `oklch(0.228 0.007 265)` dark): dialogs, popovers, dropdowns, sheets. In light this stays the *lightest* surface in the system while cards recede, so an overlay reads as floating above the page rather than as part of it. This is why popover and card are no longer the same token.
-- **Ink** (`oklch(0.22 0.006 30)` light / `oklch(0.96 0.003 265)` dark): body text, eased off pure black/white for a softer read.
-- **Muted** (`oklch(0.936 0.003 30)` light / `oklch(0.28 0.008 265)` dark): secondary surfaces (sidebar, toolbars — a second neutral layer, per product-register convention), segmented-control tracks, disabled fills. It moved down with the card so a track still reads *on* a card.
+- **Ground** (`#fcfbfa` light / `#111315` dark): the page background. Warm-tinted off-white in light; soft charcoal with a faint cool tint in dark — never pure white or near-black.
+- **Card** (`#f4f2f1` light / `#1b1c20` dark): a tonal step *away* from the ground, and the only thing separating a card from the page — cards carry no border and no shadow (§4). The direction differs per theme on purpose: in light a card **recedes** below the ground, in dark it **lifts** above it, because a card darker than an already-dark page reads as a hole.
+- **Popover** (`#fefdfd` light / `#1b1c20` dark): dialogs, popovers, dropdowns, sheets. In light this stays the *lightest* surface in the system while cards recede, so an overlay reads as floating above the page rather than as part of it. This is why popover and card are no longer the same token.
+- **Ink** (`#1d1a19` light / `#f1f2f4` dark): body text, eased off pure black/white for a softer read.
+- **Muted** (`#ece9e9` light / `#27292d` dark): secondary surfaces (sidebar, toolbars — a second neutral layer, per product-register convention), segmented-control tracks, disabled fills. It moved down with the card so a track still reads *on* a card.
 - **`--muted-foreground` is tuned against its *worst* ground, not the page background** — muted/accent, where secondary text mostly sits (toolbars, sidebar, tab tracks, count badges). L 0.543 was calibrated against the old muted (0.965) and reaches only 4.19:1 on the current one. **L 0.523** clears AA on all five grounds: background 5.27 / card 4.88 / popover 5.38 / muted 4.52 / accent 4.52.
-- **Border** (`oklch(0.898 0.003 30)` light / `9% white` dark): input outlines and internal dividers — always subtle, never a structural color. It no longer draws card edges; tone does that.
-- **Border-strong** (`oklch(0.78 0.004 30)` light / `22% white` dark): row dividers in the dense surfaces only (entry list, timesheet grid). `--border` measures 1.21:1 on a card, which effectively vanishes across a 30-row list at low vision. This sits at ~1.8:1 — deliberately short of the 3:1 non-text target, because a 3:1 divider reads as a structural rule and breaks the quiet-ledger feel. Never use it for panels or inputs.
+- **Border** (`#dfdddc` light / `9% white` dark): input outlines and internal dividers — always subtle, never a structural color. It no longer draws card edges; tone does that.
+- **Border-strong** (`#bab6b6` light / `22% white` dark): row dividers in the dense surfaces only (entry list, timesheet grid). `--border` measures 1.21:1 on a card, which effectively vanishes across a 30-row list at low vision. This sits at ~1.8:1 — deliberately short of the 3:1 non-text target, because a 3:1 divider reads as a structural rule and breaks the quiet-ledger feel. Never use it for panels or inputs.
 
 ### Named Rules
 **The One Accent Rule.** The brand red appears in at most one or two places on any given screen — the running state and the primary action. It is never used as a large background fill or decoration.
@@ -200,7 +200,7 @@ The system is flat-by-default with tonal layering, not shadow-driven. This is no
 
 ### Inputs / Fields
 - **Style:** 1px border, `bg-background`, `rounded-full`, **no shadow**. `Input` carries `px-4` so text is not crowded into the curve; **`SelectTrigger` stays at `px-3`** because it is `w-fit` in tight toolbars and the extra 8px truncated its value ("No sub-grou…") — a chevron already gives it the breathing room the pill needs. **Textarea is the deliberate exception** to the shape — it keeps `rounded-xl`, because a pill forces the first and last lines of multi-line text into the curve.
-- **Focus:** border shifts to the ring color plus a 3px ring at 50% opacity — no glow, no scale change. **The focus ring is not the brand red.** `--ring` (`oklch(0.55 0.14 265)` light / `oklch(0.7 0.14 265)` dark) is deliberately a different hue from both `--primary` and `--destructive`: when they shared a value, a focused input read as a validation error and "Save changes" was the same color as "Discard". Hue 265 is the system's own cool tint from the dark ramp, not a stock blue. One focus vocabulary everywhere — no bare-underline substitutes.
+- **Focus:** border shifts to the ring color plus a 3px ring at 50% opacity — no glow, no scale change. **The focus ring is not the brand red.** `--ring` (`#496dc3` light / `#739bf5` dark) is deliberately a different hue from both `--primary` and `--destructive`: when they shared a value, a focused input read as a validation error and "Save changes" was the same color as "Discard". Hue 265 is the system's own cool tint from the dark ramp, not a stock blue. One focus vocabulary everywhere — no bare-underline substitutes.
 - **Error:** border and ring shift to the destructive color at reduced opacity.
 
 ### Navigation
@@ -373,14 +373,14 @@ Variants live in a sibling `*-variants.ts` module so the component file exports 
 
 The brand mark is a **circled analog clock reading ~10:10** (the classic "watch ad" angle): a brand-red circle, a white ring at 90% opacity, two rounded white hands, and a center dot. It is the one place the brand red appears as a fill.
 
-**Single source of truth:** `src/shared/brand-mark.ts` — glyph geometry (`clockGlyph`), face ratio, and the pre-converted sRGB hexes of the brand tokens for surfaces that can't use `oklch()` (static assets, email, OG image):
+**Single source of truth:** `src/shared/brand-mark.ts` — glyph geometry (`clockGlyph`), face ratio, and the brand tokens as hex for surfaces that can't use CSS variables (static assets, email, OG image). They are the same values as `src/react-app/css/global/variables.css`, and a test fails if they drift apart:
 
-| Token | oklch | hex |
-|---|---|---|
-| Brand red (light `--primary`) | `oklch(0.588 0.207 27.33)` | `#dd322e` |
-| Brand red (dark `--primary`) | `oklch(0.65 0.207 27.33)` | `#f34a42` |
-| Ground light | `oklch(0.988 0.0015 30)` | `#fcfbfa` |
-| Ground dark | `oklch(0.185 0.006 265)` | `#111315` |
+| Token | hex |
+|---|---|
+| Brand red (light `--primary`) | `#dd322e` |
+| Brand red (dark `--primary`) | `#f34a42` |
+| Ground light | `#fcfbfa` |
+| Ground dark | `#111315` |
 
 **Two consumers, one geometry:**
 - `src/react-app/components/brand/BrandMark.tsx` — the in-app mark (sidebar brand + collapsed-rail expand control, mobile top bar and nav sheet, login/signup). Fills the circle with `var(--primary)` so it tracks the theme.
@@ -388,4 +388,4 @@ The brand mark is a **circled analog clock reading ~10:10** (the classic "watch 
 
 **Named rule — One Clock.** No surface may draw its own clock glyph (including lucide's `Clock`) as a brand stand-in. The mark is always the shared geometry; change it in `brand-mark.ts` and re-run `pnpm generate-icons`. The lucide `Timer` icon in the nav is a *navigation* icon, not a brand mark — that distinction is the line.
 
-**Satellite surfaces:** the extension popup consumes the same oklch tokens directly in its inline CSS (Chrome-only surface); transactional email uses the pre-converted hexes via `src/worker/emails/theme.ts` and a deliberately text-only header ("tracking.gritoweb.com.br") — no image logo in email, since image blocking would break it.
+**Satellite surfaces:** the extension popup keeps its own copy of these tokens in its inline CSS, still written in OKLCH (Chrome-only surface, not part of this pass); transactional email uses the pre-converted hexes via `src/worker/emails/theme.ts` and a deliberately text-only header ("tracking.gritoweb.com.br") — no image logo in email, since image blocking would break it.

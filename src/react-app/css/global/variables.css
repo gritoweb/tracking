@@ -3,122 +3,50 @@
   --font-geist-mono: "Geist Mono Variable", ui-monospace, "SFMono-Regular", monospace;
   --radius: 0.5rem;
 
-  /* Soft tones: a warm-neutral off-white ground (chroma toward the brand's red
-     hue, not the cliché cream). Ink softened off pure black.
-
-     Surfaces are separated by TONE ALONE — cards carry no border (DESIGN.md §4).
-     The direction of the step is per-theme, chosen for legibility rather than
-     symmetry: in light a card RECEDES below the ground (0.988 -> 0.962), in dark
-     it LIFTS above it (0.185 -> 0.228), because a card darker than an already
-     dark page reads as a hole. Popover keeps the lightest value in light mode on
-     purpose: an overlay floats above the page, so it must not share the card's
-     recessed tone or a dialog reads as part of the surface behind it. */
-  --background: oklch(0.988 0.0015 30);
-  --foreground: oklch(0.22 0.006 30);
-  --card: oklch(0.962 0.0025 30);
-  --card-foreground: oklch(0.22 0.006 30);
-  --popover: oklch(0.995 0.001 30);
-  --popover-foreground: oklch(0.22 0.006 30);
-  --primary: oklch(0.588 0.207 27.33);
-  /* Pure white, not 0.985: on the brand red #fafafa measures 4.40:1 and fails
-     AA for every primary button label. White measures 4.59:1, and #ffffff is
-     what DESIGN.md's button-primary spec already documents. */
-  --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.936 0.003 30);
-  --secondary-foreground: oklch(0.26 0.006 30);
-  --muted: oklch(0.936 0.003 30);
-  /* Tuned against the *worst* ground it lands on, not the page background —
-     muted/accent is where secondary text mostly sits (toolbars, sidebar, tab
-     tracks, count badges), and those moved down with the rest of the ramp.
-     L 0.543 was calibrated against the old muted (0.965) and only reaches
-     4.19:1 on the new one. L 0.523 clears AA on all five grounds:
-     background 5.27 / card 4.88 / popover 5.38 / muted 4.52 / accent 4.52. */
-  --muted-foreground: oklch(0.523 0.008 30);
-  --accent: oklch(0.936 0.004 30);
-  --accent-foreground: oklch(0.26 0.006 30);
-  /* Destructive has to be a DIFFERENT RED from the brand, and it wasn't:
-     --primary sat at hue 27.33 and --destructive at 27.325 — the same hue to
-     three decimals, 0.011 apart in lightness. On a 1.5px progress bar a project
-     3% into its budget and one 110% through it were indistinguishable, and the
-     budget ladder ran red -> amber -> red, reversing exactly where it mattered.
-
-     Deeper and cooler: 9 degrees off the brand hue and 0.138 darker, so the two
-     reds separate on lightness as well as hue and destructive reads as the more
-     severe of the pair. The old value also failed AA as small text — 4.27:1 on
-     card, 3.95:1 on muted — which is why `text-destructive` needed no ink
-     variant to go wrong. Measured here: label 7.97:1, text 7.72 background /
-     7.15 card / 6.61 muted, 6.05:1 on its own /10 tint and 5.12:1 on /20. */
-  --destructive: oklch(0.45 0.19 18);
-  --destructive-foreground: oklch(1 0 0);
-  --success: oklch(0.596 0.145 163.225);
-  --success-foreground: oklch(0.985 0 0);
-  /* Success used as TEXT — the third of the same family as --primary-ink and
-     --warning-ink, and it exists for the same measured reason: --success is
-     calibrated as a fill and fails AA as small type on every light ground.
-     Holds hue and chroma, moves lightness only. L 0.488 was tuned against the
-     old ramp; on the new one it misses at 4.31:1 on muted, so it steps to
-     0.468 — background 5.85 / card 5.42 / popover 5.97 / muted 5.02 / accent
-     5.02, and 4.50:1 on its own /10 tint (worst of the three plausible
-     compositing models: linear, oklab, and gamma-space alpha).
-     `/15` is deliberately not in that list: both call sites are `aria-hidden`
-     progress-bar tracks with no text on them. */
-  --success-ink: oklch(0.468 0.145 163.225);
-  --warning: oklch(0.666 0.179 58.318);
-  --warning-foreground: oklch(0.985 0 0);
-  /* Warning used as TEXT, exactly as --primary-ink is for the brand red.
-     --warning is calibrated as a fill; as small text it measured 3.15:1 on card
-     (the "Unverified" badge) and 2.77:1 on its own /10 tint (the warning Alert).
-     Holds hue and chroma, moves lightness only. Worst measured ground is the
-     /10 tint at 5.36:1, and 4.52:1 for the alert description's /90 text. */
-  --warning-ink: oklch(0.505 0.179 58.318);
-  --border: oklch(0.898 0.003 30);
-  /* Dense row dividers only (entry list, timesheet). --border measures 1.21:1
-     on a card, which effectively disappears across a 30-row list for a
-     low-vision user. This is ~1.8:1 — deliberately short of the 3:1 non-text
-     target, because a 3:1 divider reads as a structural rule and DESIGN.md
-     keeps borders subtle. Cards no longer have an edge at all (tone separates
-     them); --border now draws input edges and internal dividers only. */
-  --border-strong: oklch(0.78 0.004 30);
-  --input: oklch(0.898 0.003 30);
-  /* Focus gets its own hue. This used to be byte-identical to --primary and
-     0.011 lightness from --destructive, so a focused field read as a validation
-     error and "Save changes" was the same red as "Discard". Hue 265 is the
-     system's own cool tint (see the dark ramp), not a stock blue; L is set per
-     theme so the ring clears 3:1 (WCAG 1.4.11) on background/card/muted/accent —
-     measured 4.44:1 here, 5.01:1 dark. */
-  --ring: oklch(0.55 0.14 265);
-  /* How much of a project/tag swatch survives in text drawn ON that swatch's own
-     tint (the rest is mixed toward --foreground). Ceiling measured across all 18
-     DISTINCT_COLORS over every ground, mixing in oklab as `color-mix` does:
-     50% light (was 52% before the ramp moved down), 64% dark — these sit under
-     it with margin, so the token is unchanged. See .tt-swatch-tint. */
+  /* Soft tones: warm off-white ground with chroma toward the brand hue; surfaces separate by tone alone (DESIGN.md §4). */
+  --background: #fcfbfa;
+  --foreground: #1d1a19;
+  --card: #f4f2f1;
+  --card-foreground: #1d1a19;
+  --popover: #fefdfd;
+  --popover-foreground: #1d1a19;
+  --primary: #dd322e;
+  /* Pure white on the brand red (4.59:1); #fafafa only reached 4.40:1 and failed AA for every primary button label. */
+  --primary-foreground: #ffffff;
+  --secondary: #ece9e9;
+  --secondary-foreground: #272322;
+  --muted: #ece9e9;
+  /* Tuned against the worst ground it lands on (muted/accent), where secondary text mostly sits: clears AA on all five grounds. */
+  --muted-foreground: #6e6867;
+  --accent: #ece9e8;
+  --accent-foreground: #272322;
+  /* Destructive is a different red from the brand: 9 degrees off the hue and darker, so budget ladders and errors are told apart. */
+  --destructive: #a5002a;
+  --destructive-foreground: #ffffff;
+  --success: #009966;
+  --success-foreground: #fafafa;
+  /* Success as text: same hue and chroma as --success with lightness moved down so it clears AA on every light ground. */
+  --success-ink: #007242;
+  --warning: #e17100;
+  --warning-foreground: #fafafa;
+  /* Warning as text: --warning is a fill; this holds its hue and chroma and moves lightness only, to clear AA as small text. */
+  --warning-ink: #aa3e00;
+  --border: #dfdddc;
+  /* Dense row dividers only: ~1.8:1, short of 3:1 on purpose so dividers stay subtle; cards have no edge, tone separates them. */
+  --border-strong: #bab6b6;
+  --input: #dfdddc;
+  /* Focus has its own hue (the cool tint, 265) so a focused field never reads as an error; it clears 3:1 on every ground. */
+  --ring: #496dc3;
+  /* How much of a swatch survives in text on its own tint; measured ceiling across all 18 colours is 50% light, 64% dark. */
   --swatch-ink-mix: 46%;
-  /* Full-surface tint (a whole status column, not a small chip) — much weaker
-     than --swatch-ink-mix's 13% chip tint, since a whole panel of saturated
-     color reads as "selected" rather than "labeled". See .tt-swatch-column. */
+  /* Full-surface tint for a whole status column, much weaker than the chip tint so a panel reads as labeled, not selected. */
   --swatch-column-mix: 6%;
-  /* Brand red used as TEXT (active nav item, running pill, the billable "$").
-     --primary is tuned as a fill behind white, and fails AA as small text: 3.59:1
-     on its own /10 tint in light, 4.27:1 in dark, 4.45:1 for the billable glyph.
-     This holds the brand hue and chroma and moves only lightness — down toward
-     ink in light, up in dark. Measured ceilings: light L ≤ 0.52, dark L ≥ 0.74. */
-  --primary-ink: oklch(0.5 0.19 27.33);
-  /* The only chart-specific colour left.
-     --chart-1..5 were stock shadcn values doing two things wrong: they were a
-     *second* categorical palette competing with the 18-colour DISTINCT_COLORS
-     the rest of the app uses for projects and tags, and chart-1 flipped hue
-     family between themes (orange in light, blue-violet in dark). Categorical
-     colour now comes from DISTINCT_COLORS everywhere, and both bar charts encode
-     billable with --success — the same meaning it carries on the KPI strip.
-
-     This is the de-emphasized half of those part-of-whole stacks: the
-     non-billable remainder above the billable green. It has to stay
-     distinguishable from --success on luminance alone, since hue is the one
-     channel a colour-blind reader loses — measured 2.23:1 greyscale in light,
-     3.74:1 in dark, with stack position and a legend carrying the rest. */
-  --chart-ink-soft: oklch(0.84 0.012 30);
+  /* Brand red as text: --primary is a fill behind white and fails AA as small text; this moves lightness only. */
+  --primary-ink: #b71a1b;
+  /* The one chart-specific colour: the de-emphasised non-billable half of a stack, told apart from --success by luminance alone. */
+  --chart-ink-soft: #d2c8c6;
   /* Replaces dialog/sheet/alert-dialog's hard-coded `bg-black/50`; not redeclared in `.dark` since a scrim dims either theme's page the same way. */
-  --scrim: oklch(0.22 0.006 30 / 50%);
+  --scrim: #1d1a1980;
 
   /* Named for Lote 5 to adopt via `w-(--size-x)`/`max-h-(--size-x)`; only `ui/dialog.tsx`'s `size` variant consumes one so far. */
   --size-board-column: 18rem; /* the board column and its drag overlay share it, so a dragged card keeps the column's width */
@@ -130,56 +58,41 @@
 }
 
 .dark {
-  /* Soft tones: lift the harsh near-black to a soft charcoal with a faint cool
-     tint (hue 265), so the warm red brand reads against a calm, premium ground
-     rather than pure black. Cards sit a step above the field; ink eased off pure
-     white. */
-  --background: oklch(0.185 0.006 265);
-  --foreground: oklch(0.96 0.003 265);
-  --card: oklch(0.228 0.007 265);
-  --card-foreground: oklch(0.96 0.003 265);
-  --popover: oklch(0.228 0.007 265);
-  --popover-foreground: oklch(0.96 0.003 265);
-  --primary: oklch(0.65 0.207 27.33);
-  --primary-foreground: oklch(0.16 0.006 265);
-  --secondary: oklch(0.28 0.008 265);
-  --secondary-foreground: oklch(0.96 0.003 265);
-  --muted: oklch(0.28 0.008 265);
-  --muted-foreground: oklch(0.72 0.012 265);
-  --accent: oklch(0.3 0.009 265);
-  --accent-foreground: oklch(0.96 0.003 265);
-  /* Same separation as light, resolved the other way: on charcoal a deep red
-     disappears, so destructive goes brighter than the brand red rather than
-     darker (0.72 vs --primary's 0.65) and takes the bigger hue step.
-
-     Its foreground flips to ink, which --primary-foreground already does in
-     this theme and --destructive-foreground never did: near-white on this fill
-     measures 2.69:1 and failed AA on every destructive button label in dark
-     mode. Ink measures 7.24:1. Text uses of the token: 6.93 background /
-     6.36 card / 5.63 muted, 5.59:1 on its own /10 tint. */
-  --destructive: oklch(0.72 0.17 12);
-  --destructive-foreground: oklch(0.16 0.006 265);
-  --success: oklch(0.696 0.17 162.48);
-  --success-foreground: oklch(0.16 0.006 265);
-  /* Dark ink is light, so the fill value already clears AA as text here
-     (5.53:1 worst ground). Same value, declared so call sites use one class. */
-  --success-ink: oklch(0.696 0.17 162.48);
-  --warning: oklch(0.769 0.188 70.08);
-  --warning-foreground: oklch(0.16 0.006 265);
-  /* Dark ink is light, so the fill value already clears AA as text here
-     (6.36:1 worst ground, 6.06:1 on its own /20 tint). Same value, declared so
-     call sites can use one class in both themes. */
-  --warning-ink: oklch(0.769 0.188 70.08);
-  --border: oklch(1 0 0 / 9%);
-  --border-strong: oklch(1 0 0 / 22%);
-  --input: oklch(1 0 0 / 13%);
-  --ring: oklch(0.7 0.14 265);
+  /* Soft tones: a charcoal with a faint cool tint (hue 265) instead of near-black; cards sit a step above the field. */
+  --background: #111315;
+  --foreground: #f1f2f4;
+  --card: #1b1c20;
+  --card-foreground: #f1f2f4;
+  --popover: #1b1c20;
+  --popover-foreground: #f1f2f4;
+  --primary: #f34a42;
+  --primary-foreground: #0c0d10;
+  --secondary: #27292d;
+  --secondary-foreground: #f1f2f4;
+  --muted: #27292d;
+  --muted-foreground: #a1a5ac;
+  --accent: #2c2e32;
+  --accent-foreground: #f1f2f4;
+  /* Destructive in dark goes brighter than the brand red (a deep red disappears on charcoal), with an ink foreground for AA. */
+  --destructive: #fb7188;
+  --destructive-foreground: #0c0d10;
+  --success: #00bc7d;
+  --success-foreground: #0c0d10;
+  /* In dark the fill value already clears AA as text (5.53:1 worst); declared so call sites use one class. */
+  --success-ink: #00bc7d;
+  --warning: #fe9a00;
+  --warning-foreground: #0c0d10;
+  /* In dark the fill value already clears AA as text (6.36:1 worst); declared so call sites use one class. */
+  --warning-ink: #fe9a00;
+  --border: #ffffff17;
+  --border-strong: #ffffff38;
+  --input: #ffffff21;
+  --ring: #739bf5;
   /* Dark ink is light, so more of the swatch survives before contrast suffers. */
   --swatch-ink-mix: 55%;
   /* Dark columns sit on --muted (see .dark .tt-swatch-column), so the swatch only needs a light touch. */
   --swatch-column-mix: 6%;
-  --primary-ink: oklch(0.76 0.19 27.33);
-  /* Dark ground inverts which end is "muted": the soft mark goes darker than
-     the card, not lighter. Same role, same hue discipline as light. */
-  --chart-ink-soft: oklch(0.40 0.014 265);
+  --primary-ink: #ff796b;
+  /* In dark the soft mark goes darker than the card, not lighter: the same role as in light. */
+  --chart-ink-soft: #44484f;
 }

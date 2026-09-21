@@ -1,14 +1,5 @@
-/* ─── Swatch tints ──────────────────────────────────────────────────────────
-   Project and tag colors are arbitrary palette hexes, so any label drawn on a
-   tint of its own swatch has to be derived, not copied. Setting `color` to the
-   raw swatch (the old ProjectBadge/calendar-event approach) makes legibility a
-   lottery on the hue's luminance — amber landed at 1.88:1 in light mode.
-
-   Mixing the swatch toward --foreground fixes both themes with one expression:
-   light ink is dark so the label darkens, dark ink is light so it lightens.
-   `--swatch-ink-mix` is the measured ceiling per theme; consumers set --swatch. */
-/* Text only — for labels already sitting on a swatch-tinted surface painted by
-   something else (FullCalendar paints the event block itself). */
+/* Swatch tints: text on a tint of its own swatch is derived by mixing toward --foreground, so legibility does not depend on the hue. */
+/* Text only, for labels on a swatch-tinted surface painted by something else (FullCalendar paints the event block). */
 .tt-swatch-ink {
   color: color-mix(in oklab, var(--swatch) var(--swatch-ink-mix), var(--foreground));
 }
@@ -24,16 +15,12 @@
   background-color: color-mix(in oklab, var(--swatch) var(--swatch-column-mix), transparent);
 }
 
-/* In dark, transparent-over-background put a low-chroma status (Backlog's slate) at the same
-   lightness as the card resting on it (both ~0.22). Basing the column on --muted keeps every
-   column a step lighter than its cards, whatever the swatch. */
+/* In dark, base the column on --muted so every column stays a step lighter than its cards whatever the swatch. */
 .dark .tt-swatch-column {
   background-color: color-mix(in oklab, var(--swatch) var(--swatch-column-mix), var(--muted));
 }
 
-/* Secondary text sitting on a swatch tint. --muted-foreground is tuned against
-   the flat background and washes out over a colored fill (3.81:1 worst case),
-   so step it toward ink. Measured ceiling 80% in both themes. */
+/* Secondary text on a swatch tint: --muted-foreground washes out there, so step it 30% toward ink (ceiling measured at 80%). */
 .tt-on-tint-muted {
   color: color-mix(in oklab, var(--muted-foreground) 70%, var(--foreground));
 }

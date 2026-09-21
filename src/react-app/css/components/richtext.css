@@ -56,8 +56,7 @@
   color: var(--muted-foreground);
   text-decoration: line-through;
 }
-/* The browser's native checkbox has no shape opinion — give it the same square-ish
-   mark used by the task row and subtask checkboxes, not a third shape in the app. */
+/* Give the native checkbox the same square-ish mark as the task row and subtask checkboxes. */
 .tt-richtext ul[data-type="taskList"] input[type="checkbox"] {
   appearance: none;
   width: 1rem;

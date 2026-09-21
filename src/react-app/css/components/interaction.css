@@ -1,11 +1,4 @@
-/* ─── Reveal-on-hover ───────────────────────────────────────────────────────
-   Row actions that fade in with the pointer. The gate must be hover CAPABILITY,
-   not viewport width: the old `sm:opacity-0 sm:group-hover:opacity-100` hid the
-   control on every touch device wider than 640px — i.e. every tablet — where
-   `group-hover` can never fire, so Continue and the row menu were unreachable.
-
-   Default is visible; only a device that can actually hover opts into hiding.
-   focus-within/focus-visible keep it reachable by keyboard. */
+/* Reveal-on-hover: gated on hover capability, not viewport width, so touch tablets keep the actions visible; keyboard focus reveals too. */
 .tt-reveal {
   opacity: 1;
   transition: opacity var(--transition-duration-fast) var(--ease-out-quart);
@@ -23,13 +16,7 @@
   }
 }
 
-/* ─── Touch targets ─────────────────────────────────────────────────────────
-   Gated on input capability, not viewport width — same reasoning as .tt-reveal
-   above. The timer bar's dense controls sit at 28–32px, which is right under a
-   trackpad and misses under a thumb, and the device that decides is the one
-   with the thumb: a 900px-wide tablet is not a desktop. Only the hit area
-   grows; the visual chip keeps its designed height, so the bar doesn't turn
-   chunky on a pointer device that merely reports coarse. */
+/* Touch targets: gated on input capability, not viewport width; only the hit area grows, the visual chip keeps its height. */
 @media (pointer: coarse) {
   .tt-touch {
     min-height: 44px;

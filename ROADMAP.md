@@ -122,7 +122,7 @@ Left out of the 1.0.0 round on purpose; none of it is a known bug.
   `start_timer`/`stop_timer` stay out (see `docs/MCP.md`).
 - **The browser extension.** Untouched this round: no tests, `SECURITY_AUDIT.md`
   dated 2026-07-13, and its API allow-list still admits all of `*.workers.dev`
-  and `localhost` in a production build.
+  and `localhost` in a production build. Its popup also keeps its own copy of the colour tokens, still in OKLCH.
 - **Hardening that has no cheap fix yet.** An integration URL whose hostname
   resolves to a private address (`127.0.0.1.nip.io`) passes `url-guard.ts`,
   because a Worker cannot look the name up; only owners and admins can set it.

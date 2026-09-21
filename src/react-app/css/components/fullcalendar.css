@@ -1,22 +1,11 @@
-/*
- * FullCalendar theming, scoped to `.tt-calendar`, mapping FC's CSS variables to
- * the app's design tokens. Tokens (--border, --card, --primary, …) are swapped
- * by the `.dark` class, so these overrides adapt to dark mode automatically —
- * no separate dark block needed.
- *
- * `@reference` (not `@import`) so `@apply` below resolves against the app's
- * theme/utilities without re-emitting app.css's output into this file.
- */
+/* FullCalendar theming scoped to .tt-calendar; app tokens swap with .dark, and @reference keeps @apply from re-emitting app.css. */
 @reference "../app.css";
 .tt-calendar {
   --fc-border-color: var(--border);
   --fc-page-bg-color: var(--card);
   --fc-neutral-bg-color: var(--muted);
   --fc-neutral-text-color: var(--muted-foreground);
-  /* Neutral, not brand red: this washed the entire today column full-height,
-     which is the accent as a large background fill (the One Accent Rule
-     forbids exactly that) and muddied red project blocks sitting on it. The
-     now-indicator line below stays red — that one is precise and earned. */
+  /* Neutral, not brand red: a red wash on the whole today column breaks the One Accent Rule and muddies red project blocks. */
   --fc-today-bg-color: color-mix(in oklab, var(--foreground) 4%, transparent);
   --fc-now-indicator-color: var(--primary);
   --fc-highlight-color: color-mix(in oklab, var(--primary) 14%, transparent);
@@ -44,8 +33,7 @@
   padding: 0.5rem 0;
 }
 
-/* Slot height is driven by the zoom control (--fc-slot-height, px), falling
-   back to a comfortable drag target when unset. */
+/* Slot height follows the zoom control (--fc-slot-height), with a comfortable drag target as the default. */
 .tt-calendar .fc .fc-timegrid-slot {
   height: var(--fc-slot-height, 2.75rem);
 }
@@ -56,16 +44,13 @@
   border-color: var(--border);
 }
 
-/* FullCalendar's own gutter is 2px left and 2.5% right, so a day column leaves a
-   growing empty strip on the right. The left gap is a real margin, the right one
-   is the inset gutter each block draws (below), which makes both read as 3px. */
+/* FullCalendar's gutter leaves a growing empty strip on the right; a real left margin plus each block's inset gutter make both read as 3px. */
 .tt-calendar .fc .fc-timegrid-col-events {
   margin-inline: 3px 0;
 }
 
 
-/* The drag preview is rendered full-width over its neighbours; CalendarView pins
-   it to the dragged block's own share of the column through these vars. */
+/* The drag preview is full-width; CalendarView pins it to the dragged block's share of the column through these vars. */
 .tt-calendar .fc-timegrid-event-harness:has(.fc-event-mirror) {
   left: var(--tt-mirror-left, 0) !important;
   right: var(--tt-mirror-right, 0) !important;
@@ -76,8 +61,7 @@
   border-radius: var(--radius-sm);
   border: none;
   border-left: 3px solid var(--fc-event-border-color, var(--primary));
-  /* ~3px of gutter so stacked blocks stay distinct — an inset shadow, not a
-     real border, so it doesn't shift FC's own width/left math. */
+  /* ~3px gutter between stacked blocks as an inset shadow, so FC's own width/left math is not shifted. */
   box-shadow: inset -3px 0 0 var(--fc-page-bg-color);
   padding: 0;
   overflow: hidden;
@@ -86,15 +70,11 @@
 .tt-calendar .fc .fc-timegrid-event .fc-event-main {
   padding: 2px 6px;
   color: var(--foreground);
-  /* Event labels degrade by how much room THIS block has, not by viewport width:
-     a week grid on a tablet and a day grid on a phone give wildly different
-     column widths at similar viewports. Without this, the meta line wraps into
-     "9:00 –" / "10:30" / "1h" / "30m" — four lines of shrapnel. */
+  /* Event labels degrade by this block's own width, not the viewport's, so the meta line never wraps into four short lines. */
   container-type: inline-size;
 }
 
-/* The range you drag to create wears FullCalendar's own solid blue, where the
-   app's dark event ink is unreadable — white on it, in both themes. */
+/* The drag-to-create range keeps FullCalendar's solid blue, where the dark event ink is unreadable: white text in both themes. */
 .tt-calendar .fc .fc-timegrid-event.tt-event-select,
 .tt-calendar .fc .fc-timegrid-event.tt-event-select .fc-event-main,
 .tt-calendar .fc .fc-timegrid-event.tt-event-select .fc-event-time,
@@ -103,10 +83,7 @@
   color: #fff;
 }
 
-/* "9:00 – 10:30 · 1h 30m" needs ~145px at 11px mono. Narrower than that and the
-   duration would be silently clipped by the block's overflow, so drop it
-   deliberately and keep the times. (Measured: a week column is 132px at 1280px
-   viewport, 176px at 1600px.) */
+/* The duration needs ~145px at 11px mono; below that drop it on purpose rather than let the block clip it. */
 @container (max-width: 144px) {
   .tt-event-dur,
   .tt-event-sep {
@@ -114,8 +91,7 @@
   }
 }
 
-/* Below ~85px even the times get clipped — and the block's position and height
-   already encode when and how long. Title plus project only. */
+/* Below ~85px even the times clip, and position and height already say when and how long: title and project only. */
 @container (max-width: 84px) {
   .tt-event-meta {
     display: none;
@@ -133,15 +109,12 @@
 .tt-calendar .fc-event.tt-event-running {
   border-left-style: dashed;
 }
-/* Shares the app-wide running-dot cue rather than redeclaring its own keyframe
-   — see css/global/motion.css. Three separate pulse implementations used to exist for the
-   one "a timer is running" signal, at three different durations and curves. */
+/* Shares the app-wide running-dot cue (css/global/motion.css) instead of a keyframe of its own. */
 .tt-calendar .fc-event.tt-event-running .tt-running-dot {
   animation: var(--animate-running-dot);
 }
 
-/* Ghost = unconfirmed external calendar event: dashed outline, hollow fill,
-   cursor affordance. Sits visually "behind" real tracked blocks. */
+/* Ghost = unconfirmed external calendar event: dashed outline, hollow fill, visually behind tracked blocks. */
 .tt-calendar .fc-event.tt-event-ghost {
   border-style: dashed;
   cursor: pointer;
@@ -151,10 +124,7 @@
   border-style: solid;
 }
 
-/* Draft = a proposed entry awaiting review. Dashed like a ghost, but tinted
-   with its proposed project's colour so a drafted week still reads as a week of
-   work rather than a row of grey placeholders. Solidifies on hover — the block
-   is a door into review. */
+/* Draft = proposed entry awaiting review: dashed like a ghost but tinted with its project colour, solid on hover. */
 .tt-calendar .fc-event.tt-event-draft {
   border-style: dashed;
   cursor: pointer;
@@ -174,15 +144,8 @@
   background: var(--primary);
 }
 
-/* Resize handle: FullCalendar's default is an ~8px invisible strip at the
-   bottom edge, easy to miss — a near-miss lands on the event body instead
-   (a click opens the entry sheet, a drag moves it) rather than resizing.
-   Widen the actual hit area and draw a visible grip so the affordance is
-   discoverable, matching what a drag-to-resize calendar (Toggl) signals. */
-/* Two separate handles: -start (top, needs eventStartEditable) and -end
-   (bottom, needs eventDurationEditable) — both are on, so both edges resize,
-   like Google Calendar. Sharing one `bottom` offset across both had been
-   pulling the top handle down to the bottom, which is why only one dot showed. */
+/* Widen the resize handle's hit area and draw a visible grip: the default 8px strip is easy to miss and a near-miss moves the event. */
+/* Two handles, -start (top) and -end (bottom), each with its own offset so both edges resize. */
 .tt-calendar .fc-timegrid-event .fc-event-resizer {
   @apply cursor-ns-resize;
 }
@@ -193,12 +156,7 @@
   @apply h-2.5 -bottom-[5px];
 }
 .tt-calendar .fc-timegrid-event .fc-event-resizer::after {
-  /* Toggl's own grip icon (react-big-calendar's dnd addon,
-     .rbc-addons-dnd-resize-ns-icon): a double horizontal line, not a dot.
-     The bare 8px FC gives by default has no visual cue at all, so a
-     near-miss lands on the event body (click opens the entry sheet, drag
-     moves it) instead of resizing. Neutral foreground, not the brand
-     accent — this is a grid affordance, not a project color. */
+  /* Toggl's grip icon (a double horizontal line) in neutral foreground: a grid affordance, not a project colour. */
   @apply content-[''] absolute left-1/2 w-3 -translate-x-1/2 border-t-[3px] border-double border-foreground opacity-0 transition-opacity duration-fast ease-out-quart;
 }
 .tt-calendar .fc-timegrid-event .fc-event-resizer-start::after {

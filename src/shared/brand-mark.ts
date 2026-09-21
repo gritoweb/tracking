@@ -8,13 +8,12 @@
  * `pnpm generate-icons`; never redraw the clock anywhere else.
  */
 
-// Pre-converted sRGB hex of the DESIGN.md oklch tokens, for surfaces that
-// can't use oklch()/CSS vars (static icon assets, email, OG image).
-export const BRAND_RED = "#dd322e"; // --primary light, oklch(0.588 0.207 27.33)
-export const BRAND_RED_DARK = "#f34a42"; // --primary dark, oklch(0.65 0.207 27.33)
-export const GROUND_LIGHT = "#fcfbfa"; // --background light, oklch(0.988 0.0015 30)
-export const GROUND_DARK = "#111315"; // --background dark, oklch(0.185 0.006 265)
-export const MUTED_INK_DARK = "#a1a5ac"; // --muted-foreground dark, oklch(0.72 0.012 265)
+// The same hex as css/global/variables.css, for surfaces that can't use CSS variables (static icons, email, OG image); a test holds them equal.
+export const BRAND_RED = "#dd322e"; // --primary light
+export const BRAND_RED_DARK = "#f34a42"; // --primary dark
+export const GROUND_LIGHT = "#fcfbfa"; // --background light
+export const GROUND_DARK = "#111315"; // --background dark
+export const MUTED_INK_DARK = "#a1a5ac"; // --muted-foreground dark
 
 /**
  * Inner SVG for the clock glyph (ring + hour/minute hands + center dot),

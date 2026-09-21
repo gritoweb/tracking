@@ -1,8 +1,6 @@
 import type { CSSProperties } from "react";
 
-// Email-safe hex equivalents of the DESIGN.md oklch tokens ("The Quiet Ledger").
-// Email clients don't support oklch(), so these are pre-converted; light-mode
-// only — clients apply their own dark-mode inversion.
+// Email-safe hex, light only: four equal css/global/variables.css tokens (tested); canvas, mutedInk and border are older values.
 export const colors = {
   primary: "#dd322e", // brand red — the single accent, primary button fill only
   primaryInk: "#b71a1b", // brand red retuned for small text (links)

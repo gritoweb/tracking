@@ -184,6 +184,7 @@ A fifth pass (September 2026, on the `refactor` branch) closed what the audit st
 | Doc | Audience | Contents |
 |---|---|---|
 | `README.md` | anyone | overview, features, dev setup |
+| `docs/CSS_NOTES.md` | devs | the full reasoning behind the CSS tokens and rules (the CSS files carry one-line comments) |
 | `docs/RELEASE_1.0.0.md` | operators | what 1.0.0 changes, known limits, and the order to deploy it |
 | `CLAUDE.md` | agents/devs | commands, conventions, deploy sequence |
 | `docs/ARCHITECTURE.md` | devs | this file |
