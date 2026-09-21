@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-09-18 (37)
+### Added
+- **The database refuses hours without a project (migration `0049`).** `time_entries.project_id` still allows NULL (it has since the first schema), so the "every entry needs a project" rule lived only in the code of each writer. Two triggers now enforce it below all of them: `BEFORE INSERT` and `BEFORE UPDATE OF project_id` abort with "A time entry needs a project" when the project is NULL. Existing rows are not touched, and editing any other column of an entry is unaffected.
+- One consequence, on purpose: `project_id` has `ON DELETE SET NULL`, so deleting a project that still has hours is now refused rather than orphaning them. The app never deletes projects (it archives them), and deleting a whole workspace still works.
+
+Checked while writing it: the calendar auto-track insert needs no change. It only inserts a project the inference picked from `loadGroundingProjects`, whose filter (`active = 1 AND client_id IS NOT NULL`) is the one `findActiveProject` applies.
+
+Verified: applied to the local D1 (`wrangler d1 migrations apply --local`), where inserting an entry with no project fails with `SQLITE_CONSTRAINT_TRIGGER`; the API still answers 400 for a missing project, 201 for a valid entry and 200 for its delete. Tests on a real in-memory SQLite (insert, insert with an explicit NULL, clearing the project, moving to another project, editing other columns, deleting a project with and without hours, deleting a workspace). Not applied to the remote database. `tsc -b` 0, lint 0.
+
+## 2026-09-18 (37)
+### Added
+- **The database refuses hours without a project (migration `0049`).** `time_entries.project_id` still allows NULL (it has since the first schema), so the "every entry needs a project" rule lived only in the code of each writer. Two triggers now enforce it below all of them: `BEFORE INSERT` and `BEFORE UPDATE OF project_id` abort with "A time entry needs a project" when the project is NULL. Existing rows are not touched, and editing any other column of an entry is unaffected.
+- One consequence, on purpose: `project_id` has `ON DELETE SET NULL`, so deleting a project that still has hours is now refused rather than orphaning them. The app never deletes projects (it archives them), and deleting a whole workspace still works.
+
+Checked while writing it: the calendar auto-track insert needs no change. It only inserts a project the inference picked from `loadGroundingProjects`, whose filter (`active = 1 AND client_id IS NOT NULL`) is the one `findActiveProject` applies.
+
+Verified: applied to the local D1 (`wrangler d1 migrations apply --local`), where inserting an entry with no project fails with `SQLITE_CONSTRAINT_TRIGGER`; the API still answers 400 for a missing project, 201 for a valid entry and 200 for its delete. Tests on a real in-memory SQLite (insert, insert with an explicit NULL, clearing the project, moving to another project, editing other columns, deleting a project with and without hours, deleting a workspace). Not applied to the remote database. `tsc -b` 0, lint 0.
+
 ## 2026-09-18 (36)
 ### Added
 - **A test that runs the real SQL for "removing a member takes them off the tasks" (D6).** The existing tests only compared the SQL text a stub received. `src/test/sqlite-d1.ts` now gives tests a real in-memory SQLite with every migration applied, behind the slice of the D1 API the worker uses (`prepare/bind/run/all/first`), and `removeMemberFromTasks` is tested against it: the person disappears from every task they were on, other people's assignments stay, their notifications in that workspace go, the same person's assignments in another workspace stay, and their tracked hours are kept. Nothing in the worker changed.
