@@ -32,7 +32,7 @@ interface McpRunningTimerRow {
 
 /** An entry as the API returns it, plus where the app shows it. */
 function withEntryUrl(entry: TimeEntry, base: string) {
-  return { ...entry, url: entryUrl(base, entry.start) };
+  return { ...entry, url: entryUrl(base, entry.start, entry.id) };
 }
 
 export function registerEntryReads(d: ToolDeps): void {
@@ -178,7 +178,7 @@ export function registerEntryReads(d: ToolDeps): void {
       return json(
         results.map(formatEntry).map((e) => ({
           id: e.id,
-          url: entryUrl(appUrl(env), e.start),
+          url: entryUrl(appUrl(env), e.start, e.id),
           date: e.start.slice(0, 10),
           start: e.start,
           stop: e.stop,

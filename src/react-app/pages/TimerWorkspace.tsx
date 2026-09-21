@@ -1,4 +1,4 @@
-import { useMemo, useState, Suspense, lazy } from "react";
+import { useEffect, useMemo, useState, Suspense, lazy } from "react";
 import { useSearchParams } from "react-router-dom";
 import { addWeeks, addMonths, addDays, format, parseISO } from "date-fns";
 import { TimerWorkspaceHeader } from "@/components/timer/TimerWorkspaceHeader";
@@ -42,6 +42,7 @@ export function TimerWorkspace() {
   const showWeekends = useUIStore((s) => s.showWeekends);
   const setShowWeekends = useUIStore((s) => s.setShowWeekends);
   const openQuickAdd = useUIStore((s) => s.openQuickAdd);
+  const flashEntry = useUIStore((s) => s.flashEntry);
   const listRangeKey = useUIStore((s) => s.listRangeKey);
   const listRangeSince = useUIStore((s) => s.listRangeSince);
   const listRangeUntil = useUIStore((s) => s.listRangeUntil);
@@ -81,11 +82,20 @@ export function TimerWorkspace() {
   // `null` means "follow the clock": the grid views open on today and keep
   // following it across midnight. Stepping or revealing a date pins an explicit
   // anchor; the Today button releases it again.
-  // `/?date=YYYY-MM-DD` opens on that day: the link an Assistant reply gives for a time entry.
+  // `/?date=YYYY-MM-DD&entry=ID` opens on that day and highlights that entry: the
+  // link an Assistant reply gives for a time entry (its id is the only proof the
+  // write really happened — the Assistant can't guess it, unlike the date).
   const [searchParams] = useSearchParams();
   const [anchorOverride, setAnchorOverride] = useState<Date | null>(() => parseDateParam(searchParams.get("date")));
   const today = useMemo(() => parseISO(dayKey), [dayKey]);
   const anchor = anchorOverride ?? today;
+
+  useEffect(() => {
+    const entryId = searchParams.get("entry");
+    if (entryId) flashEntry(entryId);
+    // Only the link's initial load should flash — never re-run on an unrelated param change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const isListView = effectiveView === "list";
   const { since, until } = useMemo(
