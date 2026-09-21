@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { SettingsHint } from "./SettingsHint";
 
 interface SettingsRowProps {
   htmlFor?: string;
@@ -17,7 +18,7 @@ export function SettingsRow({ htmlFor, label, description, children, className }
       <div className="pr-2">
         <Label htmlFor={htmlFor}>{label}</Label>
         {description && (
-          <p className="mt-1 text-xs leading-normal text-muted-foreground">{description}</p>
+          <SettingsHint>{description}</SettingsHint>
         )}
       </div>
       {children}

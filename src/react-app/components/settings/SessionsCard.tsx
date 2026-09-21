@@ -136,9 +136,8 @@ export function SessionsCard() {
               >
                 {!isCurrent && (
                   <Button
-                    variant="ghost"
+                    variant="ghost-destructive"
                     size="sm"
-                    className="shrink-0 text-muted-foreground hover:text-destructive"
                     onClick={() => revoke.mutate(s.token)}
                     disabled={revoke.isPending}
                   >

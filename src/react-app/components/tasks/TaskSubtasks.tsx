@@ -49,11 +49,11 @@ export function TaskSubtasks({ task, subtasks, onToggle, onOpen, onRequestDelete
               <AvatarStack members={sub.assignees.map((a) => ({ id: a.userId, name: a.name, image: a.image }))} max={3} size="xs" />
             )}
             <Button
-              variant="ghost"
+              variant="ghost-destructive"
               size="icon-xs"
               aria-label={`Delete ${sub.name}`}
               onClick={() => onRequestDelete(sub)}
-              className="tt-reveal shrink-0 text-muted-foreground hover:text-destructive"
+              className="tt-reveal"
             >
               <Trash2 className="h-3 w-3" />
             </Button>

@@ -35,6 +35,9 @@ export const buttonVariants = cva(
           "bg-secondary text-secondary-foreground hover:bg-secondary/80 aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
         ghost:
           "hover:bg-accent hover:text-accent-foreground aria-expanded:bg-accent aria-expanded:text-accent-foreground dark:hover:bg-accent/50",
+        // A quiet control that only turns red under the pointer: remove, revoke, sign out.
+        "ghost-destructive":
+          "text-muted-foreground hover:bg-accent hover:text-destructive aria-expanded:bg-accent aria-expanded:text-accent-foreground dark:hover:bg-accent/50",
         link: "text-primary underline-offset-4 hover:underline",
       },
       size: {

@@ -14,6 +14,7 @@ import { Duration } from "@/components/ui/numeric";
 import { DISTINCT_COLORS } from "@/lib/colorUtils";
 import { useUIStore } from "@/stores/uiStore";
 import type { BreakdownRow } from "@/hooks/useReports";
+import { ReportFigure } from "./ReportFigure";
 
 // Palette for dimensions whose rows have no intrinsic colour (client/task/tag).
 // Deliberately the same hue-alternated set projects and tags use: a second
@@ -142,9 +143,9 @@ export function BreakdownCard({
                         0% of the revenue, which is exactly what "Internal /
                         Admin — $0.00 · 26%" was saying. It now sits after the
                         figure it qualifies, with nothing between them. */}
-                    <span className="w-9 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+                    <ReportFigure kind="percent">
                       {pct}%
-                    </span>
+                    </ReportFigure>
                   </div>
                 );
               })}
@@ -162,9 +163,9 @@ export function BreakdownCard({
                   </span>
                 )}
                 <Duration seconds={totalSeconds} size="sm" weight="semibold" className="min-w-12 shrink-0" />
-                <span className="w-9 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+                <ReportFigure kind="percent">
                   100%
-                </span>
+                </ReportFigure>
               </div>
             </>
           )}

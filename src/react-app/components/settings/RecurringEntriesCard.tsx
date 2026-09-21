@@ -93,9 +93,8 @@ export function RecurringEntriesCard() {
                   <Pencil className="h-3.5 w-3.5" />
                 </Button>
                 <Button
-                  variant="ghost"
+                  variant="ghost-destructive"
                   size="icon-sm"
-                  className="text-muted-foreground hover:text-destructive"
                   onClick={() => setDeleteTarget(r)}
                   aria-label="Delete recurring entry"
                 >

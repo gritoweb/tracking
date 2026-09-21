@@ -167,9 +167,8 @@ export function SidebarContent({ collapsed, onNavigate }: SidebarContentProps) {
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
-                  variant="ghost"
+                  variant="ghost-destructive"
                   size="icon-sm"
-                  className="shrink-0 text-muted-foreground hover:text-destructive"
                   onClick={handleSignOut}
                   aria-label="Sign out"
                 >

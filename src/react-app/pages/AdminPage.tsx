@@ -163,8 +163,7 @@ export function AdminPage() {
                   {u.id !== user.id && (
                     <Button
                       size="sm"
-                      variant="ghost"
-                      className="text-muted-foreground hover:text-destructive"
+                      variant="ghost-destructive"
                       onClick={() => setRemoveTarget(u)}
                     >
                       Remove

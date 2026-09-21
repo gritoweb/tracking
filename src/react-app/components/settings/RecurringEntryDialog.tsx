@@ -26,6 +26,7 @@ import {
 import { DEFAULT_ENTRY_BILLABLE } from "@shared/billable";
 import { recurringFormSchema, type RecurringFormValues } from "./RecurringEntryDialog.schema";
 import type { RecurringEntry } from "@shared/schemas";
+import { SettingsHint } from "./SettingsHint";
 
 interface RecurringEntryDialogProps {
   open: boolean;
@@ -182,9 +183,9 @@ export function RecurringEntryDialog({ open, onClose, editing }: RecurringEntryD
           <div className="flex items-center justify-between rounded-md border p-3">
             <div>
               <FieldLabel htmlFor="rec-billable">Billable</FieldLabel>
-              <p className="mt-1 text-xs leading-normal text-muted-foreground">
+              <SettingsHint>
                 Mark each generated entry as billable.
-              </p>
+              </SettingsHint>
             </div>
             <Controller
               control={form.control}

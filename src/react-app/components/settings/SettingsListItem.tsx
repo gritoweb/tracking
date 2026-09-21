@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { SettingsHint } from "./SettingsHint";
 
 interface SettingsListItemProps {
   icon?: LucideIcon;
@@ -18,7 +19,7 @@ export function SettingsListItem({ icon: Icon, title, subtitle, children, classN
         {Icon && <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />}
         <div className="min-w-0">
           <div className="flex items-center gap-2">{title}</div>
-          {subtitle && <p className="mt-1 text-xs leading-normal text-muted-foreground">{subtitle}</p>}
+          {subtitle && <SettingsHint>{subtitle}</SettingsHint>}
         </div>
       </div>
       {children}

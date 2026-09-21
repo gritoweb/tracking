@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-09-18 (48)
+### Changed
+- **Four patterns that were pasted into several screens are now one thing each.** A scan of every screen found only six long class strings repeated three or more times, so the code was already tidy; these are the ones worth naming:
+  - `Button` variant **`ghost-destructive`**: the quiet control that only turns red under the pointer (sign out, remove a passkey, revoke a session, delete a recurring entry or a subtask, unlink an account, remove a user). Seven screens wrote `variant="ghost"` plus `text-muted-foreground hover:text-destructive`; the `shrink-0` several of them added was already in the button's base classes.
+  - `CenteredPage` (`components/layout`): the full-height tinted ground of the sign-in, invitation and no-workspace pages.
+  - `ReportFigure` (`components/reports`): the small right-aligned share (`percent`) and amount (`amount`) numbers beside a report row's duration, eight copies across `BreakdownCard` and `SummaryTree`.
+  - `SettingsHint` (`components/settings`): the supporting line under a settings label or list item.
+  Nothing else was touched: the invitation page keeps its second, untinted `<main>` (a different look), and the near-misses found by the scan (a link-like button with `h-auto p-0`, the solid red ones) stay as they are.
+
+Verified: the built stylesheet is the same 156 rules and 109,318 bytes as before, the calendar stylesheet is byte-identical, so nothing can render differently. In a real browser the sign-in page's `<main>` keeps its classes and computed height, background and alignment, the Settings button goes from the muted grey to the destructive red on hover, and the hint lines render. Tests for the variant, `ReportFigure` and `CenteredPage`. `tsc -b` 0, lint 0, vitest 750/750, build ok.
+
 ## 2026-09-18 (47)
 ### Changed
 - **The coverage floor goes from 28% lines / 31% branches to 42% / 40%, and routes now count.** The measured coverage of the files already listed was 45% / 46%, so the floor was far below reality. `src/worker/routes/**` and `src/worker/db/**` are now in the measured set, which is why the honest number is 42.3% lines and 40.9% branches (many route files still have no test); the floor sits just under that so it can only go up.

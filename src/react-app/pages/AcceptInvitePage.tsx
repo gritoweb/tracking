@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { workspacesQueryKey } from "@/hooks/useWorkspaces";
 import { authClient } from "@/lib/auth-client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CenteredPage } from "@/components/layout/CenteredPage";
 
 export function AcceptInvitePage() {
   const [params] = useSearchParams();
@@ -50,7 +51,7 @@ export function AcceptInvitePage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-muted/30 px-4">
+    <CenteredPage>
       <Card className="w-full max-w-sm">
         <CardHeader>
           <CardTitle as="h1" className="text-xl">Joining workspace…</CardTitle>
@@ -63,6 +64,6 @@ export function AcceptInvitePage() {
           )}
         </CardContent>
       </Card>
-    </main>
+    </CenteredPage>
   );
 }

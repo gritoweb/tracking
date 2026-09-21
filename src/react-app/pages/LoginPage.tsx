@@ -5,6 +5,7 @@ import { authClient } from "@/lib/auth-client";
 import { BrandMark } from "@/components/brand/BrandMark";
 import { INVITE_ONLY_MESSAGE, isInviteOnlyError } from "@shared/invite-only";
 import { LoginFormCard } from "./LoginFormCard";
+import { CenteredPage } from "@/components/layout/CenteredPage";
 
 /** Same-origin path to return to after sign-in; anything else falls back to the app root. */
 function safeRedirect(value: string | null): string {
@@ -156,7 +157,7 @@ export function LoginPage() {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-muted/30 px-4">
+    <CenteredPage>
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="mb-8 flex items-center justify-center gap-2">
@@ -184,6 +185,6 @@ export function LoginPage() {
           onSubmit={handleSubmit}
         />
       </div>
-    </main>
+    </CenteredPage>
   );
 }

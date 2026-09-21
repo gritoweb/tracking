@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/currency";
 import { useUIStore } from "@/stores/uiStore";
 import type { GroupedReport, GroupRow } from "@/hooks/useReports";
+import { ReportFigure } from "./ReportFigure";
 
 interface SummaryTreeProps {
   data: GroupedReport;
@@ -73,16 +74,16 @@ export function SummaryTree({ data, showAmount = true, header }: SummaryTreeProp
                       {g.name}
                     </span>
                     {showAmount && (
-                      <span className="w-20 text-right text-xs tabular-nums text-muted-foreground">
+                      <ReportFigure kind="amount">
                         {formatCurrency(g.billableAmount, currency)}
-                      </span>
+                      </ReportFigure>
                     )}
                     <Duration seconds={g.totalSeconds} size="sm" weight="semibold" className="w-16" />
                     {/* Share of TIME — kept next to the duration it describes,
                         not next to the amount it doesn't. */}
-                    <span className="w-9 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+                    <ReportFigure kind="percent">
                       {pct(g.totalSeconds)}%
-                    </span>
+                    </ReportFigure>
                   </button>
 
                   {hasSub && open && (
@@ -97,14 +98,14 @@ export function SummaryTree({ data, showAmount = true, header }: SummaryTreeProp
                             {s.name}
                           </span>
                           {showAmount && (
-                            <span className="w-20 text-right text-xs tabular-nums text-muted-foreground">
+                            <ReportFigure kind="amount">
                               {formatCurrency(s.billableAmount, currency)}
-                            </span>
+                            </ReportFigure>
                           )}
                           <Duration seconds={s.totalSeconds} size="sm" weight="medium" className="w-16" />
-                          <span className="w-9 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+                          <ReportFigure kind="percent">
                             {pct(s.totalSeconds)}%
-                          </span>
+                          </ReportFigure>
                         </div>
                       ))}
                     </div>
@@ -118,14 +119,14 @@ export function SummaryTree({ data, showAmount = true, header }: SummaryTreeProp
               <span className="h-3.5 w-3.5 shrink-0" />
               <span className="min-w-0 flex-1 truncate text-sm font-semibold">Total</span>
               {showAmount && (
-                <span className="w-20 text-right text-xs tabular-nums text-muted-foreground">
+                <ReportFigure kind="amount">
                   {formatCurrency(data.billableAmount, currency)}
-                </span>
+                </ReportFigure>
               )}
               <Duration seconds={data.totalSeconds} size="sm" weight="semibold" className="w-16" />
-              <span className="w-9 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+              <ReportFigure kind="percent">
                 100%
-              </span>
+              </ReportFigure>
             </div>
           </div>
         )}

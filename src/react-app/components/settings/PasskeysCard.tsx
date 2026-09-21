@@ -83,9 +83,8 @@ export function PasskeysCard() {
                 subtitle={p.createdAt ? `Added ${formatShortDate(toIso(p.createdAt))}` : undefined}
               >
                 <Button
-                  variant="ghost"
+                  variant="ghost-destructive"
                   size="icon-sm"
-                  className="shrink-0 text-muted-foreground hover:text-destructive"
                   aria-label="Remove passkey"
                   onClick={() => setDeleteTarget(p)}
                   disabled={remove.isPending}

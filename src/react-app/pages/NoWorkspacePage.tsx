@@ -14,6 +14,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/hooks/useAuth";
 import { workspacesQueryKey } from "@/hooks/useWorkspaces";
 import { authClient } from "@/lib/auth-client";
+import { CenteredPage } from "@/components/layout/CenteredPage";
 
 // Better Auth lists invitations only for a verified address; a code sign-in verifies it.
 const VERIFICATION_REQUIRED = "EMAIL_VERIFICATION_REQUIRED_FOR_INVITATION";
@@ -60,7 +61,7 @@ export function NoWorkspacePage() {
   const invitations = data?.invitations ?? [];
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-muted/30 px-4">
+    <CenteredPage>
       <Card className="w-full max-w-sm">
         <CardHeader className="space-y-1">
           <CardTitle as="h1" className="text-xl">
@@ -120,6 +121,6 @@ export function NoWorkspacePage() {
           </Button>
         </CardFooter>
       </Card>
-    </main>
+    </CenteredPage>
   );
 }

@@ -88,9 +88,8 @@ export function ConnectedAccountsCard() {
               >
                 {linked ? (
                   <Button
-                    variant="ghost"
+                    variant="ghost-destructive"
                     size="sm"
-                    className="text-muted-foreground hover:text-destructive"
                     onClick={() => unlink.mutate(linked)}
                     disabled={unlink.isPending || loginMethodCount <= 1}
                     title={
