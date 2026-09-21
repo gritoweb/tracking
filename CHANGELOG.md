@@ -6,6 +6,14 @@
 
 Verified: the gate lets exactly 600 requests from one address through and refuses the 601st (test), the test that reads `wrangler.jsonc` finds `MCP_LIMITER` at 600, and the wrangler dry run lists `env.MCP_LIMITER (600 requests/60s)`. `pnpm check` 0.
 
+## 2026-09-18 (56)
+### Changed
+- **Documentation brought up to date with what shipped in this round.** `USER_GUIDE`: a "Comments, mentions and images" section (the `@` list beside the caret, e-mail on repeated names, editing, who can delete, paging, the count on the card, the panel following a teammate's edits, Attach image) and the **seven** default statuses (it still described five). `ARCHITECTURE`: shared request limits and the fifth security pass (with what cannot be closed in a Worker), the `/mcp` gate, the comment permission and paging rules, the two database integrity rules (`0049`, `0050`), workspace-owned keys/tags/favorites, the split stylesheet and named patterns, and a rewritten Testing & CI section (it claimed there was no unit test framework and that Playwright was a required check). `MCP`: `list_task_comments` paging, the `403 Forbidden origin` and `429` troubleshooting entries and the two new security-model points. `CLAUDE.md` and `README`: the test setup and the seven statuses. `ROADMAP`: the cross-isolate limit is no longer open, and a section records what was left out on purpose (MCP breadth, the extension, the hardening with no cheap fix).
+- **`package.json` gets `"version": "1.0.0"`** and `docs/RELEASE_1.0.0.md` holds the release notes, the known limits and the deploy order. The tag is not created; nothing is deployed or merged into `master`.
+- The `delete_task_comment` tool description no longer says only the author can delete (owners and admins can), so a model is not told the wrong thing.
+
+Verified: `pnpm install --frozen-lockfile` still passes with the version added; `tsc -b` 0, lint 0, vitest green.
+
 ## 2026-09-18 (55)
 ### Changed
 - **Two people with the same name can be told apart in the @ list.** The list showed an avatar and a name, so two members called "Sam" looked identical when picking one. Rows whose name repeats within the list now also show the e-mail underneath (and only those rows, so the usual list stays as compact as before). In a comment the pick is remembered by id, so choosing the right row is enough to tag the right person.

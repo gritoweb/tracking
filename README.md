@@ -70,11 +70,18 @@ AUTH_SECRET=<random string>   # also used to encrypt stored integration tokens
 
 Optional calendar sync needs `GOOGLE_CALENDAR_CLIENT_ID` / `_SECRET` and/or `MICROSOFT_CALENDAR_CLIENT_ID` / `_SECRET` — see [docs/CALENDAR_SYNC.md](docs/CALENDAR_SYNC.md). The app runs fine without them; the feature just stays disabled.
 
-Run the Playwright e2e suite (spins up `pnpm dev` against localhost:5173):
+Run the unit and route tests (vitest; route tests use a real in-memory SQLite with every migration applied), the type check and the linter:
+
+```bash
+pnpm exec vitest run
+pnpm exec tsc -b
+pnpm lint
+```
+
+The Playwright e2e suite is run by hand (it spins up `pnpm dev` against localhost:5173 and is not part of CI):
 
 ```bash
 pnpm test:e2e
-pnpm lint
 ```
 
 ## Build & Deploy

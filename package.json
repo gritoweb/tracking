@@ -1,5 +1,6 @@
 {
 	"name": "timetracker-app",
+	"version": "1.0.0",
 	"description": "Toggl-like time tracking app built on Cloudflare Workers, Hono, React 19, and Shadcn UI",
 	"cloudflare": {
 		"label": "Vite React Template",

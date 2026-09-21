@@ -120,6 +120,8 @@ reach — 25 on a read key, 64 on read+write (25 read + 39 write).
 | Productivity | `list_favorites`, `list_recurring`, `list_saved_reports`, `get_planner` | `create_favorite`, `delete_favorite`, `create_recurring`, `update_recurring`, `delete_recurring`, `create_saved_report`, `delete_saved_report`, `set_planner_hours` |
 | Account | `whoami`, `list_members`, `list_api_keys`, `list_notifications`, `get_settings`, `get_calendar_status` | `mark_notification_read`, `mark_all_notifications_read`, `delete_notification`, `update_settings`, `set_calendar_auto_track` |
 
+`list_task_comments` returns a task's newest 100 comments, oldest first. Pass `limit` (1–200) for a different page size and `before` (a comment id) to read the ones older than it.
+
 25 read tools + 39 write tools = 64 total. `start_timer`, `stop_timer` and
 `start_favorite` were removed on purpose (decision 2026-09-18): timers are
 app-only, and logging/editing entries already covers what the AI needs to do.
@@ -204,6 +206,17 @@ the connection made at launch. Quit the client fully and reopen.
 **Answers are a few hours out on "yesterday" / "last week".** The client is
 probably not passing `timezoneOffsetMinutes`. See above.
 
+**`403 Forbidden origin`.** The request carried a browser `Origin` header that
+isn't this app's. MCP clients are programs and send none; a browser page on
+another site must not be able to drive the server (DNS rebinding), so it is
+refused before anything else. Call it from the client, not from a web page.
+
+**`429 Too many requests`** with a `Retry-After`. `/mcp` allows about 600 (ten a second)
+requests a minute per address, checked before the key is looked up. A client
+that pages through a large workspace should batch its calls and honour
+`Retry-After`; the limit is per location and approximate, so a brief burst over
+it can pass and a sustained one cannot.
+
 **A tool the docs list isn't there.** You're on a read-only key; the 39 write
 tools are only registered for read+write. If it's `start_timer`, `stop_timer`
 or `start_favorite`, it's not a key issue — those were removed (see Tools
@@ -223,6 +236,13 @@ above).
   that could mint further credentials would turn one leaked key into permanent
   access.
 - Revocation is immediate — the next request 401s.
+- **Checked before the database.** A browser `Origin` that isn't ours is refused
+  with 403 and a per-address limit answers 429, both before the key is looked up,
+  so guessing keys or flooding the endpoint costs no query.
+- **A key acts as the person who created it**, with that person's role: a
+  member's key has a member's permissions and stops working when they leave the
+  workspace. Any member may create or revoke a workspace key; that is a product
+  decision (keys belong to the workspace), not an oversight.
 
 ## Implementation map
 

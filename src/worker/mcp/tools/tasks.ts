@@ -276,7 +276,7 @@ export function registerTaskWrites(d: ToolDeps): void {
     "delete_task_comment",
     {
       title: "Delete a comment",
-      description: "Remove a comment for good. Only the comment's author can; confirm which one with the person first.",
+      description: "Remove a comment for good. Its author can, and so can a workspace owner or admin; confirm which one with the person first.",
       inputSchema: { taskId: IdArg("task"), commentId: IdArg("comment") },
       annotations: DESTRUCTIVE,
     },

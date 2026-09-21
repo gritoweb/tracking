@@ -95,15 +95,6 @@ through the app.
 
 ## Backend hardening
 
-- **Cross-isolate auth rate limiting** — the credential-endpoint limiter
-  (`middleware/rate-limit.ts`) is in-isolate only; a distributed attacker (or one
-  user spread across colos) gets N× the configured limit. Flagged in
-  `extension/SECURITY_AUDIT.md` and again in the July 2026 audit. Cheapest
-  durable fix: a zone-level **WAF rate-limiting rule on `/api/auth/*`**
-  (dashboard config, no code); alternatives are the Workers Rate Limiting
-  binding or a DO-backed counter for the email-sending + AI endpoints
-  specifically. OTP brute force is already safe regardless (Better Auth's
-  DB-backed 3-attempt limit holds across isolates).
 - **CSP tightening** — two CSPs exist and only one of them matters much.
   `public/_headers` governs the **document** (where the Assistant renders LLM
   output) and is already tight: connect-src pinned to `'self'
@@ -116,6 +107,27 @@ through the app.
   and `/agents/*` responses (`assets.run_worker_first`) — JSON and WebSocket
   upgrades, which execute no scripts. Tightening it is hygiene for
   defence-in-depth, not the mitigation the Assistant needs.
+
+---
+
+## Deferred by decision (September 2026, added on 2026-09-21)
+
+Left out of the 1.0.0 round on purpose; none of it is a known bug.
+
+- **MCP breadth.** The 64 tools work and `/mcp` is now gated, but a benchmark
+  against the ClickUp connector (a coverage matrix of REST routes against tools)
+  was not done, and these were not built: `search`, a workspace overview, a
+  member lookup by name, task activity with time-in-status, confirming or
+  discarding a draft from a tool, cursor paging beyond `list_task_comments`.
+  `start_timer`/`stop_timer` stay out (see `docs/MCP.md`).
+- **The browser extension.** Untouched this round: no tests, `SECURITY_AUDIT.md`
+  dated 2026-07-13, and its API allow-list still admits all of `*.workers.dev`
+  and `localhost` in a production build.
+- **Hardening that has no cheap fix yet.** An integration URL whose hostname
+  resolves to a private address (`127.0.0.1.nip.io`) passes `url-guard.ts`,
+  because a Worker cannot look the name up; only owners and admins can set it.
+  There is no `audit_log`. `wrangler` is 4.110 against 4.135. `/mcp` limits by
+  address only, not per key.
 
 ---
 
