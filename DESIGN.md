@@ -239,7 +239,7 @@ Motion in a quiet ledger is confirmation, not performance. It exists to answer t
 
 ### Duration Scale
 
-Three steps, defined in `index.css` and consumed as `duration-fast` / `duration-base` / `duration-slow`. Pick by **how far the thing travels**, not by how important it is.
+Three steps, defined in `css/global/theme.css` and consumed as `duration-fast` / `duration-base` / `duration-slow`. Pick by **how far the thing travels**, not by how important it is.
 
 | Token | Value | For |
 |---|---|---|
@@ -281,11 +281,11 @@ There is no third busy form. The assistant's "Thinking…" used to be a `backgro
 
 **The Disclosure Rule.** Anything that opens or closes animates its *panel*, not just its chevron. `CollapsibleContent` carries the height animation by default (`duration-base`, `overflow-hidden`); a disclosure whose arrow rotates smoothly while its content snaps into place reads as broken.
 
-**The Reduced-Motion Rule.** `prefers-reduced-motion: reduce` collapses every animation and transition globally (`index.css`). Any effect whose *timing is coordinated in JS* — a row that waits for its exit animation before unmounting, a highlight that clears on a timer — must read the preference too and shorten itself; the CSS rule cannot reach a `setTimeout`. A running state must always survive the preference as colour and iconography, never as motion alone.
+**The Reduced-Motion Rule.** `prefers-reduced-motion: reduce` collapses every animation and transition globally (`css/global/accessibility.css`). Any effect whose *timing is coordinated in JS* — a row that waits for its exit animation before unmounting, a highlight that clears on a timer — must read the preference too and shorten itself; the CSS rule cannot reach a `setTimeout`. A running state must always survive the preference as colour and iconography, never as motion alone.
 
 ## 7. Layering
 
-Four named tiers, registered in `index.css` as `--z-index-*`. The values are the ones the app already used by convention; naming them means a new surface picks a *meaning* rather than a number, and the order is greppable in one place.
+Four named tiers, registered in `css/global/theme.css` as `--z-index-*`. The values are the ones the app already used by convention; naming them means a new surface picks a *meaning* rather than a number, and the order is greppable in one place.
 
 | Token | Value | For |
 |---|---|---|
@@ -362,7 +362,7 @@ Variants live in a sibling `*-variants.ts` module so the component file exports 
 | `ColorDot` | — | a project/tag colour next to its name |
 | `EmptyState`, `Skeleton`, `Spinner`, `Kbd` | — | see §6 and §3 for when each applies |
 
-### Utilities (in `index.css`)
+### Utilities (in `css/global/utilities.css` and `css/components/`)
 - `focus-ring` — the house focus ring. Never copy `focus-visible:ring-[3px] …` by hand.
 - `hit-area` — expands the touch target of a small control without changing its layout.
 - `tt-reveal` / `tt-touch` — hover-revealed affordances that stay visible on touch devices.

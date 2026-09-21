@@ -2,7 +2,7 @@ import type { CalendarViewType } from "@/components/calendar/CalendarView";
 
 /**
  * Narrowest day column that still carries a readable event label. Below this the
- * container queries in styles/fullcalendar.css strip the meta line entirely, so
+ * container queries in css/components/fullcalendar.css strip the meta line entirely, so
  * a column narrower than this is showing a block with no facts on it.
  */
 export const MIN_DAY_COLUMN = 96;

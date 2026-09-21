@@ -5,9 +5,9 @@
  * no separate dark block needed.
  *
  * `@reference` (not `@import`) so `@apply` below resolves against the app's
- * theme/utilities without re-emitting index.css's output into this file.
+ * theme/utilities without re-emitting app.css's output into this file.
  */
-@reference "../index.css";
+@reference "../app.css";
 .tt-calendar {
   --fc-border-color: var(--border);
   --fc-page-bg-color: var(--card);
@@ -134,7 +134,7 @@
   border-left-style: dashed;
 }
 /* Shares the app-wide running-dot cue rather than redeclaring its own keyframe
-   — see index.css. Three separate pulse implementations used to exist for the
+   — see css/global/motion.css. Three separate pulse implementations used to exist for the
    one "a timer is running" signal, at three different durations and curves. */
 .tt-calendar .fc-event.tt-event-running .tt-running-dot {
   animation: var(--animate-running-dot);

@@ -1,0 +1,9 @@
+/* DESIGN.md §5's ring half for a control with no border of its own (dialog/sheet close buttons). */
+@utility focus-ring {
+  @apply focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50;
+}
+
+/* Grows the hit box past the visible chip, for a control under the 24px WCAG 2.5.8 floor. */
+@utility hit-area {
+  @apply relative before:absolute before:-inset-1.5 before:content-[''];
+}

@@ -47,7 +47,7 @@ export function pacingLabel(p: ProjectPacing): string | null {
  *
  * `warning-ink`, not `warning`: --warning is calibrated as a *fill* and fails AA
  * as small type on card (3.15:1). The bar can use --warning; this label can't.
- * See the token comments in index.css.
+ * See the token comments in css/global/variables.css.
  */
 export function pacingToneClass(status: ProjectPacing["status"]): string {
   switch (status) {

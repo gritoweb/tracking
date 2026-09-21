@@ -1,0 +1,144 @@
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-ink: var(--primary-ink);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-ink: var(--warning-ink);
+  --color-success-ink: var(--success-ink);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-ink-soft: var(--chart-ink-soft);
+  --color-scrim: var(--scrim);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  /* Geometry is chosen by what an element IS, not by taste (DESIGN.md §5).
+     Three families, and the boundary between them is density:
+
+       controls   — `rounded-full`. Buttons, badges, inputs, segments, icon
+                    buttons. A pill costs nothing at 24-40px and it is the
+                    single loudest cue in the new language.
+       containers — `rounded-container` (this token). Cards, dialogs, sheets,
+                    popovers. 20px, up from the 12px `rounded-xl` they used.
+       data cells — unchanged `rounded-md`/`-lg`. Entry rows, timesheet cells,
+                    calendar blocks, planner cells, table cells. Pills on a
+                    30-row list would trade the app's actual job for a look.
+
+     Named rather than spelled `rounded-[1.25rem]` at each call site so the
+     container radius moves in one place, and so a reviewer can see which
+     family a surface belongs to from the class name alone. */
+  --radius-container: 1.25rem;
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+
+  /* Micro — the documented floor of the type ramp (DESIGN.md §3), for
+     chrome-level detail only: kbd chips, dense inline badges, counts. It was
+     always a real step; it was just spelled as a 10px arbitrary value at 28
+     call sites, which reads as drift and trips the design-system check. Named
+     so it can be used as `text-micro` and so the floor moves in one place.
+
+     Deliberately no `--text-micro--line-height`: the arbitrary values it
+     replaces set font-size only and inherited their leading, so pinning one
+     here would quietly reflow 28 dense call sites. This swap is meant to be
+     byte-identical in output.
+
+     (Don't write the arbitrary form in this comment — Tailwind scans CSS
+     comments too and will emit a dead utility for it.) */
+  --text-micro: 0.625rem;
+
+  /* Display — one step above Title, for a panel's own name where it *is* the header
+     (the task detail sheet), not a page heading sitting above other chrome. */
+  --text-display: 2.5rem;
+  --text-display--line-height: 1.25;
+
+  /* Layering. The values are the ones already in use (10/20/50) — this names
+     the three tiers that existed by convention so a new surface picks a
+     meaning rather than a number, and so the order is greppable in one place.
+
+       sticky   — headers and frozen first columns inside a scrolling grid
+       overlay  — something covering a pane but not the app (calendar error
+                  wash, the ghost-count button, a sticky corner cell that has to
+                  win against its sticky neighbours)
+       portal   — dialogs, sheets, popovers, dropdowns, selects
+       tooltip  — above portal on purpose: a tooltip on a control *inside* a
+                  dialog was previously the same 50 as the dialog and relied on
+                  DOM order to be visible at all. */
+  --z-index-sticky: 10;
+  --z-index-overlay: 20;
+  --z-index-portal: 50;
+  --z-index-tooltip: 60;
+
+  /* Motion — natural deceleration curves (no bounce/elastic).
+     `--ease-out-quart` is the default: everything uses it unless it has a
+     reason not to. Quint is reserved for the one large, slow move (the timer
+     control's width change), where the flatter tail keeps a big element from
+     appearing to overshoot. */
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* Duration scale (utilities: duration-fast / -base / -slow).
+     Three steps, chosen by how far the thing being animated travels:
+       fast — a state change in place: hover, focus, colour, a chevron.
+       base — something appearing or leaving: overlays, popovers, rows.
+       slow — a panel-sized move across the screen: sheets, drawers.
+     Numeric `duration-200` and friends still work; prefer the named steps so
+     the scale stays greppable and a retune happens in one place. */
+  --transition-duration-fast: 150ms;
+  --transition-duration-base: 200ms;
+  --transition-duration-slow: 300ms;
+
+  /* Reusable entrance animations (utilities: animate-fade-in / -up / -scale-in).
+     All three sit on the `base` step: they used to run 250/350/400ms, which read
+     as three different systems on screens that show more than one of them (the
+     reports strip fades up while an empty state scales in). A pure opacity fade
+     can afford to be the slowest of the three since nothing moves. */
+  --animate-fade-in: fade-in var(--transition-duration-slow) var(--ease-out-quart) both;
+  --animate-fade-up: fade-up var(--transition-duration-base) var(--ease-out-quart) both;
+  --animate-scale-in: scale-in var(--transition-duration-base) var(--ease-out-quart) both;
+
+  /* "A timer is running" has exactly two forms, and they share a 1.6s cadence
+     so that when both are on screen — the sidebar readout sits under the timer
+     bar — they breathe together instead of drifting against each other.
+
+     1. The signature: a flat ring breathes outward from behind the round Stop
+        button. Spends attention deliberately; only used on that one control.
+     2. The quiet one: a small dot breathes in place, for dense surfaces (the
+        sidebar's running readout, a running block on the calendar grid).
+
+     Both loop symmetrically, so the dot is on `ease-in-out` rather than the
+     house `ease-out-quart` — see DESIGN.md §6. The ring keeps `ease-out-quart`
+     because it *travels* (scale 1 → 1.7) rather than breathing in place. */
+  --animate-recording-pulse: recording-pulse 1.6s var(--ease-out-quart) infinite;
+  --animate-running-dot: running-dot 1.6s ease-in-out infinite;
+
+  /* Just-stopped entry — the row fades up into place while a primary-tinted wash
+     and left rail bloom then recede, so the eye tracks where the timer landed
+     (utility: animate-stopped). */
+  --animate-stopped:
+    fade-up var(--transition-duration-base) var(--ease-out-quart) both,
+    row-flash 1.4s var(--ease-out-quart) both;
+
+}

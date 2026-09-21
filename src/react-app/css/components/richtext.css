@@ -1,0 +1,92 @@
+/* Task description editor (tiptap ships unstyled) — plain prose at the app's own tokens. */
+.tt-richtext p {
+  margin: 0;
+}
+.tt-richtext p + p {
+  margin-top: 0.5em;
+}
+.tt-richtext h2 {
+  margin: 0.75em 0 0.25em;
+  font-size: var(--text-xl);
+  font-weight: 600;
+}
+/* A tagged person: the same chip the comments draw. */
+.tt-richtext .tt-mention {
+  border-radius: var(--radius-sm);
+  background-color: color-mix(in oklab, var(--primary) 10%, transparent);
+  padding: 0 0.25rem;
+  color: var(--primary-ink);
+  font-weight: 500;
+  cursor: pointer;
+}
+.tt-richtext h2:first-child {
+  margin-top: 0;
+}
+.tt-richtext ul:not([data-type="taskList"]) {
+  margin: 0.25em 0;
+  padding-left: 1.25em;
+  list-style: disc;
+}
+.tt-richtext p.is-editor-empty:first-child::before {
+  float: left;
+  height: 0;
+  color: var(--muted-foreground);
+  content: attr(data-placeholder);
+  pointer-events: none;
+}
+/* Checklist — a real checkbox input, not a bullet; a struck-through label marks it done. */
+.tt-richtext ul[data-type="taskList"] {
+  margin: 0.25em 0;
+  padding-left: 0;
+  list-style: none;
+}
+.tt-richtext ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5em;
+}
+.tt-richtext ul[data-type="taskList"] li > label {
+  margin-top: 0.2em;
+}
+.tt-richtext ul[data-type="taskList"] li > div {
+  flex: 1;
+  min-width: 0;
+}
+.tt-richtext ul[data-type="taskList"] li[data-checked="true"] > div {
+  color: var(--muted-foreground);
+  text-decoration: line-through;
+}
+/* The browser's native checkbox has no shape opinion — give it the same square-ish
+   mark used by the task row and subtask checkboxes, not a third shape in the app. */
+.tt-richtext ul[data-type="taskList"] input[type="checkbox"] {
+  appearance: none;
+  width: 1rem;
+  height: 1rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--background);
+  cursor: pointer;
+  display: grid;
+  place-content: center;
+  transition: background-color var(--transition-duration-fast) var(--ease-out-quart), border-color var(--transition-duration-fast) var(--ease-out-quart);
+}
+.tt-richtext ul[data-type="taskList"] input[type="checkbox"]:hover {
+  border-color: var(--primary);
+}
+.tt-richtext ul[data-type="taskList"] input[type="checkbox"]:checked {
+  background-color: var(--primary);
+  border-color: var(--primary);
+}
+.tt-richtext ul[data-type="taskList"] input[type="checkbox"]:checked::after {
+  content: "";
+  width: 0.25rem;
+  height: 0.45rem;
+  border: solid var(--primary-foreground);
+  border-width: 0 2px 2px 0;
+  transform: translateY(-1px) rotate(45deg);
+}
+.tt-richtext img {
+  max-width: 100%;
+  border-radius: var(--radius-md);
+  margin: 0.5em 0;
+}

@@ -41,7 +41,7 @@ const MOTION_AND_LAYER_CHECKS = [
 	{
 		selector: "Literal[value=/\\bz-(10|20|30|40|50)\\b/]",
 		message:
-			"Use the semantic layer scale — z-sticky / z-overlay / z-portal / z-tooltip (index.css) — so a new surface picks a meaning, not a number.",
+			"Use the semantic layer scale — z-sticky / z-overlay / z-portal / z-tooltip (css/global/theme.css) — so a new surface picks a meaning, not a number.",
 	},
 ];
 
@@ -86,12 +86,12 @@ const COLOR_CHECKS = [
 	{
 		selector: "Literal[value=/#(?:[0-9a-fA-F]{3,4}){1,2}\\b/]",
 		message:
-			"no-raw-hex-color: use a semantic token from index.css instead of a raw hex colour.",
+			"no-raw-hex-color: use a semantic token from css/global/variables.css instead of a raw hex colour.",
 	},
 	{
 		selector: "TemplateElement[value.raw=/#(?:[0-9a-fA-F]{3,4}){1,2}\\b/]",
 		message:
-			"no-raw-hex-color: use a semantic token from index.css instead of a raw hex colour.",
+			"no-raw-hex-color: use a semantic token from css/global/variables.css instead of a raw hex colour.",
 	},
 	{
 		selector:

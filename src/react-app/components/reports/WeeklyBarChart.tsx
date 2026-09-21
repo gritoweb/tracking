@@ -39,7 +39,7 @@ const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
  *
  * A stack also survives colour-blindness better than two hue-only bars: the
  * segments are positional and legended, and the two fills are separated on
- * luminance as well as hue (see the --chart-ink-soft note in index.css).
+ * luminance as well as hue (see the --chart-ink-soft note in css/global/variables.css).
  */
 const chartConfig = {
   billable: { label: "Billable", color: "var(--success)" },

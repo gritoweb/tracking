@@ -73,7 +73,7 @@ export function CalendarEventContent(arg: EventContentArg) {
         </span>
       </div>
       {/* Class hooks let the block drop detail as its own width shrinks —
-          see the @container rules in styles/fullcalendar.css. */}
+          see the @container rules in css/components/fullcalendar.css. */}
       <div className="tt-event-meta tt-on-tint-muted flex items-center gap-1.5 whitespace-nowrap text-micro">
         <span className="font-mono">{arg.timeText}</span>
         <span className="tt-event-sep" aria-hidden>

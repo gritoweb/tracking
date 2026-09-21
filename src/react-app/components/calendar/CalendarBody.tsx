@@ -28,7 +28,7 @@ import {
 import { useDraftRange } from "@/hooks/useDrafts";
 import { localDayKey } from "@/lib/dateUtils";
 
-import "@/styles/fullcalendar.css";
+import "@/css/components/fullcalendar.css";
 
 interface CalendarBodyProps {
   // Start of the visible period: a week start for time-grid views, a month

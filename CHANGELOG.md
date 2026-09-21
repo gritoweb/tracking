@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-09-18 (38)
+### Changed
+- **The stylesheet is split by subject instead of one 600-line `index.css`.** `src/react-app/css/app.css` now only lists the imports, in order; the rest lives in `css/global/` (`theme`, `variables`, `base`, `utilities`, `motion`, `print`, `accessibility`) and `css/components/` (`swatch`, `interaction`, `richtext`, `fullcalendar`). Nothing was rewritten: each file is an exact block of the old one, and the old `styles/fullcalendar.css` moved to `css/components/fullcalendar.css` (still imported by `CalendarBody`, so it stays its own lazy chunk). Only the file layout follows the idea of one folder per concern; no colour, size or rule was taken from another project. `main.tsx`, `components.json`, the comments and docs (`CLAUDE.md`, `DESIGN.md`) that named `index.css` now point at the file that holds the thing.
+- The reduced-motion rule keeps its place at the end of the cascade (`css/global/accessibility.css`, imported last).
+
+Verified by building before and after: the main stylesheet has the same 156 rules and the same 109,318 bytes (only five neighbouring rules trade places, because `.tt-on-tint-muted` now sits with the swatch rules, and it shares no property with them), and the calendar stylesheet is byte-identical. In the dev server the tokens and the calendar mapping resolve in light and dark. `tsc -b` 0, lint 0.
+
 ## 2026-09-18 (37)
 ### Added
 - **The database refuses hours without a project (migration `0049`).** `time_entries.project_id` still allows NULL (it has since the first schema), so the "every entry needs a project" rule lived only in the code of each writer. Two triggers now enforce it below all of them: `BEFORE INSERT` and `BEFORE UPDATE OF project_id` abort with "A time entry needs a project" when the project is NULL. Existing rows are not touched, and editing any other column of an entry is unaffected.

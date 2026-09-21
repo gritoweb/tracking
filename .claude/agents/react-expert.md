@@ -37,7 +37,7 @@ You are a React frontend expert specializing in this time-tracker app's SPA.
 - Prefer editing existing components over creating new ones unless a genuinely new component is needed.
 - All query keys should be consistent with existing patterns in the hook files — check before inventing new ones.
 - New shadcn/ui components: run `pnpm dlx shadcn@latest add <component>` — do not hand-write Radix primitives.
-- Tailwind v4: use CSS variables for theme values, not arbitrary values. Check `src/react-app/index.css` for available theme vars.
+- Tailwind v4: use CSS variables for theme values, not arbitrary values. Check `src/react-app/css/global/theme.css` and `variables.css` for available theme vars.
 - Mutations should invalidate the relevant TanStack Query cache keys after success.
 - Timer state is synced in real-time via WebSocket — any timer mutation must also handle the `timer_update` event path.
 - `lib/api.ts` is the single typed API client — add new endpoints there rather than using raw fetch elsewhere.

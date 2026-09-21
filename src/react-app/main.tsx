@@ -8,7 +8,7 @@ import { queryClient } from "@/lib/queryClient";
 import { installUnhandledRejectionReporter } from "@/lib/errorReporter";
 import "@fontsource-variable/geist/index.css";
 import "@fontsource-variable/geist-mono/index.css";
-import "./index.css";
+import "./css/app.css";
 import App from "./App";
 
 installUnhandledRejectionReporter();

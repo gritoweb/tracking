@@ -1,0 +1,41 @@
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+/* Just-stopped row flash — a primary wash blooms then recedes, with a left rail
+   accent that draws attention to the row without shifting layout. */
+@keyframes row-flash {
+  0%   { background-color: color-mix(in oklab, var(--primary) 16%, transparent);
+         box-shadow: inset 3px 0 0 0 var(--primary); }
+  35%  { background-color: color-mix(in oklab, var(--primary) 12%, transparent);
+         box-shadow: inset 3px 0 0 0 var(--primary); }
+  100% { background-color: transparent;
+         box-shadow: inset 3px 0 0 0 transparent; }
+}
+/* Flat recording pulse behind the round Stop button — a solid ring scales
+   outward and fades while the disc itself stays put, no shadow/gradient. */
+@keyframes recording-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.45;
+  }
+  100% {
+    transform: scale(1.7);
+    opacity: 0;
+  }
+}
+/* The quiet running cue — a dot breathing in place, for the sidebar readout and
+   a running block on the calendar grid. Opacity only: these sit inside dense
+   rows where a scaling dot would nudge its neighbours. */
+@keyframes running-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}

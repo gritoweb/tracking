@@ -255,7 +255,7 @@ export function TaskBoard({
 
       {/* The overlay is what actually follows the pointer; the card in the column
           stays put as a hole (TaskCard). `dropAnimation: null` under reduced
-          motion — the CSS rule in index.css can't reach an animation JS owns. */}
+          motion — the CSS rule in css/global/accessibility.css can't reach an animation JS owns. */}
       <DragOverlay dropAnimation={reducedMotion ? null : undefined}>
         {dragging ? <TaskCard task={dragging} onOpen={onOpenTask} overlay /> : null}
       </DragOverlay>

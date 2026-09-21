@@ -5,7 +5,7 @@ import { extendTailwindMerge } from "tailwind-merge";
  * tailwind-merge has to be told about `text-micro` and `text-display`.
  *
  * It classifies `text-*` by a built-in list of font sizes; `micro` and `display` are ours
- * (`--text-micro` / `--text-display` in index.css), so out of the box it reads
+ * (`--text-micro` / `--text-display` in css/global/theme.css), so out of the box it reads
  * them as *colour* utilities. Any `cn("… text-micro … text-<colour>")`
  * therefore silently dropped the size as a conflict and the element rendered at
  * whatever it inherited — 16px in the case that surfaced this, on a control the
