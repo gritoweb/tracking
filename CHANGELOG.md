@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-09-21 (67)
+### Added
+- **Deleting a time entry now asks first.** Single-row delete, the bulk selection bar's "Delete", and a description group's "Delete all" all open the same `ConfirmDialog` tasks already use, instead of deleting immediately (the undo toast stays as a second safety net on the two single-entry paths). Requested by Luis after noticing entries vanished with no confirmation, unlike tasks.
+- **Right-click a task to edit or delete it.** Both the board card and the list row now open a small context menu (reusing the existing `ContextMenu` primitive, unused until now) with "Edit task…" and "Delete" — the same edit sheet and delete confirmation the "…" menu already used, no new dialog or mutation path. `tsc -b` (0), `lint` (0), `vitest run` (974/974, unaffected — these surfaces had no prior test coverage; verified by hand instead).
+
 ## 2026-09-21 (66)
 ### Fixed
 - **The Assistant could confirm a write "succeeded" without ever seeing it happen.** `log_time` (like every other mutating tool) needs a human approval click in the app before it runs; asked "foi?" right after logging time, the model answered "Sim, registro finalizado! 2h 43min..." with no approval ever granted and no entry ever created (a follow-up `list_time_entries` came back empty) — confirmed working correctly the same request via the MCP client instead, isolating the bug to the in-app chat's grounding, not `log_time` itself or the S-02 approval-signature fix. The prompt's "ground factual answers" rule covered read queries but not confirming a write; it now forbids claiming a mutation succeeded without a fresh tool result in the same turn, and requires a `list_/get_` check before answering an uncertain "did it work?". `tsc -b` (0), `lint` (0), `vitest run` (974/974, +1).
