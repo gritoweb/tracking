@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-09-21 (66)
+### Fixed
+- **The Assistant could confirm a write "succeeded" without ever seeing it happen.** `log_time` (like every other mutating tool) needs a human approval click in the app before it runs; asked "foi?" right after logging time, the model answered "Sim, registro finalizado! 2h 43min..." with no approval ever granted and no entry ever created (a follow-up `list_time_entries` came back empty) — confirmed working correctly the same request via the MCP client instead, isolating the bug to the in-app chat's grounding, not `log_time` itself or the S-02 approval-signature fix. The prompt's "ground factual answers" rule covered read queries but not confirming a write; it now forbids claiming a mutation succeeded without a fresh tool result in the same turn, and requires a `list_/get_` check before answering an uncertain "did it work?". `tsc -b` (0), `lint` (0), `vitest run` (974/974, +1).
+
 ## 2026-09-21 (65)
 ### Deployed
 - **All 37 `SECURITY.md` findings (S-01 through S-34) are live in production.** `security` fast-forwarded into `master` (`501c47b`); remote D1 migrations `0051_keep_one_owner.sql` and `0052_saved_reports_workspace_fk.sql` applied before the deploy (bookmark `00000af4-00000000-000050ed-c298fa9d8899e5596822f4a28f32a531` taken first). `pnpm check` (0) then `pnpm run deploy`: Version ID `4ce4b931-e7b6-4262-9b44-7e5c1696eaff`. Smoke check: `GET /` → 200, `GET /api/me` (no session) → 401.
