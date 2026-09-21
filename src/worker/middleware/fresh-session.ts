@@ -20,7 +20,13 @@ export const requireFreshSession = createMiddleware<{ Bindings: Env }>(async (c,
   const origin = new URL(c.req.url).origin;
   const auth = createAuth(c.env, origin);
 
-  const result = await auth.api.getSession({ headers: c.req.raw.headers });
+  // disableCookieCache: this gate protects account deletion — a stale signed
+  // cookie cache must never stand in for a real, still-existing session row
+  // (SECURITY.md S-04).
+  const result = await auth.api.getSession({
+    headers: c.req.raw.headers,
+    query: { disableCookieCache: true },
+  });
   if (!result) return c.json({ error: "Unauthorized" }, 401);
 
   const createdAt = new Date(result.session.createdAt).getTime();
