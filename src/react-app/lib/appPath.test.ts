@@ -12,4 +12,15 @@ describe("appPath", () => {
     expect(appPath("//evil.test/x", "https://app.test")).toBeNull();
     expect(appPath("javascript:alert(1)", "https://app.test")).toBeNull();
   });
+
+  // SECURITY.md S-06: a naive `startsWith("/") && !startsWith("//")` prefix
+  // check let `/\evil.test/x` through as "internal" — starts with "/", not
+  // "//" — but a real <a href> built from that exact string resolves to
+  // https://evil.test/x, because the browser normalizes "\" to "/" while
+  // parsing. Any equivalent backslash-based disguise must be refused too.
+  it("refuses a backslash disguised as an in-app path (resolves to another origin)", () => {
+    expect(appPath("/\\evil.test/x", "https://app.test")).toBeNull();
+    expect(appPath("/\\\\evil.test/x", "https://app.test")).toBeNull();
+    expect(appPath("\\/evil.test/x", "https://app.test")).toBeNull();
+  });
 });
