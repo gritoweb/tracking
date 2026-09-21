@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-18 (42)
+### Security
+- **Attachment downloads say how they are served (`Content-Disposition`).** The download route sent only `Content-Type` (a PNG, JPEG, WebP or GIF, decided from the file's bytes at upload), leaving disposition to the browser. It now sends `inline; filename="…"; filename*=UTF-8''…`, so the image still shows in the page but a "save as" gets the original name. The name is stored user input, so it is cleaned before it reaches a header: control characters, quotes and slashes are dropped (a line break would have made the response throw), non-ASCII goes in the RFC 5987 form with an ASCII fallback beside it, and it is capped at 120 characters. This is hardening, not a hole: the response already carries `nosniff` and a CSP, and only image types are ever served.
+
+Tests: the route serves the stored image inline with its name and 404s another workspace's attachment; the header for a non-ASCII name, for `a"\r\nX-Evil: 1/../b\\c.png` (no CR, LF, quote or slash survives), for a name with nothing usable left, and for a very long one. `tsc -b` 0, lint 0.
+
 ## 2026-09-18 (41)
 ### Security
 - **The API no longer answers `Access-Control-Allow-Origin: *`.** When a request carried no `Origin`, the CORS middleware replied with a wildcard. A browser's cross-origin call always carries an `Origin`, so nothing was reachable through it, but a wildcard on an authenticated API is one refactor away from mattering. No `Origin` now means no CORS header; the app's own origin is still echoed and any other gets nothing. The origin check is exported (`isAllowedOrigin`) so `/mcp` can use the same list.
