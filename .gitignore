@@ -201,6 +201,7 @@ dist
 # Local working plan, never versioned
 plano.md
 plano2.md
+promptseguranca.md
 
 ### Lockfiles — pnpm only ###
 package-lock.json
