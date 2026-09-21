@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-18 (47)
+### Changed
+- **The coverage floor goes from 28% lines / 31% branches to 42% / 40%, and routes now count.** The measured coverage of the files already listed was 45% / 46%, so the floor was far below reality. `src/worker/routes/**` and `src/worker/db/**` are now in the measured set, which is why the honest number is 42.3% lines and 40.9% branches (many route files still have no test); the floor sits just under that so it can only go up.
+
+Verified: `vitest run --coverage` exits 0 at 42.34% lines and 40.91% branches with the new floor.
+
 ## 2026-09-18 (46)
 ### Added
 - **Tests for the report routes and the task status routes, on a real database.** `routes/reports` and `routes/task-statuses` had none.

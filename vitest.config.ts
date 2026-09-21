@@ -18,13 +18,15 @@ export default defineConfig({
         "src/worker/lib/**",
         "src/worker/middleware/**",
         "src/worker/integrations/**",
+        "src/worker/routes/**",
+        "src/worker/db/**",
         "src/shared/**",
         "src/react-app/lib/**",
       ],
-      // Floored to the measured value (target is 80/80) - most files under the globs above still have no test.
+      // Floored to the measured value (target is 80/80) - many files under the globs above still have no test.
       thresholds: {
-        lines: 28,
-        branches: 31,
+        lines: 42,
+        branches: 40,
       },
     },
   },
