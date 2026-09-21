@@ -5,31 +5,21 @@ import {
   type IntegrationAdapter,
   type PushContext,
 } from "./types";
-import { fetchWithoutRedirect, safeIntegrationOrigin } from "./url-guard";
+import { fetchWithoutRedirect, readUpstreamError, safeIntegrationOrigin } from "./url-guard";
 
 const API_VERSION = "v15.0";
+
+const originOf = (baseUrl: string) => safeIntegrationOrigin(baseUrl, "workfront");
 
 // Normalise a stored base_url (domain or full URL) into the REST API root, after
 // SSRF-validating the host, e.g.
 // "acme.my.workfront.com" -> "https://acme.my.workfront.com/attask/api/v15.0".
 function apiRoot(baseUrl: string): string {
-  return `${safeIntegrationOrigin(baseUrl, "workfront")}/attask/api/${API_VERSION}`;
+  return `${originOf(baseUrl)}/attask/api/${API_VERSION}`;
 }
 
 function creds(connection: Connection): WorkfrontCredentials {
   return connection.credentials as WorkfrontCredentials;
-}
-
-// Cap the surfaced upstream body: it reaches the client, so don't let it echo an
-// arbitrary/large response back as an oracle.
-async function readError(res: Response): Promise<string> {
-  const text = (await res.text().catch(() => "")).slice(0, 200);
-  try {
-    const json = JSON.parse(text);
-    return json?.error?.message ?? json?.message ?? text ?? res.statusText;
-  } catch {
-    return text || res.statusText;
-  }
 }
 
 export const workfrontAdapter: IntegrationAdapter = {
@@ -64,7 +54,7 @@ export const workfrontAdapter: IntegrationAdapter = {
       body: fields.toString(),
     });
     if (!res.ok) {
-      throw new IntegrationError(`Workfront push failed: ${await readError(res)}`);
+      throw new IntegrationError(`Workfront push failed: ${await readUpstreamError(res, originOf(connection.baseUrl))}`);
     }
 
     const body = (await res.json()) as { data?: { ID?: string } };
@@ -84,7 +74,7 @@ export const workfrontAdapter: IntegrationAdapter = {
       { headers: { Accept: "application/json" } },
     );
     if (!res.ok) {
-      throw new IntegrationError(`Workfront connection failed: ${await readError(res)}`);
+      throw new IntegrationError(`Workfront connection failed: ${await readUpstreamError(res, originOf(connection.baseUrl))}`);
     }
   },
 };

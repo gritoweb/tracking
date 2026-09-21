@@ -5,7 +5,7 @@ import {
   type IntegrationAdapter,
   type PushContext,
 } from "./types";
-import { fetchWithoutRedirect, safeIntegrationOrigin } from "./url-guard";
+import { fetchWithoutRedirect, readUpstreamError, safeIntegrationOrigin } from "./url-guard";
 
 const API_VERSION = "v9.2";
 
@@ -63,18 +63,6 @@ async function getAccessToken(connection: Connection): Promise<string> {
   return body.access_token;
 }
 
-async function readError(res: Response): Promise<string> {
-  // Cap the surfaced upstream body — it reaches the client; don't echo an
-  // arbitrary/large response back as an oracle.
-  const text = (await res.text().catch(() => "")).slice(0, 200);
-  try {
-    const json = JSON.parse(text);
-    return json?.error?.message ?? text ?? res.statusText;
-  } catch {
-    return text || res.statusText;
-  }
-}
-
 export const dynamicsAdapter: IntegrationAdapter = {
   async pushTimeEntry(ctx: PushContext): Promise<{ externalId: string }> {
     const { connection, project, entry, comment } = ctx;
@@ -111,7 +99,7 @@ export const dynamicsAdapter: IntegrationAdapter = {
       body: JSON.stringify(record),
     });
     if (!res.ok) {
-      throw new IntegrationError(`Dynamics push failed: ${await readError(res)}`);
+      throw new IntegrationError(`Dynamics push failed: ${await readUpstreamError(res, origin)}`);
     }
 
     const body = (await res.json().catch(() => ({}))) as { msdyn_timeentryid?: string };

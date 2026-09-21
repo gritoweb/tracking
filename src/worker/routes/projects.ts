@@ -199,8 +199,9 @@ export const projectsRouter = new Hono<{
     if (!canManageWorkspace(await getMemberRole(c.env.DB, workspaceId, c.get("userId")))) {
       return c.json({ error: MANAGER_ONLY_ERROR }, 403);
     }
-    await c.env.DB.prepare(
+    const result = await c.env.DB.prepare(
       `UPDATE projects SET active = 0 WHERE id = ? AND workspace_id = ?`
     ).bind(c.req.param("id"), workspaceId).run();
+    if (!result.meta.changes) return c.json({ error: "Not found" }, 404);
     return c.json({ ok: true }, 200);
   });

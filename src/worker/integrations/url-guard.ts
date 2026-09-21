@@ -94,3 +94,62 @@ export async function fetchWithoutRedirect(url: string, init?: RequestInit): Pro
   }
   return res;
 }
+
+const ERROR_READ_BYTES = 2048;
+const ERROR_TEXT_CHARS = 200;
+
+// Control characters, C1, and the Unicode line/paragraph separators: none may reach a person's screen from upstream text.
+// eslint-disable-next-line no-control-regex
+const UNSAFE_TEXT = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]+/g;
+
+function flatten(text: string): string {
+  return text.replace(UNSAFE_TEXT, " ").replace(/ {2,}/g, " ").trim();
+}
+
+/** Reads at most ERROR_READ_BYTES of an upstream error body, then drops the rest of the stream. */
+async function readBodyHead(res: Response): Promise<string> {
+  if (!res.body) return "";
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    while (total < ERROR_READ_BYTES) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      total += value.length;
+    }
+  } catch {
+    // A broken stream still yields whatever arrived before it broke.
+  } finally {
+    await reader.cancel().catch((err) => console.warn("integration: could not cancel the upstream error stream", { cause: String(err) }));
+  }
+  const bytes = new Uint8Array(Math.min(total, ERROR_READ_BYTES));
+  let at = 0;
+  for (const chunk of chunks) {
+    const part = chunk.subarray(0, bytes.length - at);
+    bytes.set(part, at);
+    at += part.length;
+  }
+  // stream: true and no flush, so a character cut by the byte cap is dropped rather than turned into U+FFFD.
+  return decoder.decode(bytes, { stream: true });
+}
+
+/**
+ * The message for a non-OK upstream reply: bounded read, one flat line, capped, and named after
+ * the host it came from so upstream text can never pass as the app's own.
+ */
+export async function readUpstreamError(res: Response, origin: string): Promise<string> {
+  const text = await readBodyHead(res);
+  let message = text;
+  try {
+    const json = JSON.parse(text) as { error?: { message?: unknown }; message?: unknown };
+    const fromJson = json?.error?.message ?? json?.message;
+    if (typeof fromJson === "string") message = fromJson;
+  } catch {
+    // Not JSON (or cut mid-document): the raw text is the message.
+  }
+  const body = flatten(message).slice(0, ERROR_TEXT_CHARS) || res.statusText || `HTTP ${res.status}`;
+  return `[${new URL(origin).host}] ${body}`;
+}
