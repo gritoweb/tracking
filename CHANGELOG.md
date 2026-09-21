@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-09-21 (68)
+### Fixed
+- **The Assistant's "logged it" link carried no proof it actually happened.** `entryUrl` only ever encoded the entry's date (`?date=2026-09-21`) — information the model already has from context, so a false "Registrei... Link: .../?date=..." claim (from the write-confirmation bug fixed above) looked completely genuine even though nothing was created. The url now also carries the entry's real id (`&entry=<id>`), which only exists after a write actually returns it; `TimerWorkspace` reads it on load and flashes that entry, so the link is more useful too, not just harder to fake. Ruled out an alternate hypothesis first (no "start timer" tool exists in the catalog — confirmed by grep — so the model wasn't confusing `log_time` with starting a timer). `tsc -b` (0), `lint` (0), `vitest run` (974/974).
+
 ## 2026-09-21 (67)
 ### Added
 - **Deleting a time entry now asks first.** Single-row delete, the bulk selection bar's "Delete", and a description group's "Delete all" all open the same `ConfirmDialog` tasks already use, instead of deleting immediately (the undo toast stays as a second safety net on the two single-entry paths). Requested by Luis after noticing entries vanished with no confirmation, unlike tasks.
