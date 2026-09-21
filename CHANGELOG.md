@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-09-18 (40)
+### Security
+- **The integration URL guard no longer lets an IPv4 address hide inside an IPv6 literal.** `safeIntegrationOrigin` blocked `[::1]`, unique-local and link-local IPv6 but let `[::ffff:a9fe:a9fe]` through, which is `169.254.169.254` (the cloud metadata address), and likewise `[::ffff:7f00:1]` (loopback), the mapped private ranges, `[::7f00:1]`, NAT64 `[64:ff9b::7f00:1]`, 6to4 and Teredo. IPv6 is now an allow-list: only global unicast (`2000::/3`) minus the protocol-assignment, documentation and 6to4 ranges is accepted, so anything that embeds or reserves an address is refused. Its test used `2001:db8::1` as the example of a "public" address, but that is the documentation range; it now uses a real one.
+- **Pushes to Workfront and Dynamics no longer follow redirects.** Their `fetch` calls used the default (follow), so a base URL that passed the guard could answer `302` and send the request, with the credentials, to an address the guard never saw. `fetchWithoutRedirect` refuses any 3xx and says where it pointed, so a host that really moved gets a clear message ("use that address as the base URL") instead of a silent hop.
+
+Not fixed, by nature: a public hostname that resolves to a private address (`127.0.0.1.nip.io`) still passes, because the guard looks at the name and a Worker has no DNS lookup to check it against. Only an owner or admin can set an integration URL.
+
+Proof of the gap before the change (the real guard run on the URLs): `[::ffff:127.0.0.1]`, `[::ffff:7f00:1]`, `[::ffff:169.254.169.254]`, `[::ffff:10.0.0.1]`, `[::ffff:192.168.1.1]`, `[::127.0.0.1]`, `[64:ff9b::7f00:1]` and `[::ffff:0:0]` were all accepted; after, all are refused, while `[2606:4700:4700::1111]`, `[2a00:1450:4001:81b::200e]` and `[2001:4860:4860::8888]` are still accepted. 48 integration tests. `tsc -b` 0.
+
 ## 2026-09-18 (39)
 ### Added
 - **The lint rule against swallowed errors also catches `.catch(() => undefined)`, `null` and `[]`.** The existing rule only saw an empty arrow body, so these three passed while doing the same thing. `res.json().catch(() => null)` (the "body may not be JSON" fallback, where the `null` is handled right after) is deliberately not flagged.

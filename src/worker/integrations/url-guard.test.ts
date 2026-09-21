@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { safeIntegrationOrigin } from "./url-guard";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { fetchWithoutRedirect, safeIntegrationOrigin } from "./url-guard";
 import { IntegrationError } from "./types";
 
 describe("safeIntegrationOrigin", () => {
@@ -67,7 +67,25 @@ describe("safeIntegrationOrigin", () => {
   );
 
   it("accepts a public IPv6 literal", () => {
-    expect(safeIntegrationOrigin("https://[2001:db8::1]")).toBe("https://[2001:db8::1]");
+    expect(safeIntegrationOrigin("https://[2606:4700:4700::1111]")).toBe("https://[2606:4700:4700::1111]");
+  });
+
+  it.each([
+    "[::ffff:127.0.0.1]", // IPv4-mapped loopback
+    "[::ffff:7f00:1]",
+    "[::ffff:169.254.169.254]", // the cloud metadata address in disguise
+    "[::ffff:10.0.0.1]",
+    "[::ffff:192.168.1.1]",
+    "[::127.0.0.1]", // IPv4-compatible
+    "[64:ff9b::7f00:1]", // NAT64
+    "[::ffff:0:0]",
+    "[2002:7f00:1::]", // 6to4 embeds 127.0.0.1
+    "[2001:0:4136:e378:8000:63bf:3fff:fdd2]", // Teredo
+    "[2001:db8::1]", // documentation range
+    "[ff02::1]", // multicast
+    "[fec0::1]", // deprecated site-local
+  ])("rejects the IPv6 literal that hides or reserves an address: %s", (host) => {
+    expect(() => safeIntegrationOrigin(`https://${host}`)).toThrow(IntegrationError);
   });
 
   it("rejects a DNS-rebinding-looking numeric hostname disguised with dots", () => {
@@ -90,5 +108,34 @@ describe("safeIntegrationOrigin", () => {
 
   it("trims trailing slashes before validating", () => {
     expect(safeIntegrationOrigin("https://example.com///")).toBe("https://example.com");
+  });
+});
+
+describe("fetchWithoutRedirect", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("asks fetch not to follow redirects and returns a normal answer untouched", async () => {
+    const fetchMock = vi.fn(async () => new Response("ok", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const res = await fetchWithoutRedirect("https://example.com/api", { method: "POST" });
+    expect(res.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledWith("https://example.com/api", { method: "POST", redirect: "manual" });
+  });
+
+  it("refuses a redirect and names where it pointed", async () => {
+    vi.stubGlobal("fetch", async () => new Response(null, { status: 302, headers: { Location: "https://new.example.com/api" } }));
+    await expect(fetchWithoutRedirect("https://old.example.com/api")).rejects.toThrow(/redirected the request to new\.example\.com/);
+  });
+
+  it("refuses a redirect to an internal address just the same, without following it", async () => {
+    const fetchMock = vi.fn(async () => new Response(null, { status: 307, headers: { Location: "http://169.254.169.254/latest/meta-data" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(fetchWithoutRedirect("https://example.com/api")).rejects.toThrow(IntegrationError);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses a redirect that has no readable Location", async () => {
+    vi.stubGlobal("fetch", async () => new Response(null, { status: 301 }));
+    await expect(fetchWithoutRedirect("https://example.com/api")).rejects.toThrow(/redirected the request\./);
   });
 });

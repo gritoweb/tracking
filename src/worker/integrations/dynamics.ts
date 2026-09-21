@@ -5,7 +5,7 @@ import {
   type IntegrationAdapter,
   type PushContext,
 } from "./types";
-import { safeIntegrationOrigin } from "./url-guard";
+import { fetchWithoutRedirect, safeIntegrationOrigin } from "./url-guard";
 
 const API_VERSION = "v9.2";
 
@@ -98,7 +98,7 @@ export const dynamicsAdapter: IntegrationAdapter = {
       record["msdyn_projecttask@odata.bind"] = `/msdyn_projecttasks(${project.externalTaskId})`;
     }
 
-    const res = await fetch(`${origin}/api/data/${API_VERSION}/msdyn_timeentries`, {
+    const res = await fetchWithoutRedirect(`${origin}/api/data/${API_VERSION}/msdyn_timeentries`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,

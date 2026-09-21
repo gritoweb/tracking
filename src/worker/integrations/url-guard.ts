@@ -24,18 +24,25 @@ function isPrivateIPv4(host: string): boolean {
   );
 }
 
+// Allow-list, not block-list: only global unicast (2000::/3) minus the ranges that embed or reserve
+// addresses. IPv4-mapped (::ffff:), IPv4-compatible and NAT64 all fall outside 2000::/3, so
+// `[::ffff:a9fe:a9fe]` (the cloud metadata address in disguise) is refused along with the rest.
+function isPublicIPv6(literal: string): boolean {
+  const [first = "", second = ""] = literal.split(":");
+  if (literal.includes(".") || !first) return false;
+  const head = parseInt(first, 16);
+  if (Number.isNaN(head) || head < 0x2000 || head > 0x3fff) return false;
+  const next = second ? parseInt(second, 16) : 0;
+  if (head === 0x2001 && (next <= 0x01ff || next === 0x0db8)) return false; // protocol assignments (Teredo…), documentation
+  if (head === 0x2002) return false; // 6to4 embeds an IPv4 address
+  return true;
+}
+
 function isUnsafeHost(hostname: string): boolean {
   const h = hostname.toLowerCase().replace(/\.$/, "");
   if (h === "localhost" || h.endsWith(".localhost")) return true;
   if (h.endsWith(".local") || h.endsWith(".internal")) return true;
-  if (h.startsWith("[")) {
-    // IPv6 literal — block loopback, ULA (fc00::/7) and link-local (fe80::/10).
-    const inner = h.replace(/^\[|\]$/g, "");
-    if (inner === "::1" || inner === "::") return true;
-    if (/^f[cd][0-9a-f]{2}:/.test(inner)) return true;
-    if (/^fe[89ab][0-9a-f]:/.test(inner)) return true;
-    return false;
-  }
+  if (h.startsWith("[")) return !isPublicIPv6(h.replace(/^\[|\]$/g, ""));
   if (isPrivateIPv4(h)) return true;
   // A public host always has a dot (a registrable domain / TLD); a single-label
   // name resolves only on an internal network, so reject it.
@@ -73,4 +80,17 @@ export function safeIntegrationOrigin(
   }
 
   return url.origin;
+}
+
+/** A push must never be sent somewhere the base URL did not name, so a redirect is refused rather than followed. */
+export async function fetchWithoutRedirect(url: string, init?: RequestInit): Promise<Response> {
+  const res = await fetch(url, { ...init, redirect: "manual" });
+  if (res.status >= 300 && res.status < 400) {
+    const location = res.headers.get("Location");
+    const host = location && URL.canParse(location, url) ? new URL(location, url).host : "";
+    throw new IntegrationError(
+      `The server redirected the request${host ? ` to ${host}` : ""}. Use that address as the base URL instead.`,
+    );
+  }
+  return res;
 }

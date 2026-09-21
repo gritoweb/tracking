@@ -5,7 +5,7 @@ import {
   type IntegrationAdapter,
   type PushContext,
 } from "./types";
-import { safeIntegrationOrigin } from "./url-guard";
+import { fetchWithoutRedirect, safeIntegrationOrigin } from "./url-guard";
 
 const API_VERSION = "v15.0";
 
@@ -55,7 +55,7 @@ export const workfrontAdapter: IntegrationAdapter = {
     // "Method Not Allowed"). apiKey + method go on the query, object fields in
     // the form-encoded body.
     const auth = new URLSearchParams({ apiKey, method: "POST" });
-    const res = await fetch(`${apiRoot(connection.baseUrl)}/hour?${auth}`, {
+    const res = await fetchWithoutRedirect(`${apiRoot(connection.baseUrl)}/hour?${auth}`, {
       method: "POST",
       headers: {
         Accept: "application/json",
@@ -79,7 +79,7 @@ export const workfrontAdapter: IntegrationAdapter = {
     const { apiKey } = creds(connection);
     // A minimal authenticated read: valid keys return data, invalid keys error.
     const params = new URLSearchParams({ apiKey, $$LIMIT: "1" });
-    const res = await fetch(
+    const res = await fetchWithoutRedirect(
       `${apiRoot(connection.baseUrl)}/user/search?${params}`,
       { headers: { Accept: "application/json" } },
     );
