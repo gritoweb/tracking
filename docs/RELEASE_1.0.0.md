@@ -1,6 +1,6 @@
 # TimeTracker 1.0.0 — release notes
 
-Prepared on 2026-09-21 on the `refactor` branch. **Nothing here is deployed and nothing is merged into `master`**; the last section is the order to do that in. Every change below has a dated entry with its proof in [`CHANGELOG.md`](../CHANGELOG.md) (2026-09-18 entries 32 to 55).
+**Deployed to production on 2026-09-21** from `master` at `e058e10` (the `refactor` branch was fast-forwarded into it), on the support Cloudflare account. Order followed: production data checked read-only, backup exported, migrations `0049` and `0050` applied to the remote database, `master` pushed, worker deployed. Every change below has a dated entry with its proof in [`CHANGELOG.md`](../CHANGELOG.md) (2026-09-18 entries 32 to 62).
 
 ## For the people using it
 
@@ -33,7 +33,7 @@ Prepared on 2026-09-21 on the `refactor` branch. **Nothing here is deployed and 
 - A public hostname that resolves to a private address still passes the integration URL guard (a Worker cannot resolve names); only owners and admins can set an integration URL.
 - A repeated name in a task **title** resolves to the first person with that name (titles are plain text); tag them in a comment for an exact tag.
 - The browser extension and the MCP tool catalog were not part of this release (see `ROADMAP.md`).
-- Cloudflare's rate limit binding can only be seen enforcing after a deploy; in the local production-mode runtime the `/mcp` gate answered 401 up to the configured limit for one address and 429 beyond it.
+- The shared request limits are approximate by Cloudflare's own design. Measured in production: 13 quick sign-in attempts were all let through, and with 120 attempts in a row (limit 10 a minute) the first `429` came at attempt 30 and 39 were refused. It stops sustained guessing, not a short burst; `/mcp` (600 a minute) was not refused by a 700-request burst.
 
 ## Deploying it (in this order; each step needs a person's go-ahead)
 

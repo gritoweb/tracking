@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-09-21 (62)
+### Changed
+- **1.0.0 is in production.** `refactor` was fast-forwarded into `master` (`e058e10`, 39 commits) and deployed to the support Cloudflare account (the only one of the four this login sees that holds the `time-tracker` database).
+  - Before writing anything: production read-only showed 3 members and 3 distinct member pairs, 0 time entries without a project (15 entries, 3 projects) and exactly `0049` and `0050` pending; a backup of the remote database was exported outside the repository.
+  - Migrations `0049` (two triggers on `time_entries`) and `0050` (unique `member` index) were applied to the remote database and checked (`sqlite_master` lists both triggers and the index).
+  - `pnpm check` (typecheck, build, wrangler dry run) passed and `pnpm run deploy` published version `39554ba5`; the git-connected build then published the same commit as `76e4319f`, which is what is live. Pushing to `master` therefore deploys by itself; the migrations do not, and stay a manual step.
+
+Smoke test on the live site: `/` and `/login` answer 200; `POST /mcp` answers 401 with `WWW-Authenticate` and, with a foreign `Origin`, 403; the API sends no `access-control-allow-origin` without an `Origin` and echoes the app's own; HSTS, CSP, `nosniff` and `X-Frame-Options` are present; 46 events tailed from the live version were all `ok` with no exceptions.
+
+Found by testing the limiter in production, which was the one thing that could not be checked before: the shared limits are approximate. 13 quick sign-in attempts were all let through, and 120 in a row (limit 10 a minute) were refused from the 30th on (39 of them); a 700-request burst at `/mcp` (limit 600) was not refused. They stop sustained guessing, not a short burst, as Cloudflare documents ("permissive, eventually consistent"). Nothing was changed in response; the number to tighten, if wanted, is in `SHARED_LIMITS`.
+
 ## 2026-09-18 (61)
 ### Fixed
 - **The comments e2e spec looks for the edit field by its real role.** `e2e/task-comments.spec.ts` asked for `getByRole("textbox", { name: "Edit comment" })`, but the field became a `combobox` (the `@` list) in the mention-chip commit `eec4b44`, which is already on `master`; Playwright is not in CI, so the spec had been failing unnoticed. It looks for the `combobox` now.
