@@ -1,14 +1,14 @@
 import type { CSSProperties } from "react";
 
-// Email-safe hex, light only: four equal css/global/variables.css tokens (tested); canvas, mutedInk and border are older values.
+// Email-safe hex, light only: the same values as the light tokens in css/global/variables.css (a test holds them equal).
 export const colors = {
   primary: "#dd322e", // brand red — the single accent, primary button fill only
   primaryInk: "#b71a1b", // brand red retuned for small text (links)
-  canvas: "#f5f3f2", // muted — outer email background so the card reads as a surface
+  canvas: "#ece9e9", // muted — outer email background so the card reads as a surface
   surface: "#fefdfd", // card background
   ink: "#1d1a19", // body text
-  mutedInk: "#6f6a68", // secondary text, footer
-  border: "#e4e1e0",
+  mutedInk: "#6e6867", // secondary text, footer
+  border: "#dfdddc",
 };
 
 // Geist isn't reliably loadable in email clients — fall back to the system stacks.

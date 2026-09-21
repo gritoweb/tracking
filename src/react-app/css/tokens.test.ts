@@ -28,11 +28,19 @@ describe("colour tokens (css/global/variables.css)", () => {
     expect(tokenIn(dark, "--muted-foreground")).toBe(MUTED_INK_DARK);
   });
 
-  it("are the ones the e-mail theme repeats, for the four that are kept current", () => {
+  it("are the ones the e-mail theme repeats (light only)", () => {
     expect(tokenIn(light, "--primary")).toBe(emailColors.primary);
     expect(tokenIn(light, "--primary-ink")).toBe(emailColors.primaryInk);
+    expect(tokenIn(light, "--muted")).toBe(emailColors.canvas);
     expect(tokenIn(light, "--popover")).toBe(emailColors.surface);
     expect(tokenIn(light, "--foreground")).toBe(emailColors.ink);
+    expect(tokenIn(light, "--muted-foreground")).toBe(emailColors.mutedInk);
+    expect(tokenIn(light, "--border")).toBe(emailColors.border);
+  });
+
+  it("put readable ink on the success and warning fills, as the dark theme does (4.5:1 needs a dark label on these)", () => {
+    expect(tokenIn(light, "--success-foreground")).toBe(tokenIn(light, "--foreground"));
+    expect(tokenIn(light, "--warning-foreground")).toBe(tokenIn(light, "--foreground"));
   });
 
   it("are the ones DESIGN.md lists at its top", () => {
@@ -48,5 +56,14 @@ describe("colour tokens (css/global/variables.css)", () => {
       destructive: tokenIn(light, "--destructive"), success: tokenIn(light, "--success"), warning: tokenIn(light, "--warning"),
     };
     for (const [key, value] of Object.entries(expected)) expect(listed(key), key).toBe(value);
+  });
+
+  it("are the ones the extension popup uses: it imports this file instead of keeping a copy", () => {
+    const popupCss = readFileSync(new URL("../../../extension/popup/popup.css", import.meta.url), "utf8");
+    const popupHtml = readFileSync(new URL("../../../extension/popup/index.html", import.meta.url), "utf8");
+    expect(popupCss).toContain('@import "../../src/react-app/css/global/variables.css";');
+    expect(popupCss).not.toMatch(/oklch\(|#[0-9a-fA-F]{6}/);
+    expect(popupHtml).not.toContain("<style");
+    expect(popupHtml).toContain("./popup.css");
   });
 });

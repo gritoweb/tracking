@@ -1,0 +1,20 @@
+/* The app's own colour tokens: one source, so the popup cannot drift from the web app. */
+@import "../../src/react-app/css/global/variables.css";
+
+/* The names the popup's inline styles use, defined from those tokens. */
+:root {
+  --bg: var(--background);
+  --bg-muted: var(--muted);
+  --fg: var(--foreground);
+  --fg-muted: var(--muted-foreground);
+  --input-border: var(--input);
+  --brand: var(--primary);
+  --accent-bg: color-mix(in oklab, var(--primary) 8%, var(--background));
+  --brand-disabled: color-mix(in oklab, var(--primary) 45%, var(--background));
+}
+.dark {
+  --accent-bg: color-mix(in oklab, var(--primary) 12%, var(--background));
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { width: 320px; min-height: 200px; font-family: system-ui, sans-serif; font-size: 14px; background: var(--bg); color: var(--fg); }

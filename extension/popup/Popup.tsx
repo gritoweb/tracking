@@ -280,7 +280,7 @@ export function Popup() {
     width: "100%",
     padding: "8px 0",
     background: disabled ? c.brandDisabled : c.brand,
-    color: "#fff",
+    color: "var(--primary-foreground)",
     border: "none",
     borderRadius: 6,
     fontWeight: 600,
@@ -411,7 +411,7 @@ export function Popup() {
               placeholder="https://your-worker.workers.dev"
             />
             <button onClick={handleSaveApiUrl} style={{
-              background: c.brand, color: "#fff", border: "none",
+              background: c.brand, color: "var(--primary-foreground)", border: "none",
               borderRadius: 4, padding: "4px 10px", fontSize: 12, cursor: "pointer",
             }}>Save</button>
           </div>

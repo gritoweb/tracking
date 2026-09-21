@@ -24,11 +24,11 @@
   --destructive: #a5002a;
   --destructive-foreground: #ffffff;
   --success: #009966;
-  --success-foreground: #fafafa;
+  --success-foreground: #1d1a19;
   /* Success as text: same hue and chroma as --success with lightness moved down so it clears AA on every light ground. */
   --success-ink: #007242;
   --warning: #e17100;
-  --warning-foreground: #fafafa;
+  --warning-foreground: #1d1a19;
   /* Warning as text: --warning is a fill; this holds its hue and chroma and moves lightness only, to clear AA as small text. */
   --warning-ink: #aa3e00;
   --border: #dfdddc;

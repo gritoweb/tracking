@@ -83,8 +83,6 @@ const COLOR_EXEMPT_FILES = [
 	// Email clients do not support oklch(), and Chrome's setBadgeBackgroundColor takes a literal.
 	"src/worker/emails/**",
 	"extension/background/**",
-	// The popup still carries its own inline styles; it moves to the shared tokens with the extension work.
-	"extension/popup/**",
 	"e2e/**",
 	"scripts/**",
 ];
