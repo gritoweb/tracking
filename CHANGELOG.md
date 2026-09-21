@@ -23,7 +23,7 @@
 - **Packaging the extension without `VITE_APP_URL` shipped it pointing at `localhost`.** `SECURITY.md` S-33 (new, MEDIUM, found while fixing S-16): `extension/vite.config.ts` now reads the repo root's `.env` (`envDir`) and fails the production build outright if the variable is missing, instead of silently falling back.
 - **`saved_reports.workspace_id` had no `ON DELETE CASCADE`.** `SECURITY.md` S-34 (new, LOW, found by the pentest agent during cleanup): migration `0052_saved_reports_workspace_fk.sql` rebuilds the table with the FK; deleting a workspace no longer leaves an orphaned saved-report row.
 - Accepted as-is, no code change: **S-23** (`/API/me` case-sensitivity falling through to the SPA shell — no data exposure, and normalizing it risks the Google OAuth callback route) and **S-28** (hostile attachment filenames are stored raw but already neutralized on every output path).
-- New/updated migrations `0051_keep_one_owner.sql` and `0052_saved_reports_workspace_fk.sql` are applied and proven on **local** D1 only — they still need `npx wrangler d1 migrations apply time-tracker --remote` before the next deploy.
+- New/updated migrations `0051_keep_one_owner.sql` and `0052_saved_reports_workspace_fk.sql` are applied and proven on **local** D1 only — they still need `npx wrangler d1 migrations apply time-tracker --remote` before the next deploy. D1 time-travel bookmark taken right before applying them: `00000af4-00000000-000050ed-c298fa9d8899e5596822f4a28f32a531`.
 
 ## 2026-09-21 (63)
 ### Fixed
