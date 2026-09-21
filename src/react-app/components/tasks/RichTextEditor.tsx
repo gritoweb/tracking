@@ -8,6 +8,7 @@ import { Image } from "@tiptap/extension-image";
 import { Plugin, PluginKey, type EditorState } from "@tiptap/pm/state";
 import { Decoration, DecorationSet, type EditorView } from "@tiptap/pm/view";
 import { useEditorMentions } from "./useEditorMentions";
+import { refreshMentionLabels } from "@/lib/mentionLabels";
 import { cn } from "@/lib/utils";
 import type { WorkspaceMember } from "@/hooks/useWorkspaceRole";
 import { toastApiError } from "@/lib/toastApiError";
@@ -191,6 +192,11 @@ export function RichTextEditor({
     const next = JSON.stringify(content);
     if (current !== next) editor.commands.setContent(content);
   }, [editor, content]);
+
+  // A chip saved a name at the moment of tagging; show the person's current one. After the sync above, which would bring the old label back.
+  useEffect(() => {
+    if (editor && members.length) refreshMentionLabels(editor, members);
+  }, [editor, content, members]);
 
   if (!editor) return null;
 

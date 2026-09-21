@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-18 (52)
+### Fixed
+- **A @mention chip in a task description shows the person's current name.** The chip stores `{ id, label }` when it is inserted, and the editor drew the saved label, so someone renamed later kept showing under the old name in every description that tagged them (the comment chips already looked the name up by id). `refreshMentionLabels` now runs when the editor's team or content changes, matches each chip to a member by id and rewrites its label to the current name, so it also shows on screen. It runs after the content sync (which would otherwise bring the old label back), keeps the saved label of someone who is no longer a member, and is not put on the undo stack, so undo cannot resurrect the old name.
+
+Verified in a real browser: a task whose description was saved with the label "Old Demo Name" for the demo user opened with the chip reading "@Demo User". Tests on a real TipTap editor (jsdom): a renamed person is updated in the document and on screen, nothing changes when the label is already current, a person who left keeps the saved label, two people with the same name keep their own by id, a document without mentions is untouched, and undo does not bring the old name back. `tsc -b` 0, lint 0.
+
 ## 2026-09-18 (51)
 ### Changed
 - **`Input` has a `bare` variant, so the "transparent field" trick lives in one place.** The base `Input` fills itself in the dark theme (`dark:bg-input/30`), and a `dark:` class beats `bg-transparent`, so every borderless field had to remember to add `dark:bg-transparent` too; two of them forgot once and showed a lighter box in dark mode (fixed in an earlier entry, but nothing kept it from happening again). `variant="bare"` (no fill, border or shadow, dark included) now does it, matching the `Textarea` variant of the same name; the timer bar's description field and the "Add a subtask" field use it and keep their own padding and focus ring.
