@@ -37,7 +37,7 @@ extension/
   (`chrome-extension://<id>`) in the worker's `trustedOrigins`
   (`src/worker/auth.ts`) — not by disabling CSRF.
 - **API base URL:** configurable in the popup's settings but validated against an
-  allow-list (`lib/apiUrl.ts`: `tracking.gritoweb.com.br`, `*.workers.dev`,
+  allow-list (`lib/apiUrl.ts`: `tracking.gritoweb.com.br`,
   `localhost`/`127.0.0.1`) so the bearer token is never sent to an arbitrary
   origin.
 - **Content script:** the `timetracker:sync` and `timetracker:assistant`
@@ -50,8 +50,14 @@ extension/
 The extension is built separately from the web app.
 
 ```bash
-pnpm build:ext        # → dist/extension/
+pnpm build:ext        # → dist/extension/ (the store package)
+pnpm build:ext:dev    # → same folder, keeps the localhost:5173 dev origin
 ```
+
+The app URL comes from `VITE_APP_URL` in the repo root `.env` (or the
+environment). The production build **fails** without it instead of falling back
+to localhost; only `--mode development` may. Outside development the build also
+strips the `localhost:5173` match from the packaged `manifest.json`.
 
 Then load it unpacked:
 
@@ -68,6 +74,7 @@ card. There is no HMR for the extension build.
 Useful scripts:
 
 - `pnpm build:ext` — build to `dist/extension/`.
+- `pnpm build:ext:dev` — development build (`vite build --mode development`).
 - `pnpm zip:ext` — build + package `dist/timetracker-extension.zip` for upload.
 - `pnpm ext:id` — print the dev extension ID derived from the signing key.
 

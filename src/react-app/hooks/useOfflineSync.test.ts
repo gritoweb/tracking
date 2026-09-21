@@ -25,6 +25,7 @@ function pending(overrides: Partial<PendingMutation> = {}): PendingMutation {
     body: { description: "updated" },
     createdAt: Date.now(),
     attempts: 0,
+    userId: "user-a",
     ...overrides,
   };
 }
@@ -39,7 +40,7 @@ describe("drainQueue", () => {
     getPendingMutations.mockResolvedValue([pending()]);
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, status: 200 }));
 
-    await drainQueue();
+    await drainQueue("user-a");
 
     expect(deletePendingMutation).toHaveBeenCalledWith(1);
     expect(toastApiError).not.toHaveBeenCalled();
@@ -57,7 +58,7 @@ describe("drainQueue", () => {
       })
     );
 
-    await drainQueue();
+    await drainQueue("user-a");
 
     expect(deletePendingMutation).toHaveBeenCalledWith(1);
     expect(incrementPendingMutationAttempts).not.toHaveBeenCalled();
@@ -76,7 +77,7 @@ describe("drainQueue", () => {
     );
     incrementPendingMutationAttempts.mockResolvedValue(MAX_REPLAY_ATTEMPTS - 1);
 
-    await drainQueue();
+    await drainQueue("user-a");
 
     expect(deletePendingMutation).not.toHaveBeenCalled();
     expect(toastApiError).not.toHaveBeenCalled();
@@ -90,7 +91,7 @@ describe("drainQueue", () => {
     );
     incrementPendingMutationAttempts.mockResolvedValue(MAX_REPLAY_ATTEMPTS);
 
-    await drainQueue();
+    await drainQueue("user-a");
 
     expect(deletePendingMutation).toHaveBeenCalledWith(1);
     expect(toastApiError).toHaveBeenCalledTimes(1);
@@ -100,7 +101,7 @@ describe("drainQueue", () => {
     getPendingMutations.mockResolvedValue([pending(), pending({ id: 2 })]);
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
 
-    await drainQueue();
+    await drainQueue("user-a");
 
     expect(deletePendingMutation).not.toHaveBeenCalled();
     expect(toastApiError).not.toHaveBeenCalled();
@@ -110,7 +111,7 @@ describe("drainQueue", () => {
     getPendingMutations.mockResolvedValue([pending(), pending({ id: 2 })]);
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("boom")));
 
-    await drainQueue();
+    await drainQueue("user-a");
 
     expect(deletePendingMutation).toHaveBeenCalledWith(1);
     expect(deletePendingMutation).toHaveBeenCalledWith(2);

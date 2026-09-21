@@ -188,11 +188,13 @@ export async function appFetch(path: string, init?: RequestInit): Promise<Respon
     ) {
       const body = init?.body ? JSON.parse(init.body as string) : undefined;
       // No Idempotency-Key: nothing server-side can cheaply dedupe it yet, so sending one would be a lie.
-      await addPendingMutation({
+      const queued = await addPendingMutation({
         method: method as "POST" | "PUT" | "PATCH" | "DELETE",
         url: `${API_BASE}${path}`,
         body,
       });
+      // No signed-in owner to attribute the write to: surface the plain network failure, not a false "saved".
+      if (!queued) throw err;
       throw new ApiError("Offline — saved locally, will sync when you reconnect", 0, true);
     }
     throw err;

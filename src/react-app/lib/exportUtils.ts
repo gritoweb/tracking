@@ -63,8 +63,11 @@ export function exportToCSV(
   filename = "time-entries",
   options: ExportOptions = {}
 ): void {
+  // A leading apostrophe stops Excel/Sheets evaluating a text cell as a formula; numbers stay untouched.
   const csvCell = (v: string | number) =>
-    typeof v === "number" ? String(v) : `"${v.replace(/"/g, '""')}"`;
+    typeof v === "number"
+      ? String(v)
+      : `"${(/^[=+\-@\t\r]/.test(v) ? `'${v}` : v).replace(/"/g, '""')}"`;
   const lines = [
     withoutAmount(EXPORT_HEADERS, options).join(","),
     ...entries.map((e) => withoutAmount(exportRow(e), options).map(csvCell).join(",")),

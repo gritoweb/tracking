@@ -1,4 +1,5 @@
 import { openDB, type IDBPDatabase } from "idb";
+import { authClient } from "@/lib/auth-client";
 
 interface TimerState {
   entryId: string;
@@ -15,6 +16,8 @@ interface PendingMutation {
   body?: unknown;
   createdAt: number;
   attempts: number;
+  /** Owner of the write; absent on rows queued before per-person isolation existed. */
+  userId?: string;
 }
 
 interface TimeTrackerDB {
@@ -61,15 +64,27 @@ export async function clearTimerState(): Promise<void> {
   await db.delete("timer_state", "current");
 }
 
+// Survives a transient empty session (a failed refetch while offline) so a queued edit keeps its owner.
+let lastKnownUserId: string | null = null;
+authClient.$store.atoms.session.subscribe((session) => {
+  const id = session.data?.user?.id;
+  if (id) lastKnownUserId = id;
+});
+
+/** Returns false, queueing nothing, when no person can own the write; the caller must surface its original error. */
 export async function addPendingMutation(
-  mutation: Omit<PendingMutation, "id" | "createdAt" | "attempts">
-): Promise<void> {
+  mutation: Omit<PendingMutation, "id" | "createdAt" | "attempts" | "userId">
+): Promise<boolean> {
+  const userId = authClient.$store.atoms.session.get().data?.user?.id ?? lastKnownUserId;
+  if (!userId) return false;
   const db = await getDB();
   await db.add("pending_mutations", {
     ...mutation,
+    userId,
     createdAt: Date.now(),
     attempts: 0,
   } as PendingMutation);
+  return true;
 }
 
 export async function getPendingMutations(): Promise<PendingMutation[]> {
@@ -80,6 +95,12 @@ export async function getPendingMutations(): Promise<PendingMutation[]> {
 export async function deletePendingMutation(id: number): Promise<void> {
   const db = await getDB();
   await db.delete("pending_mutations", id);
+}
+
+export async function clearPendingMutations(): Promise<void> {
+  lastKnownUserId = null;
+  const db = await getDB();
+  await db.clear("pending_mutations");
 }
 
 /** Bumps a replay's failure count and returns the new total; a missing row (raced delete) counts as exhausted. */

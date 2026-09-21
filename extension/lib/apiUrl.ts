@@ -33,14 +33,7 @@ export function normalizeApiUrl(input: string): string | null {
   // Production.
   const isProd = protocol === "https:" && hostname === APP_HOST;
 
-  // Cloudflare preview deploys. Uses the parsed hostname so lookalikes such as
-  // `phish.workers.dev.attacker.com` (hostname ends in `.attacker.com`) are
-  // rejected.
-  const isWorkersDev =
-    protocol === "https:" &&
-    (hostname === "workers.dev" || hostname.endsWith(".workers.dev"));
-
-  if (!isLocalhost && !isProd && !isWorkersDev) return null;
+  if (!isLocalhost && !isProd) return null;
 
   return url.origin;
 }

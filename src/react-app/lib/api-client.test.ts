@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { ApiError, api } from "./api-client";
 
@@ -29,9 +29,13 @@ function mockFetchOnce(response: Partial<Response>) {
   );
 }
 
+beforeEach(() => {
+  addPendingMutation.mockResolvedValue(true);
+});
+
 afterEach(() => {
   vi.unstubAllGlobals();
-  addPendingMutation.mockClear();
+  addPendingMutation.mockReset();
 });
 
 // `api.me()` is the thinnest endpoint — exercising it is exercising `appFetch`
@@ -118,6 +122,14 @@ describe("api.me (via appFetch)", () => {
       url: "/api/time_entries/e1",
       body: { description: "offline edit" },
     });
+  });
+
+  it("rethrows the original network error when no person can own the queued change", async () => {
+    const networkError = new TypeError("Failed to fetch");
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(networkError));
+    addPendingMutation.mockResolvedValue(false);
+
+    await expect(api.timeEntries.update("e1", { description: "offline edit" })).rejects.toBe(networkError);
   });
 
   // Comments/statuses/attachments have side effects a blind replay must not repeat.

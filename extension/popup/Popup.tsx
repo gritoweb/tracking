@@ -235,7 +235,7 @@ export function Popup() {
   const handleSaveApiUrl = () => {
     const normalized = normalizeApiUrl(apiUrl);
     if (!normalized) {
-      setApiUrlError(`Must be ${APP_HOST}, a *.workers.dev URL, or localhost`);
+      setApiUrlError(`Must be ${APP_HOST} or localhost`);
       return;
     }
     setApiUrlError(null);
@@ -408,7 +408,7 @@ export function Popup() {
               value={apiUrl}
               onChange={(e) => { setApiUrl(e.target.value); setApiUrlError(null); }}
               style={{ ...inputStyle, padding: "4px 8px", fontSize: 12 }}
-              placeholder="https://your-worker.workers.dev"
+              placeholder={DEFAULT_API_URL}
             />
             <button onClick={handleSaveApiUrl} style={{
               background: c.brand, color: "var(--primary-foreground)", border: "none",

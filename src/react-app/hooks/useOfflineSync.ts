@@ -7,6 +7,7 @@ import {
 } from "@/lib/idb";
 import { ApiError, errorMessage } from "@/lib/api-client";
 import { toastApiError } from "@/lib/toastApiError";
+import { useAuth } from "@/hooks/useAuth";
 
 // Bounded so a persistently failing server doesn't retry a write forever.
 export const MAX_REPLAY_ATTEMPTS = 5;
@@ -15,27 +16,38 @@ export function useOfflineSync() {
   const queryClient = useQueryClient();
   const isOnline = useOnlineStatus();
   const isDraining = useRef(false);
+  const { user } = useAuth();
+  const userId = user?.id;
 
   useEffect(() => {
-    if (!isOnline || isDraining.current) return;
+    if (!isOnline || !userId || isDraining.current) return;
     isDraining.current = true;
 
-    drainQueue()
+    drainQueue(userId)
       .then(() => {
         queryClient.invalidateQueries({ queryKey: ["time-entries"] });
       })
       .finally(() => {
         isDraining.current = false;
       });
-  }, [isOnline, queryClient]);
+  }, [isOnline, userId, queryClient]);
 
   return { isOnline };
 }
 
 /** Exported for direct unit testing of the queue's per-status rules, separate from the online/offline effect wiring. */
-export async function drainQueue() {
+export async function drainQueue(userId: string | undefined) {
+  if (!userId) return;
   const mutations = await getPendingMutations();
   for (const mutation of mutations) {
+    if (mutation.userId === undefined) {
+      // Queued before ownership was recorded: replaying it under whoever is signed in now would be a guess.
+      console.warn("Discarding an offline change with no recorded owner", mutation.url);
+      if (mutation.id !== undefined) await deletePendingMutation(mutation.id);
+      continue;
+    }
+    // Another person's change stays queued for its owner and is never sent under this session.
+    if (mutation.userId !== userId) continue;
     let res: Response;
     try {
       res = await fetch(mutation.url, {

@@ -12,8 +12,9 @@ import { APP_URL } from "../lib/appUrl";
 // OWN origins. The content script is also injected into GitHub/Jira/Linear for
 // context detection (below); we must not accept spoofed timer state from those.
 const APP_ORIGINS = new Set([
-  "http://localhost:5173",
   APP_URL,
+  // Dev-only: the string must not exist in the store package.
+  ...(import.meta.env.MODE === "development" ? ["http://localhost:5173"] : []),
 ]);
 
 if (APP_ORIGINS.has(window.location.origin)) {

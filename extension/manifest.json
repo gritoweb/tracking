@@ -8,7 +8,6 @@
   "permissions": ["storage", "alarms"],
   "host_permissions": [
     "http://localhost/*",
-    "https://*.workers.dev/*",
     "https://tracking.gritoweb.com.br/*"
   ],
   "background": {
