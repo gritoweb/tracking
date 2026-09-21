@@ -19,7 +19,7 @@ import { createWorkersAI } from "workers-ai-provider";
 import { buildAssistantContext } from "../lib/assistant";
 import { buildAssistantTools } from "../lib/assistant-tools";
 import { buildChatTools } from "../mcp/chat-tools";
-import { replyLanguage, settleDanglingToolCalls } from "../lib/assistant-messages";
+import { replyLanguage, settleDanglingToolCalls, restoreApprovalSignatures } from "../lib/assistant-messages";
 import { recallMemories, buildMemoryBlock } from "../lib/assistant-memory";
 import { withDedupedStreams } from "../lib/workers-ai-stream";
 import { isoOffset } from "../lib/local-date";
@@ -47,6 +47,11 @@ export class ChatAgent extends AIChatAgent<Cloudflare.Env> {
   // resets if the DO hibernates — enough to stop a runaway client from spamming
   // Workers AI calls, same trade-off as the REST rate-limit middleware.
   private recentTurns: number[] = [];
+
+  // Work around agents@0.17.4 dropping the signature it itself issues when a
+  // tool-approval-request is first persisted — see restoreApprovalSignatures.
+  // In-memory: resets on hibernation, same accepted trade-off as recentTurns above.
+  private pendingApprovalSignatures = new Map<string, string>();
 
   async onChatMessage(onFinish: StreamTextOnFinishCallback<ToolSet>, options?: OnChatMessageOptions) {
     const [workspaceId, userId] = this.name.split(":");
@@ -92,7 +97,8 @@ export class ChatAgent extends AIChatAgent<Cloudflare.Env> {
 
     // Clamp any oversized message before it reaches the model, so a single huge
     // paste can't inflate the prompt (and cost/CPU) unbounded.
-    const bounded = settleDanglingToolCalls(this.messages).map((m) => ({
+    const restored = restoreApprovalSignatures(this.messages, this.pendingApprovalSignatures);
+    const bounded = settleDanglingToolCalls(restored).map((m) => ({
       ...m,
       parts: m.parts.map((p) =>
         p.type === "text" && p.text.length > MAX_MESSAGE_CHARS
@@ -116,7 +122,19 @@ export class ChatAgent extends AIChatAgent<Cloudflare.Env> {
       onFinish,
     });
 
-    return result.toUIMessageStreamResponse();
+    // Tap the stream for the signature agents@0.17.4 won't persist itself — see
+    // restoreApprovalSignatures. Every other chunk passes through untouched.
+    const stream = result.toUIMessageStream().pipeThrough(
+      new TransformStream({
+        transform: (chunk, controller) => {
+          if (chunk.type === "tool-approval-request" && chunk.signature) {
+            this.pendingApprovalSignatures.set(chunk.toolCallId, chunk.signature);
+          }
+          controller.enqueue(chunk);
+        },
+      }),
+    );
+    return createUIMessageStreamResponse({ stream });
   }
 
   /** A one-off assistant text reply (rate-limit notice) without a model call. */

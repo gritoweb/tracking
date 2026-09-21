@@ -22,6 +22,28 @@ export function settleDanglingToolCalls(messages: UIMessage[]): UIMessage[] {
   return messages.map((m, i) => (i >= lastUser ? m : { ...m, parts: m.parts.map(settle) }));
 }
 
+/**
+ * agents@0.17.4 drops the HMAC `signature` when it first persists a `tool-approval-request`
+ * part, so every real approve/deny then fails `validateApprovedToolApprovals` with "missing
+ * signature" — not just a forged one, defeating the point of the SECURITY.md S-02 fix. Restores
+ * it from the cache `ChatAgent` fills as each request streams out (keyed by toolCallId),
+ * consuming the entry once used; a part with no matching entry (DO hibernated, or a forged
+ * approval that never saw a genuine request from this server) is left to fail closed as before.
+ */
+export function restoreApprovalSignatures(messages: UIMessage[], signatures: Map<string, string>): UIMessage[] {
+  if (signatures.size === 0) return messages;
+  return messages.map((m) => ({
+    ...m,
+    parts: m.parts.map((p) => {
+      if (!isToolPart(p) || !("approval" in p) || !p.approval || p.approval.signature || !("toolCallId" in p)) return p;
+      const signature = signatures.get(p.toolCallId as string);
+      if (!signature) return p;
+      signatures.delete(p.toolCallId as string);
+      return { ...p, approval: { ...p.approval, signature } } as Part;
+    }),
+  }));
+}
+
 const PORTUGUESE = /[ãõçâêô]|\b(que|não|nao|tenho|quantas?|quantos?|hoje|semana|crie|criar|mostre|lancei|minhas?|meus?|tarefas?|horas|projetos?|você|voce|pra|para|está|esta)\b/i;
 
 /** The reply-language line for the prompt: Scout ignores "answer in the user's language" but follows a named one. */
