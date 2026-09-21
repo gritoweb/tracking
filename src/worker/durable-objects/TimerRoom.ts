@@ -1,6 +1,20 @@
 import { DurableObject } from "cloudflare:workers";
 
+// The real client sends at most one "activity" heartbeat per 30s per tab
+// (ACTIVITY_HEARTBEAT_MS in useWebSocket.ts) — both bounds below are still
+// generous headroom over that, but close off the flood a same-workspace
+// member could otherwise send (SECURITY.md S-05: 20 MB messages and ~99,000
+// msgs/2s were accepted with no cap before this).
+const MAX_MESSAGE_BYTES = 1024;
+const RATE_LIMIT_MAX = 20;
+const RATE_LIMIT_WINDOW_MS = 60_000;
+
 export class TimerRoom extends DurableObject<Env> {
+  // Per-connection sliding window. In-memory (keyed by the live WebSocket
+  // object), so it resets on hibernation — the same accepted trade-off as
+  // ChatAgent's own rate limiter.
+  private messageTimestamps = new WeakMap<WebSocket, number[]>();
+
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     // Answer the client's "ping" without waking a hibernated object.
@@ -64,6 +78,31 @@ export class TimerRoom extends DurableObject<Env> {
   }
 
   webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): void {
+    const size = typeof message === "string" ? message.length : message.byteLength;
+    if (size > MAX_MESSAGE_BYTES) {
+      try {
+        ws.close(1009, "Message too large");
+      } catch {
+        // Already closed.
+      }
+      return;
+    }
+
+    const now = Date.now();
+    const timestamps = (this.messageTimestamps.get(ws) ?? []).filter(
+      (t) => now - t < RATE_LIMIT_WINDOW_MS,
+    );
+    if (timestamps.length >= RATE_LIMIT_MAX) {
+      try {
+        ws.close(1008, "Rate limit exceeded");
+      } catch {
+        // Already closed.
+      }
+      return;
+    }
+    timestamps.push(now);
+    this.messageTimestamps.set(ws, timestamps);
+
     // "ping" is handled by the auto-response pair. The only client-sent
     // message is an activity heartbeat, relayed to the same user's OTHER
     // sockets so idle detection on their open sessions defers to it.
