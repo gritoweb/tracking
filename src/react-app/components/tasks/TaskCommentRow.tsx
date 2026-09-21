@@ -52,8 +52,10 @@ export function CommentRow({
     return (
       <div className="flex gap-2.5 px-3 py-2.5">
         <UserAvatar name={comment.userName} image={comment.userImage} className="h-7 w-7 shrink-0" />
-        <div className="min-w-0 flex-1 space-y-1.5">
+        {/* Same frame as the composer below the thread: a bare field inside it, actions inside it. */}
+        <div className="min-w-0 flex-1 space-y-2 rounded-md border px-3 py-2">
           <MentionInput
+            variant="bare"
             aria-label="Edit comment"
             value={body}
             onValueChange={setBody}
@@ -65,7 +67,6 @@ export function CommentRow({
               e.preventDefault();
               attach(imageFile(e.dataTransfer?.files));
             }}
-            rows={2}
             autoFocus
           />
           {attachment && <AttachmentPreview url={attachment.url} onRemove={() => setAttachment(null)} />}

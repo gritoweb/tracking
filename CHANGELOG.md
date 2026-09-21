@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-18 (53)
+### Changed
+- **Editing a comment looks like writing one.** The in-place edit form was the default field (its own rounded box, a fixed two-line height and a resize handle) while the composer below the thread is a frame around a bare field with the button inside. The edit form now uses the same: a `rounded-md border` frame holding a `bare` field that grows with its text, no handle, and Cancel/Save inside the frame.
+
+Verified in a real browser, light and dark, by opening the edit form on a comment: the field has no border, fill or radius of its own (also in dark, where the old field had the lighter fill), sits at the composer's 72px minimum height, and Cancel/Save are inside the frame. `tsc -b` 0, lint 0, vitest green.
+
 ## 2026-09-18 (52)
 ### Fixed
 - **A @mention chip in a task description shows the person's current name.** The chip stores `{ id, label }` when it is inserted, and the editor drew the saved label, so someone renamed later kept showing under the old name in every description that tagged them (the comment chips already looked the name up by id). `refreshMentionLabels` now runs when the editor's team or content changes, matches each chip to a member by id and rewrites its label to the current name, so it also shows on screen. It runs after the content sync (which would otherwise bring the old label back), keeps the saved label of someone who is no longer a member, and is not put on the undo stack, so undo cannot resurrect the old name.
