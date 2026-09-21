@@ -49,12 +49,19 @@ const MOTION_AND_LAYER_CHECKS = [
 // A config object's `no-restricted-syntax` fully replaces, rather than merges
 // with, another matching config's, so each scope below spreads every selector
 // that must apply to its files.
+// `res.json().catch(() => null)` is the parse-fallback idiom, not a swallowed failure, so it is not flagged.
 const CATCH_CHECKS = [
 	{
 		selector:
 			"CallExpression[callee.property.name='catch'] > ArrowFunctionExpression[body.type='BlockStatement'][body.body.length=0]",
 		message:
 			"no-empty-catch-handler: swallowing a rejection hides the failure; handle it or log it with context.",
+	},
+	{
+		selector:
+			"CallExpression[callee.property.name='catch']:not([callee.object.callee.property.name='json']) > ArrowFunctionExpression:matches([body.type='Identifier'][body.name='undefined'], [body.type='Literal'][body.raw='null'], [body.type='ArrayExpression'][body.elements.length=0], [body.type='UnaryExpression'][body.operator='void'])",
+		message:
+			"no-empty-catch-handler: `.catch(() => undefined)` swallows the rejection just like an empty handler; handle it or log it with context.",
 	},
 	{
 		selector:

@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-09-18 (39)
+### Added
+- **The lint rule against swallowed errors also catches `.catch(() => undefined)`, `null` and `[]`.** The existing rule only saw an empty arrow body, so these three passed while doing the same thing. `res.json().catch(() => null)` (the "body may not be JSON" fallback, where the `null` is handled right after) is deliberately not flagged.
+- **A test that runs the repo's own ESLint config on snippets** (`src/worker/lint-catch-rules.test.ts`), so the rules cannot quietly stop firing: an empty handler, `undefined`/`null`/`[]` handlers, an empty `catch {}` and an `onError` that drops its argument are flagged; a handler that logs, a `catch` block with a comment saying why, and the JSON fallback are allowed.
+
+Triage that led here (all of `src`, tests excluded): 16 places swallow an error and only one is a bare empty handler (`lib/errorReporter.ts`, already justified in place: reporting a reporting failure would recurse). The other 15 are `catch` blocks that carry a comment with the reason (a dead WebSocket, a JSON fallback, an error already toasted), which ESLint's `no-empty` accepts and which stay as they are.
+
+Verified: with the new selector removed, exactly the three new cases fail; restored, 9/9 pass. `pnpm lint` finds no other place in the repo (the extension is untouched). `tsc -b` 0.
+
 ## 2026-09-18 (38)
 ### Changed
 - **The stylesheet is split by subject instead of one 600-line `index.css`.** `src/react-app/css/app.css` now only lists the imports, in order; the rest lives in `css/global/` (`theme`, `variables`, `base`, `utilities`, `motion`, `print`, `accessibility`) and `css/components/` (`swatch`, `interaction`, `richtext`, `fullcalendar`). Nothing was rewritten: each file is an exact block of the old one, and the old `styles/fullcalendar.css` moved to `css/components/fullcalendar.css` (still imported by `CalendarBody`, so it stays its own lazy chunk). Only the file layout follows the idea of one folder per concern; no colour, size or rule was taken from another project. `main.tsx`, `components.json`, the comments and docs (`CLAUDE.md`, `DESIGN.md`) that named `index.css` now point at the file that holds the thing.
