@@ -12,6 +12,10 @@ export function MentionOptions({
   active: number;
   onPick: (member: WorkspaceMember) => void;
 }) {
+  // Two people with one name look the same in the list, so only those rows also say who they are.
+  const nameCount = new Map<string, number>();
+  for (const member of items) nameCount.set(member.name, (nameCount.get(member.name) ?? 0) + 1);
+
   return (
     <ul role="listbox" aria-label="People to mention">
       {items.map((member, i) => (
@@ -29,7 +33,12 @@ export function MentionOptions({
             )}
           >
             <UserAvatar name={member.name} email={member.email} image={member.image} className="h-6 w-6" />
-            <span className="min-w-0 flex-1 truncate">{member.name}</span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate">{member.name}</span>
+              {(nameCount.get(member.name) ?? 0) > 1 && (
+                <span className="block truncate text-xs text-muted-foreground">{member.email}</span>
+              )}
+            </span>
           </button>
         </li>
       ))}

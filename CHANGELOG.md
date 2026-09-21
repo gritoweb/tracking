@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-09-18 (55)
+### Changed
+- **Two people with the same name can be told apart in the @ list.** The list showed an avatar and a name, so two members called "Sam" looked identical when picking one. Rows whose name repeats within the list now also show the e-mail underneath (and only those rows, so the usual list stays as compact as before). In a comment the pick is remembered by id, so choosing the right row is enough to tag the right person.
+- **Known limit, now written down in `TaskTitle`:** a task title is plain text by design (a tag marker would end up on board cards and invoice lines), so a repeated name in a title resolves to the first person with that name; tag them in a comment for an exact tag. Nothing else changes for titles.
+
+Tests (`MentionOptions` had none): only the name when names are all different; the e-mail on the rows of a repeated name and not on the others; picking the second of two same-name people passes that person's id. `tsc -b` 0, lint 0.
+
 ## 2026-09-18 (54)
 ### Changed
 - **The @ list in the comment field opens beside the "@" being typed, not under the whole field.** In a comment of several lines the list appeared below the entire box, far from the caret. `MentionInput` now anchors it to the position of the "@" (`caretRect`, which lays the text before it out in a hidden copy of the field with the same font, width and wrapping) and asks for that position again whenever the popover repositions, so it follows a scroll. It is the same behaviour as the description editor, and the helper that anchors a popover to a rectangle (`anchorAt`) is now shared by both instead of living inside one.

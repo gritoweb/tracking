@@ -13,7 +13,8 @@ interface TaskTitleProps {
 
 /**
  * The task's name. It is plain text, so a tagged person is only drawn as a chip while the field is not being
- * edited: click the text to edit it, click a chip to see the person.
+ * edited: click the text to edit it, click a chip to see the person. Plain text cannot say which of two people
+ * with the same name was meant, so a repeated name resolves to the first; tag them in a comment for an exact tag.
  */
 export function TaskTitle({ name, onNameChange, onSave, members }: TaskTitleProps) {
   const [editing, setEditing] = useState(false);
