@@ -70,7 +70,6 @@ export const timeEntriesRouter = new Hono<{
   Variables: { workspaceId: string; userId: string };
 }>()
   // ─── List ─────────────────────────────────────────────────────────────────
-  // The Timer is personal for everyone, owners included (D3); the team is reviewed in Reports.
   .get("/", async (c) => {
     const workspaceId = c.get("workspaceId");
     const userId = c.get("userId");

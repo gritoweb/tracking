@@ -7,10 +7,17 @@ export function createMigratedD1() {
   const raw = new DatabaseSync(":memory:");
   for (const file of Object.keys(MIGRATIONS).sort()) raw.exec(MIGRATIONS[file]);
 
+  const returnsRows = (sql: string) => /^\s*(select|with|pragma)\b/i.test(sql);
+
   const db = {
     prepare(sql: string) {
       let params: SQLInputValue[] = [];
       const statement = {
+        // D1's batch runs each statement in one transaction and answers with one result per statement.
+        execute() {
+          if (returnsRows(sql)) return { success: true, results: raw.prepare(sql).all(...params), meta: { changes: 0 } };
+          return { success: true, results: [], meta: { changes: Number(raw.prepare(sql).run(...params).changes) } };
+        },
         bind(...values: unknown[]) {
           params = values as SQLInputValue[];
           return statement;
@@ -27,6 +34,17 @@ export function createMigratedD1() {
         },
       };
       return statement;
+    },
+    async batch(statements: { execute(): unknown }[]) {
+      raw.exec("BEGIN");
+      try {
+        const results = statements.map((statement) => statement.execute());
+        raw.exec("COMMIT");
+        return results;
+      } catch (error) {
+        raw.exec("ROLLBACK");
+        throw error;
+      }
     },
   };
 

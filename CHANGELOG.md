@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-09-18 (45)
+### Added
+- **Tests for the time entry routes, run against a real database.** `routes/time-entries` had none. 38 tests now drive the router as an owner, an admin and two members in one workspace (and an owner of a second one) over an in-memory SQLite with every migration applied, so they check the real SQL and the real permission rules: a member lists only their own hours while an owner or admin lists the workspace's (never another workspace's); `?running=true` and `/current` return only the caller's timer; `GET /:id` hides a teammate's entry from a member; `POST` needs an active project with a client (archived, client-less, another workspace's and unknown projects are all refused and store nothing) and stops only the caller's running timer; `PUT`, `DELETE`, the bulk edit and the bulk delete follow author-or-manager, keep a running timer to the person tracking (an admin gets 403), refuse a stop before the start even from a one-field edit, refuse an archived project, refuse the whole bulk when one entry is not allowed (and change none), and never reach another workspace when handed its ids; `PATCH /:id/stop` stops only your own, answers `null` for a vanished id and leaves a finished entry alone.
+- `src/test/route-harness.ts` mounts a router as one person in one workspace over that database (reusable for the next route), and `sqlite-d1.ts` learned `batch`.
+
+Fixed in passing: a comment on `GET /` said the Timer list is personal for owners too, which is the opposite of the code and of CLAUDE.md ("every read of tracked hours goes through `entryScopeUserId`"; owner/admin see the workspace). Removed.
+
+Verified: breaking `entryScopeUserId` (everyone sees the workspace) fails the member-list test, and letting a manager touch a running timer fails three tests (edit, delete and bulk delete); both restored, 38/38. `tsc -b` 0, lint 0.
+
 ## 2026-09-18 (44)
 ### Security
 - **The calendar OAuth state cookie is `__Host-` prefixed over https.** `tt_cal_state` carries the random state, the provider, the workspace and the person who started the connection, and the callback trusts it. It was already `httpOnly`, `SameSite=Lax`, short-lived and bound to the session that comes back, so it was not forgeable from the page. What it could not stop is a cookie set from another subdomain of the same parent domain (which hosts other sites): browsers let a sibling subdomain plant a plain cookie for the whole domain. With the `__Host-` prefix (Secure, `Path=/`, no `Domain`) they refuse that outright, which is why this is preferred over signing the value: the fix is enforced by the browser, not by our code. Over http (local dev) the name stays plain, because a Secure cookie cannot be set there.
