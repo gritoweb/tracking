@@ -8,11 +8,25 @@ interface Bucket {
 // Per-isolate counters: exact, free, and enough against one hot source. Not shared across isolates or locations.
 const buckets = new Map<string, Bucket>();
 
-/** The bindings in wrangler.jsonc `ratelimits`: one counter per Cloudflare location, shared by every isolate there. */
-export type SharedLimiter = "AUTH_LIMITER" | "AI_LIMITER" | "MCP_LIMITER";
+/**
+ * The bindings in wrangler.jsonc `ratelimits` (one counter per Cloudflare location, shared by every isolate there) and the
+ * requests a minute each allows. This is the one place the numbers live in code; a test holds wrangler.jsonc to them.
+ * /mcp's is high on purpose: only a script or an attack reaches 10 a second from one address, and it exists to keep key
+ * guessing and floods off the database, not to pace real use.
+ */
+export const SHARED_LIMITS = { AUTH_LIMITER: 10, AI_LIMITER: 20, MCP_LIMITER: 600 } as const;
+export type SharedLimiter = keyof typeof SHARED_LIMITS;
 
 /** Every shared limiter is declared with a 60-second period. */
-const SHARED_PERIOD_SECONDS = 60;
+export const SHARED_PERIOD_SECONDS = 60;
+
+/** The one answer for "too many requests", for the Hono middleware and for /mcp, which runs outside Hono. */
+export function tooManyRequests(retryAfterSeconds: number): Response {
+  return new Response(JSON.stringify({ message: "Too many requests, try again later" }), {
+    status: 429,
+    headers: { "Content-Type": "application/json", "Cache-Control": "no-store", "Retry-After": String(retryAfterSeconds) },
+  });
+}
 
 export function clientIp(headers: Headers): string {
   return headers.get("cf-connecting-ip") ?? headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "unknown";
@@ -67,10 +81,10 @@ export function rateLimit(maxPerWindow: number, windowMs: number, shared?: Share
       windowMs,
       shared,
     });
-    if (retryAfter !== null) {
-      c.header("Retry-After", String(retryAfter));
-      return c.json({ message: "Too many requests, try again later" }, 429);
-    }
+    if (retryAfter !== null) return tooManyRequests(retryAfter);
     await next();
   };
 }
+
+/** A route held to one of the shared limiters, at that limiter's own number. */
+export const sharedRateLimit = (limiter: SharedLimiter) => rateLimit(SHARED_LIMITS[limiter], SHARED_PERIOD_SECONDS * 1000, limiter);

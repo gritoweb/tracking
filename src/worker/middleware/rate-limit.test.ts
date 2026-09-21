@@ -1,6 +1,8 @@
 import { Hono } from "hono";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { limitRequest, rateLimit } from "./rate-limit";
+import { SHARED_LIMITS, SHARED_PERIOD_SECONDS, limitRequest, rateLimit, sharedRateLimit, tooManyRequests } from "./rate-limit";
+
+const WRANGLER = Object.values(import.meta.glob<string>("../../../wrangler.jsonc", { query: "?raw", import: "default", eager: true }))[0];
 
 // The counters live for the whole test file, so each test uses an address of its own.
 function appWith(max: number, shared?: "AUTH_LIMITER") {
@@ -76,3 +78,40 @@ describe("rateLimit (shared across isolates)", () => {
     warn.mockRestore();
   });
 });
+
+describe("SHARED_LIMITS and wrangler.jsonc", () => {
+  it.each(Object.entries(SHARED_LIMITS))("%s allows %i a minute in the code and in wrangler.jsonc alike", (name, limit) => {
+    const declared = new RegExp(`"name":\\s*"${name}"[^}]*"limit":\\s*(\\d+),\\s*"period":\\s*(\\d+)`).exec(WRANGLER);
+    expect(Number(declared?.[1])).toBe(limit);
+    expect(Number(declared?.[2])).toBe(SHARED_PERIOD_SECONDS);
+  });
+
+  it("declares no limiter the code does not know about", () => {
+    const declared = [...WRANGLER.matchAll(/"name":\s*"([A-Z_]+_LIMITER)"/g)].map((m) => m[1]).sort();
+    expect(declared).toEqual(Object.keys(SHARED_LIMITS).sort());
+  });
+
+  it("keeps /mcp high enough that normal use never meets it", () => {
+    expect(SHARED_LIMITS.MCP_LIMITER).toBeGreaterThanOrEqual(600);
+  });
+});
+
+describe("sharedRateLimit", () => {
+  it("holds a route to the limiter's own number", async () => {
+    const app = new Hono<{ Bindings: Env }>().use("*", sharedRateLimit("AI_LIMITER")).get("/x", (c) => c.text("ok"));
+    for (let i = 0; i < SHARED_LIMITS.AI_LIMITER; i++) expect((await app.request("/x", from("10.0.8.1"), {} as Env)).status).toBe(200);
+    expect((await app.request("/x", from("10.0.8.1"), {} as Env)).status).toBe(429);
+  });
+});
+
+describe("tooManyRequests", () => {
+  it("is one answer for both the middleware and /mcp: 429, JSON, never cached, with when to retry", async () => {
+    const res = tooManyRequests(42);
+    expect(res.status).toBe(429);
+    expect(res.headers.get("Retry-After")).toBe("42");
+    expect(res.headers.get("Cache-Control")).toBe("no-store");
+    expect(res.headers.get("Content-Type")).toBe("application/json");
+    expect(await res.json()).toEqual({ message: "Too many requests, try again later" });
+  });
+});
+

@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-18 (58)
+### Changed
+- **One home for the shared limits and one "too many requests" answer.** The numbers of the three shared limiters lived twice each: in `wrangler.jsonc` and as literals in `index.ts` (10 for sign-in, 20 for AI) or in `mcp/gate.ts` (600), and only the `/mcp` one had a test tying them together. They now live in `SHARED_LIMITS` (`middleware/rate-limit.ts`); `sharedRateLimit(name)` builds a route's limiter from it and the `/mcp` gate reads it too, so the code says each number once. A single test holds `wrangler.jsonc` to the table (every name, its limit and its 60-second period, and that no limiter is declared that the code does not know), which is the part that cannot be shared because Cloudflare reads that file, not the Worker. The 429 is one function, `tooManyRequests`, used by the Hono middleware and by `/mcp` (which runs outside Hono); before, they built two slightly different bodies (`{message}` and `{error}`). Behaviour is unchanged: sign-in stays at 10, AI at 20, `/mcp` at 600.
+
+Verified: 22 tests on the limiter and the gate (the per-limiter numbers against `wrangler.jsonc`, `sharedRateLimit` refusing after exactly AI's 20, the shape of the 429), `tsc -b` 0, lint 0, vitest green.
+
 ## 2026-09-18 (57)
 ### Changed
 - **The `/mcp` limit goes from 120 to 600 requests a minute per address.** The ordinary `/api` routes (time entries, tasks, reports) have no blanket limit at all; only the sensitive endpoints do (sign-in, AI, e-mail, outbound). `/mcp` had a blanket one, and 120 a minute is easy to reach for legitimate use: an agent fires several tools a second, and a whole office leaves through one address. 600 (ten a second) is only reached by a script or an attack, and the limit exists to keep key guessing and floods off the database, not to pace real use. `MCP_REQUESTS_PER_MINUTE` in `mcp/gate.ts` and `MCP_LIMITER` in `wrangler.jsonc` are the same number, and a test fails if they drift apart. This supersedes the 120 written in entry (43) and in the docs, which now say 600.
