@@ -261,6 +261,14 @@ export function createAuth(env: Env, baseURL: string) {
           }
           await sendEmail(env, email, `Sign in to ${appHost(appUrl(env))}`, MagicLinkEmail({ url, appUrl: appUrl(env) }));
         },
+        // The plugin's own rate limit is keyed by request IP; sendInvitationEmail's call to
+        // signInMagicLink above has no request to read one from, so every invite send — from
+        // every workspace — falls into ONE shared bucket (better-auth's NO_TRUSTED_IP_KEY
+        // fallback). A real magic-link sign-in always has a caller IP and gets its own bucket,
+        // so this only bounds invite bursts: raised past AUTH_LIMITER's 10/60s on
+        // /organization/invite-member (index.ts) so that ceiling, not this one, is what a
+        // bulk invite actually hits.
+        rateLimit: { window: 60, max: 20 },
       }),
       passkey({
         rpID: rpURL.hostname,
