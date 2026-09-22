@@ -5,6 +5,8 @@ import { passkey } from "@better-auth/passkey";
 import { WorkspaceInvitationEmail } from "./emails/workspace-invitation";
 import { VerificationOtpEmail } from "./emails/verification-otp";
 import { MagicLinkEmail } from "./emails/magic-link";
+import { ResetPasswordEmail } from "./emails/reset-password";
+import { VerifyEmailEmail } from "./emails/verify-email";
 import { sendEmail } from "./lib/mailer";
 import { appUrl } from "./lib/app-url";
 import { appHost } from "@shared/app";
@@ -58,8 +60,25 @@ export function createAuth(env: Env, baseURL: string) {
     emailAndPassword: {
       // Password sign-in is a production login method (ENABLE_PASSWORD_AUTH is a deployed var).
       enabled: env.ENABLE_PASSWORD_AUTH === "true",
-      // An unverified password sign-up could claim an invited address first; only the dev/e2e helper keeps it.
-      disableSignUp: !import.meta.env.DEV,
+      disableSignUp: false,
+      // Without this, whoever POSTs /sign-up/email first with someone else's invited-but-unclaimed
+      // address would squat it with a password of their own choosing. With it, sign-up returns no
+      // session (better-auth skips auto-sign-in — see sign-up.mjs's shouldSkipAutoSignIn) and
+      // /sign-in/email refuses until the inbox owner clicks the verification link below — matching
+      // the same guarantee requireEmailVerificationOnInvitation already gives invite acceptance.
+      // Dev/e2e keep the old frictionless behavior (e2e/auth.ts signs in immediately after sign-up).
+      requireEmailVerification: !import.meta.env.DEV,
+      // A reset invalidates other sessions — the requester proved control of the mailbox, a stolen cookie elsewhere shouldn't survive it.
+      revokeSessionsOnPasswordReset: true,
+      async sendResetPassword({ user, url }) {
+        await sendEmail(env, user.email, `Reset your ${appHost(appUrl(env))} password`, ResetPasswordEmail({ url, appUrl: appUrl(env) }));
+      },
+    },
+    emailVerification: {
+      autoSignInAfterVerification: true,
+      async sendVerificationEmail({ user, url }) {
+        await sendEmail(env, user.email, `Verify your ${appHost(appUrl(env))} email`, VerifyEmailEmail({ url, appUrl: appUrl(env) }));
+      },
     },
     session: {
       // Disable better-auth's global "fresh session" gate so /list-sessions (the
@@ -197,19 +216,24 @@ export function createAuth(env: Env, baseURL: string) {
         },
         // Only a proven owner of the address may join; relaxed in dev so e2e password users can accept.
         requireEmailVerificationOnInvitation: !import.meta.env.DEV,
+        // The invite link is a magic-link sign-in: clicking it authenticates AND lands on
+        // /accept-invite already signed in, instead of a plain URL that still requires a
+        // separate login step. sendMagicLink below routes the email by the invite metadata.
         async sendInvitationEmail(data) {
-          const url = `${baseURL}/accept-invite?id=${data.id}`;
-          await sendEmail(
-            env,
-            data.email,
-            `You've been invited to a ${appHost(appUrl(env))} workspace`,
-            WorkspaceInvitationEmail({
-              inviterName: data.inviter.user.name,
-              workspaceName: data.organization.name,
-              url,
-              appUrl: appUrl(env),
-            }),
-          );
+          await auth.api.signInMagicLink({
+            body: {
+              email: data.email,
+              callbackURL: `/accept-invite?id=${data.id}`,
+              metadata: {
+                invitationId: data.id,
+                inviterName: data.inviter.user.name,
+                workspaceName: data.organization.name,
+              },
+            },
+            // No inbound request to read headers from — this call originates
+            // from the invitation hook itself, not a browser request.
+            headers: new Headers(),
+          });
         },
       }),
       admin(),
@@ -219,7 +243,22 @@ export function createAuth(env: Env, baseURL: string) {
         },
       }),
       magicLink({
-        async sendMagicLink({ email, url }) {
+        async sendMagicLink({ email, url, metadata }) {
+          const invite = metadata as { invitationId?: string; inviterName?: string; workspaceName?: string } | undefined;
+          if (invite?.invitationId) {
+            await sendEmail(
+              env,
+              email,
+              `You've been invited to a ${appHost(appUrl(env))} workspace`,
+              WorkspaceInvitationEmail({
+                inviterName: invite.inviterName ?? "",
+                workspaceName: invite.workspaceName ?? "",
+                url,
+                appUrl: appUrl(env),
+              }),
+            );
+            return;
+          }
           await sendEmail(env, email, `Sign in to ${appHost(appUrl(env))}`, MagicLinkEmail({ url, appUrl: appUrl(env) }));
         },
       }),

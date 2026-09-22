@@ -37,8 +37,14 @@ const AdminPage = lazyWithReload(() =>
 const LoginPage = lazyWithReload(() =>
   import("@/pages/LoginPage").then((m) => ({ default: m.LoginPage }))
 );
+const SignUpPage = lazyWithReload(() =>
+  import("@/pages/SignUpPage").then((m) => ({ default: m.SignUpPage }))
+);
 const AcceptInvitePage = lazyWithReload(() =>
   import("@/pages/AcceptInvitePage").then((m) => ({ default: m.AcceptInvitePage }))
+);
+const ResetPasswordPage = lazyWithReload(() =>
+  import("@/pages/ResetPasswordPage").then((m) => ({ default: m.ResetPasswordPage }))
 );
 const NotFoundPage = lazyWithReload(() =>
   import("@/pages/NotFoundPage").then((m) => ({ default: m.NotFoundPage }))
@@ -55,8 +61,18 @@ const router = createBrowserRouter([
     errorElement: <RouteErrorBoundary fullScreen />,
   },
   {
+    path: "/sign-up",
+    element: withSuspense(<SignUpPage />),
+    errorElement: <RouteErrorBoundary fullScreen />,
+  },
+  {
     path: "/accept-invite",
     element: withSuspense(<AcceptInvitePage />),
+    errorElement: <RouteErrorBoundary fullScreen />,
+  },
+  {
+    path: "/reset-password",
+    element: withSuspense(<ResetPasswordPage />),
     errorElement: <RouteErrorBoundary fullScreen />,
   },
   {

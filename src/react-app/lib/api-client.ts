@@ -473,6 +473,8 @@ export const api = {
   settings: {
     get: () => json(settingsClient.index.$get()),
     update: (body: UpdateSettings) => json(settingsClient.index.$patch({ json: body })),
+    setPassword: (newPassword: string) =>
+      json(settingsClient["set-password"].$post({ json: { newPassword } })),
     sendDigest: (kind: "daily" | "weekly") =>
       json(
         settingsClient.digest.send.$post({

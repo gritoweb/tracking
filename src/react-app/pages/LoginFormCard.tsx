@@ -1,6 +1,8 @@
 import { KeyRound } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -109,10 +111,17 @@ export function LoginFormCard({
 
           {usePassword ? (
             <div className="space-y-1.5">
-              <Label htmlFor="password">Password</Label>
-              <Input
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Password</Label>
+                <Link
+                  to="/reset-password"
+                  className="text-xs text-muted-foreground underline underline-offset-4"
+                >
+                  Forgot password?
+                </Link>
+              </div>
+              <PasswordInput
                 id="password"
-                type="password"
                 value={password}
                 onChange={(e) => onPasswordChange(e.target.value)}
                 placeholder="••••••••"
@@ -189,7 +198,13 @@ export function LoginFormCard({
 
       <CardFooter className="flex flex-col gap-3 pt-0">
         <p className="text-center text-sm text-muted-foreground">
-          Access is by invitation only. Ask a workspace admin to invite you.
+          New here?{" "}
+          <Link to="/sign-up" className="underline underline-offset-4">
+            Create an account
+          </Link>
+        </p>
+        <p className="text-center text-xs text-muted-foreground">
+          Access is by invitation only — you'll need a pending invite to a workspace.
         </p>
       </CardFooter>
     </Card>

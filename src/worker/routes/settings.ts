@@ -1,8 +1,10 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
+import { APIError } from "better-auth";
 import { UpdateSettingsSchema, type Settings } from "@shared/schemas";
 import { sendDigest, localDateAt } from "../lib/digest";
+import { createAuth } from "../auth";
 
 type Row = {
   currency: string;
@@ -124,6 +126,32 @@ export const settingsRouter = new Hono<{
     const row = await c.env.DB.prepare(SELECT).bind(userId).first<Row>();
     return c.json(toSettings(row), 200);
   })
+  /**
+   * Set a password for the signed-in account.
+   *
+   * Better Auth's `setPassword` is server-only (no client-callable route) —
+   * it exists precisely for an account that signed up passwordless/social and
+   * has no current password to verify, unlike `changePassword`. Lets someone
+   * who accepted an invite via magic link, or signed in with Google, add a
+   * password afterward so they have a fallback sign-in method.
+   */
+  .post(
+    "/set-password",
+    zValidator("json", z.object({ newPassword: z.string().min(8).max(128) })),
+    async (c) => {
+      const { newPassword } = c.req.valid("json");
+      const auth = createAuth(c.env, new URL(c.req.url).origin);
+      try {
+        await auth.api.setPassword({ body: { newPassword }, headers: c.req.raw.headers });
+      } catch (err) {
+        if (err instanceof APIError) {
+          return c.json({ error: err.message }, (err.statusCode as 400) || 400);
+        }
+        return c.json({ error: "Failed to set password" }, 500);
+      }
+      return c.json({ ok: true }, 200);
+    }
+  )
   /**
    * Send one digest immediately, to the signed-in user's own address.
    *
