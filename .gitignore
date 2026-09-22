@@ -198,10 +198,11 @@ dist
 .dev.vars*
 !.dev.vars.example
 
-# Local working plan, never versioned
-plano.md
-plano2.md
+# Local working plan & security reports, never versioned
+plano*.md
 promptseguranca.md
+SECURITY.md
+scratch*
 
 ### Lockfiles — pnpm only ###
 package-lock.json
