@@ -9,9 +9,14 @@ export const cardVariants = cva(
         default: "",
         destructive: "bg-destructive/5",
       },
+      interactive: {
+        true: "cursor-pointer transition-colors duration-fast ease-out-quart hover:bg-accent/40 active:scale-[0.99]",
+        false: "",
+      },
     },
     defaultVariants: {
       tone: "default",
+      interactive: false,
     },
   }
 )

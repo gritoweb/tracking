@@ -101,7 +101,7 @@ export function TaskCard({ task, onOpen, onRequestDelete, overlay = false }: Tas
       className={cn(
         "group flex flex-col gap-1.5 rounded-lg bg-popover p-2.5",
         "transition-colors duration-fast ease-out-quart",
-        !overlay && "cursor-grab touch-none active:cursor-grabbing",
+        !overlay && "cursor-pointer touch-none active:cursor-grabbing",
         !overlay && "focus-ring",
         running && "bg-primary/5",
         // Stays in place as a hole while the overlay follows the pointer.
@@ -109,8 +109,16 @@ export function TaskCard({ task, onOpen, onRequestDelete, overlay = false }: Tas
         // The overlay renders in a portal, outside the column's own width — without this it
         // sizes to its content instead of matching the card it was picked up from.
         // eslint-disable-next-line no-restricted-syntax -- the drag overlay floats over the board, so it is an overlay shadow
-        overlay && "w-(--size-board-column) shadow-lg"
+        overlay && "w-(--size-board-column) shadow-lg cursor-grabbing"
       )}
+      onClick={(e) => {
+        if (overlay) return;
+        const target = e.target as HTMLElement | null;
+        if (target?.closest("button, a, input, select, textarea, [role='button'], [role='menuitem'], [data-slot='select-trigger']")) {
+          return;
+        }
+        onOpen(task);
+      }}
     >
       <div className="flex items-start gap-1.5">
         {/* Same vocabulary as the list: tinted ring, only P1/P2 carry colour. Clickable here — the

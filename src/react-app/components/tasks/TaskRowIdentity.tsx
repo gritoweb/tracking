@@ -64,7 +64,7 @@ export function TaskRowIdentity({
           title="Click to rename"
           onClick={onStartEditName}
           className={cn(
-            "block max-w-full truncate text-left text-sm",
+            "block max-w-full truncate text-left text-sm cursor-pointer",
             !task.active && "text-muted-foreground line-through"
           )}
         >
@@ -99,7 +99,7 @@ export function TaskRowIdentity({
         </div>
       ) : progress !== null ? (
         <button
-          className="mt-0.5 flex w-full max-w-xs items-center gap-1.5 transition-opacity duration-fast ease-out-quart hover:opacity-70"
+          className="mt-0.5 flex w-full max-w-xs items-center gap-1.5 cursor-pointer transition-opacity duration-fast ease-out-quart hover:opacity-70"
           onClick={onStartEditTime}
         >
           <Progress value={progress} className="h-1 flex-1" aria-hidden />
@@ -113,7 +113,7 @@ export function TaskRowIdentity({
           // gap-1.5, not gap-1: the trailing space in the text node is swallowed
           // at the flex-item boundary, so the dashed underline started hard
           // against the "·" and read tighter than the spaces around it.
-          className="mt-0.5 flex items-center gap-1.5 text-micro text-muted-foreground transition-opacity duration-fast ease-out-quart hover:opacity-70"
+          className="mt-0.5 flex items-center gap-1.5 text-micro text-muted-foreground cursor-pointer transition-opacity duration-fast ease-out-quart hover:opacity-70"
           onClick={onStartEditTime}
         >
           <span>{formatDurationShort(task.trackedSeconds)} tracked ·</span>
@@ -124,7 +124,7 @@ export function TaskRowIdentity({
           // `block`: a bare <button> is inline-block, so this ran onto the same
           // line as the task name ("Data mappingadd estimate"). The other two
           // states are flex and already drop below; mt-0.5 shows this meant to.
-          className="mt-0.5 block text-micro text-muted-foreground/0 transition-colors duration-fast ease-out-quart group-hover:text-muted-foreground/50 hover:text-muted-foreground!"
+          className="mt-0.5 block text-micro text-muted-foreground/0 cursor-pointer transition-colors duration-fast ease-out-quart group-hover:text-muted-foreground/50 hover:text-muted-foreground!"
           onClick={onStartEditTime}
         >
           add estimate

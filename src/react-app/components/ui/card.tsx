@@ -7,12 +7,13 @@ import { cardVariants } from "@/components/ui/card-variants"
 function Card({
   className,
   tone,
+  interactive,
   ...props
 }: React.ComponentProps<"div"> & VariantProps<typeof cardVariants>) {
   return (
     <div
       data-slot="card"
-      className={cn(cardVariants({ tone }), className)}
+      className={cn(cardVariants({ tone, interactive }), className)}
       {...props}
     />
   )

@@ -23,4 +23,14 @@ describe("Card", () => {
     expect(el).toHaveClass("bg-destructive/5")
     expect(el.className).not.toMatch(/\bborder\b/)
   })
+
+  it("interactive=true adds cursor-pointer and hover styling", () => {
+    render(
+      <Card data-testid="card" interactive>
+        content
+      </Card>
+    )
+    const el = screen.getByTestId("card")
+    expect(el).toHaveClass("cursor-pointer")
+  })
 })

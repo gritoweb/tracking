@@ -22,4 +22,9 @@ describe("Button variant ghost-destructive", () => {
     render(<Button variant="ghost-destructive" className="tt-reveal" aria-label="Remove">x</Button>)
     expect(screen.getByRole("button", { name: "Remove" })).toHaveClass("tt-reveal", "hover:text-destructive")
   })
+
+  it("includes cursor-pointer in base button classes", () => {
+    render(<Button>Click me</Button>)
+    expect(screen.getByRole("button", { name: "Click me" })).toHaveClass("cursor-pointer")
+  })
 })
