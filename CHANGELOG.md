@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-09-22 (72)
+### Deployed
+- **Password reset, invite auto-login, and invite-gated sign-up (71) are live in production.** CI green on `136ed87`, `pnpm check` (0) then `pnpm run deploy`: Version ID `fe9990c6-7864-44e7-b033-531d4ea0ff85`. Smoke check: `GET /` → 200, `GET /api/me` (no session) → 401, `GET /reset-password` → 200, `GET /sign-up` → 200.
+
 ## 2026-09-22 (71)
 ### Added
 - **Self-service password reset, and account creation is now open (invite-gated) instead of dev-only.** Three things landed together, requested by Luis after asking for the reset-password link and finding there was no sign-up entry point either:
