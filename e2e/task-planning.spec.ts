@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { signUp } from "./auth";
 import { createProject } from "./project-helpers";
+import { TASK_TIMER_ENABLED } from "../src/react-app/lib/features";
 
 /**
  * Tasks as the plan side of the timer: due dates, priority, subtasks and
@@ -22,6 +23,7 @@ async function seed(page: import("@playwright/test").Page) {
 }
 
 test("a task starts a timer in one click, and stopping offers to close it out", async ({ page }) => {
+  test.skip(!TASK_TIMER_ENABLED, "The Tasks page's timer is switched off (src/react-app/lib/features.ts).");
   const { project, origin } = await seed(page);
   await page.request.post("/api/tasks", {
     data: { name: "Cutover plan", projectId: project.id, dueDate: localDate(0) },

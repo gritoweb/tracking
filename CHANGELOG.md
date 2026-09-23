@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-09-23 (78)
+### Fixed
+- **Two stale e2e specs.** `entry-delete.spec.ts` had been failing since the delete confirmation landed (`fce6361`, 2026-09-21): it clicked the menu's Delete and waited for the toast while the page sat on the "Delete entry?" dialog; it now confirms. `task-planning.spec.ts`'s "a task starts a timer in one click" drove the Tasks page play button that (74) hid, so it now skips while `TASK_TIMER_ENABLED` is off and comes back on its own when the flag is flipped. Playwright isn't in CI, so neither blocked a merge; both were found checking the release. Verified: those two specs 9 passed / 1 skipped; the task, calendar and entry e2e specs 61 passed before the fix; `vitest run` 980/980; `pnpm check` (0); `lint` (0).
+
 ## 2026-09-23 (77)
 ### Changed
 - **Entry form: Client and Logged by use the task sheet's field-row layout** (icon + label on the left, value on the right) instead of stacked label/text, as Luis asked, so the read-only facts read like the task detail panel. `FieldRow` moved out of `TaskProperties.tsx` into `components/FieldRow.tsx` and both use it, so there's one copy. Logged by keeps the avatar (xs) beside the name.

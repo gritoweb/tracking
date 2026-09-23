@@ -22,6 +22,8 @@ test.describe("entry delete", () => {
     await row.hover();
     await page.getByRole("button", { name: "Entry actions" }).click();
     await page.getByRole("menuitem", { name: "Delete" }).click();
+    // Deleting asks first (ConfirmDialog, since fce6361).
+    await page.getByRole("alertdialog", { name: "Delete entry?" }).getByRole("button", { name: "Delete" }).click();
 
     // The row plays its exit animation, then is removed; an undo toast appears.
     await expect(page.getByText("Entry deleted")).toBeVisible();
