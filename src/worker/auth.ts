@@ -85,12 +85,12 @@ export function createAuth(env: Env, baseURL: string) {
       // Settings → Active sessions card) doesn't 403 with SESSION_NOT_FRESH once a
       // session is older than freshAge (default 1 day) — that broke the card for
       // every returning user, and better-auth has no per-endpoint override.
-      // NOTE: freshAge:0 also drops the gate from /update-user, /unlink-account,
-      // AND /delete-user (better-auth skips its deletion freshness check entirely
-      // when freshAge is 0, and passwordless users have no current-password
-      // check either) — so it is re-imposed on those three endpoints in
-      // middleware/fresh-session.ts (wired in index.ts). Revoke/change-password
-      // use better-auth's separate checks and are unaffected.
+      // NOTE: freshAge:0 also drops the gate from /unlink-account AND /delete-user
+      // (better-auth skips its deletion freshness check entirely when freshAge is 0,
+      // and passwordless users have no current-password check either) — so it is
+      // re-imposed on those, and on the revoke-session routes, in
+      // middleware/fresh-session.ts (wired in index.ts). /update-user was never
+      // freshness-gated by better-auth and stays ungated (name/image only).
       freshAge: 0,
       // Serve getSession() from a signed cookie for 5 minutes instead of a D1
       // lookup on every /api/* request (workspaceMiddleware). Bearer-token

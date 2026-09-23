@@ -95,7 +95,7 @@ const app = new Hono<{ Bindings: Env }>()
   // freshAge 0, Better Auth skips its own freshness check on deletion entirely
   // (and no delete-verification email is configured), so without this gate any
   // stolen cookie or bearer token could irreversibly delete the account.
-  .use("/api/auth/update-user", requireFreshSession)
+  // update-user is deliberately NOT gated: it only sets name/image (email is refused), Better Auth never gated it, and gating it 403'd every rename after a day.
   .use("/api/auth/unlink-account", requireFreshSession)
   .use("/api/auth/delete-user", requireFreshSession)
   // Same freshAge:0 gap applies to these three — SECURITY.md S-07.
