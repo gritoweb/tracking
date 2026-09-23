@@ -1,19 +1,16 @@
-import type { MouseEvent, ReactNode } from "react";
-import { Archive, Edit2, MoreHorizontal } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import type { ReactNode } from "react";
+import { Archive, Edit2 } from "lucide-react";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import { cn } from "@/lib/utils";
 
 interface TaskRailRowProps {
   active?: boolean;
   onClick?: () => void;
-  onContextMenu?: (e: MouseEvent) => void;
   /** Icon or colour dot, centred in a fixed slot so every row's label starts at the same x. */
   leading: ReactNode;
   label: string;
@@ -24,7 +21,7 @@ interface TaskRailRowProps {
 }
 
 /** One row of the tasks rail. "All tasks", a client and a project share this, so their size and actions column never drift. */
-export function TaskRailRow({ active, onClick, onContextMenu, leading, label, count, heading, actions }: TaskRailRowProps) {
+export function TaskRailRow({ active, onClick, leading, label, count, heading, actions }: TaskRailRowProps) {
   const body = (
     <>
       <span className="flex h-4 w-4 shrink-0 items-center justify-center">{leading}</span>
@@ -38,7 +35,7 @@ export function TaskRailRow({ active, onClick, onContextMenu, leading, label, co
     active ? "bg-primary/10 text-primary-ink" : heading ? "text-muted-foreground" : "text-foreground"
   );
   return (
-    <div className="flex items-center gap-0.5" onContextMenu={onContextMenu}>
+    <div className="flex items-center gap-0.5">
       {onClick ? (
         <button
           type="button"
@@ -57,38 +54,30 @@ export function TaskRailRow({ active, onClick, onContextMenu, leading, label, co
   );
 }
 
-interface RailActionsMenuProps {
-  label: string;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+interface RailContextMenuProps {
   onEdit: () => void;
   onArchive: () => void;
+  children: ReactNode;
 }
 
-/** The Edit / Archive menu behind a row's "…" button; `open` is controlled so a right-click can open it too. */
-export function RailActionsMenu({ label, open, onOpenChange, onEdit, onArchive }: RailActionsMenuProps) {
+/** Right-click Edit / Archive on a rail row; the row has no visible actions button. */
+export function RailContextMenu({ onEdit, onArchive, children }: RailContextMenuProps) {
   return (
-    <DropdownMenu open={open} onOpenChange={onOpenChange}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon-xs" aria-label={`${label} actions`} className="shrink-0 text-muted-foreground">
-              <MoreHorizontal className="h-3.5 w-3.5" />
-            </Button>
-          </DropdownMenuTrigger>
-        </TooltipTrigger>
-        <TooltipContent>{label} actions</TooltipContent>
-      </Tooltip>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={onEdit}>
-          <Edit2 className="mr-2 h-3.5 w-3.5" />
+    <ContextMenu>
+      {/* A div, not the row itself: TaskRailRow doesn't forward the trigger's ref and handlers. */}
+      <ContextMenuTrigger asChild>
+        <div>{children}</div>
+      </ContextMenuTrigger>
+      <ContextMenuContent>
+        <ContextMenuItem onSelect={onEdit}>
+          <Edit2 />
           Edit
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={onArchive}>
-          <Archive className="mr-2 h-3.5 w-3.5" />
+        </ContextMenuItem>
+        <ContextMenuItem onSelect={onArchive}>
+          <Archive />
           Archive
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }

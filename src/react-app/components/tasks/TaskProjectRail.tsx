@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { FolderOpen, Users } from "lucide-react";
+import { ChevronRight, FolderOpen, Users } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -17,7 +18,9 @@ import { useProjects, useClients, useDeleteProject, useDeleteClient } from "@/ho
 import { useWorkspaceRole } from "@/hooks/useWorkspaceRole";
 import { useMediaQuery, BELOW_MD } from "@/hooks/useMediaQuery";
 import { groupProjectsByClient } from "@/lib/taskUtils";
-import { RailActionsMenu, TaskRailRow } from "./TaskRailRow";
+import { useUIStore } from "@/stores/uiStore";
+import { cn } from "@/lib/utils";
+import { RailContextMenu, TaskRailRow } from "./TaskRailRow";
 import type { Client, Project, Task } from "@shared/schemas";
 
 interface TaskProjectRailProps {
@@ -41,8 +44,8 @@ export function TaskProjectRail({ tasks, projectId, onChange, clientId, onClient
   const deleteClient = useDeleteClient();
   const [editProject, setEditProject] = useState<Project | null>(null);
   const [editClient, setEditClient] = useState<Client | null>(null);
-  // Right-click on a row opens the same menu as its "..." button — one open at a time.
-  const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const collapsedClients = useUIStore((s) => s.collapsedRailClients);
+  const toggleClient = useUIStore((s) => s.toggleRailClient);
   // Archive has no undo toast, so it goes through ConfirmDialog like every other destructive action.
   const [archiveProject, setArchiveProject] = useState<Project | null>(null);
   const [archiveClient, setArchiveClient] = useState<Client | null>(null);
@@ -109,61 +112,73 @@ export function TaskProjectRail({ tasks, projectId, onChange, clientId, onClient
         const client = group.clientId ? clientById.get(group.clientId) : undefined;
         const clientActive = client ? clientId === client.id : false;
         const clientOpenCount = group.projects.reduce((sum, p) => sum + (openCounts.get(p.id) ?? 0), 0);
-        const menuKey = (kind: "client" | "project", id: string) => `${kind}:${id}`;
-        return (
-          <div key={group.clientName ?? "none"}>
-            <TaskRailRow
-              heading
-              active={clientActive}
-              onClick={client ? () => onClientChange(clientActive ? null : client.id) : undefined}
-              onContextMenu={(e) => {
-                if (!canManage || !client) return;
-                e.preventDefault();
-                setOpenMenu(menuKey("client", client.id));
-              }}
-              leading={<Users className="h-4 w-4" aria-hidden />}
-              label={group.clientName ?? "No client"}
-              count={client ? clientOpenCount : undefined}
-              actions={
-                canManage && client ? (
-                  <RailActionsMenu
-                    label={client.name}
-                    open={openMenu === menuKey("client", client.id)}
-                    onOpenChange={(o) => setOpenMenu(o ? menuKey("client", client.id) : null)}
-                    onEdit={() => setEditClient(client)}
-                    onArchive={() => setArchiveClient(client)}
-                  />
-                ) : undefined
-              }
-            />
-            <div className="mt-0.5 space-y-0.5">
-              {group.projects.map((project) => (
-                <TaskRailRow
-                  key={project.id}
-                  active={projectId === project.id}
-                  onClick={() => onChange(project.id)}
-                  onContextMenu={(e) => {
-                    if (!canManage) return;
-                    e.preventDefault();
-                    setOpenMenu(menuKey("project", project.id));
-                  }}
-                  leading={<ColorDot color={project.color} />}
-                  label={project.name}
-                  count={openCounts.get(project.id) ?? 0}
-                  actions={
-                    canManage ? (
-                      <RailActionsMenu
-                        label={project.name}
-                        open={openMenu === menuKey("project", project.id)}
-                        onOpenChange={(o) => setOpenMenu(o ? menuKey("project", project.id) : null)}
-                        onEdit={() => setEditProject(project)}
-                        onArchive={() => setArchiveProject(project)}
-                      />
-                    ) : undefined
-                  }
+        const groupKey = group.clientId ?? "none";
+        const expanded = !collapsedClients.includes(groupKey);
+        const groupName = group.clientName ?? "No client";
+        const clientRow = (
+          <TaskRailRow
+            heading
+            active={clientActive}
+            onClick={client ? () => onClientChange(clientActive ? null : client.id) : undefined}
+            leading={<Users className="h-4 w-4" aria-hidden />}
+            label={groupName}
+            count={client ? clientOpenCount : undefined}
+            actions={
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                onClick={() => toggleClient(groupKey)}
+                aria-expanded={expanded}
+                aria-label={`${expanded ? "Collapse" : "Expand"} ${groupName}`}
+                title={`${expanded ? "Collapse" : "Expand"} ${groupName}`}
+                // A disclosure, not a menu trigger: the ghost variant's open-menu fill on aria-expanded doesn't apply.
+                className="text-muted-foreground aria-expanded:bg-transparent aria-expanded:text-muted-foreground aria-expanded:hover:bg-accent"
+              >
+                <ChevronRight
+                  className={cn(
+                    "h-3.5 w-3.5 transition-transform duration-fast ease-out-quart",
+                    expanded && "rotate-90"
+                  )}
                 />
-              ))}
-            </div>
+              </Button>
+            }
+          />
+        );
+        return (
+          <div key={groupKey}>
+            {canManage && client ? (
+              <RailContextMenu onEdit={() => setEditClient(client)} onArchive={() => setArchiveClient(client)}>
+                {clientRow}
+              </RailContextMenu>
+            ) : (
+              clientRow
+            )}
+            {expanded && (
+              <div className="mt-0.5 space-y-0.5">
+                {group.projects.map((project) => {
+                  const row = (
+                    <TaskRailRow
+                      active={projectId === project.id}
+                      onClick={() => onChange(project.id)}
+                      leading={<ColorDot color={project.color} />}
+                      label={project.name}
+                      count={openCounts.get(project.id) ?? 0}
+                    />
+                  );
+                  return canManage ? (
+                    <RailContextMenu
+                      key={project.id}
+                      onEdit={() => setEditProject(project)}
+                      onArchive={() => setArchiveProject(project)}
+                    >
+                      {row}
+                    </RailContextMenu>
+                  ) : (
+                    <div key={project.id}>{row}</div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         );
       })}

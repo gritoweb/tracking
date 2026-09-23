@@ -93,6 +93,9 @@ interface UIStore {
   /** The task rail beside the Timer grid. Persisted — it's a workspace layout choice. */
   taskRailOpen: boolean;
   setTaskRailOpen: (v: boolean) => void;
+  /** Client groups folded shut in the Tasks page's project rail ("none" = the no-client group). Persisted. */
+  collapsedRailClients: string[];
+  toggleRailClient: (key: string) => void;
 
   toggleSidebar: () => void;
   setSidebarCollapsed: (v: boolean) => void;
@@ -242,6 +245,13 @@ export const useUIStore = create<UIStore>()(
       closeTaskLogTime: () => set({ logTimeTaskId: null }),
       taskRailOpen: false,
       setTaskRailOpen: (v) => set({ taskRailOpen: v }),
+      collapsedRailClients: [],
+      toggleRailClient: (key) =>
+        set((s) => ({
+          collapsedRailClients: s.collapsedRailClients.includes(key)
+            ? s.collapsedRailClients.filter((k) => k !== key)
+            : [...s.collapsedRailClients, key],
+        })),
       flashEntry: (id) => {
         clearTimeout(flashTimeout);
         set({ highlightedEntryId: id, pinnedEntryId: id });
@@ -266,6 +276,7 @@ export const useUIStore = create<UIStore>()(
       partialize: (s) => ({
         sidebarCollapsed: s.sidebarCollapsed,
         taskRailOpen: s.taskRailOpen,
+        collapsedRailClients: s.collapsedRailClients,
         theme: s.theme,
         timeFormat: s.timeFormat,
         currency: s.currency,

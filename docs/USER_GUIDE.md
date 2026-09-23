@@ -147,7 +147,7 @@ The key is shown **once** and can't be recovered; if you lose it, revoke it and 
 
 ## Planning with tasks
 
-The Tasks page opens on **Board**, with a rail of your projects (grouped by client) on the left — pick one to filter both layouts. **List** is the same tasks as a flat list, with grouping, sorting and status filters. **Board** and **List** are two views of the same data, not a filter — the **Due** dropdown beside them narrows either one to **Today** (overdue counts as today too) or **Upcoming** (the next seven days).
+The Tasks page opens on **Board**, with a rail of your projects (grouped by client) on the left — pick a project, or a client to see all of its projects at once, to filter both layouts. The arrow beside each client folds its projects away (remembered next time), and owners/admins can right-click a client or project to edit or archive it. **List** is the same tasks as a flat list, with grouping, sorting and status filters. **Board** and **List** are two views of the same data, not a filter — the **Due** dropdown beside them narrows either one to **Today** (overdue counts as today too) or **Upcoming** (the next seven days).
 
 **Capturing.** The field at the top of the list adds a task and stays open for the next one, so several go in as several lines of typing. It reads a few tokens out of what you type and strips them from the name:
 

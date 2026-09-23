@@ -148,9 +148,9 @@ Deliberately no `--text-micro--line-height`: the arbitrary values it replaces se
 
 (Don't write the arbitrary form in this comment — Tailwind scans CSS comments too and will emit a dead utility for it.)
 
-### --text-display: 2.5rem;
+### --text-display: 1.5rem;
 
-Display — one step above Title, for a panel's own name where it *is* the header (the task detail sheet), not a page heading sitting above other chrome.
+Display — one step above Title, for a panel's own name where it *is* the header (the task detail sheet), not a page heading sitting above other chrome. Was 40px; cut to 24px on 2026-09-23 at Luis's request.
 
 ### --z-index-sticky: 10;
 

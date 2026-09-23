@@ -44,8 +44,8 @@
   --text-micro: 0.625rem;
 
   /* Display: one step above Title, for a panel's own name where it is the header (the task detail sheet). */
-  --text-display: 2.5rem;
-  --text-display--line-height: 1.25;
+  --text-display: 1.5rem;
+  --text-display--line-height: 1.333;
 
   /* Layering: the three tiers that existed by convention, named (sticky, overlay, portal), plus tooltip above portal. */
   --z-index-sticky: 10;

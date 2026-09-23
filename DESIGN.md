@@ -142,7 +142,7 @@ Charts encode **billable**, not category: both bar charts stack `--success` (the
 **Character:** One well-tuned variable sans carries headings, labels, buttons, and body — a second family (Geist Mono) appears only for tabular numbers, durations, and timestamps, where fixed-width digits matter for scannability. Fixed rem scale throughout, not fluid/clamp — this is a product surface viewed at consistent DPI, not a marketing page.
 
 ### Hierarchy
-- **Display** (600 weight, 40px / `text-display`, 1.25 line-height): a panel's own name where it *is* the header, not a page heading sitting above other chrome — the task detail sheet's title.
+- **Display** (600 weight, 24px / `text-display`, 1.333 line-height): a panel's own name where it *is* the header, not a page heading sitting above other chrome — the task detail sheet's title.
 - **Title** (600 weight, 20px / `text-xl`, 1.3 line-height): page headings ("Reports", "Settings").
 - **Headline** (600 weight, 16px / `text-base`, 1.4 line-height): card titles, section headers.
 - **Body** (400 weight, 14px / `text-sm`, 1.5 line-height): default UI text, descriptions, table cells. 65–75ch cap where prose appears (AI summary output); dense tabular data runs narrower.

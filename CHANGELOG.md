@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-09-23 (73)
+### Fixed
+- **Clicking a client in the Tasks rail didn't filter the Board.** `TaskBoardList` applied the client scope only to `scopedTasks`, which fed the List; the Board (the default layout) got `assigneeFilteredTasks` plus the project id alone, so a client click changed nothing on screen. The Board now receives `scopedTasks` too.
+### Changed
+- **Tasks rail: each client folds its projects away** with a chevron in the row's right slot; which clients are folded persists in `uiStore.collapsedRailClients`. The ghost button's open-menu fill on `aria-expanded` is neutralised there, since it's a disclosure, not a menu.
+- **Tasks rail: the "…" button on client/project rows is gone.** Edit/Archive stay available on right-click (owners/admins) through the existing `ContextMenu` primitive (`RailContextMenu`, replacing `RailActionsMenu`); archive still goes through the confirm dialog.
+- **Task detail sheet title is 24px, down from 40px** (`--text-display` token; DESIGN.md §3 and `docs/CSS_NOTES.md` updated). The token was used only by that title.
+- Requested by Luis as a design list for the Tasks page. Verified: `tsc -b` (0), `lint` (0), `vitest run` 979/980 — the one failure, `lint-catch-rules.test.ts`, passes 9/9 on its own with and without this change (it runs ESLint in-process and flakes under full-suite load). Browser check with a throwaway Playwright spec on local dev: client filter narrows Board and List, a folded client stays folded after reload, no "…" buttons render, right-click opens Edit/Archive, the sheet title computes to 24px.
+
 ## 2026-09-22 (72)
 ### Deployed
 - **Password reset, invite auto-login, and invite-gated sign-up (71) are live in production.** CI green on `136ed87`, `pnpm check` (0) then `pnpm run deploy`: Version ID `fe9990c6-7864-44e7-b033-531d4ea0ff85`. Smoke check: `GET /` → 200, `GET /api/me` (no session) → 401, `GET /reset-password` → 200, `GET /sign-up` → 200.

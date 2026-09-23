@@ -107,7 +107,7 @@ export function TaskBoardList({ openTaskId = null, openTab = "task" }: TaskBoard
     );
   }, [tasks, assignedToMe, user]);
 
-  // The Board filters the same way internally, from `assigneeFilteredTasks` below.
+  // Both layouts read this: the Board has no client filter of its own.
   const scopedTasks = useMemo(() => {
     if (railProjectId) return assigneeFilteredTasks.filter((t) => t.projectId === railProjectId);
     if (railClientId) return assigneeFilteredTasks.filter((t) => clientProjectIds.has(t.projectId));
@@ -221,7 +221,7 @@ export function TaskBoardList({ openTaskId = null, openTab = "task" }: TaskBoard
         >
           {layout === "board" ? (
             <TaskBoard
-              tasks={assigneeFilteredTasks}
+              tasks={scopedTasks}
               projectId={railProjectId}
               dueFilter={dueFilter}
               status={status}
