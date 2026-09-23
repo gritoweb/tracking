@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { ChevronRight, FolderOpen, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Select,
   SelectContent,
@@ -124,28 +125,28 @@ export function TaskProjectRail({ tasks, projectId, onChange, clientId, onClient
             label={groupName}
             count={client ? clientOpenCount : undefined}
             actions={
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                onClick={() => toggleClient(groupKey)}
-                aria-expanded={expanded}
-                aria-label={`${expanded ? "Collapse" : "Expand"} ${groupName}`}
-                title={`${expanded ? "Collapse" : "Expand"} ${groupName}`}
-                // A disclosure, not a menu trigger: the ghost variant's open-menu fill on aria-expanded doesn't apply.
-                className="text-muted-foreground aria-expanded:bg-transparent aria-expanded:text-muted-foreground aria-expanded:hover:bg-accent"
-              >
-                <ChevronRight
-                  className={cn(
-                    "h-3.5 w-3.5 transition-transform duration-fast ease-out-quart",
-                    expanded && "rotate-90"
-                  )}
-                />
-              </Button>
+              <CollapsibleTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  aria-label={`${expanded ? "Collapse" : "Expand"} ${groupName}`}
+                  title={`${expanded ? "Collapse" : "Expand"} ${groupName}`}
+                  // A disclosure, not a menu trigger: the ghost variant's open-menu fill on aria-expanded doesn't apply.
+                  className="text-muted-foreground aria-expanded:bg-transparent aria-expanded:text-muted-foreground aria-expanded:hover:bg-accent"
+                >
+                  <ChevronRight
+                    className={cn(
+                      "h-3.5 w-3.5 transition-transform duration-base ease-out-quart",
+                      expanded && "rotate-90"
+                    )}
+                  />
+                </Button>
+              </CollapsibleTrigger>
             }
           />
         );
         return (
-          <div key={groupKey}>
+          <Collapsible key={groupKey} open={expanded} onOpenChange={() => toggleClient(groupKey)}>
             {canManage && client ? (
               <RailContextMenu onEdit={() => setEditClient(client)} onArchive={() => setArchiveClient(client)}>
                 {clientRow}
@@ -153,7 +154,7 @@ export function TaskProjectRail({ tasks, projectId, onChange, clientId, onClient
             ) : (
               clientRow
             )}
-            {expanded && (
+            <CollapsibleContent>
               <div className="mt-0.5 space-y-0.5">
                 {group.projects.map((project) => {
                   const row = (
@@ -178,8 +179,8 @@ export function TaskProjectRail({ tasks, projectId, onChange, clientId, onClient
                   );
                 })}
               </div>
-            )}
-          </div>
+            </CollapsibleContent>
+          </Collapsible>
         );
       })}
 
