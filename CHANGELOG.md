@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-09-23 (83)
+### Deployed
+- **Account deactivation and the session fixes (82) are live in production**, at Luis's request. Before pushing: `refactor` CI green (run 35919745176); no file under `migrations/` or config in the diff; a read-only check of the production D1 found all 15 columns the new code touches (`pragma_table_info`) and "No migrations to apply". `master` fast-forwarded to `2618ab1`, CI green (run 35920279340), Workers Builds deployed Version ID `f79780bc-92ec-4ffb-a096-3c7eeb3caed4` (previous: `325e99f7-a315-4cd8-9eed-21af2a2809f4`, the rollback target). Smoke check without any account: `GET /` → 200, `GET /api/me` → 401, `POST /api/auth/admin/remove-user` → 403 `ACCOUNT_DELETION_DISABLED` (the new route; the old code answered 401), `POST /api/auth/delete-user` → 401 with the new `message` field. No production account was signed out, deactivated or written to.
+
 ## 2026-09-23 (82)
 ### Changed
 - **Deleting an account now deactivates it; no record is ever deleted.** Asked for by Luis ("excluir a conta não pode apagar dado nenhum"). Measured first on an in-memory SQLite with every migration: deleting a `user` row set the author of their time entries and tasks to NULL (so reports per person lost those hours), deleted their task assignments and recurring templates, and, when a legacy `workspaces.userId` pointed at them, cascaded away the whole workspace (every entry, project, task and comment of every member). Production has one workspace with `userId` NULL (read-only `SELECT`), so the cascade couldn't hit it today, but the self-service delete and the admin removal (which also purged solo-owned workspaces on purpose) both could.
