@@ -1,12 +1,9 @@
 import { Hono } from "hono";
 import { APIError } from "better-auth";
 import { createAuth } from "../auth";
+import { DEACTIVATED_REASON, deactivateAccount, soleOwnedWorkspaces } from "../lib/account-deactivation";
 
-// Admin-only user removal. Better Auth's removeUser deletes the user row
-// (sessions/accounts/member rows cascade via FKs) but knows nothing about the
-// app's data, so this endpoint also purges workspaces the user solely owned —
-// deleting a `workspaces` row cascades every app table except saved_reports,
-// which has no FK and is deleted explicitly.
+// Admin-only user removal: deactivates the account (lib/account-deactivation.ts), so no workspace and no record is ever deleted.
 export const adminRouter = new Hono<{
   Bindings: Env;
   Variables: { workspaceId: string; userId: string };
@@ -16,19 +13,20 @@ export const adminRouter = new Hono<{
     return c.json({ error: "You can't remove your own account from here" }, 400);
   }
 
+  // Admin first: the sole-owner answer below names workspaces, which a non-admin must not learn.
   const auth = createAuth(c.env, new URL(c.req.url).origin);
+  const caller = await auth.api.getSession({ headers: c.req.raw.headers, query: { disableCookieCache: true } });
+  const roles = String(caller?.user.role ?? "").split(",").map((r) => r.trim());
+  if (!roles.includes("admin")) return c.json({ error: "Only an admin can remove users" }, 403);
 
-  // Captured before removal — the member rows cascade away with the user.
-  const { results: owned } = await c.env.DB.prepare(
-    `SELECT organizationId AS id FROM member WHERE userId = ? AND role = 'owner'`
-  )
-    .bind(targetId)
-    .all<{ id: string }>();
+  const sole = await soleOwnedWorkspaces(c.env.DB, targetId);
+  if (sole.length > 0) {
+    return c.json({ error: `They're the only owner of ${sole.join(", ")}. Make someone else an owner first.` }, 409);
+  }
 
-  // Authorization lives in better-auth: this throws unless the caller's
-  // session has the admin role. Nothing is purged before it succeeds.
+  // better-auth re-checks the admin role here too.
   try {
-    await auth.api.removeUser({ body: { userId: targetId }, headers: c.req.raw.headers });
+    await auth.api.banUser({ body: { userId: targetId, banReason: DEACTIVATED_REASON }, headers: c.req.raw.headers });
   } catch (err) {
     if (err instanceof APIError) {
       return c.json({ error: err.message }, (err.statusCode as 403) || 403);
@@ -36,24 +34,6 @@ export const adminRouter = new Hono<{
     return c.json({ error: "Failed to remove user" }, 500);
   }
 
-  // Purge workspaces that now have no members left (solo-owned ones). A
-  // workspace shared with remaining members is left untouched.
-  let purged = 0;
-  for (const ws of owned) {
-    const remaining = await c.env.DB.prepare(
-      `SELECT COUNT(*) AS n FROM member WHERE organizationId = ?`
-    )
-      .bind(ws.id)
-      .first<{ n: number }>();
-    if ((remaining?.n ?? 0) > 0) continue;
-    await c.env.DB.batch([
-      c.env.DB.prepare(`DELETE FROM saved_reports WHERE workspace_id = ?`).bind(ws.id),
-      c.env.DB.prepare(`DELETE FROM workspaces WHERE id = ?`).bind(ws.id),
-    ]);
-    purged++;
-  }
-  // Their saved reports in workspaces they were merely a member of.
-  await c.env.DB.prepare(`DELETE FROM saved_reports WHERE user_id = ?`).bind(targetId).run();
-
-  return c.json({ ok: true, purgedWorkspaces: purged }, 200);
+  await deactivateAccount(c.env.DB, targetId);
+  return c.json({ ok: true }, 200);
 });

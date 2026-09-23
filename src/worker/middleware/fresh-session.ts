@@ -13,13 +13,15 @@ export const requireFreshSession = createMiddleware<{ Bindings: Env }>(async (c,
     headers: c.req.raw.headers,
     query: { disableCookieCache: true },
   });
-  if (!result) return c.json({ error: "Unauthorized" }, 401);
+  if (!result) return c.json({ error: "Unauthorized", message: "Unauthorized" }, 401);
 
   const createdAt = new Date(result.session.createdAt).getTime();
   if (Number.isFinite(createdAt) && Date.now() - createdAt >= FRESH_WINDOW_MS) {
     return c.json(
       {
         error: "Please sign in again before changing these account settings.",
+        // The auth client surfaces `message`; without it the screen showed a bare "Failed to …".
+        message: "Please sign in again before changing these account settings.",
         code: "SESSION_NOT_FRESH",
       },
       403,

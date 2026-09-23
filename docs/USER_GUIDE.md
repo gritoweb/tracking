@@ -311,7 +311,7 @@ Under **Settings → Account / Security / Danger zone**:
 - **Passkeys** — sign in with Touch ID / security keys.
 - **Connected accounts** — link/unlink Google sign-in.
 - **Active sessions** — see and revoke every signed-in session.
-- **Delete account** — permanent, removes your data.
+- **Deactivate account** — signs you out on every device, blocks sign-in and removes you from your workspaces. Nothing you tracked is deleted: your time, tasks and comments stay, still under your name. Being invited again brings the account back. The only owner of a workspace has to make someone else an owner first.
 
 ## Settings reference
 
@@ -331,6 +331,6 @@ Under **Settings → Account / Security / Danger zone**:
 | Integrations | Workfront / Dynamics | Workspace |
 | Account | Profile, email verification | Account |
 | Security | Passkeys, connected accounts, sessions | Account |
-| Danger zone | Delete account | — |
+| Danger zone | Deactivate account | — |
 
 "Account" settings follow you across devices; "device" settings are per-browser.

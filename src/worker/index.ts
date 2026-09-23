@@ -5,6 +5,7 @@ import { rateLimit, sharedRateLimit } from "./middleware/rate-limit";
 import { workspaceMiddleware, resolveWorkspace } from "./middleware/workspace";
 import { meRouter } from "./routes/me";
 import { requireFreshSession } from "./middleware/fresh-session";
+import { deactivateSelf, refuseHardDelete } from "./routes/account";
 import { lastOwnerRaceGuard } from "./middleware/last-owner-guard";
 import { timeEntriesRouter } from "./routes/time-entries";
 import { projectsRouter } from "./routes/projects";
@@ -89,19 +90,12 @@ const app = new Hono<{ Bindings: Env }>()
   // invite-member sends an email per call — throttle it like the other senders.
   .use("/api/auth/organization/invite-member", authRateLimit)
   .use("/api/auth/sign-in/magic-link", authRateLimit)
-  // Re-impose the fresh-session gate on the sensitive profile mutations that
-  // Better Auth's freshAge:0 (needed for the sessions card) would otherwise leave
-  // ungated. See middleware/fresh-session.ts. delete-user is included: with
-  // freshAge 0, Better Auth skips its own freshness check on deletion entirely
-  // (and no delete-verification email is configured), so without this gate any
-  // stolen cookie or bearer token could irreversibly delete the account.
-  // update-user is deliberately NOT gated: it only sets name/image (email is refused), Better Auth never gated it, and gating it 403'd every rename after a day.
+  // Fresh-session gate only where Better Auth had one before freshAge:0 — see docs/ARCHITECTURE.md.
   .use("/api/auth/unlink-account", requireFreshSession)
   .use("/api/auth/delete-user", requireFreshSession)
-  // Same freshAge:0 gap applies to these three — SECURITY.md S-07.
-  .use("/api/auth/revoke-session", requireFreshSession)
-  .use("/api/auth/revoke-sessions", requireFreshSession)
-  .use("/api/auth/revoke-other-sessions", requireFreshSession)
+  // Deleting an account deactivates it; nothing the workspace owns is ever removed (lib/account-deactivation.ts).
+  .post("/api/auth/delete-user", deactivateSelf)
+  .post("/api/auth/admin/remove-user", refuseHardDelete)
   .use("/api/auth/organization/update-member-role", lastOwnerRaceGuard)
   .use("/api/auth/organization/remove-member", lastOwnerRaceGuard)
   .on(["GET", "POST"], "/api/auth/*", (c) => {

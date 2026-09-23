@@ -3,8 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,22 +20,21 @@ import { authClient } from "@/lib/auth-client";
 export function DangerZoneCard() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
-  const [password, setPassword] = useState("");
   const [pending, setPending] = useState(false);
 
-  const handleDelete = async () => {
+  const handleDeactivate = async () => {
     setPending(true);
     try {
-      const { error } = await authClient.deleteUser({ password });
-      if (error) throw new Error(error.message ?? "Failed to delete account");
-      toast.success("Your account has been deleted");
+      // The server serves this path as a deactivation (routes/account.ts); nothing is deleted.
+      const { error } = await authClient.deleteUser();
+      if (error) throw new Error(error.message ?? "Failed to deactivate account");
+      toast.success("Your account has been deactivated");
       navigate("/login");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to delete account");
+      toast.error(e instanceof Error ? e.message : "Failed to deactivate account");
     } finally {
       setPending(false);
       setOpen(false);
-      setPassword("");
     }
   };
 
@@ -48,8 +45,8 @@ export function DangerZoneCard() {
       </CardHeader>
       <CardContent>
         <SettingsRow
-          label={<span className="text-sm font-medium text-foreground">Delete account</span>}
-          description="Permanently deletes your account and all associated data. This cannot be undone."
+          label={<span className="text-sm font-medium text-foreground">Deactivate account</span>}
+          description="Signs you out everywhere and removes you from your workspaces. Your tracked time stays with them."
         >
           <Button
             variant="outline"
@@ -57,7 +54,7 @@ export function DangerZoneCard() {
             className="shrink-0 border-destructive/50 text-destructive hover:bg-destructive hover:text-destructive-foreground"
             onClick={() => setOpen(true)}
           >
-            Delete account
+            Deactivate account
           </Button>
         </SettingsRow>
       </CardContent>
@@ -65,35 +62,24 @@ export function DangerZoneCard() {
       <AlertDialog open={open} onOpenChange={setOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete your account?</AlertDialogTitle>
+            <AlertDialogTitle>Deactivate your account?</AlertDialogTitle>
             <AlertDialogDescription>
-              This permanently deletes your account and all time entries, projects, and reports.
-              Enter your password to confirm.
+              You'll be signed out on every device and can't sign in again. Your time entries, tasks
+              and comments stay in the workspace. A new invitation brings the account back.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="space-y-1.5">
-            <Label htmlFor="delete-password">Password</Label>
-            <Input
-              id="delete-password"
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="h-9"
-            />
-          </div>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={(e) => {
                 e.preventDefault();
-                handleDelete();
+                handleDeactivate();
               }}
-              disabled={pending || !password}
+              disabled={pending}
               variant="destructive"
             >
               {pending && <Spinner size="sm" className="mr-1.5" />}
-              Delete account
+              Deactivate account
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

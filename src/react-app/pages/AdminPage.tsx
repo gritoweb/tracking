@@ -42,7 +42,7 @@ export function AdminPage() {
   const [banTarget, setBanTarget] = useState<AdminUser | null>(null);
   const [banReason, setBanReason] = useState(DEFAULT_BAN_REASON);
   const [banPending, setBanPending] = useState(false);
-  // Remove flow: hard-deletes the user and purges their solo workspaces.
+  // Remove flow: deactivates the account; nothing they tracked is deleted.
   const [removeTarget, setRemoveTarget] = useState<AdminUser | null>(null);
 
   const { data: users = [], isLoading: loading } = useQuery({
@@ -97,15 +97,11 @@ export function AdminPage() {
     const target = removeTarget;
     setRemoveTarget(null);
     try {
-      const { purgedWorkspaces } = await api.admin.removeUser(target.id);
-      toast.success(
-        purgedWorkspaces > 0
-          ? `Removed ${target.email} and ${purgedWorkspaces} ${purgedWorkspaces === 1 ? "workspace" : "workspaces"}`
-          : `Removed ${target.email}`
-      );
+      await api.admin.removeUser(target.id);
+      toast.success(`Deactivated ${target.email}`);
       refetchUsers();
-    } catch {
-      toast.error("Failed to remove user");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to remove user");
     }
   };
 
@@ -217,12 +213,12 @@ export function AdminPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Remove confirmation — hard delete, including solo-owned workspaces. */}
+      {/* Remove confirmation — deactivation, never a delete. */}
       <ConfirmDialog
         open={Boolean(removeTarget)}
         onOpenChange={(o) => !o && setRemoveTarget(null)}
         title={`Remove ${removeTarget?.name || "user"}?`}
-        description={`Permanently deletes ${removeTarget?.email ?? "this user"}, their sessions, and any workspace only they belong to — including all tracked time in it. Workspaces shared with other members are kept. This cannot be undone.`}
+        description={`${removeTarget?.email ?? "This user"} is signed out everywhere, can no longer sign in, and leaves every workspace. Their tracked time, tasks and comments stay. Inviting them again brings the account back.`}
         confirmLabel="Remove user"
         onConfirm={handleRemove}
       />
