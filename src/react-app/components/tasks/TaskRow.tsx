@@ -14,6 +14,7 @@ import { TaskRowActions } from "./TaskRowActions";
 import { useUpdateTask, useCompleteTask } from "@/hooks/useTasks";
 import { useWorkspaceMembers } from "@/hooks/useWorkspaceRole";
 import { useTimer } from "@/hooks/useTimer";
+import { TASK_TIMER_ENABLED } from "@/lib/features";
 import { useTimerStore } from "@/stores/timerStore";
 import { useUIStore } from "@/stores/uiStore";
 import { formatSeconds, parseTimeInput, formatTimeInput } from "@/lib/dateUtils";
@@ -297,7 +298,8 @@ export function TaskRow({
           onChangeRecurRule={(recurRule) => updateTask.mutate({ id: task.id, data: { recurRule } })}
         />
 
-        {startControl}
+        {/* Task timer hidden on the Tasks page: no use for this feature at the moment (TASK_TIMER_ENABLED in lib/features.ts). */}
+        {TASK_TIMER_ENABLED && startControl}
       </div>
     </div>
   );

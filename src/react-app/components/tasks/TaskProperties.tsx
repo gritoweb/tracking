@@ -19,6 +19,7 @@ import { ColorDot } from "@/components/ColorDot";
 import { TaskStatusChip } from "./TaskStatusChip";
 import type { WorkspaceMember } from "@/hooks/useWorkspaceRole";
 import { formatDurationShort } from "@/lib/dateUtils";
+import { TASK_TIMER_ENABLED } from "@/lib/features";
 import { PRIORITIES, PRIORITY_LABEL, PRIORITY_RING, dateToLocalDate, formatDueDate, localDateToDate } from "@/lib/taskUtils";
 import { cn } from "@/lib/utils";
 import type { Task } from "@shared/schemas";
@@ -213,19 +214,23 @@ export function TaskProperties({
         />
       </FieldRow>
 
+      {/* Read-only: the total logged against this task (subtasks included); edited only by logging time. */}
       <FieldRow icon={<TimerIcon className="h-3.5 w-3.5" />} label="Time tracked">
         <div className="flex items-center gap-1.5">
           <span className="text-sm tabular-nums">{formatDurationShort(task.trackedSeconds)}</span>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            aria-label={running ? "Stop timer" : "Start timer on this task"}
-            onClick={onToggleTimer}
-            className={running ? "text-primary" : "text-muted-foreground hover:text-primary"}
-          >
-            {running ? <Square className="h-3.5 w-3.5 fill-current" /> : <Play className="h-3.5 w-3.5" />}
-          </Button>
+          {/* Task timer hidden: no use for this feature at the moment (TASK_TIMER_ENABLED in lib/features.ts). */}
+          {TASK_TIMER_ENABLED && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label={running ? "Stop timer" : "Start timer on this task"}
+              onClick={onToggleTimer}
+              className={running ? "text-primary" : "text-muted-foreground hover:text-primary"}
+            >
+              {running ? <Square className="h-3.5 w-3.5 fill-current" /> : <Play className="h-3.5 w-3.5" />}
+            </Button>
+          )}
         </div>
       </FieldRow>
     </div>

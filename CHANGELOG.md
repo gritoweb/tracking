@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-09-23 (74)
+### Changed
+- **The Tasks page no longer starts timers from a task.** The play/stop control is hidden on the board card, the detail sheet's "Time tracked" row and the list row, so the time on a task is display-only. Requested by Luis: there's no use for the feature right now, and it must not be deleted. The code stays in place and compiling behind `TASK_TIMER_ENABLED = false` (`src/react-app/lib/features.ts`), with a one-line note at each spot; set it to `true` to bring all three back. The Timer page's task rail (the compact `TaskRow`) keeps its play, since starting a timer is that page's job. "Time tracked" is unchanged in what it shows: `trackedSeconds`, subtasks included and role-scoped (a member sees only their own hours).
+- Verified: `tsc -b` (0), `lint` (0), `vitest run` 979/980 — the one failure (`QuickAddTaskInlineView.test.tsx`) passes 3/3 alone with and without this change, the same full-suite flake as in (73). Browser check with a throwaway Playwright spec: after a 1h 30m entry is logged against a task, the board card shows `1h 30m` with no play button, the list row has none, and `/tasks/:id` shows "Time tracked 1h 30m" with no start/stop control.
+
 ## 2026-09-23 (73)
 ### Fixed
 - **Clicking a client in the Tasks rail didn't filter the Board.** `TaskBoardList` applied the client scope only to `scopedTasks`, which fed the List; the Board (the default layout) got `assigneeFilteredTasks` plus the project id alone, so a client click changed nothing on screen. The Board now receives `scopedTasks` too.

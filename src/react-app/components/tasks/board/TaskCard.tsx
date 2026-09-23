@@ -24,6 +24,7 @@ import { AvatarStack } from "@/components/ui/avatar";
 import { MultiSelect } from "@/components/pickers/MultiSelect";
 import { TaskStatusChip } from "../TaskStatusChip";
 import { useTimer } from "@/hooks/useTimer";
+import { TASK_TIMER_ENABLED } from "@/lib/features";
 import { useTimerStore } from "@/stores/timerStore";
 import { useUpdateTask } from "@/hooks/useTasks";
 import { useWorkspaceMembers } from "@/hooks/useWorkspaceRole";
@@ -165,7 +166,8 @@ export function TaskCard({ task, onOpen, onRequestDelete, overlay = false }: Tas
           {task.name}
         </button>
 
-        {running ? (
+        {/* Task timer hidden: no use for this feature at the moment (TASK_TIMER_ENABLED in lib/features.ts). */}
+        {TASK_TIMER_ENABLED && (running ? (
           <Button
             variant="ghost"
             size="icon-xs"
@@ -191,7 +193,7 @@ export function TaskCard({ task, onOpen, onRequestDelete, overlay = false }: Tas
           >
             <Play className="h-3.5 w-3.5" />
           </Button>
-        )}
+        ))}
       </div>
 
       {task.description && (
