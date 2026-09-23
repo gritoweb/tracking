@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-09-23 (81)
+### Deployed
+- **The rename fix (80) is live in production**, at Luis's request. Worker change only (the gate list in `index.ts`), no migration. `refactor` fast-forwarded onto `master` at `c214a08`; CI green (run 35916275488). Workers Builds deployed it: Version ID `857b928b-eb24-4b3f-bccc-28db7fa445ec` (previous: `405faf99-c9d9-4931-9ee7-314a1653ff36`, the rollback target). Smoke check: `GET /` → 200, `GET /api/me` and `POST /api/auth/update-user` without a session → 401. The fix itself is proven locally (e2e with an aged session); it isn't re-proven in production, since that would mean writing to the production D1.
+
 ## 2026-09-23 (80)
 ### Fixed
 - **Renaming yourself in Settings → Account failed with 403 once your session was more than a day old.** `/api/auth/update-user` sat behind `requireFreshSession`, which refuses any session created over 24h ago with `SESSION_NOT_FRESH`. The gate was added on the premise that `freshAge: 0` had removed a Better Auth freshness check there, but Better Auth never gated `update-user` (in 1.6.23 only `list-sessions` and `unlink-account` use `freshSessionMiddleware`), and the route can only change name and image — Better Auth refuses an email change on it and the app declares no input fields. The gate is removed from `update-user` only; `unlink-account`, `delete-user` and the three `revoke-*session*` routes keep it. Reported by Luis. Reproduced first: a session aged to two days in the local D1 got `403 {"code":"SESSION_NOT_FRESH"}` on a rename. After the fix the same request returns 200 and the name changes, while `revoke-other-sessions` still returns 403. That check is now `e2e/account-rename-stale-session.spec.ts` (ages the session with `wrangler d1 execute --local`). `tsc -b` (0), `lint` (0). CLAUDE.md and `docs/ARCHITECTURE.md` corrected. `SECURITY.md` (git-excluded) still lists `update-user` among the gated routes in its S-04/S-07 notes.
