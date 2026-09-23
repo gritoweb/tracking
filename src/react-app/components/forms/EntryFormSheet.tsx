@@ -16,6 +16,7 @@ import { ProjectPicker } from "@/components/pickers/ProjectPicker";
 import { TaskPicker } from "@/components/pickers/TaskPicker";
 import { TagPicker } from "@/components/pickers/TagPicker";
 import { TimeOfDayInput } from "@/components/entries/TimeOfDayInput";
+import { useProjects } from "@/hooks/useProjects";
 import type { useEntryDraft } from "@/hooks/useEntryDraft";
 
 type Draft = ReturnType<typeof useEntryDraft>;
@@ -34,6 +35,8 @@ interface EntryFormSheetProps {
   requireRange?: boolean;
   /** Slot above the footer, e.g. the calendar's "tracking a Google event" note. */
   children?: ReactNode;
+  /** Who logged the entry, shown read-only under the project; omitted on create. */
+  loggedBy?: string | null;
 }
 
 /**
@@ -61,8 +64,12 @@ export function EntryFormSheet({
   draft,
   requireRange = true,
   children,
+  loggedBy,
 }: EntryFormSheetProps) {
   const { draft: d, patch, setDate, anchorDate } = draft;
+  const { data: projects = [] } = useProjects();
+  // Follows the picked project, so it changes with it rather than showing the saved one.
+  const clientName = projects.find((p) => p.id === d.projectId)?.clientName ?? null;
   // A create needs a full span. An edit only has to not be *inverted*: a running
   // entry has no stop yet, and a zero-length entry may already exist and still
   // needs its description fixable. `requireRange: false` used to mean no check at
@@ -92,6 +99,13 @@ export function EntryFormSheet({
             />
           </div>
 
+          {clientName && (
+            <div className="space-y-1.5">
+              <Label>Client</Label>
+              <p className="text-sm">{clientName}</p>
+            </div>
+          )}
+
           <div className="space-y-1.5">
             <Label>Project</Label>
             <ProjectPicker
@@ -103,6 +117,13 @@ export function EntryFormSheet({
               <p className="text-xs text-muted-foreground">Every entry needs a project.</p>
             )}
           </div>
+
+          {loggedBy && (
+            <div className="space-y-1.5">
+              <Label>Logged by</Label>
+              <p className="text-sm">{loggedBy}</p>
+            </div>
+          )}
 
           {d.projectId && (
             <div className="space-y-1.5">

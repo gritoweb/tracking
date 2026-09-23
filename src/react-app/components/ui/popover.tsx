@@ -25,6 +25,8 @@ function PopoverContent({
   // which reads as clipped rather than placed. 8px is the smallest gap that
   // still looks deliberate.
   collisionPadding = 8,
+  onWheel,
+  onTouchMove,
   ...props
 }: React.ComponentProps<typeof PopoverPrimitive.Content>) {
   return (
@@ -38,6 +40,15 @@ function PopoverContent({
           "z-portal w-72 origin-(--radix-popover-content-transform-origin) rounded-xl border bg-popover p-4 text-popover-foreground shadow-md outline-hidden data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 duration-base ease-out-quart data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
           className
         )}
+        // Portaled outside an open Sheet/Dialog, whose scroll lock (on document) would otherwise swallow the wheel.
+        onWheel={(e) => {
+          e.stopPropagation()
+          onWheel?.(e)
+        }}
+        onTouchMove={(e) => {
+          e.stopPropagation()
+          onTouchMove?.(e)
+        }}
         {...props}
       />
     </PopoverPrimitive.Portal>

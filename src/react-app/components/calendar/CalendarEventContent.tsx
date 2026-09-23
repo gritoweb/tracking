@@ -83,6 +83,9 @@ export function CalendarEventContent(arg: EventContentArg) {
           {running ? "running" : formatDurationShort(entry.duration ?? 0)}
         </span>
       </div>
+      {entry.clientName && (
+        <span className="tt-on-tint-muted truncate text-micro">{entry.clientName}</span>
+      )}
       {entry.projectName && (
         <span
           className="tt-swatch-ink truncate text-micro font-medium"
@@ -90,6 +93,9 @@ export function CalendarEventContent(arg: EventContentArg) {
         >
           {entry.projectName}
         </span>
+      )}
+      {entry.userName && (
+        <span className="tt-on-tint-muted truncate text-micro">{entry.userName}</span>
       )}
     </div>
   );

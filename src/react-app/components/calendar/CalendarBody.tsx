@@ -9,7 +9,7 @@ import {
   startOfDay,
   endOfDay,
 } from "date-fns";
-import { CalendarView, type CalendarViewType } from "./CalendarView";
+import { CalendarView, CLICK_ENTRY_MINUTES, type CalendarViewType } from "./CalendarView";
 import { CalendarCreateDialog } from "./CalendarCreateDialog";
 import { CalendarBodyOverlays } from "./CalendarBodyOverlays";
 import { CalendarEventContextMenu } from "./CalendarEventContextMenu";
@@ -196,7 +196,8 @@ export function CalendarBody({
   };
 
   const handleDateClick = (startIso: string) => {
-    const stopIso = new Date(new Date(startIso).getTime() + 60 * 60 * 1000).toISOString();
+    // A click marks one snap step; it used to open a fixed hour, so a 15-minute slot came out as 1h.
+    const stopIso = new Date(new Date(startIso).getTime() + CLICK_ENTRY_MINUTES * 60 * 1000).toISOString();
     setCreateRange({ start: startIso, stop: stopIso });
     setCreateOpen(true);
   };

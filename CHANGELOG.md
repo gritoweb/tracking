@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-09-23 (75)
+### Fixed
+- **Clicking an empty calendar slot always opened a 1-hour entry.** `handleDateClick` (`CalendarBody.tsx`) added a fixed hour to the clicked time, so a quarter-hour you meant to mark came out as 1h; only a drag honoured the span. A click now marks one snap step, `CLICK_ENTRY_MINUTES = 15` (`CalendarView.tsx`), the same constant that drives `snapDuration`. Reproduced first in the browser: a click gave `10:00–11:00` (01:00:00); after the fix a click 30% into the 14:00 row gives `14:15–14:30` (00:15:00).
+- **The project list in the entry form (and every picker inside a sheet or dialog) wouldn't scroll with the mouse wheel**, so reaching a project further down meant typing a search. The popover is portaled outside the open Sheet, and the Sheet's scroll lock (`react-remove-scroll`, a `wheel` listener on `document`) cancelled every wheel event that didn't start inside it. Fixed once in the shared `PopoverContent` primitive by stopping `wheel`/`touchmove` from bubbling past the popover, not per picker. The task sheet's picker is the same `ProjectPicker` and had the same defect. Measured with 30 projects: the list's `scrollTop` after a 400px wheel went from 0 to 400 in both the entry sheet and the task sheet.
+### Changed
+- **The calendar grid draws one row per hour instead of two half-hour rows** (`slotDuration` 01:00). The zoom control still stores a per-half-hour height, so each hour row is twice it and the calendar keeps the same size on screen (88px per hour by default, as before). The drag snap stays at 15 minutes.
+- **Calendar blocks show the client above the project and who logged the entry below it** (`clientName`/`userName`, already on every entry from `ENTRY_SELECT`, so no API change).
+- **The entry form shows the same: Client (read-only, taken from the selected project so it follows a project change) above Project, and "Logged by" below it** when editing. `EditableEntry` gains an optional `userName`, which both `TimeEntry` and a report's `DetailedEntry` already carry.
+- Requested by Luis. Verified: `tsc -b` (0), `lint` (0), `vitest run` 979/980 (the one failure, `lint-catch-rules.test.ts`, passes 9/9 alone, the same full-suite flake as in (73)). Playwright: throwaway specs for each item above plus the existing `calendar-create` and `calendar-density` specs, all passing.
+
 ## 2026-09-23 (74)
 ### Changed
 - **The Tasks page no longer starts timers from a task.** The play/stop control is hidden on the board card, the detail sheet's "Time tracked" row and the list row, so the time on a task is display-only. Requested by Luis: there's no use for the feature right now, and it must not be deleted. The code stays in place and compiling behind `TASK_TIMER_ENABLED = false` (`src/react-app/lib/features.ts`), with a one-line note at each spot; set it to `true` to bring all three back. The Timer page's task rail (the compact `TaskRow`) keeps its play, since starting a timer is that page's job. "Time tracked" is unchanged in what it shows: `trackedSeconds`, subtasks included and role-scoped (a member sees only their own hours).

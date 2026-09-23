@@ -56,7 +56,7 @@ Entries support **description, project, task, tags, billable flag**, and inline 
 The Timer tab hosts five interchangeable views behind one shared header (date navigation, weekends toggle, zoom):
 
 - **List** — entries grouped by day, with day totals.
-- **Calendar** — a Toggl-style FullCalendar grid (week / 5-day / day / month). Real entries render as colored blocks and unconfirmed Google Calendar events show as dashed "ghosts".
+- **Calendar** — a Toggl-style FullCalendar grid (week / 5-day / day / month). One row per hour. Real entries render as colored blocks showing the client, project and who logged them, and unconfirmed Google Calendar events show as dashed "ghosts". Click an empty spot to log 15 minutes starting at that quarter hour, or drag to mark a longer span.
 - **Split** — calendar + list side by side (large screens).
 - **Timesheet** — the weekly hours grid.
 - **Planner** — plan your week ahead of time (see below).

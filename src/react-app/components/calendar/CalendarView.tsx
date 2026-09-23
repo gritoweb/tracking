@@ -15,6 +15,9 @@ import type { DateClickArg, EventResizeDoneArg, DropArg } from "@fullcalendar/in
 import { CalendarEventContent } from "./CalendarEventContent";
 import type { CalendarEventExtendedProps } from "@/lib/calendarMapping";
 
+/** The grid's snap step, and the length of an entry created by a single click on it. */
+export const CLICK_ENTRY_MINUTES = 15;
+
 export type CalendarViewType =
   | "timeGridWeek"
   | "timeGridFiveDay"
@@ -115,7 +118,8 @@ export const CalendarView = forwardRef<FullCalendar, CalendarViewProps>(
       <div
         ref={hostRef}
         className="tt-calendar min-h-0 flex-1"
-        style={{ ["--fc-slot-height" as string]: `${slotHeight}px` }}
+        // One grid row per hour; the zoom value stays per half hour, so an hour is two of it.
+        style={{ ["--fc-slot-height" as string]: `${slotHeight * 2}px` }}
       >
         <FullCalendar
           ref={ref}
@@ -139,8 +143,8 @@ export const CalendarView = forwardRef<FullCalendar, CalendarViewProps>(
           // Split the column: stacking draws a later block over the one still running.
           slotEventOverlap={false}
           nowIndicator
-          slotDuration="00:30:00"
-          snapDuration="00:15:00"
+          slotDuration="01:00:00"
+          snapDuration={`00:${CLICK_ENTRY_MINUTES}:00`}
           scrollTime="08:00:00"
           eventTimeFormat={timeFmt}
           slotLabelFormat={timeFmt}
