@@ -3,6 +3,8 @@ import type { EventContentArg } from "@fullcalendar/core";
 import { CalendarPlus, Wand2 } from "lucide-react";
 import { formatDurationShort } from "@/lib/dateUtils";
 import { ColorDot, DEFAULT_PROJECT_COLOR } from "@/components/ColorDot";
+import { ProjectBadge } from "@/components/ProjectBadge";
+import { Avatar } from "@/components/ui/avatar";
 import type { CalendarEventExtendedProps } from "@/lib/calendarMapping";
 
 // Custom renderer for a calendar block. Passed to FullCalendar's `eventContent`.
@@ -65,7 +67,7 @@ export function CalendarEventContent(arg: EventContentArg) {
   const color = entry.projectColor ?? DEFAULT_PROJECT_COLOR;
 
   const body = (
-    <div className="flex h-full flex-col gap-0.5 overflow-hidden text-left leading-tight">
+    <div className="tt-event-body gap-0.5 text-left leading-tight">
       <div className="flex items-center gap-1">
         {running && <ColorDot color={color} className="tt-running-dot h-1.5 w-1.5" />}
         <span className="truncate text-xs font-medium">
@@ -84,18 +86,27 @@ export function CalendarEventContent(arg: EventContentArg) {
         </span>
       </div>
       {entry.clientName && (
-        <span className="tt-on-tint-muted truncate text-micro">{entry.clientName}</span>
-      )}
-      {entry.projectName && (
-        <span
-          className="tt-swatch-ink truncate text-micro font-medium"
-          style={{ "--swatch": color } as CSSProperties}
-        >
-          {entry.projectName}
+        <span className="tt-on-tint-muted truncate text-micro" title={entry.clientName}>
+          {entry.clientName}
         </span>
       )}
-      {entry.userName && (
-        <span className="tt-on-tint-muted truncate text-micro">{entry.userName}</span>
+      {/* Same footer as a task card: project badge, then who logged it as an avatar. */}
+      {(entry.projectName || entry.userName) && (
+        <div className="flex min-w-0 items-center gap-1">
+          {entry.projectName && (
+            <ProjectBadge name={entry.projectName} color={entry.projectColor} className="min-w-0 px-1 py-0 text-micro" />
+          )}
+          {entry.userName && (
+            <Avatar
+              name={entry.userName}
+              email={entry.userEmail}
+              image={entry.userImage}
+              size="xs"
+              title={`Logged by ${entry.userName}`}
+              className="ml-auto shrink-0"
+            />
+          )}
+        </div>
       )}
     </div>
   );

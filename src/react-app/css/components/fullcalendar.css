@@ -83,6 +83,19 @@
   color: #fff;
 }
 
+/* A line that doesn't fit the block's height wraps into a clipped second column, so it vanishes whole instead of showing half a row. */
+.tt-event-body {
+  display: flex;
+  flex-direction: column;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  height: 100%;
+  overflow: hidden;
+}
+.tt-event-body > * {
+  width: 100%;
+}
+
 /* The duration needs ~145px at 11px mono; below that drop it on purpose rather than let the block clip it. */
 @container (max-width: 144px) {
   .tt-event-dur,

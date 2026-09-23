@@ -14,6 +14,8 @@ export interface EditableEntry {
   start: string;
   stop: string | null;
   userName?: string | null;
+  userEmail?: string | null;
+  userImage?: string | null;
 }
 
 interface EntryFormProps {
@@ -55,7 +57,7 @@ export function EntryForm({ entry, open, onClose }: EntryFormProps) {
       draft={draft}
       // A running entry legitimately has no stop yet; don't block saving it.
       requireRange={false}
-      loggedBy={entry.userName}
+      loggedBy={entry.userName ? { name: entry.userName, email: entry.userEmail, image: entry.userImage } : null}
     />
   );
 }

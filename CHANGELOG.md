@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-09-23 (76)
+### Changed
+- **Calendar blocks reuse the task card's own pieces for project and author** instead of the plain text lines from (75), which Luis found ugly: the client stays a muted line, and under it the project is a `ProjectBadge` with the logger's `Avatar` (initials or photo, `title` "Logged by …") on the right, the same footer a task card has. No new component.
+- **A line that doesn't fit a short block now disappears whole** instead of showing half a row at the bottom edge (a 30-minute block cut the new footer in two). The block body (`.tt-event-body`, `css/components/fullcalendar.css`) is a wrapping flex column, so an overflowing line wraps into a clipped second column. CSS only; the existing width container queries are untouched.
+- **Entry form: "Logged by" shows the avatar with the name and moved above Project**, next to Client, so the read-only facts sit together on top and every picker (Project, Task, Tags, Date…) sits below them. Asked for by Luis.
+- Verified: `tsc -b` (0), `lint` (0); throwaway Playwright spec screenshots a 2h and a 30min block (the short one shows title and time, no partial row) and asserts the form order Client → Logged by → Project → Task → Tags.
+
 ## 2026-09-23 (75)
 ### Fixed
 - **Clicking an empty calendar slot always opened a 1-hour entry.** `handleDateClick` (`CalendarBody.tsx`) added a fixed hour to the clicked time, so a quarter-hour you meant to mark came out as 1h; only a drag honoured the span. A click now marks one snap step, `CLICK_ENTRY_MINUTES = 15` (`CalendarView.tsx`), the same constant that drives `snapDuration`. Reproduced first in the browser: a click gave `10:00–11:00` (01:00:00); after the fix a click 30% into the 14:00 row gives `14:15–14:30` (00:15:00).

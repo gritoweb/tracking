@@ -17,6 +17,7 @@ import { TaskPicker } from "@/components/pickers/TaskPicker";
 import { TagPicker } from "@/components/pickers/TagPicker";
 import { TimeOfDayInput } from "@/components/entries/TimeOfDayInput";
 import { useProjects } from "@/hooks/useProjects";
+import { Avatar } from "@/components/ui/avatar";
 import type { useEntryDraft } from "@/hooks/useEntryDraft";
 
 type Draft = ReturnType<typeof useEntryDraft>;
@@ -36,7 +37,7 @@ interface EntryFormSheetProps {
   /** Slot above the footer, e.g. the calendar's "tracking a Google event" note. */
   children?: ReactNode;
   /** Who logged the entry, shown read-only under the project; omitted on create. */
-  loggedBy?: string | null;
+  loggedBy?: { name: string; email?: string | null; image?: string | null } | null;
 }
 
 /**
@@ -106,6 +107,16 @@ export function EntryFormSheet({
             </div>
           )}
 
+          {loggedBy && (
+            <div className="space-y-1.5">
+              <Label>Logged by</Label>
+              <div className="flex items-center gap-2 text-sm">
+                <Avatar name={loggedBy.name} email={loggedBy.email} image={loggedBy.image} size="sm" />
+                {loggedBy.name}
+              </div>
+            </div>
+          )}
+
           <div className="space-y-1.5">
             <Label>Project</Label>
             <ProjectPicker
@@ -117,13 +128,6 @@ export function EntryFormSheet({
               <p className="text-xs text-muted-foreground">Every entry needs a project.</p>
             )}
           </div>
-
-          {loggedBy && (
-            <div className="space-y-1.5">
-              <Label>Logged by</Label>
-              <p className="text-sm">{loggedBy}</p>
-            </div>
-          )}
 
           {d.projectId && (
             <div className="space-y-1.5">
