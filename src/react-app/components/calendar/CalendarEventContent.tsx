@@ -4,7 +4,6 @@ import { CalendarPlus, Wand2 } from "lucide-react";
 import { formatDurationShort } from "@/lib/dateUtils";
 import { ColorDot, DEFAULT_PROJECT_COLOR } from "@/components/ColorDot";
 import { ProjectBadge } from "@/components/ProjectBadge";
-import { Avatar } from "@/components/ui/avatar";
 import type { CalendarEventExtendedProps } from "@/lib/calendarMapping";
 
 // Custom renderer for a calendar block. Passed to FullCalendar's `eventContent`.
@@ -90,23 +89,15 @@ export function CalendarEventContent(arg: EventContentArg) {
           {entry.clientName}
         </span>
       )}
-      {/* Same footer as a task card: project badge, then who logged it as an avatar. */}
-      {(entry.projectName || entry.userName) && (
-        <div className="flex min-w-0 items-center gap-1">
-          {entry.projectName && (
-            <ProjectBadge name={entry.projectName} color={entry.projectColor} className="min-w-0 px-1 py-0 text-micro" />
-          )}
-          {entry.userName && (
-            <Avatar
-              name={entry.userName}
-              email={entry.userEmail}
-              image={entry.userImage}
-              size="xs"
-              title={`Logged by ${entry.userName}`}
-              className="ml-auto shrink-0"
-            />
-          )}
+      {entry.projectName && (
+        <div className="flex min-w-0">
+          <ProjectBadge name={entry.projectName} color={entry.projectColor} className="min-w-0 px-1 py-0 text-micro" />
         </div>
+      )}
+      {entry.userName && (
+        <span className="tt-on-tint-muted truncate text-micro" title={`Logged by ${entry.userName}`}>
+          {entry.userName}
+        </span>
       )}
     </div>
   );

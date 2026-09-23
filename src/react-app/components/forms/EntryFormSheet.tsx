@@ -18,6 +18,8 @@ import { TagPicker } from "@/components/pickers/TagPicker";
 import { TimeOfDayInput } from "@/components/entries/TimeOfDayInput";
 import { useProjects } from "@/hooks/useProjects";
 import { Avatar } from "@/components/ui/avatar";
+import { FieldRow } from "@/components/FieldRow";
+import { UserRound, Users } from "lucide-react";
 import type { useEntryDraft } from "@/hooks/useEntryDraft";
 
 type Draft = ReturnType<typeof useEntryDraft>;
@@ -100,20 +102,22 @@ export function EntryFormSheet({
             />
           </div>
 
-          {clientName && (
-            <div className="space-y-1.5">
-              <Label>Client</Label>
-              <p className="text-sm">{clientName}</p>
-            </div>
-          )}
-
-          {loggedBy && (
-            <div className="space-y-1.5">
-              <Label>Logged by</Label>
-              <div className="flex items-center gap-2 text-sm">
-                <Avatar name={loggedBy.name} email={loggedBy.email} image={loggedBy.image} size="sm" />
-                {loggedBy.name}
-              </div>
+          {/* Read-only facts, laid out like the task sheet's field rows. */}
+          {(clientName || loggedBy) && (
+            <div>
+              {clientName && (
+                <FieldRow icon={<Users className="h-3.5 w-3.5" />} label="Client">
+                  <span className="truncate text-sm">{clientName}</span>
+                </FieldRow>
+              )}
+              {loggedBy && (
+                <FieldRow icon={<UserRound className="h-3.5 w-3.5" />} label="Logged by">
+                  <span className="flex min-w-0 items-center gap-2 text-sm">
+                    <Avatar name={loggedBy.name} email={loggedBy.email} image={loggedBy.image} size="xs" />
+                    <span className="truncate">{loggedBy.name}</span>
+                  </span>
+                </FieldRow>
+              )}
             </div>
           )}
 

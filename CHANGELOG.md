@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-23 (77)
+### Changed
+- **Entry form: Client and Logged by use the task sheet's field-row layout** (icon + label on the left, value on the right) instead of stacked label/text, as Luis asked, so the read-only facts read like the task detail panel. `FieldRow` moved out of `TaskProperties.tsx` into `components/FieldRow.tsx` and both use it, so there's one copy. Logged by keeps the avatar (xs) beside the name.
+- **Calendar block: who logged it is plain text under the project badge, no avatar.** The photo stays only in the entry form. Reverses the avatar-in-block part of (76) at Luis's request.
+- Verified: `tsc -b` (0), `lint` (0); a throwaway Playwright spec read the block text (`Homepage build | 09:00 - 11:00 | Acme Co | Website Redesign | Test User`), asserted there's no avatar in it, and screenshots confirmed the entry form's new rows and the task sheet unchanged after the `FieldRow` move.
+
 ## 2026-09-23 (76)
 ### Changed
 - **Calendar blocks reuse the task card's own pieces for project and author** instead of the plain text lines from (75), which Luis found ugly: the client stays a muted line, and under it the project is a `ProjectBadge` with the logger's `Avatar` (initials or photo, `title` "Logged by …") on the right, the same footer a task card has. No new component.

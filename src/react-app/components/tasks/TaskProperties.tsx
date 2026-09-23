@@ -1,8 +1,6 @@
-import type { ReactNode } from "react";
 import { CalendarDays, CircleDot, Flag, FolderOpen, Hourglass, Play, Square, Timer as TimerIcon, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -16,6 +14,7 @@ import { ProjectPicker } from "@/components/pickers/ProjectPicker";
 import { MultiSelect } from "@/components/pickers/MultiSelect";
 import { AvatarStack } from "@/components/ui/avatar";
 import { ColorDot } from "@/components/ColorDot";
+import { FieldRow } from "@/components/FieldRow";
 import { TaskStatusChip } from "./TaskStatusChip";
 import type { WorkspaceMember } from "@/hooks/useWorkspaceRole";
 import { formatDurationShort } from "@/lib/dateUtils";
@@ -23,19 +22,6 @@ import { TASK_TIMER_ENABLED } from "@/lib/features";
 import { PRIORITIES, PRIORITY_LABEL, PRIORITY_RING, dateToLocalDate, formatDueDate, localDateToDate } from "@/lib/taskUtils";
 import { cn } from "@/lib/utils";
 import type { Task } from "@shared/schemas";
-
-/** One row per field — icon+label on the left, value on the right, the ClickUp reference's own layout. */
-function FieldRow({ icon, label, htmlFor, children }: { icon: ReactNode; label: string; htmlFor?: string; children: ReactNode }) {
-  return (
-    <div className="flex items-center gap-3 py-1">
-      <Label htmlFor={htmlFor} className="w-32 shrink-0 font-normal text-muted-foreground">
-        {icon}
-        {label}
-      </Label>
-      <div className="min-w-0 flex-1">{children}</div>
-    </div>
-  );
-}
 
 interface TaskPropertiesProps {
   task: Task;
