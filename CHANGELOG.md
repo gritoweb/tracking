@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-09-23 (79)
+### Deployed
+- **(73)–(78) are live in production**, at Luis's request: tasks rail (client filter on the Board, collapsible clients, right-click edit/archive, 24px sheet title), the hidden task timer, the calendar's hourly rows and 15-minute click, wheel scrolling in pickers inside sheets, and client/author on calendar blocks and the entry form. Frontend only: no migration, no worker/binding change. `refactor` fast-forwarded onto `master` at `a4770b1`; CI green (run 35913773549); `pnpm check` (0) beforehand. Workers Builds deployed it from the push: Version ID `69e6ad63-786c-44b7-ac12-5ba268b17400` (previous: `4e5fefea-2267-4c15-8e27-5e51088c06fa`, the rollback target). Smoke check: `GET /` → 200, `GET /api/me` (no session) → 401, and the live `CalendarBody` stylesheet contains the new `.tt-event-body` rule.
+
 ## 2026-09-23 (78)
 ### Fixed
 - **Two stale e2e specs.** `entry-delete.spec.ts` had been failing since the delete confirmation landed (`fce6361`, 2026-09-21): it clicked the menu's Delete and waited for the toast while the page sat on the "Delete entry?" dialog; it now confirms. `task-planning.spec.ts`'s "a task starts a timer in one click" drove the Tasks page play button that (74) hid, so it now skips while `TASK_TIMER_ENABLED` is off and comes back on its own when the flag is flipped. Playwright isn't in CI, so neither blocked a merge; both were found checking the release. Verified: those two specs 9 passed / 1 skipped; the task, calendar and entry e2e specs 61 passed before the fix; `vitest run` 980/980; `pnpm check` (0); `lint` (0).
