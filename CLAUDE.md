@@ -18,6 +18,7 @@ pnpm run deploy       # Deploy to Cloudflare Workers (use `run` — `pnpm deploy
 pnpm cf-typegen       # Regenerate TS types from wrangler.jsonc bindings (run after binding changes)
 npx wrangler tail     # Stream live worker logs
 pnpm test:e2e         # Run Playwright e2e tests (spins up `pnpm dev` against localhost:5173)
+node tools/mcp-grade.mjs --owner-key-file <file> [--read-key-file <f>] [--member-key-file <f>]  # Live call of every MCP tool against the LOCAL dev server (refuses any other host); logs each call, grades each tool /10
 ```
 
 Unit and route tests run under **vitest** (`pnpm exec vitest run`, ~800 tests; route tests use a real in-memory SQLite with every migration applied, see `src/test/sqlite-d1.ts` and `src/test/route-harness.ts`). Playwright e2e tests live in `e2e/` and drive the app through a real browser against the Vite dev server.

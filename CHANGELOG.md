@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-09-24 (96)
+### Changed
+- **`tools/mcp-grade.mjs` (the live grader of every MCP tool) runs with one key and proves today's behaviour.** It needed three keys (owner, read-only, member); the read and member keys are now optional and their checks print SKIP, never PASS. It refuses any host but localhost (it writes data), logs one ✔/✘ line per call, and covers what changed today: `items` on `create_task`, `update_task` (assignees), `move_task`, `delete_task`, `log_time`, `update_time_entry`, `delete_time_entry`; a parent closed/reopened through `move_task` taking its subtask along; `list_task_activity` recording both moves; a repeating task closed with `completedOn` spawning the next day's; `fork_task_statuses`; `list_tasks` with no date returning linked tasks; the catalog at 66 with no batch twins. Run on the local dev server with Luis's admin key: `GRADE: all 66 at 10`, exit 0, 99 ✔ lines, no ✘. Documented in CLAUDE.md "Commands".
+
 ## 2026-09-24 (95)
 ### Changed
 - **The MCP spends far fewer tokens per answer.** Measured on 20 realistic tasks (notes, a due date, an assignee): `list_tasks` went from 18,332 to 5,211 characters (~4,600 → ~1,300 tokens, −72%).
