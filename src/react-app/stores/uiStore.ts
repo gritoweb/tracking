@@ -98,6 +98,9 @@ interface UIStore {
   /** How a task opens: a centered two-column modal (default) or the side panel. Persisted per browser. */
   taskViewMode: TaskViewMode;
   setTaskViewMode: (v: TaskViewMode) => void;
+  /** Whether the task modal shows its activity (comments) column or gives the content the full width. Persisted per browser. */
+  taskActivityOpen: boolean;
+  setTaskActivityOpen: (v: boolean) => void;
   /** Client groups folded shut in the Tasks page's project rail ("none" = the no-client group). Persisted. */
   collapsedRailClients: string[];
   toggleRailClient: (key: string) => void;
@@ -252,6 +255,8 @@ export const useUIStore = create<UIStore>()(
       setTaskRailOpen: (v) => set({ taskRailOpen: v }),
       taskViewMode: "modal",
       setTaskViewMode: (v) => set({ taskViewMode: v }),
+      taskActivityOpen: true,
+      setTaskActivityOpen: (v) => set({ taskActivityOpen: v }),
       collapsedRailClients: [],
       toggleRailClient: (key) =>
         set((s) => ({
@@ -284,6 +289,7 @@ export const useUIStore = create<UIStore>()(
         sidebarCollapsed: s.sidebarCollapsed,
         taskRailOpen: s.taskRailOpen,
         taskViewMode: s.taskViewMode,
+        taskActivityOpen: s.taskActivityOpen,
         collapsedRailClients: s.collapsedRailClients,
         theme: s.theme,
         timeFormat: s.timeFormat,

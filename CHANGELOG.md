@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-24 (109) — on `refactor`, not deployed
+### Added
+- **Fold the comments column away in the task modal.** One button (`PanelRightClose` / `PanelRightOpen`) at the top right of the content column hides the comments and gives the content the full width, and brings them back; the choice persists per browser (`uiStore.taskActivityOpen`). The column slides (`grid-template-columns` over `duration-slow` / `ease-out-quart`, reduced motion honoured globally) instead of snapping; while folded it is `inert`. Opening a task from a comments link unfolds it. The button sits inside the scrolling content column and sticks to its top, so the column's scrollbar sits after it. Stacked (narrow) layouts don't show it.
+### Verified
+- `tsc -b` (0), `lint` (0), `vitest run` 1061/1061 (one earlier full run failed 2 worker tests — `time-entries` S-27 bulk count and `list_tasks` misspelt search — that pass 3/3 alone and on the next full run; untouched by this change, noted as load-sensitive); in the browser: hide/show and persistence, button left of the scrollbar (1338 vs 1344), stays at the top after a 500px scroll, content column widening 1214→1630 over ~300ms.
+
 ## 2026-09-24 (108) — on `refactor`, not deployed
 ### Changed
 - **An empty line says what it's for while you edit**: the line holding the caret shows "Write, or type / for commands" (`LINE_HINT`, through the `Placeholder` extension's `showOnlyCurrent`), only while the editor has focus, so a blank line at rest stays blank. The whole-empty description keeps its own placeholder. No AI wording.
