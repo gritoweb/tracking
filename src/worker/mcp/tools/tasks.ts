@@ -98,6 +98,7 @@ export function registerTaskReads(d: ToolDeps): void {
         projectId: z.string().optional().describe("From list_projects"),
         statusId: z.string().optional().describe("From list_task_statuses"),
         assignee: z.string().optional().describe("A member's userId from list_members, or `me`"),
+        search: z.string().trim().min(1).max(200).optional().describe("Only tasks whose name contains this text (case-insensitive) — the one call to find a task the person named"),
         includeDone: z.boolean().default(false).describe("Also return completed tasks"),
         dueBy: z
           .string()
@@ -107,7 +108,7 @@ export function registerTaskReads(d: ToolDeps): void {
       },
       annotations: READ_ONLY,
     },
-    async ({ projectId, statusId, assignee, includeDone, dueBy }) => {
+    async ({ projectId, statusId, assignee, includeDone, dueBy, search }) => {
       const query = new URLSearchParams();
       if (projectId) query.set("projectId", projectId);
       if (statusId) query.set("statusId", statusId);
@@ -119,7 +120,14 @@ export function registerTaskReads(d: ToolDeps): void {
       ]);
       const columnOrder = statuses.ok ? statuses.data.map((st) => st.id) : [];
       return fromBridge(tasks, (list) =>
-        sortByColumn(list.filter((t) => !dueBy || (t.dueDate !== null && t.dueDate <= dueBy)), columnOrder)
+        sortByColumn(
+          list.filter(
+            (t) =>
+              (!dueBy || (t.dueDate !== null && t.dueDate <= dueBy)) &&
+              (!search || t.name.toLowerCase().includes(search.toLowerCase()))
+          ),
+          columnOrder
+        )
           .slice(0, ROW_LIMIT)
           .map((t) => taskListView(t, appUrl(env)))
       );

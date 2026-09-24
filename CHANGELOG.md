@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-09-24 (102)
+### Fixed
+- **The Assistant stopped mid-task without a word.** Asked to move a task "that has the comments" to Backlog, it listed projects, listed tasks twice, read comments, fetched the columns — and stopped. The stored conversation shows five steps, each tool `output-available`, no error and no closing text: `ChatAgent`'s `stopWhen: stepCountIs(5)` cut it just before the `move_task`. Three fixes:
+  - The cap is `MAX_STEPS = 10` — still a guard against a loop, with room for find → disambiguate → check columns → act.
+  - Fewer steps needed: `list_tasks` takes `search` (name contains, case-insensitive), and the prompt finds a named task with one such call, no `list_projects` first.
+  - If an answer still ends on a tool result with nothing said after it, the chat says "I stopped before finishing this. Say "continue"…" instead of sitting there looking done (`endedMidTask`, `ai-elements/turnState.ts`).
+### Verified
+- `tsc -b` (0), `lint` (0), `vitest run` 1038/1038 (new: `endedMidTask` true after a trailing tool result, false after text or a pending approval; `list_tasks` `search`), `pnpm check` (0), e2e Assistant + MCP 6 passed.
+
 ## 2026-09-24 (101)
 ### Fixed
 - **The Assistant said "Done!" about a move that never happened.** Luis approved a `move_task`; the task stayed in Backlog, and on his next message the model reported success. Evidence: the conversation stored in the ChatAgent's local Durable Object had that part in `approval-responded` with no output, the task's history had one move (the later retry), and the dev log had `AI_InvalidToolApprovalSignatureError … missing signature` for exactly that approval id — three times today. Cause: `ChatAgent` signs every approval (`experimental_toolApprovalSecret`, the S-02 security fix), and the Agents SDK (`agents@0.17.4`, and 0.24.0 too) drops the signature when it persists the approval request (`message-builder`'s `applyChunkToParts` keeps only `id`/`descriptor`). Run from the browser's copy (which has it) an approval works; run from the stored copy it fails, the action never runs, and the chat showed nothing.

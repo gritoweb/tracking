@@ -27,6 +27,8 @@ import { buildAssistantSystemPrompt } from "../lib/assistant-prompt";
 
 // Function calling over the 64-tool catalog; Scout picked the wrong tool most of the time (docs/IA.md).
 const MODEL = "@cf/zai-org/glm-4.7-flash";
+/** Model/tool round trips per answer: a guard against a loop, with room for find → disambiguate → check columns → act. */
+const MAX_STEPS = 10;
 
 // Cost/abuse bounds (this DO is billed per Workers AI call):
 // cap a single reply's length, the size of any one inbound message fed to the
@@ -114,7 +116,7 @@ export class ChatAgent extends AIChatAgent<Cloudflare.Env> {
       tools,
       // Enforces needsApproval server-side instead of trusting the client — SECURITY.md S-02.
       experimental_toolApprovalSecret: this.env.AUTH_SECRET,
-      stopWhen: stepCountIs(5),
+      stopWhen: stepCountIs(MAX_STEPS),
       // Scout answers in the language of the last thing it read, usually an English tool result; restate the reply language last.
       prepareStep: ({ messages }) => ({ messages: [...messages, { role: "system" as const, content: language }] }),
       maxOutputTokens: MAX_OUTPUT_TOKENS,

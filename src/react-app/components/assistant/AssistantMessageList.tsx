@@ -4,6 +4,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { ToolCard } from "./ai-elements/ToolCard";
 import { ApprovalBatchBar } from "./ai-elements/ApprovalBatchBar";
 import { pendingApprovalIds } from "./ai-elements/pendingApprovals";
+import { endedMidTask } from "./ai-elements/turnState";
 import { AssistantMarkdown } from "./ai-elements/AssistantMarkdown";
 import { MessageActions } from "./ai-elements/MessageActions";
 
@@ -56,6 +57,11 @@ export function AssistantMessageList({
               }
               return null;
             })}
+            {m.role === "assistant" && m.id === lastAssistantId && !busy && endedMidTask(m.parts) && (
+              <p className="text-xs text-muted-foreground">
+                I stopped before finishing this. Say "continue" and I'll pick it up from here.
+              </p>
+            )}
             {m.role === "assistant" && (
               <MessageActions
                 message={m}

@@ -366,3 +366,14 @@ describe("create_task through the MCP doesn't duplicate a task made minutes ago"
     expect((w.raw.prepare(`SELECT COUNT(*) AS n FROM tasks WHERE name = 'Twice'`).get() as { n: number }).n).toBe(1);
   });
 });
+
+describe("list_tasks search finds a named task in one call", () => {
+  it("returns only tasks whose name contains the text, ignoring case", async () => {
+    const w = world();
+    const admin = w.toolsFor("u-admin");
+    await w.call(admin, "create_task", { name: "Develop tracking", projectId: "p1" });
+    await w.call(admin, "create_task", { name: "Write docs", projectId: "p1" });
+    const found = (await w.call(admin, "list_tasks", { search: "TRACK" })).data as unknown as { name: string }[];
+    expect(found.map((t) => t.name)).toEqual(["Develop tracking"]);
+  });
+});
