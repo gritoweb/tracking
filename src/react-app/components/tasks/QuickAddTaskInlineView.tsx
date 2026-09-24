@@ -1,6 +1,7 @@
 import { useRef } from "react";
-import { Plus, CornerDownLeft, CalendarDays } from "lucide-react";
+import { Plus, CalendarDays } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -22,6 +23,8 @@ interface QuickAddTaskInlineViewProps {
   onKeyDown: (e: React.KeyboardEvent) => void;
   autoFocus: boolean;
   canSubmit: boolean;
+  /** The last add is still on its way to the server: the button shows it and won't send another. */
+  pending: boolean;
   onSubmit: () => void;
   showProjectField: boolean;
   projectId: string | null;
@@ -50,6 +53,7 @@ export function QuickAddTaskInlineView({
   onKeyDown,
   autoFocus,
   canSubmit,
+  pending,
   onSubmit,
   showProjectField,
   projectId,
@@ -78,18 +82,7 @@ export function QuickAddTaskInlineView({
             : "rounded-md border border-dashed focus-within:border-solid focus-within:border-ring"
         )}
       >
-        {/* The "+" is the button: it adds what is typed, or puts the cursor in the field when nothing is. */}
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-xs"
-          aria-label="Add"
-          title={canSubmit ? "Add (Enter)" : "Type a name to add"}
-          onClick={() => (canSubmit ? onSubmit() : inputRef.current?.focus())}
-          className="shrink-0 text-muted-foreground"
-        >
-          <Plus className="h-3.5 w-3.5" />
-        </Button>
+        <Plus className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
         <Input
           variant="bare"
           ref={inputRef}
@@ -99,7 +92,7 @@ export function QuickAddTaskInlineView({
           onKeyDown={onKeyDown}
           placeholder={placeholder}
           aria-label="Add a task"
-          className="h-6 px-0 py-0 text-sm focus-visible:ring-0"
+          className="h-6 py-0 text-sm"
         />
         {showProjectField && (
           <ProjectPicker value={projectId} onChange={onProjectChange} className="shrink-0 rounded-md" />
@@ -152,7 +145,19 @@ export function QuickAddTaskInlineView({
           }
         />
 
-        {canSubmit && <CornerDownLeft className="h-3 w-3 shrink-0 text-muted-foreground" aria-hidden />}
+        {/* A real button, not only Enter: adds what is typed, or puts the cursor in the field when nothing is. */}
+        <Button
+          type="button"
+          size="xs"
+          variant={canSubmit ? "default" : "ghost"}
+          disabled={pending}
+          title={canSubmit ? "Add (Enter)" : "Type a name to add"}
+          onClick={() => (canSubmit ? onSubmit() : inputRef.current?.focus())}
+          className="shrink-0"
+        >
+          {pending && <Spinner size="sm" />}
+          Add
+        </Button>
       </div>
 
       {/* Echo what the tokens were understood as, before Enter commits them.

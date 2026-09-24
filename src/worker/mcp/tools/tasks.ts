@@ -173,7 +173,8 @@ export function registerTaskWrites(d: ToolDeps): void {
       title: "Create a task",
       description:
         "Add a task to a project's plan — the thing to be done, separate from tracked time. Only when the person asked for this task. Use list_projects for the projectId; never guess it. `assigneeIds` must already be workspace members — ask the person who, rather than guessing.",
-      inputSchema: CreateTaskSchema.shape,
+      // No `id`: a model must never pick one; the retry guard is for forms, which mint their own.
+      inputSchema: CreateTaskSchema.omit({ id: true }).shape,
       annotations: MUTATES,
     },
     async (data) => {

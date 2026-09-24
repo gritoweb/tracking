@@ -1,5 +1,6 @@
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { MultiSelect } from "@/components/pickers/MultiSelect";
@@ -18,6 +19,8 @@ interface QuickAddTaskStackedViewProps {
   onKeyDown: (e: React.KeyboardEvent) => void;
   autoFocus: boolean;
   canSubmit: boolean;
+  /** The last add is still on its way to the server: the button shows it and won't send another. */
+  pending: boolean;
   onSubmit: () => void;
   showProjectField: boolean;
   projectId: string | null;
@@ -44,6 +47,7 @@ export function QuickAddTaskStackedView({
   onKeyDown,
   autoFocus,
   canSubmit,
+  pending,
   onSubmit,
   showProjectField,
   projectId,
@@ -71,9 +75,11 @@ export function QuickAddTaskStackedView({
           onKeyDown={onKeyDown}
           placeholder="Task name"
           aria-label="Add a task"
-          className="h-7 border-0 px-0 text-sm shadow-none focus-visible:ring-0"
+          variant="bare"
+          className="h-7 text-sm"
         />
         <Button size="sm" disabled={!canSubmit} onClick={onSubmit}>
+          {pending && <Spinner size="sm" />}
           Add
         </Button>
       </div>

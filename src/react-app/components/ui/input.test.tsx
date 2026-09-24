@@ -32,6 +32,13 @@ describe("Input variant bare", () => {
     expect(el.className).not.toMatch(/dark:bg-input\/30/)
   })
 
+  it("keeps a side gutter and a small radius, so the pill's curve can't clip the first letters", () => {
+    render(<Input variant="bare" aria-label="Field" />)
+    const el = screen.getByLabelText("Field")
+    expect(el).toHaveClass("px-2", "rounded-md", "focus-visible:ring-0")
+    expect(el).not.toHaveClass("rounded-full", "px-4")
+  })
+
   it("leaves the default look alone", () => {
     render(<Input aria-label="Field" />)
     const el = screen.getByLabelText("Field")

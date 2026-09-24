@@ -28,23 +28,32 @@ function view(overrides: Partial<React.ComponentProps<typeof QuickAddTaskInlineV
     dueDate: null,
     effectiveProjectId: "p1",
     hasAnyProject: true,
+    pending: false,
     ...overrides,
   };
   return { props, ...render(<QuickAddTaskInlineView {...props} />) };
 }
 
 describe("QuickAddTaskInlineView", () => {
-  it("adds what is typed when the + is clicked", () => {
+  it("adds what is typed when Add is clicked", () => {
     const { props } = view({ value: "Write tests", canSubmit: true });
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
     expect(props.onSubmit).toHaveBeenCalledTimes(1);
   });
 
-  it("puts the cursor in the field, and adds nothing, when the + is clicked with no name", () => {
+  it("puts the cursor in the field, and adds nothing, when Add is clicked with no name", () => {
     const { props } = view();
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
     expect(props.onSubmit).not.toHaveBeenCalled();
     expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Add a task" }));
+  });
+
+  it("won't send another while the last add is still in flight", () => {
+    const { props } = view({ value: "Write tests", canSubmit: false, pending: true });
+    const add = screen.getByRole("button", { name: "Add" });
+    expect(add).toBeDisabled();
+    fireEvent.click(add);
+    expect(props.onSubmit).not.toHaveBeenCalled();
   });
 
   it("keeps the assign button visible without a hover", () => {

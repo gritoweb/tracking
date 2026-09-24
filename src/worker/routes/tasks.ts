@@ -154,21 +154,27 @@ export async function createTask(
   data: CreateTask,
   scopeUserId: string | null,
   createdBy: string
-): Promise<{ task: Task } | { error: string }> {
-  const id = crypto.randomUUID();
+): Promise<{ task: Task; created: boolean } | { error: string; status: 400 | 409 }> {
+  const id = data.id ?? crypto.randomUUID();
   const now = new Date().toISOString();
+
+  // A retry of a create that already landed (a double Enter, a resent request) returns that task.
+  if (data.id) {
+    const replay = await replayedTask(db, data.id, workspaceId, scopeUserId);
+    if (replay) return replay;
+  }
 
   let parentId: string | null = null;
   let projectId = data.projectId;
   if (data.parentId) {
     const parent = await resolveParent(db, data.parentId, workspaceId);
-    if (!parent) return { error: "Parent task not found, or is itself a subtask" };
+    if (!parent) return { error: "Parent task not found, or is itself a subtask", status: 400 };
     parentId = parent.id;
     // A subtask always belongs to its parent's project — the row inherits the
     // project badge, so letting the two diverge would render a lie.
     projectId = parent.projectId;
   } else if (!(await projectInWorkspace(db, projectId, workspaceId))) {
-    return { error: "Project not found" };
+    return { error: "Project not found", status: 400 };
   }
 
   // Recurrence lives on the thing you actually schedule. A repeating subtask
@@ -179,15 +185,17 @@ export async function createTask(
   const status = data.statusId
     ? await resolveStatus(db, workspaceId, data.statusId)
     : await defaultStatus(db, workspaceId, projectId);
-  if (!status) return { error: "Status not found" };
+  if (!status) return { error: "Status not found", status: 400 };
   const born = syncFromCategory(status.category, true, null);
 
-  await db.prepare(
+  // ON CONFLICT: two copies of the same create racing past the replay check above; the loser reads the winner's row.
+  const inserted = await db.prepare(
     `INSERT INTO tasks
        (id, workspace_id, project_id, name, description, active, estimated_seconds,
         due_date, priority, sort_order, board_order, status_id, completed_at,
         parent_id, recur_rule, created_by, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(id) DO NOTHING`
   ).bind(
     id,
     workspaceId,
@@ -207,12 +215,29 @@ export async function createTask(
     createdBy,
     now
   ).run();
+  if (inserted.meta.changes === 0) {
+    return (await replayedTask(db, id, workspaceId, scopeUserId)) ?? { error: "Task id already in use", status: 409 };
+  }
 
   if (data.assigneeIds) await setAssignees(db, workspaceId, id, data.assigneeIds);
 
   const row = await readTask(db, id, workspaceId, scopeUserId);
-  if (!row) return { error: "Task created but could not be read back" };
-  return { task: formatTask(row) };
+  if (!row) return { error: "Task created but could not be read back", status: 400 };
+  return { task: formatTask(row), created: true };
+}
+
+/** The task a client id already names, in this workspace; an id taken in another workspace is refused. */
+async function replayedTask(
+  db: D1Database,
+  id: string,
+  workspaceId: string,
+  scopeUserId: string | null
+): Promise<{ task: Task; created: false } | { error: string; status: 409 } | null> {
+  const owner = await db.prepare(`SELECT workspace_id FROM tasks WHERE id = ?`).bind(id).first<{ workspace_id: string }>();
+  if (!owner) return null;
+  if (owner.workspace_id !== workspaceId) return { error: "Task id already in use", status: 409 };
+  const row = await readTask(db, id, workspaceId, scopeUserId);
+  return row ? { task: formatTask(row), created: false } : null;
 }
 
 /** The MCP `move_task` tool's own minimal path to a status change — the REST routes' board-drag and dialog-save paths have more surface (subtask cascade, recurrence spawn) this doesn't need. */
@@ -377,7 +402,9 @@ export const tasksRouter = new Hono<{
     const userId = c.get("userId");
     const data = c.req.valid("json");
     const result = await createTask(c.env.DB, workspaceId, data, await taskScope(c), userId);
-    if ("error" in result) return c.json({ error: result.error }, 400);
+    if ("error" in result) return c.json({ error: result.error }, result.status);
+    // A replayed create changed nothing: no second notification, no broadcast.
+    if (!result.created) return c.json(result.task, 200);
 
     if (data.assigneeIds?.length) {
       c.executionCtx.waitUntil(

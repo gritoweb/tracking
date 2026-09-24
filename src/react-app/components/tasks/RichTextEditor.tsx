@@ -8,7 +8,8 @@ import { Image } from "@tiptap/extension-image";
 import { TextStyle, Color } from "@tiptap/extension-text-style";
 import { Plugin, PluginKey, type EditorState } from "@tiptap/pm/state";
 import { Decoration, DecorationSet, type EditorView } from "@tiptap/pm/view";
-import { useEditorMentions } from "./useEditorMentions";
+import { setMentionMembers, useEditorMentions } from "./useEditorMentions";
+import { useEditorSlashCommands } from "./useEditorSlashCommands";
 import { RichTextBubbleMenu } from "./RichTextBubbleMenu";
 import { refreshMentionLabels } from "@/lib/mentionLabels";
 import { cn } from "@/lib/utils";
@@ -129,7 +130,7 @@ function insertUploadedImage(
 /**
  * A task's description: headings, marks, text color, lists plus a markable checklist — tiptap, headless,
  * styled to this app's own tokens. No fixed toolbar: selecting text raises `RichTextBubbleMenu` (as in
- * ClickUp), and markdown-style typing (`**bold**`, `# heading`, `[] item`) still works.
+ * ClickUp), "/" lists the block types, and markdown-style typing (`**bold**`, `# heading`) still works.
  * Autosaves on blur, same as every other field on the sheet — not per keystroke, which would fire
  * a write per letter typed.
  */
@@ -144,6 +145,7 @@ export function RichTextEditor({
   members = [],
 }: RichTextEditorProps) {
   const mentions = useEditorMentions(members);
+  const slash = useEditorSlashCommands();
   const editor = useEditor({
     extensions: [
       StarterKit.configure({ codeBlock: false, horizontalRule: false, heading: { levels: [1, 2, 3] } }),
@@ -155,6 +157,7 @@ export function RichTextEditor({
       Image,
       UploadPlaceholderExtension,
       mentions.extension,
+      slash.extension,
     ],
     content,
     editorProps: {
@@ -202,6 +205,10 @@ export function RichTextEditor({
     if (editor && members.length) refreshMentionLabels(editor, members);
   }, [editor, content, members]);
 
+  useEffect(() => {
+    if (editor) setMentionMembers(editor, members);
+  }, [editor, members]);
+
   if (!editor) return null;
 
   return (
@@ -209,6 +216,7 @@ export function RichTextEditor({
       <EditorContent editor={editor} className={className} />
       <RichTextBubbleMenu editor={editor} />
       {mentions.ui}
+      {slash.ui}
     </>
   );
 }

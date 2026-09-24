@@ -13,6 +13,7 @@ import {
 import { ColorSwatchPicker } from "@/components/ui/color-swatch-picker";
 import { nextUnusedColor } from "@shared/colors";
 import { useCreateTaskStatus } from "@/hooks/useTaskStatuses";
+import { useSingleSubmit } from "@/hooks/useSingleSubmit";
 import { STATUS_CATEGORY_LABEL } from "@/lib/taskUtils";
 import type { TaskStatus, TaskStatusCategory } from "@shared/schemas";
 
@@ -25,6 +26,7 @@ interface AddStatusColumnProps {
 /** The `+` at the end of the board — an inline panel, not a dialog, same as `QuickAddTask`. */
 export function AddStatusColumn({ statuses, projectId }: AddStatusColumnProps) {
   const create = useCreateTaskStatus(projectId);
+  const submitting = useSingleSubmit();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [category, setCategory] = useState<TaskStatusCategory>("active");
@@ -39,7 +41,9 @@ export function AddStatusColumn({ statuses, projectId }: AddStatusColumnProps) {
 
   const submit = () => {
     if (!name.trim()) return;
-    create.mutate({ name: name.trim(), color, category }, { onSuccess: reset });
+    submitting.run((settle) =>
+      create.mutate({ name: name.trim(), color, category }, { onSuccess: reset, onSettled: settle })
+    );
   };
 
   if (!open) {
@@ -104,7 +108,7 @@ export function AddStatusColumn({ statuses, projectId }: AddStatusColumnProps) {
         <Button variant="ghost" size="sm" onClick={reset}>
           Cancel
         </Button>
-        <Button size="sm" disabled={!name.trim() || create.isPending} onClick={submit}>
+        <Button size="sm" disabled={!name.trim() || submitting.pending} onClick={submit}>
           Add status
         </Button>
       </div>

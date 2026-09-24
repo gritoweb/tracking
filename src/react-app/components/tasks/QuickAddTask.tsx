@@ -2,6 +2,7 @@ import { useState } from "react";
 import { QuickAddTaskStackedView } from "./QuickAddTaskStackedView";
 import { QuickAddTaskInlineView } from "./QuickAddTaskInlineView";
 import { useCreateTask } from "@/hooks/useTasks";
+import { useSingleSubmit } from "@/hooks/useSingleSubmit";
 import { useProjects } from "@/hooks/useProjects";
 import { useWorkspaceMembers } from "@/hooks/useWorkspaceRole";
 import { parseQuickAdd } from "@/lib/taskUtils";
@@ -53,6 +54,7 @@ export function QuickAddTask({
   className,
 }: QuickAddTaskProps) {
   const createTask = useCreateTask();
+  const submitting = useSingleSubmit();
   const { data: projects = [] } = useProjects();
   const { data: members = [] } = useWorkspaceMembers(true);
   const [value, setValue] = useState("");
@@ -61,6 +63,8 @@ export function QuickAddTask({
   const [manualDueDate, setManualDueDate] = useState<string | null>(null);
   const [dueOpen, setDueOpen] = useState(false);
   const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
+  // The task's id, minted per capture: every retry of this line names the same task, so the server makes it once.
+  const [draftId, setDraftId] = useState(() => crypto.randomUUID());
 
   // With exactly one project there is no choice to make, and asking for it turns
   // every capture into two interactions. `null` still means "not chosen" for
@@ -79,29 +83,33 @@ export function QuickAddTask({
   const pickedProject = projectId ? projects.find((p) => p.id === projectId) : undefined;
   const showProjectField = !parentId && !hinted && !soleProject;
 
-  const canSubmit = parsed.name.length > 0 && !!effectiveProjectId;
+  const canSubmit = parsed.name.length > 0 && !!effectiveProjectId && !submitting.pending;
 
   const reset = () => {
     setValue("");
     setManualDueDate(null);
     setAssigneeIds([]);
+    setDraftId(crypto.randomUUID());
   };
 
   const submit = () => {
     if (!canSubmit || !effectiveProjectId) return;
-    createTask.mutate(
-      {
-        name: parsed.name,
-        projectId: effectiveProjectId,
-        ...(dueDate ? { dueDate } : {}),
-        ...(parsed.priority ? { priority: parsed.priority } : {}),
-        ...(parentId ? { parentId } : {}),
-        ...(defaultStatusId ? { statusId: defaultStatusId } : {}),
-        ...(assigneeIds.length ? { assigneeIds } : {}),
-      },
-      // Clear on success only. Clearing optimistically and then failing loses
-      // what the user typed, and this field's whole job is not losing it.
-      { onSuccess: reset }
+    submitting.run((settle) =>
+      createTask.mutate(
+        {
+          id: draftId,
+          name: parsed.name,
+          projectId: effectiveProjectId,
+          ...(dueDate ? { dueDate } : {}),
+          ...(parsed.priority ? { priority: parsed.priority } : {}),
+          ...(parentId ? { parentId } : {}),
+          ...(defaultStatusId ? { statusId: defaultStatusId } : {}),
+          ...(assigneeIds.length ? { assigneeIds } : {}),
+        },
+        // Clear on success only. Clearing optimistically and then failing loses
+        // what the user typed, and this field's whole job is not losing it.
+        { onSuccess: reset, onSettled: settle }
+      )
     );
   };
 
@@ -125,6 +133,7 @@ export function QuickAddTask({
         onKeyDown={onKeyDown}
         autoFocus={autoFocus}
         canSubmit={canSubmit}
+        pending={submitting.pending}
         onSubmit={submit}
         showProjectField={showProjectField}
         projectId={projectId}
@@ -155,6 +164,7 @@ export function QuickAddTask({
       onKeyDown={onKeyDown}
       autoFocus={autoFocus}
       canSubmit={canSubmit}
+        pending={submitting.pending}
       onSubmit={submit}
       showProjectField={showProjectField}
       projectId={projectId}

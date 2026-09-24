@@ -11,8 +11,9 @@ export const inputVariants = cva(
       },
       variant: {
         default: "",
-        // Sits on a surface that is already the frame: no fill, border or shadow of its own. dark:bg-transparent is part of it because the base's dark fill would otherwise beat bg-transparent.
-        bare: "border-0 bg-transparent shadow-none dark:bg-transparent",
+        // Sits on a surface that is already the frame: no fill, border, shadow or ring. dark:bg-transparent beats the base's dark fill.
+        // rounded-md + px-2, never the pill with px-0: Chrome clips an input's text to its rounded box, cutting the first letters.
+        bare: "rounded-md border-0 bg-transparent px-2 shadow-none focus-visible:ring-0 dark:bg-transparent",
       },
     },
     defaultVariants: {

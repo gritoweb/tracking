@@ -128,6 +128,12 @@ const UI_PRIMITIVE_CHECKS = [
 			"no-adhoc-shadow: cards and controls have no resting shadow by design (DESIGN.md §4); reuse a components/ui primitive instead.",
 	},
 	{
+		selector:
+			"JSXOpeningElement[name.name=/^(?:Input|SearchInput|PasswordInput)$/] JSXAttribute[name.name='className'] Literal[value=/(?:^|\\s)p[xlr]-0(?:\\s|$)/]",
+		message:
+			"no-input-zero-padding: a pill input with no side padding clips its first letters; use the Input `bare` variant (it owns the gutter) instead of px-0.",
+	},
+	{
 		selector: "Literal[value=/\\b[wh]-\\[\\d+(?:\\.\\d+)?px\\]/]",
 		message:
 			"no-arbitrary-pixel-size: use a spacing/size token instead of an arbitrary pixel width or height.",

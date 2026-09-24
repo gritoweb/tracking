@@ -303,6 +303,8 @@ export const TaskSchema = z.object({
 const TASK_DESCRIPTION_MAX = 20000;
 
 export const CreateTaskSchema = z.object({
+  /** Chosen by the form when capture starts: a retried create with the same id returns the task already made, never a second one. */
+  id: z.string().uuid().optional(),
   name: z.string().min(1).max(255),
   description: z.string().max(TASK_DESCRIPTION_MAX).nullable().optional(),
   projectId: z.string(),

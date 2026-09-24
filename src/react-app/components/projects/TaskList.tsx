@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSingleSubmit } from "@/hooks/useSingleSubmit";
 import { Plus, Trash2, Pencil, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -20,6 +21,9 @@ interface TaskListProps {
 export function TaskList({ projectId }: TaskListProps) {
   const { data: tasks = [], isLoading } = useTasks(projectId);
   const createTask = useCreateTask();
+  const submitting = useSingleSubmit();
+  // The new task's id, minted per capture: a retry names the same task, so the server makes it once.
+  const [draftId, setDraftId] = useState(() => crypto.randomUUID());
   const updateTask = useUpdateTask();
   const deleteTask = useDeleteTask();
 
@@ -36,7 +40,18 @@ export function TaskList({ projectId }: TaskListProps) {
   const handleCreate = () => {
     const name = newName.trim();
     if (!name) return;
-    createTask.mutate({ name, projectId }, { onSuccess: () => setNewName("") });
+    submitting.run((settle) =>
+      createTask.mutate(
+        { id: draftId, name, projectId },
+        {
+          onSuccess: () => {
+            setNewName("");
+            setDraftId(crypto.randomUUID());
+          },
+          onSettled: settle,
+        }
+      )
+    );
   };
 
   const handleStartEdit = (task: Task) => {
