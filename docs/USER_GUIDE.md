@@ -172,7 +172,7 @@ The line under the field shows what it understood before you commit it.
 
 **Editing.** Click a task's name to rename it in place, or its due-date chip to re-date it. **⋯ → Edit task…** opens the full form — name, notes, project, estimate, due date, priority and repeat — which is the same form used to create one.
 
-**Subtasks.** A task can hold a checklist one level deep. Type a name and press Enter or **Add**; pressing again while it saves does nothing, so an impatient Enter never makes duplicates. Time is tracked against whichever one you actually worked on, and a parent's tracked total includes its subtasks'. Ticking a parent ticks its children with it.
+**Subtasks.** A task can hold a checklist one level deep. An open subtask shows **Subtask of** its parent (with the parent's status) above its name; click it to go to the parent. Type a name and press Enter or **Add**; pressing again while it saves does nothing, so an impatient Enter never makes duplicates. Time is tracked against whichever one you actually worked on, and a parent's tracked total includes its subtasks'. Ticking a parent ticks its children with it.
 
 **Repeats.** A task can repeat daily, on weekdays, weekly on chosen days, or monthly on a date. The next occurrence is created **when you tick the current one off** — so a repeating task you never complete simply goes overdue rather than piling up copies. If it has subtasks, the fresh occurrence gets a fresh checklist.
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-24 (87)
+### Added
+- **A subtask shows "Subtask of" its parent above its name**, with the parent's status dot (hover: "Current status: …") and one click to open the parent, as ClickUp does (`TaskParentLink`, in both the modal and the sidebar).
+### Changed
+- **The task modal is ClickUp's size**, measured from a screenshot Luis took at 1920px: the viewport less 24px, capped at 1632px (`--size-task-modal`), and the content column centred at 912px (`--size-task-content`) instead of stretching to the edge; comments stay ~420px (`--size-task-activity`). New e2e: at 1920px the dialog is 1632px wide at x=144, exactly ClickUp's; a subtask's "Subtask of" opens the parent, and the parent shows none. `lint` (0), `vitest` 996/996, `pnpm check` (0), view-mode e2e 6/6.
+
 ## 2026-09-24 (86)
 ### Changed
 - **No `eslint-disable` left in the project**, at Luis's request (a suppression hides the problem instead of fixing it). The seven remaining ones were fixed at the root by a Sonnet agent, reviewed and re-verified here:

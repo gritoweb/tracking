@@ -10,6 +10,7 @@ import { TaskDetailToolbar } from "./TaskDetailToolbar";
 import { TaskModalShell } from "./TaskModalShell";
 import { TaskSidebarShell } from "./TaskSidebarShell";
 import { TaskTitle } from "./TaskTitle";
+import { TaskParentLink } from "./TaskParentLink";
 import { TaskProperties } from "./TaskProperties";
 import { TaskDescriptionField } from "./TaskDescriptionField";
 import { TaskSubtasks } from "./TaskSubtasks";
@@ -136,7 +137,13 @@ export function TaskDetail({ open, onClose, task, tab, onTabChange, onRequestDel
     />
   );
 
-  const title = <TaskTitle name={name} onNameChange={setName} onSave={saveName} members={members} />;
+  const parent = task.parentId ? allTasks.find((t) => t.id === task.parentId) : undefined;
+  const title = (
+    <div className="space-y-1">
+      {parent && <TaskParentLink parent={parent} onOpen={(id) => navigate(taskPath(id))} />}
+      <TaskTitle name={name} onNameChange={setName} onSave={saveName} members={members} />
+    </div>
+  );
 
   // Field rows first, then Description/Subtasks/Attachments as bigger blocks — the ClickUp reference's order.
   const content = (

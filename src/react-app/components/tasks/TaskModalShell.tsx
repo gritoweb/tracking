@@ -43,10 +43,13 @@ export function TaskModalShell({
         {toolbar}
 
         {/* One scroll on a narrow screen (columns stack), one scroll per column from lg up. */}
-        <div className="grid min-h-0 flex-1 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] lg:grid-rows-[minmax(0,1fr)] lg:overflow-hidden">
-          <div className="min-w-0 space-y-5 px-6 py-5 lg:overflow-y-auto lg:px-8 lg:py-6">
-            {title}
-            {content}
+        <div className="grid min-h-0 flex-1 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_minmax(0,var(--size-task-activity))] lg:grid-rows-[minmax(0,1fr)] lg:overflow-hidden">
+          <div className="min-w-0 px-6 py-5 lg:overflow-y-auto lg:px-8 lg:py-6">
+            {/* Centred at a reading width, as ClickUp's is, instead of stretching to the column's edge. */}
+            <div className="mx-auto max-w-(--size-task-content) space-y-5">
+              {title}
+              {content}
+            </div>
           </div>
 
           <section

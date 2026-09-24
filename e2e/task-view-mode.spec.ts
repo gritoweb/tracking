@@ -103,3 +103,40 @@ test("typing / in the description offers block types and applies the one picked"
   await expect.poll(description).toContain('"taskList"');
   expect(await description()).not.toContain("/check");
 });
+
+test("a subtask shows which task it belongs to, and one click opens that task", async ({ page }) => {
+  await signUp(page);
+  const project = await createProject(page, { name: "ERP Migration", color: "#e11d48" });
+  const parent = await (
+    await page.request.post("/api/tasks", { data: { name: "Cutover plan", projectId: project.id } })
+  ).json();
+  const child = await (
+    await page.request.post("/api/tasks", { data: { name: "Freeze writes", projectId: project.id, parentId: parent.id } })
+  ).json();
+
+  await page.goto(`/tasks/${child.id}`);
+  const panel = page.getByRole("dialog", { name: "Freeze writes" });
+  await expect(panel.getByText("Subtask of")).toBeVisible();
+  await panel.getByRole("button", { name: "Go to parent task: Cutover plan" }).click();
+  await expect(page).toHaveURL(new RegExp(`/tasks/${parent.id}$`));
+  await expect(page.getByRole("dialog", { name: "Cutover plan" }).getByText("Subtask of")).toHaveCount(0);
+});
+
+test.describe("on a 1920px screen", () => {
+  test.use({ viewport: { width: 1920, height: 1000 } });
+
+  test("the modal stops at ClickUp's width and centres its content", async ({ page }) => {
+    await signUp(page);
+    const project = await createProject(page, { name: "ERP Migration", color: "#e11d48" });
+    const task = await (
+      await page.request.post("/api/tasks", { data: { name: "Cutover plan", projectId: project.id } })
+    ).json();
+
+    await page.goto(`/tasks/${task.id}`);
+    const panel = page.getByRole("dialog", { name: "Cutover plan" });
+    await expect(panel).toBeVisible();
+    const box = (await panel.boundingBox())!;
+    expect(Math.round(box.width)).toBe(1632);
+    expect(Math.round(box.x)).toBe(144);
+  });
+});
