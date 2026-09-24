@@ -1,5 +1,5 @@
 import { ESLint } from "eslint";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 // The repo's own ESLint config, run on snippets: the rules against swallowed errors must keep firing.
 const eslint = new ESLint();
@@ -10,6 +10,9 @@ async function messages(code: string): Promise<string[]> {
 }
 
 describe("swallowed-error lint rules", () => {
+  // Loading the repo's whole ESLint config takes seconds under a parallel run; pay it once here, not inside the first case's 5s.
+  beforeAll(() => messages(""), 60_000);
+
   it.each([
     ["an empty handler", "export const a = fetch('/x').catch(() => {});"],
     ["a handler returning undefined", "export const a = fetch('/x').catch(() => undefined);"],

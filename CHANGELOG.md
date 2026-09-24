@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-09-24 (94)
+### Fixed
+- **`lint-catch-rules.test.ts` failed now and then in a full run** ("flags an empty handler", its first case). The first case paid for loading the repo's whole ESLint config, which under the parallel suite passed vitest's 5s default; alone it always passed. The load now happens once in a `beforeAll` with its own 60s allowance. Note: (93) was committed and pushed after a run where this test had failed — the commit and push weren't gated on the run's result; a rerun was green, and this makes the run reliable. `vitest run` 1018/1018.
+
 ## 2026-09-24 (93)
 ### Changed
 - **"My tasks" is a plain list of links again, just not only today's.** Grouping `list_tasks` by status (91) backfired in the app: the Assistant's model turned the groups into a broken table, and its tool card showed "5 results" with no links, because the card links each result item that carries a `url` and the groups carried none. `list_tasks` returns the flat task list again (each with its status and `url`, so the card links every task), now sorted in the board's column order (`sortByColumn`), completed ones only with `includeDone`. Both prompts say to list one short linked line per task, no tables. What stays from the fix: "my tasks" with no day named is every open task, whatever its due date. Verified: `lint` (0), `vitest` all green, `pnpm check` (0), live `list_tasks` on `tracking-local` returns linked tasks Pendente → Em progresso.
