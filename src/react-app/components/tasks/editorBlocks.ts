@@ -1,4 +1,4 @@
-import { Heading1, Heading2, Heading3, List, ListChecks, ListOrdered, Pilcrow, TextQuote, type LucideIcon } from "lucide-react";
+import { Code2, Heading1, Heading2, Heading3, List, ListChecks, ListOrdered, Minus, Pilcrow, TextQuote, type LucideIcon } from "lucide-react";
 import type { ChainedCommands, Editor } from "@tiptap/react";
 
 /** A block type the description can turn a line into — one catalogue for the selection bar and the "/" menu. */
@@ -6,8 +6,8 @@ export interface EditorBlock {
   id: string;
   label: string;
   icon: LucideIcon;
-  /** Where it sits in the selection bar: the line's type, or a list. */
-  group: "type" | "list";
+  /** Selection bar row ("type" | "list"); "block" is "/" and "Turn into" only; "insert" adds a node, so it is "/" only. */
+  group: "type" | "list" | "block" | "insert";
   /** Extra words "/" matches besides the label, pt-BR included, since that's how the team types. */
   keywords: string[];
   apply: (chain: ChainedCommands) => ChainedCommands;
@@ -71,7 +71,28 @@ export const EDITOR_BLOCKS: readonly EditorBlock[] = [
     apply: (c) => c.toggleTaskList(),
     isActive: (e) => e.isActive("taskList"),
   },
+  {
+    id: "code",
+    label: "Code block",
+    icon: Code2,
+    group: "block",
+    keywords: ["codeblock", "pre", "snippet", "codigo", "código"],
+    apply: (c) => c.toggleCodeBlock(),
+    isActive: (e) => e.isActive("codeBlock"),
+  },
+  {
+    id: "divider",
+    label: "Divider",
+    icon: Minus,
+    group: "insert",
+    keywords: ["hr", "rule", "separator", "divisor", "linha", "separador"],
+    apply: (c) => c.setHorizontalRule(),
+    isActive: () => false,
+  },
 ];
+
+/** What a line can be turned into from its handle menu — every block except the ones that insert a new node. */
+export const TURN_INTO_BLOCKS = EDITOR_BLOCKS.filter((b) => b.group !== "insert");
 
 const fold = (s: string) => s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
 

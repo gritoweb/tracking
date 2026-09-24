@@ -1,13 +1,17 @@
-import { useEffect, useRef, useState } from "react";
-import { Button } from "@/components/ui/button";
+import { Expandable } from "@/components/ui/expandable";
 import { RichTextEditor } from "./RichTextEditor";
+import { useAuth } from "@/hooks/useAuth";
+import { useWorkspaceRole } from "@/hooks/useWorkspaceRole";
+import { useDescriptionCollab } from "@/hooks/useDescriptionCollab";
 import { parseDescription } from "@/lib/richText";
 import type { WorkspaceMember } from "@/hooks/useWorkspaceRole";
 import type { Task } from "@shared/schemas";
 import type { JSONContent } from "@tiptap/react";
 
-/** Past this, the description collapses behind a "Show more" — matching ClickUp's "Objetivo". */
+/** Past this, the description collapses behind "Expand" — matching ClickUp's task description. */
 const DESCRIPTION_COLLAPSED_HEIGHT = 180;
+/** `pt-6` above the text for a co-editor's name tag; added back so the collapsed text stays 180px tall. */
+const NAME_TAG_GUTTER = 24;
 
 interface TaskDescriptionFieldProps {
   task: Task;
@@ -17,53 +21,27 @@ interface TaskDescriptionFieldProps {
   onDeleteImage: (id: string) => void;
 }
 
-/**
- * Full when short, collapsed with a "Show more" when it overflows — never a fixed scroll box.
- * Keyed by task id from the caller, so switching tasks remounts it and `expanded` starts fresh.
- */
+/** Keyed by task id from the caller, so switching tasks remounts it and starts collapsed again. */
 export function TaskDescriptionField({ task, members, onSave, onUploadImage, onDeleteImage }: TaskDescriptionFieldProps) {
-  const [expanded, setExpanded] = useState(false);
-  const [overflowing, setOverflowing] = useState(false);
-  const contentRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    // Wait for the content to actually paint before measuring it.
-    const id = requestAnimationFrame(() => {
-      const el = contentRef.current;
-      if (el) setOverflowing(el.scrollHeight > DESCRIPTION_COLLAPSED_HEIGHT + 1);
-    });
-    return () => cancelAnimationFrame(id);
-  }, []);
-
+  const { user } = useAuth();
+  const { collabDescriptions } = useWorkspaceRole();
+  const collab = useDescriptionCollab(task.id, collabDescriptions, user);
   return (
-    // Editing expands it: a caret or selection inside the clipped box would scroll it out from under the person.
-    <div onFocusCapture={() => setExpanded(true)}>
-      <div
-        ref={contentRef}
-        className="overflow-hidden"
-        style={!expanded && overflowing ? { maxHeight: DESCRIPTION_COLLAPSED_HEIGHT } : undefined}
-      >
-        <RichTextEditor
-          aria-label="Description"
-          content={parseDescription(task.description)}
-          onBlur={onSave}
-          onUploadImage={onUploadImage}
-          onDeleteImage={onDeleteImage}
-          members={members}
-          placeholder="Context, links, acceptance criteria — anything that isn't the name."
-        />
-      </div>
-      {overflowing && (
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="mt-1 text-muted-foreground"
-          onClick={() => setExpanded((e) => !e)}
-        >
-          {expanded ? "Show less" : "Show more"}
-        </Button>
-      )}
-    </div>
+    // Gutters for what hangs outside the text (the "+ ⠿" handle, a co-editor's name tag) so the clip doesn't cut them.
+    <Expandable
+      collapsedHeight={DESCRIPTION_COLLAPSED_HEIGHT + NAME_TAG_GUTTER}
+      expandOnFocus
+      contentClassName="-ml-14 -mt-6 pl-14 pt-6">
+      <RichTextEditor
+        aria-label="Description"
+        content={parseDescription(task.description)}
+        onBlur={onSave}
+        onUploadImage={onUploadImage}
+        onDeleteImage={onDeleteImage}
+        members={members}
+        collab={collab}
+        placeholder="Context, links, acceptance criteria — anything that isn't the name."
+      />
+    </Expandable>
   );
 }

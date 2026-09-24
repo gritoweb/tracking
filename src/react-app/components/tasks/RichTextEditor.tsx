@@ -11,10 +11,17 @@ import { Decoration, DecorationSet, type EditorView } from "@tiptap/pm/view";
 import { setMentionMembers, useEditorMentions } from "./useEditorMentions";
 import { useEditorSlashCommands } from "./useEditorSlashCommands";
 import { RichTextBubbleMenu } from "./RichTextBubbleMenu";
+import { BlockHandle } from "./BlockHandle";
 import { refreshMentionLabels } from "@/lib/mentionLabels";
 import { cn } from "@/lib/utils";
+import { getContrastColor } from "@/lib/colorUtils";
+import { NEUTRAL_SWATCH } from "@shared/colors";
 import type { WorkspaceMember } from "@/hooks/useWorkspaceRole";
 import { toastApiError } from "@/lib/toastApiError";
+import { Collaboration } from "@tiptap/extension-collaboration";
+import { CollaborationCaret } from "@tiptap/extension-collaboration-caret";
+import type { DescriptionCollab } from "@/hooks/useDescriptionCollab";
+import { DESCRIPTION_FIELD, SEED_GRANTED, SEED_REQUEST } from "@shared/description-collab";
 
 interface RichTextEditorProps {
   content: JSONContent;
@@ -28,6 +35,8 @@ interface RichTextEditorProps {
   onDeleteImage?: (id: string) => void;
   /** Who "@" can tag; without it the editor has no mentions. */
   members?: WorkspaceMember[];
+  /** Live co-editing room; when set the shared doc is the content and `content` only seeds an empty room. */
+  collab?: DescriptionCollab | null;
 }
 
 function imageFile(items: DataTransferItemList | FileList | null | undefined): File | null {
@@ -88,6 +97,21 @@ const UploadPlaceholderExtension = Extension.create({
   },
 });
 
+/** Another editor's caret; the name's ink follows the swatch, since white vanishes on the palette's light colours. */
+function renderCaret(user: { name?: string; color?: string }) {
+  const color = user.color ?? NEUTRAL_SWATCH;
+  const caret = document.createElement("span");
+  caret.className = "collaboration-carets__caret";
+  caret.style.borderColor = color;
+  const label = document.createElement("span");
+  label.className = "collaboration-carets__label";
+  label.style.backgroundColor = color;
+  label.style.color = getContrastColor(color);
+  label.textContent = user.name ?? "";
+  caret.appendChild(label);
+  return caret;
+}
+
 function findPlaceholderPos(state: EditorState, id: string): number | null {
   const set = uploadPlaceholderKey.getState(state);
   const found = set?.find(undefined, undefined, (spec: PlaceholderSpec) => spec.id === id)?.[0];
@@ -130,7 +154,8 @@ function insertUploadedImage(
 /**
  * A task's description: headings, marks, text color, lists plus a markable checklist — tiptap, headless,
  * styled to this app's own tokens. No fixed toolbar: selecting text raises `RichTextBubbleMenu` (as in
- * ClickUp), "/" lists the block types, and markdown-style typing (`**bold**`, `# heading`) still works.
+ * ClickUp), "/" lists the block types, each line has a "+ ⠿" handle (`BlockHandle`) to add, drag or
+ * transform it, and markdown-style typing (`**bold**`, `# heading`) still works.
  * Autosaves on blur, same as every other field on the sheet — not per keystroke, which would fire
  * a write per letter typed.
  */
@@ -143,12 +168,19 @@ export function RichTextEditor({
   onUploadImage,
   onDeleteImage,
   members = [],
+  collab = null,
 }: RichTextEditorProps) {
   const mentions = useEditorMentions(members);
   const slash = useEditorSlashCommands();
   const editor = useEditor({
     extensions: [
-      StarterKit.configure({ codeBlock: false, horizontalRule: false, heading: { levels: [1, 2, 3] } }),
+      StarterKit.configure({
+        heading: { levels: [1, 2, 3] },
+        // Yjs brings its own history; the local one would undo other people's typing.
+        undoRedo: collab ? false : undefined,
+        // The line that shows where a dragged block will land; its colour comes from `.tt-dropcursor`.
+        dropcursor: { class: "tt-dropcursor", width: 2, color: false },
+      }),
       TextStyle,
       Color,
       TaskList,
@@ -158,8 +190,14 @@ export function RichTextEditor({
       UploadPlaceholderExtension,
       mentions.extension,
       slash.extension,
+      ...(collab
+        ? [
+            Collaboration.configure({ document: collab.doc, field: DESCRIPTION_FIELD }),
+            CollaborationCaret.configure({ provider: collab.provider, user: collab.user, render: renderCaret }),
+          ]
+        : []),
     ],
-    content,
+    content: collab ? undefined : content,
     editorProps: {
       attributes: {
         role: "textbox",
@@ -190,15 +228,35 @@ export function RichTextEditor({
       },
     },
     onBlur: ({ editor: e }) => onBlur(e.getJSON()),
-  });
+  }, [collab?.doc]);
 
   // The sheet reopens on a different task without remounting this component — sync the content in.
   useEffect(() => {
-    if (!editor || editor.isFocused) return;
+    // In a live room the shared doc is the truth; pushing a refetched copy in would fight everyone's typing.
+    if (!editor || collab || editor.isFocused) return;
     const current = JSON.stringify(editor.getJSON());
     const next = JSON.stringify(content);
     if (current !== next) editor.commands.setContent(content);
-  }, [editor, content]);
+  }, [editor, content, collab]);
+
+  // An empty room is filled from D1 by one editor only — the one the room grants — or two first arrivals would both insert it.
+  useEffect(() => {
+    if (!editor || !collab) return;
+    const { provider } = collab;
+    const onSynced = (synced: boolean) => {
+      if (synced && editor.isEmpty) provider.sendMessage(SEED_REQUEST);
+    };
+    const onMessage = (message: string) => {
+      if (message === SEED_GRANTED && editor.isEmpty) editor.commands.setContent(content);
+    };
+    provider.on("sync", onSynced);
+    provider.on("custom-message", onMessage);
+    if (provider.synced) onSynced(true);
+    return () => {
+      provider.off("sync", onSynced);
+      provider.off("custom-message", onMessage);
+    };
+  }, [editor, collab, content]);
 
   // A chip saved a name at the moment of tagging; show the person's current one. After the sync above, which would bring the old label back.
   useEffect(() => {
@@ -215,6 +273,7 @@ export function RichTextEditor({
     <>
       <EditorContent editor={editor} className={className} />
       <RichTextBubbleMenu editor={editor} />
+      <BlockHandle editor={editor} />
       {mentions.ui}
       {slash.ui}
     </>

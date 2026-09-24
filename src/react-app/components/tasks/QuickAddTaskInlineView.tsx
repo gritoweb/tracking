@@ -77,10 +77,11 @@ export function QuickAddTaskInlineView({
     <div className={cn("space-y-1", className)}>
       <div
         className={cn(
-          "flex items-center gap-2 px-2 py-1.5 transition-colors duration-fast ease-out-quart",
+          "flex items-center gap-2 py-1.5 transition-[color,border-color,box-shadow] duration-fast ease-out-quart",
           bare
-            ? "focus-within:bg-accent/50 rounded-md"
-            : "rounded-md border border-dashed focus-within:border-solid focus-within:border-ring"
+            ? // Reads as a field at rest (the Input's own border, fill and ring), not only once focused.
+              "rounded-full border border-input px-3 dark:bg-input/30 focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50"
+            : "rounded-md border border-dashed px-2 focus-within:border-solid focus-within:border-ring"
         )}
       >
         <Input

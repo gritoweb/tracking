@@ -27,39 +27,48 @@ export function TaskSubtasks({ task, subtasks, onToggle, onOpen, onRequestDelete
           dashed border was a box inside a box. Rows divide with a hairline;
           the quick-add stands on its own underneath. */}
       <div className="space-y-1">
-        {subtasks.map((sub) => (
-          <div key={sub.id} className="group/subtask flex items-center gap-2 border-b px-1 py-1.5 last:border-b-0">
-            <Checkbox
-              checked={!sub.active}
-              onCheckedChange={(checked) => onToggle(sub, checked === true)}
-              aria-label={sub.active ? "Mark subtask done" : "Mark subtask not done"}
-            />
-            {/* Opens the subtask in its own sheet — same panel, same edit/assignee/delete
-                it would get as a top-level task, not a second stripped-down view of it. */}
-            <button
-              onClick={() => onOpen(sub.id)}
-              className={cn(
-                "min-w-0 flex-1 truncate rounded text-left text-sm hover:underline",
-                !sub.active && "text-muted-foreground line-through"
+        {/* Rows in their own group, so `last:` reaches the last row and not the add field below it. */}
+        <div>
+          {subtasks.map((sub) => (
+            <div key={sub.id} className="group/subtask flex items-center gap-2 border-b px-1 py-1.5 last:border-b-0">
+              <Checkbox
+                checked={!sub.active}
+                onCheckedChange={(checked) => onToggle(sub, checked === true)}
+                aria-label={sub.active ? "Mark subtask done" : "Mark subtask not done"}
+              />
+              {/* Opens the subtask in its own sheet — same panel, same edit/assignee/delete
+                  it would get as a top-level task, not a second stripped-down view of it. */}
+              <button
+                onClick={() => onOpen(sub.id)}
+                className={cn(
+                  "min-w-0 flex-1 truncate rounded text-left text-sm hover:underline",
+                  !sub.active && "text-muted-foreground line-through"
+                )}
+              >
+                {sub.name}
+              </button>
+              {sub.assignees.length > 0 && (
+                <AvatarStack members={sub.assignees.map((a) => ({ id: a.userId, name: a.name, image: a.image }))} max={3} size="xs" />
               )}
-            >
-              {sub.name}
-            </button>
-            {sub.assignees.length > 0 && (
-              <AvatarStack members={sub.assignees.map((a) => ({ id: a.userId, name: a.name, image: a.image }))} max={3} size="xs" />
-            )}
-            <Button
-              variant="ghost-destructive"
-              size="icon-xs"
-              aria-label={`Delete ${sub.name}`}
-              onClick={() => onRequestDelete(sub)}
-              className="tt-reveal"
-            >
-              <Trash2 className="h-3 w-3" />
-            </Button>
-          </div>
-        ))}
-        <QuickAddTask parentId={task.id} defaultProjectId={task.projectId} placeholder="Add a subtask" bare />
+              <Button
+                variant="ghost-destructive"
+                size="icon-xs"
+                aria-label={`Delete ${sub.name}`}
+                onClick={() => onRequestDelete(sub)}
+                className="tt-reveal"
+              >
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            </div>
+          ))}
+        </div>
+        <QuickAddTask
+          className={subtasks.length > 0 ? "mt-2" : undefined}
+          parentId={task.id}
+          defaultProjectId={task.projectId}
+          placeholder="Add a subtask"
+          bare
+        />
       </div>
     </div>
   );

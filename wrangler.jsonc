@@ -25,7 +25,9 @@
   "preview_urls": false,
   "vars": {
     "APP_URL": "https://tracking.gritoweb.com.br",
-    "ENABLE_PASSWORD_AUTH": "true"
+    "ENABLE_PASSWORD_AUTH": "true",
+    // Sender for every outgoing email (lib/mailer.ts); must be on a domain verified in Resend.
+    "EMAIL_FROM": "noreply@gritoweb.com.br"
   },
   // Auto-track: sweep finished Google Calendar events into time entries every 5 min.
   "triggers": {
@@ -73,6 +75,11 @@
       {
         "name": "NOTIFICATION_ROOM",
         "class_name": "NotificationRoom"
+      },
+      // One room per task description for live co-editing (Yjs). Dormant until COLLAB_DESCRIPTIONS is "true".
+      {
+        "name": "DESCRIPTION_ROOM",
+        "class_name": "DescriptionRoom"
       }
     ]
   },
@@ -148,6 +155,10 @@
     {
       "tag": "v5",
       "new_sqlite_classes": ["NotificationRoom"]
+    },
+    {
+      "tag": "v6",
+      "new_sqlite_classes": ["DescriptionRoom"]
     }
   ],
   "routes": [

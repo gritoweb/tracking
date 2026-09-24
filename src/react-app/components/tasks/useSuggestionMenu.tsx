@@ -68,6 +68,8 @@ export function useSuggestionMenu<T>() {
         className={className}
         onOpenAutoFocus={(e) => e.preventDefault()}
         onCloseAutoFocus={(e) => e.preventDefault()}
+        // The plugin closes it (onExit) when the caret leaves the trigger; focus landing in the editor must not.
+        onFocusOutside={(e) => e.preventDefault()}
       >
         {state && list(state.items, state.index)}
       </PopoverContent>

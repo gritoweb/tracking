@@ -15,6 +15,8 @@ export function useWorkspaceRole() {
   return {
     role: query.data?.role ?? null,
     canManage: query.data?.canManage ?? false,
+    /** Live co-editing of descriptions; false until the server says the deploy turned it on. */
+    collabDescriptions: query.data?.features.collabDescriptions ?? false,
     isLoading: query.isPending,
   };
 }

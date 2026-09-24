@@ -3,6 +3,7 @@ import { corsMiddleware } from "./middleware/cors";
 import { securityHeaders } from "./middleware/security-headers";
 import { rateLimit, sharedRateLimit } from "./middleware/rate-limit";
 import { workspaceMiddleware, resolveWorkspace } from "./middleware/workspace";
+import { descriptionCollabRouter } from "./routes/description-collab";
 import { meRouter } from "./routes/me";
 import { requireFreshSession } from "./middleware/fresh-session";
 import { deactivateSelf, refuseHardDelete } from "./routes/account";
@@ -43,6 +44,7 @@ import { resolveApiKey, touchApiKey } from "./lib/api-keys";
 export { TimerRoom } from "./durable-objects/TimerRoom";
 export { ChatAgent } from "./durable-objects/ChatAgent";
 export { NotificationRoom } from "./durable-objects/NotificationRoom";
+export { DescriptionRoom } from "./durable-objects/DescriptionRoom";
 
 // 10 attempts per minute on auth endpoints. Relaxed in the Vite dev server
 // (which is what `pnpm dev` and the CI e2e run use) so the Playwright suite's
@@ -136,6 +138,7 @@ const app = new Hono<{ Bindings: Env }>()
   .route("/api/keys", apiKeysRouter)
   .route("/api/me", meRouter)
   .route("/api/ws", websocketRouter)
+  .route("/api/collab/descriptions", descriptionCollabRouter)
   .route("/api/notifications", notificationsRouter)
   .route("/api/client-errors", clientErrorsRouter);
 
