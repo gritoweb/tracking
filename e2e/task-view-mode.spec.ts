@@ -16,7 +16,7 @@ test("switching a task between modal and sidebar sticks across reloads", async (
   await expect(panel.getByRole("region", { name: "Comments" })).toBeVisible();
   await expect(panel.getByRole("tab", { name: "Comments" })).toHaveCount(0);
 
-  // Hovering the view button opens its menu, as in ClickUp.
+  // Hovering the view button opens its menu.
   await panel.getByRole("button", { name: "Task view" }).hover();
   await page.getByRole("menuitemradio", { name: "Sidebar" }).click();
   const sidebar = page.getByRole("dialog", { name: "Cutover plan" });
@@ -125,7 +125,7 @@ test("a subtask shows which task it belongs to, and one click opens that task", 
 test.describe("on a 1920px screen", () => {
   test.use({ viewport: { width: 1920, height: 1000 } });
 
-  test("the modal stops at ClickUp's width and centres its content", async ({ page }) => {
+  test("the modal stops at its maximum width and centres its content", async ({ page }) => {
     await signUp(page);
     const project = await createProject(page, { name: "ERP Migration", color: "#e11d48" });
     const task = await (

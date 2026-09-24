@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { useEditorState, type Editor } from "@tiptap/react";
+import { isTextSelection, useEditorState, type Editor } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
 import {
   Bold,
@@ -45,7 +45,7 @@ function ToolButton({
 
 const Divider = () => <div className="mx-0.5 h-5 w-px bg-border" aria-hidden />;
 
-/** The formatting bar that floats over a text selection — ClickUp's description editing, on tiptap. */
+/** The formatting bar that floats over a text selection, on tiptap. */
 export function RichTextBubbleMenu({ editor }: { editor: Editor }) {
   // One secondary row at a time under the buttons: the color swatches or the link field.
   const [panel, setPanel] = useState<"color" | "link" | null>(null);
@@ -84,6 +84,13 @@ export function RichTextBubbleMenu({ editor }: { editor: Editor }) {
     <BubbleMenu
       editor={editor}
       options={{ strategy: "fixed", placement: "top-start", onHide: () => setPanel(null) }}
+      // Text selections only: a dropped block stays node-selected, and the bar popping up after every drag reads as a glitch.
+      shouldShow={({ view, state, element }) => {
+        const { selection } = state;
+        const focused = view.hasFocus() || element.contains(document.activeElement);
+        const hasText = state.doc.textBetween(selection.from, selection.to).length > 0;
+        return focused && editor.isEditable && isTextSelection(selection) && !selection.empty && hasText;
+      }}
       // Keeps the editor's selection: a click in the bar must not move focus out of the text it formats (the link field excepted).
       onMouseDown={(e) => {
         if (!(e.target instanceof HTMLInputElement)) e.preventDefault();

@@ -9,7 +9,7 @@ import { TextStyle, Color } from "@tiptap/extension-text-style";
 import { Plugin, PluginKey, type EditorState } from "@tiptap/pm/state";
 import { Decoration, DecorationSet, type EditorView } from "@tiptap/pm/view";
 import { setMentionMembers, useEditorMentions } from "./useEditorMentions";
-import { useEditorSlashCommands } from "./useEditorSlashCommands";
+import { dropHandleSlash, useEditorSlashCommands } from "./useEditorSlashCommands";
 import { RichTextBubbleMenu } from "./RichTextBubbleMenu";
 import { BlockHandle } from "./BlockHandle";
 import { refreshMentionLabels } from "@/lib/mentionLabels";
@@ -35,6 +35,8 @@ interface RichTextEditorProps {
   onDeleteImage?: (id: string) => void;
   /** Who "@" can tag; without it the editor has no mentions. */
   members?: WorkspaceMember[];
+  /** Classes on the editable element itself, e.g. a left gutter that must count as editor for hover and drop. */
+  editorClassName?: string;
   /** Live co-editing room; when set the shared doc is the content and `content` only seeds an empty room. */
   collab?: DescriptionCollab | null;
 }
@@ -153,8 +155,8 @@ function insertUploadedImage(
 
 /**
  * A task's description: headings, marks, text color, lists plus a markable checklist — tiptap, headless,
- * styled to this app's own tokens. No fixed toolbar: selecting text raises `RichTextBubbleMenu` (as in
- * ClickUp), "/" lists the block types, each line has a "+ ⠿" handle (`BlockHandle`) to add, drag or
+ * styled to this app's own tokens. No fixed toolbar: selecting text raises `RichTextBubbleMenu`,
+ * "/" lists the block types, each line has a "+ ⠿" handle (`BlockHandle`) to add, drag or
  * transform it, and markdown-style typing (`**bold**`, `# heading`) still works.
  * Autosaves on blur, same as every other field on the sheet — not per keystroke, which would fire
  * a write per letter typed.
@@ -169,6 +171,7 @@ export function RichTextEditor({
   onDeleteImage,
   members = [],
   collab = null,
+  editorClassName,
 }: RichTextEditorProps) {
   const mentions = useEditorMentions(members);
   const slash = useEditorSlashCommands();
@@ -202,7 +205,7 @@ export function RichTextEditor({
       attributes: {
         role: "textbox",
         ...(ariaLabel ? { "aria-label": ariaLabel } : {}),
-        class: cn("tt-richtext min-h-16 px-0 py-0", "focus:outline-none"),
+        class: cn("tt-richtext min-h-16 px-0 py-0", "focus:outline-none", editorClassName),
       },
       handleDOMEvents: {
         click: (_view, event) => {
@@ -227,7 +230,11 @@ export function RichTextEditor({
         return true;
       },
     },
-    onBlur: ({ editor: e }) => onBlur(e.getJSON()),
+    onBlur: ({ editor: e }) => {
+      // A "/" the "+" handle left behind must not be saved as text.
+      dropHandleSlash(e);
+      onBlur(e.getJSON());
+    },
   }, [collab?.doc]);
 
   // The sheet reopens on a different task without remounting this component — sync the content in.

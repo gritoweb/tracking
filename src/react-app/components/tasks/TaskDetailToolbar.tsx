@@ -26,7 +26,7 @@ const MODES = [
 /** Grace period so the pointer can travel from the button into its menu without the menu closing. */
 const HOVER_CLOSE_DELAY_MS = 150;
 
-/** The layout switch: opens on hover like ClickUp's, and on click/Enter for touch and keyboard. */
+/** The layout switch: opens on hover, and on click/Enter for touch and keyboard. */
 function ViewModeMenu({ mode, onModeChange }: Pick<TaskDetailToolbarProps, "mode" | "onModeChange">) {
   const [open, setOpen] = useState(false);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);

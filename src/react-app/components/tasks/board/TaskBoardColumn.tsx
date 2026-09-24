@@ -44,7 +44,7 @@ export function TaskBoardColumn({
     <section aria-label={status.name} className="flex w-(--size-board-column) shrink-0 flex-col rounded-container">
       {/* The drop/scroll region is always full column height (so you can drop into the empty
           space below a short list), but the tint wrapper inside it is natural-height — it only
-          covers the header and however many cards there are, same as the ClickUp reference,
+          covers the header and however many cards there are, same as the reference layout,
           instead of always painting the whole column down to the bottom. */}
       <div ref={setNodeRef} className="flex min-h-0 flex-1 flex-col overflow-y-auto">
         <div
@@ -86,7 +86,7 @@ export function TaskBoardColumn({
 
           {/* Inside the tint, right after the cards — not pinned to the column's bottom edge,
               which for a short column left it floating far below the last card. Text picks up
-              the status's own ink colour, same as the ClickUp reference, instead of plain grey. */}
+              the status's own ink colour, same as the reference layout, instead of plain grey. */}
           <div className="px-2 pb-2 pt-1">
             {adding ? (
               <div ref={outsideRef}>

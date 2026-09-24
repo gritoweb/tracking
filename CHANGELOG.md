@@ -1,8 +1,24 @@
 # Changelog
 
+## 2026-09-24 (106) — on `refactor`, not deployed
+### Fixed
+- **The "⠿" grip didn't start a drag.** It was a `<button>` inside the menu's Radix trigger with `preventDefault` on pointerdown, which kept the native drag from starting; a real mouse drag left the line where it was. The grip is now a plain span styled as the `Button` (`asChild`), and the menu anchors on a separate, pointer-less element. Proven with a real drag, before (no move) and after (moved).
+- **A drop straight down the handle's column was ignored**: the gutter wasn't part of the editor, so ProseMirror never saw the drop. The gutter is now padding on the editable element itself.
+- **The "+" left a "/" in the text** when its menu was dismissed. Radix takes Esc in capture and prevents it, and ProseMirror ignores prevented events (`eventBelongsToView`), so the suggestion plugin never closed. The menu now handles Esc itself (drops the handle's "/" and calls `exitSuggestion`); a click elsewhere and the blur save drop it too. A "/" the person typed is left alone.
+- **The handle hopped sideways** onto list items and quotes (`nested`); it now serves top-level blocks only, in one column.
+- **The formatting bar popped up after every drop** (the dropped block is node-selected); it now shows for text selections only.
+- **A live room could serve a stale doc**: a `DescriptionRoom` instance outlives its last editor, so a later visitor got the old copy over a newer D1 save. The room now resets (`ctx.abort`) when the last editor leaves — a reset, not a clear, whose deletes would wipe an editor reconnecting after a blip.
+### Changed
+- **Dragging a block is vertical only.** The native ghost (which followed the pointer sideways) is replaced by a transparent image; the dragged lines dim and a line marks the gap, chosen by height alone between top-level blocks (`blockDrop.ts`: pure `dropIndex`/`moveBlocks`), so a block never lands inside a list or quote by accident.
+- **The handle** centres on the block's first line of text (measured on the DOM, so an H1 lines up too), its buttons are 32px with 16px icons, and "+" shows only on an empty line, where it opens "/" on that line itself.
+- **Spacing measured on the reference editor**: H1 32px above / 6px below, H3 16px above, lists 28px in with no outer margin, checklist text at 28px with its box centred on the first line, quotes with a 4px bar, 12px in and full-colour text.
+- The reference product's name was removed from code comments, CSS and test names.
+### Verified
+- `tsc -b` (0), `lint` (0), `vitest run` 1061/1061 (new: `dropIndex`, `moveBlocks` incl. a list moved as one block, "+" on an empty line). In the browser with real hover, clicks, keys and drags: grip drag moves the block, handle column identical for paragraph/list/checklist/quote/heading, handle centred on an H1's first line, "+" only on empty lines, Esc and blur leave no "/", no formatting bar after a drop.
+
 ## 2026-09-24 (105) — on `refactor`, not deployed
 ### Added
-- **Block handle in the task description, like ClickUp's.** Hovering a line shows "+ ⠿" to its left: "+" opens the "/" menu on a new line below, "⠿" drags the line (drop line in `--primary`) or, clicked, opens Turn into / Color / Duplicate / Delete. Uses tiptap's official `@tiptap/extension-drag-handle-react` (MIT, 3.31.3); the actions are pure functions in `blockActions.ts`, and "Turn into" reuses the same `EDITOR_BLOCKS` catalogue as "/" and the selection bar.
+- **Block handle in the task description.** Hovering a line shows "+ ⠿" to its left: "+" opens the "/" menu on a new line below, "⠿" drags the line (drop line in `--primary`) or, clicked, opens Turn into / Color / Duplicate / Delete. Uses tiptap's official `@tiptap/extension-drag-handle-react` (MIT, 3.31.3); the actions are pure functions in `blockActions.ts`, and "Turn into" reuses the same `EDITOR_BLOCKS` catalogue as "/" and the selection bar.
 - **Code block and divider** in the "/" menu (pt-BR keywords `codigo`, `divisor`), styled from tokens.
 - **`ui/expandable.tsx`** — one "Expand" for the app: content clipped to a height, faded with a CSS mask (works on any surface, both themes), a centred outline pill. The description uses it instead of its own grey "Show more".
 - **Live co-editing of task descriptions**, behind `COLLAB_DESCRIPTIONS` (only in `.dev.vars`; absent from the deploy vars, so production is unchanged). One `DescriptionRoom` Durable Object per task (`y-partyserver`, already a dependency through the Agents SDK), gated by `/api/collab/descriptions/:taskId` with the same rule as editing over REST. D1 stays the source of truth: editors still save through `PUT /api/tasks/:id`; the room holds no storage and the first editor it grants seeds an empty room from D1, so two first arrivals can't insert the content twice. Other people's carets show with their name in their palette colour.

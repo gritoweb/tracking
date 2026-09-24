@@ -301,7 +301,7 @@ export const TaskSchema = z.object({
   createdAt: z.string(),
 });
 
-// 20,000 chars, plain text — our own call; ClickUp doesn't publish a limit to copy (D5).
+// 20,000 chars, plain text — our own call; the reference product publishes no limit to copy (D5).
 const TASK_DESCRIPTION_MAX = 20000;
 
 export const CreateTaskSchema = z.object({

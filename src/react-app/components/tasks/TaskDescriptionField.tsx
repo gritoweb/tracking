@@ -8,7 +8,7 @@ import type { WorkspaceMember } from "@/hooks/useWorkspaceRole";
 import type { Task } from "@shared/schemas";
 import type { JSONContent } from "@tiptap/react";
 
-/** Past this, the description collapses behind "Expand" — matching ClickUp's task description. */
+/** Past this, the description collapses behind "Expand". */
 const DESCRIPTION_COLLAPSED_HEIGHT = 180;
 /** `pt-6` above the text for a co-editor's name tag; added back so the collapsed text stays 180px tall. */
 const NAME_TAG_GUTTER = 24;
@@ -27,11 +27,11 @@ export function TaskDescriptionField({ task, members, onSave, onUploadImage, onD
   const { collabDescriptions } = useWorkspaceRole();
   const collab = useDescriptionCollab(task.id, collabDescriptions, user);
   return (
-    // Gutters for what hangs outside the text (the "+ ⠿" handle, a co-editor's name tag) so the clip doesn't cut them.
+    // Gutters for the handle and a co-editor's name tag; the left one is editor padding so drops in the handle column land.
     <Expandable
       collapsedHeight={DESCRIPTION_COLLAPSED_HEIGHT + NAME_TAG_GUTTER}
       expandOnFocus
-      contentClassName="-ml-14 -mt-6 pl-14 pt-6">
+      contentClassName="-ml-18 -mt-6 pt-6">
       <RichTextEditor
         aria-label="Description"
         content={parseDescription(task.description)}
@@ -40,6 +40,7 @@ export function TaskDescriptionField({ task, members, onSave, onUploadImage, onD
         onDeleteImage={onDeleteImage}
         members={members}
         collab={collab}
+        editorClassName="pl-18"
         placeholder="Context, links, acceptance criteria — anything that isn't the name."
       />
     </Expandable>

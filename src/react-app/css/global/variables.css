@@ -54,9 +54,9 @@
   --size-grid-meta: 7.75rem; /* TimesheetView/PlannerView's duplicated `w-[124px]` row-meta column. */
   --size-cap-60vh: 60vh; /* DetailedTable's scroll body. */
   --size-cap-80vh: 80vh; /* TaskDetail's lightbox image. */
-  --size-task-modal: 102rem; /* The task modal's widest (1632px), measured on ClickUp's own at 1920px. */
-  --size-task-content: 57rem; /* The task modal's content column (912px), centred like ClickUp's. */
-  --size-task-activity: 26rem; /* The task modal's comments column (~420px), ClickUp's Activity width. */
+  --size-task-modal: 102rem; /* The task modal's widest (1632px), measured on the reference at 1920px. */
+  --size-task-content: 57rem; /* The task modal's content column (912px), centred like the reference's. */
+  --size-task-activity: 26rem; /* The task modal's comments column (~420px), the reference's activity width. */
   --size-cap-85vh: 85vh; /* TaskDialog's content; also `ui/dialog.tsx`'s `size="lg"`/`"full"`. */
 }
 

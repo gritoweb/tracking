@@ -60,7 +60,7 @@ export function TaskProperties({
   onChangePriority,
 }: TaskPropertiesProps) {
   return (
-    // Sized by its own width, not the viewport: two fields per line in the modal, one per line in the sidebar (ClickUp's).
+    // Sized by its own width, not the viewport: two fields per line in the modal, one per line in the sidebar.
     <div className="@container">
       <div className="grid grid-cols-1 gap-x-8 @xl:grid-cols-2">
         {!isSubtask && (

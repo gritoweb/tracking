@@ -4,7 +4,7 @@ import { DESCRIPTION_FIELD, SEED_DENIED, SEED_GRANTED, SEED_REQUEST } from "@sha
 
 /** Yjs relay for live co-editing of one task description; D1 stays the source of truth (docs/ARCHITECTURE.md "Live description editing"). */
 export class DescriptionRoom extends YServer<Cloudflare.Env> {
-  // In memory while anyone is connected: an evicted room restarts empty and the editors' own sync refills it.
+  // In memory while anyone is connected; the doc is dropped when the last editor leaves (see onClose).
   static options = { hibernate: false };
 
   private seeder: string | null = null;
@@ -21,5 +21,8 @@ export class DescriptionRoom extends YServer<Cloudflare.Env> {
   onClose(connection: Connection, code: number, reason: string, wasClean: boolean) {
     super.onClose(connection, code, reason, wasClean);
     if (this.seeder === connection.id) this.seeder = null;
+    // Reset, not clear: a stale doc would beat a newer D1 save, and a clear's deletes would wipe a reconnecting editor.
+    const others = [...this.getConnections()].some((c) => c.id !== connection.id && c.readyState === WebSocket.OPEN);
+    if (!others) this.ctx.abort("last editor left");
   }
 }

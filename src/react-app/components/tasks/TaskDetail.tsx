@@ -145,7 +145,7 @@ export function TaskDetail({ open, onClose, task, tab, onTabChange, onRequestDel
     </div>
   );
 
-  // Field rows first, then Description/Subtasks/Attachments as bigger blocks — the ClickUp reference's order.
+  // Field rows first, then Description/Subtasks/Attachments as bigger blocks — the reference layout's order.
   const content = (
     <>
       <TaskProperties

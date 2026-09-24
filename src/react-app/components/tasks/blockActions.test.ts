@@ -53,6 +53,13 @@ describe("block handle actions", () => {
     expect($from.parentOffset).toBe(1);
   });
 
+  it("'+' on an empty line opens the menu on that line instead of adding another", () => {
+    make(p("a"), { type: "paragraph" }, p("b"));
+    insertBelowWithSlash(editor, top(1));
+    expect(texts()).toEqual(["a", "/", "b"]);
+    expect(editor.state.selection.$from.parent.textContent).toBe("/");
+  });
+
   it("'+' on a checklist item adds an unchecked sibling item, not a paragraph that splits the list", () => {
     make({
       type: "taskList",

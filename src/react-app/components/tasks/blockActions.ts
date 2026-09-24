@@ -1,6 +1,7 @@
 import type { Editor, JSONContent } from "@tiptap/react";
 import type { Node as PMNode } from "@tiptap/pm/model";
 import type { EditorBlock } from "./editorBlocks";
+import { markHandleSlash } from "./useEditorSlashCommands";
 
 /** The block the handle is sitting on: the node and where it starts in the doc. */
 export interface HandleTarget {
@@ -16,6 +17,11 @@ function end({ node, pos }: HandleTarget) {
 
 /** A new empty line right after the target, already holding "/" so the block menu opens on it. */
 export function insertBelowWithSlash(editor: Editor, target: HandleTarget) {
+  // An empty line is itself the new line: the menu opens on it rather than on yet another one below.
+  if (target.node.type.name === "paragraph" && target.node.content.size === 0) {
+    markHandleSlash(editor);
+    return editor.chain().focus().insertContentAt(target.pos + 1, "/").setTextSelection(target.pos + 2).run();
+  }
   const paragraph: JSONContent = { type: "paragraph", content: [{ type: "text", text: "/" }] };
   const name = target.node.type.name;
   // Inside a list the sibling must be another item, or the schema would split the list.
@@ -25,6 +31,7 @@ export function insertBelowWithSlash(editor: Editor, target: HandleTarget) {
   const at = end(target);
   // +1 steps into the new line (+1 more for the item's paragraph), landing the caret after "/".
   const caret = at + (LIST_ITEMS.has(name) ? 3 : 2);
+  markHandleSlash(editor);
   return editor.chain().focus().insertContentAt(at, line).setTextSelection(caret).run();
 }
 

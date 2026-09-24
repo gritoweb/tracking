@@ -1,5 +1,5 @@
 /* Task description editor (tiptap ships unstyled) — plain prose at the app's own tokens. */
-/* Type scale measured from ClickUp's task description (2026-09-24): 16/24 body, headings as multiples of it, 700 weight. */
+/* Measured from the reference task editor (2026-09-24, CHANGELOG 106): 16/24 body, 32/24/20 headings at 1.5, 700 weight. */
 .tt-richtext {
   font-size: var(--text-base);
   line-height: 1.5;
@@ -17,12 +17,15 @@
   line-height: 1.5;
 }
 .tt-richtext h1 {
+  margin-top: 32px;
+  padding-bottom: 6px;
   font-size: 2em;
 }
 .tt-richtext h2 {
   font-size: 1.5em;
 }
 .tt-richtext h3 {
+  margin-top: 16px;
   font-size: 1.25em;
 }
 .tt-richtext code {
@@ -33,8 +36,8 @@
   font-size: 0.875em;
 }
 .tt-richtext ol {
-  margin: 0.25em 0;
-  padding-left: 1.5em;
+  margin: 0;
+  padding-left: 28px;
   list-style: decimal;
 }
 /* A tagged person: the same chip the comments draw. */
@@ -50,8 +53,8 @@
   margin-top: 0;
 }
 .tt-richtext ul:not([data-type="taskList"]) {
-  margin: 0.25em 0;
-  padding-left: 1.25em;
+  margin: 0;
+  padding-left: 28px;
   list-style: disc;
 }
 .tt-richtext p.is-editor-empty:first-child::before {
@@ -63,17 +66,19 @@
 }
 /* Checklist — a real checkbox input, not a bullet; a struck-through label marks it done. */
 .tt-richtext ul[data-type="taskList"] {
-  margin: 0.25em 0;
+  margin: 0;
   padding-left: 0;
   list-style: none;
 }
 .tt-richtext ul[data-type="taskList"] li {
   display: flex;
   align-items: flex-start;
-  gap: 0.5em;
+  /* 1rem box + 12px: the text starts 28px in, like the other lists. */
+  gap: 12px;
 }
+/* Centred on the first line: half the line box minus half the box, plus the paragraph's 2px top padding. */
 .tt-richtext ul[data-type="taskList"] li > label {
-  margin-top: 0.2em;
+  margin-top: calc((1lh - 1rem) / 2 + 2px);
 }
 .tt-richtext ul[data-type="taskList"] li > div {
   flex: 1;
@@ -123,11 +128,11 @@
   text-underline-offset: 2px;
   cursor: pointer;
 }
+/* A quote reads as text set apart by its bar, not as greyed-out text. */
 .tt-richtext blockquote {
-  margin: 0.5em 0;
-  border-left: 3px solid color-mix(in oklab, var(--muted-foreground) 45%, transparent);
-  padding-left: 0.75em;
-  color: var(--muted-foreground);
+  margin: 0;
+  border-left: 4px solid var(--muted-foreground);
+  padding-left: 12px;
 }
 /* Code block: its own surface, monospaced, scrolls sideways instead of wrapping. */
 .tt-richtext pre {
@@ -185,4 +190,17 @@
   line-height: 1.2;
   white-space: nowrap;
   user-select: none;
+}
+/* Where a block dragged by its handle will land: a line between top-level blocks, placed by height only. */
+.tt-drop-line {
+  position: fixed;
+  z-index: var(--z-index-tooltip);
+  height: 2px;
+  border-radius: 1px;
+  background-color: var(--primary);
+  pointer-events: none;
+}
+/* The lines being dragged stay in place, dimmed, until the drop moves them. */
+.tt-richtext .tt-drag-source {
+  opacity: 0.4;
 }

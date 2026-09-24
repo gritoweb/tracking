@@ -23,11 +23,38 @@ import {
   turnBlockInto,
   type HandleTarget,
 } from "./blockActions";
+import { armVerticalDrag } from "./blockDrop";
+
+/** How far to shift the handle so it centres on the block's first line of text, not on the top of its box (an H1's box is tall). */
+function firstLineOffset(editor: Editor, pos: number): number {
+  const dom = editor.view.nodeDOM(pos);
+  const handle = editor.view.dom.parentElement?.querySelector<HTMLElement>(".tt-block-handle");
+  if (!(dom instanceof HTMLElement) || !handle) return 0;
+  const box = dom.getBoundingClientRect();
+  let center: number;
+  const text = document.createTreeWalker(dom, NodeFilter.SHOW_TEXT, (n) =>
+    n.textContent?.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP
+  ).nextNode();
+  if (text) {
+    const range = document.createRange();
+    range.setStart(text, 0);
+    range.setEnd(text, 1);
+    const line = range.getClientRects()[0] ?? range.getBoundingClientRect();
+    center = (line.top + line.bottom) / 2;
+  } else {
+    // An empty line has no glyph to measure: centre on its line box instead.
+    const style = getComputedStyle(dom);
+    const lineHeight = parseFloat(style.lineHeight) || parseFloat(style.fontSize) * 1.5;
+    center = box.top + (parseFloat(style.paddingTop) || 0) + lineHeight / 2;
+  }
+  return center - box.top - handle.offsetHeight / 2;
+}
 
 /** The "+ ⠿" beside the hovered line: "+" opens the "/" menu on a new line below, "⠿" drags the line or opens its menu. */
 export function BlockHandle({ editor }: { editor: Editor }) {
   const [target, setTarget] = useState<HandleTarget | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [offset, setOffset] = useState(0);
 
   const openMenu = (open: boolean) => {
     setMenuOpen(open);
@@ -42,42 +69,59 @@ export function BlockHandle({ editor }: { editor: Editor }) {
   return (
     <DragHandle
       editor={editor}
-      nested
       className="tt-block-handle"
+      // Top-level blocks only, so the handle keeps one column instead of hopping right onto list items.
+      onElementDragStart={() => armVerticalDrag(editor)}
       onNodeChange={({ node, pos }) => {
-        if (!menuOpen) setTarget(node ? { node, pos } : null);
+        if (menuOpen) return;
+        setTarget(node ? { node, pos } : null);
+        // Measured now: the plugin places the handle right after this call, on this same block.
+        if (node) setOffset(firstLineOffset(editor, pos));
       }}
     >
-      <div className="flex items-center pr-1">
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-xs"
-          aria-label="Add a block below"
-          title="Add a block below"
-          className="text-muted-foreground"
-          // Keeps the editor focused, so a click here isn't a blur that autosaves the description.
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={act((t) => insertBelowWithSlash(editor, t))}
-        >
-          <Plus />
-        </Button>
+      <div className="flex items-center pr-1" style={{ transform: `translateY(${offset}px)` }}>
+        {/* "+" only on an empty line; a line with text shows just the grip, which keeps the gutter quiet. */}
+        {target?.node.content.size === 0 && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Add a block below"
+            title="Add a block below"
+            className="text-muted-foreground"
+            // Keeps the editor focused, so a click here isn't a blur that autosaves the description.
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={act((t) => insertBelowWithSlash(editor, t))}
+          >
+            <Plus />
+          </Button>
+        )}
         <DropdownMenu open={menuOpen} onOpenChange={openMenu}>
-          <DropdownMenuTrigger asChild>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-xs"
-              aria-label="Drag to move, click for options"
-              title="Drag to move, click for options"
-              className="cursor-grab text-muted-foreground active:cursor-grabbing"
-              // Radix opens on pointerdown, which would open the menu at the start of every drag; open on click instead.
-              onPointerDown={(e) => e.preventDefault()}
-              onClick={() => openMenu(!menuOpen)}
-            >
-              <GripVertical />
+          <div className="relative">
+            {/* The grip is a plain span: a Radix trigger or a <button> under the pointer keeps the native drag from starting. */}
+            <Button asChild variant="ghost" size="icon-sm" className="cursor-grab text-muted-foreground active:cursor-grabbing">
+              <span
+                role="button"
+                tabIndex={0}
+                aria-label="Drag to move, click for options"
+                title="Drag to move, click for options"
+                aria-haspopup="menu"
+                aria-expanded={menuOpen}
+                onClick={() => openMenu(!menuOpen)}
+                onKeyDown={(e) => {
+                  if (e.key !== "Enter" && e.key !== " ") return;
+                  e.preventDefault();
+                  openMenu(!menuOpen);
+                }}
+              >
+                <GripVertical />
+              </span>
             </Button>
-          </DropdownMenuTrigger>
+            {/* Where the menu opens from; takes no pointer events, so it never competes with the grip. */}
+            <DropdownMenuTrigger asChild>
+              <span aria-hidden tabIndex={-1} className="pointer-events-none absolute inset-0" />
+            </DropdownMenuTrigger>
+          </div>
           <DropdownMenuContent side="bottom" align="start" className="w-52">
             <DropdownMenuSub>
               <DropdownMenuSubTrigger>

@@ -8,6 +8,7 @@ interface MenuState<T> {
   rect: DOMRect | null;
   index: number;
   pick: (item: T) => void;
+  escape?: () => void;
 }
 
 /**
@@ -29,12 +30,18 @@ export function useSuggestionMenu<T>() {
     set(null);
   };
 
-  /** For `suggestion.render`; `toPick` turns the plugin's props into "insert this item". */
+  /** For `suggestion.render`; `toPick` turns the plugin's props into "insert this item", `onEscape` runs on Esc. */
   const render =
-    <A,>(toPick: (props: SuggestionProps<T, A>) => (item: T) => void) =>
+    <A,>(toPick: (props: SuggestionProps<T, A>) => (item: T) => void, onEscape?: (props: SuggestionProps<T, A>) => void) =>
     () => {
       const show = (props: SuggestionProps<T, A>) =>
-        set({ items: props.items, rect: props.clientRect?.() ?? null, index: 0, pick: toPick(props) });
+        set({
+          items: props.items,
+          rect: props.clientRect?.() ?? null,
+          index: 0,
+          pick: toPick(props),
+          escape: onEscape && (() => onEscape(props)),
+        });
       return {
         onStart: show,
         onUpdate: show,
@@ -70,6 +77,8 @@ export function useSuggestionMenu<T>() {
         onCloseAutoFocus={(e) => e.preventDefault()}
         // The plugin closes it (onExit) when the caret leaves the trigger; focus landing in the editor must not.
         onFocusOutside={(e) => e.preventDefault()}
+        // Radix takes Esc in capture and prevents it, so ProseMirror (and the suggestion plugin) never see that key.
+        onEscapeKeyDown={() => stateRef.current?.escape?.()}
       >
         {state && list(state.items, state.index)}
       </PopoverContent>

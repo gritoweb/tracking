@@ -1,7 +1,7 @@
 import { ColorDot } from "@/components/ColorDot";
 import type { Task } from "@shared/schemas";
 
-/** Above a subtask's name: which task it belongs to, with that task's status, one click away (ClickUp's "Subtask of"). */
+/** Above a subtask's name: which task it belongs to, with that task's status, one click away ("Subtask of"). */
 export function TaskParentLink({ parent, onOpen }: { parent: Task; onOpen: (id: string) => void }) {
   return (
     <div className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">

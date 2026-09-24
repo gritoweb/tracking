@@ -272,7 +272,7 @@ describe("summarizePeriod", () => {
   });
 });
 
-describe("formatStamp (ClickUp's comment/activity time)", () => {
+describe("formatStamp (comment/activity time)", () => {
   const now = new Date(2026, 8, 24, 9, 42);
   it("says Just now inside the first minute", () => {
     expect(formatStamp(new Date(2026, 8, 24, 9, 41, 30).toISOString(), "12h", now)).toBe("Just now");
