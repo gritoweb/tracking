@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-09-24 (103)
+### Changed
+- **The Assistant's step cap is 20** (`MAX_STEPS`), at Luis's request; (102)'s 10 hadn't reached his local chat yet (see below).
+- **`list_tasks` search tolerates a typo.** "desenvolver tracing" found nothing, since search wanted the exact text and the task is "Desenvolver tracking". It now matches any word of three letters or more and ranks by words matched (`rankBySearch`), so the rest of the name still finds it.
+### Noted
+- Why the fixes of (101)/(102) didn't show up in Luis's local chat: the running `pnpm dev` had been started at 08:34, before the `agents` patch, and Vite's worker dependency cache (`node_modules/.vite/deps_tracking`) still held the unpatched builder (the signature line appears 0 times in it). The dev server was restarted with that cache cleared. Builds and production bundle from `node_modules` fresh, and CI installed the patch. After a `pnpm patch` or a dependency change, restart `pnpm dev` with the Vite cache cleared.
+- Verified: `lint` (0), `vitest run` 1039/1039 (new: a misspelt word still finds the task through the others, exact match first), `pnpm check` (0).
+
 ## 2026-09-24 (102)
 ### Fixed
 - **The Assistant stopped mid-task without a word.** Asked to move a task "that has the comments" to Backlog, it listed projects, listed tasks twice, read comments, fetched the columns — and stopped. The stored conversation shows five steps, each tool `output-available`, no error and no closing text: `ChatAgent`'s `stopWhen: stepCountIs(5)` cut it just before the `move_task`. Three fixes:

@@ -377,3 +377,18 @@ describe("list_tasks search finds a named task in one call", () => {
     expect(found.map((t) => t.name)).toEqual(["Develop tracking"]);
   });
 });
+
+describe("list_tasks search tolerates how people type a name", () => {
+  it("finds the task through the other words when one is misspelt, best match first", async () => {
+    const w = world();
+    const admin = w.toolsFor("u-admin");
+    await w.call(admin, "create_task", { name: "Develop tracking", projectId: "p1" });
+    await w.call(admin, "create_task", { name: "Develop billing", projectId: "p1" });
+    await w.call(admin, "create_task", { name: "Write docs", projectId: "p1" });
+    const found = (await w.call(admin, "list_tasks", { search: "develop tracing" })).data as unknown as { name: string }[];
+    expect(found.map((t) => t.name)).toEqual(expect.arrayContaining(["Develop tracking", "Develop billing"]));
+    expect(found.map((t) => t.name)).not.toContain("Write docs");
+    const exact = (await w.call(admin, "list_tasks", { search: "develop tracking" })).data as unknown as { name: string }[];
+    expect(exact[0].name).toBe("Develop tracking");
+  });
+});

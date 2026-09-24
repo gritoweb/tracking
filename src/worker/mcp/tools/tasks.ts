@@ -18,6 +18,24 @@ const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 /** How far back create_task looks for the same task before making another: long enough for a retry or a re-ask. */
 const DUPLICATE_WINDOW_MS = 10 * 60 * 1000;
 
+/** Words shorter than this ("de", "a", "the") match nearly everything, so they don't count. */
+const MIN_SEARCH_WORD = 3;
+
+/**
+ * Tasks matching any word of `search` (case-insensitive), most words matched first; the column order breaks ties. A person's
+ * typo in one word ("tracing" for "tracking") still finds the task through the others.
+ */
+export function rankBySearch(tasks: Task[], search: string | undefined): Task[] {
+  if (!search) return tasks;
+  const words = search.toLowerCase().split(/\s+/).filter((w) => w.length >= MIN_SEARCH_WORD);
+  if (!words.length) return tasks.filter((t) => t.name.toLowerCase().includes(search.toLowerCase()));
+  return tasks
+    .map((t, order) => ({ t, order, hits: words.filter((w) => t.name.toLowerCase().includes(w)).length }))
+    .filter((r) => r.hits > 0)
+    .sort((a, b) => b.hits - a.hits || a.order - b.order)
+    .map((r) => r.t);
+}
+
 const CATEGORY_ORDER = { not_started: 0, active: 1, completed: 2 } as const;
 
 /** Tasks in the board's column order, first column first; a project's own columns follow by category. */
@@ -98,7 +116,7 @@ export function registerTaskReads(d: ToolDeps): void {
         projectId: z.string().optional().describe("From list_projects"),
         statusId: z.string().optional().describe("From list_task_statuses"),
         assignee: z.string().optional().describe("A member's userId from list_members, or `me`"),
-        search: z.string().trim().min(1).max(200).optional().describe("Only tasks whose name contains this text (case-insensitive) — the one call to find a task the person named"),
+        search: z.string().trim().min(1).max(200).optional().describe("Words from the task's name, as the person said them (typos are fine): tasks matching any word, best matches first — the one call to find a task the person named"),
         includeDone: z.boolean().default(false).describe("Also return completed tasks"),
         dueBy: z
           .string()
@@ -120,13 +138,9 @@ export function registerTaskReads(d: ToolDeps): void {
       ]);
       const columnOrder = statuses.ok ? statuses.data.map((st) => st.id) : [];
       return fromBridge(tasks, (list) =>
-        sortByColumn(
-          list.filter(
-            (t) =>
-              (!dueBy || (t.dueDate !== null && t.dueDate <= dueBy)) &&
-              (!search || t.name.toLowerCase().includes(search.toLowerCase()))
-          ),
-          columnOrder
+        rankBySearch(
+          sortByColumn(list.filter((t) => !dueBy || (t.dueDate !== null && t.dueDate <= dueBy)), columnOrder),
+          search
         )
           .slice(0, ROW_LIMIT)
           .map((t) => taskListView(t, appUrl(env)))
