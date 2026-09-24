@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-24 (107) — on `refactor`, not deployed
+### Changed
+- **An empty line shows only "+"**, with no grip: there is nothing on it to move. A line with text shows only the grip. One control at a time also keeps the gutter quiet.
+### Verified
+- `tsc -b` (0), `lint` (0), `vitest run` 1061/1061; in the browser with real hover: empty line → "+" only, text line → grip only.
+
 ## 2026-09-24 (106) — on `refactor`, not deployed
 ### Fixed
 - **The "⠿" grip didn't start a drag.** It was a `<button>` inside the menu's Radix trigger with `preventDefault` on pointerdown, which kept the native drag from starting; a real mouse drag left the line where it was. The grip is now a plain span styled as the `Button` (`asChild`), and the menu anchors on a separate, pointer-less element. Proven with a real drag, before (no move) and after (moved).

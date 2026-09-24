@@ -62,6 +62,8 @@ export function BlockHandle({ editor }: { editor: Editor }) {
     editor.commands.setMeta("lockDragHandle", open);
   };
 
+  const isEmpty = target?.node.content.size === 0;
+
   const act = (run: (t: HandleTarget) => void) => () => {
     if (target) run(target);
   };
@@ -80,8 +82,8 @@ export function BlockHandle({ editor }: { editor: Editor }) {
       }}
     >
       <div className="flex items-center pr-1" style={{ transform: `translateY(${offset}px)` }}>
-        {/* "+" only on an empty line; a line with text shows just the grip, which keeps the gutter quiet. */}
-        {target?.node.content.size === 0 && (
+        {/* One control at a time: an empty line has nothing to move, so it gets "+"; a line with text gets the grip. */}
+        {isEmpty && (
           <Button
             type="button"
             variant="ghost"
@@ -96,86 +98,88 @@ export function BlockHandle({ editor }: { editor: Editor }) {
             <Plus />
           </Button>
         )}
-        <DropdownMenu open={menuOpen} onOpenChange={openMenu}>
-          <div className="relative">
-            {/* The grip is a plain span: a Radix trigger or a <button> under the pointer keeps the native drag from starting. */}
-            <Button asChild variant="ghost" size="icon-sm" className="cursor-grab text-muted-foreground active:cursor-grabbing">
-              <span
-                role="button"
-                tabIndex={0}
-                aria-label="Drag to move, click for options"
-                title="Drag to move, click for options"
-                aria-haspopup="menu"
-                aria-expanded={menuOpen}
-                onClick={() => openMenu(!menuOpen)}
-                onKeyDown={(e) => {
-                  if (e.key !== "Enter" && e.key !== " ") return;
-                  e.preventDefault();
-                  openMenu(!menuOpen);
-                }}
-              >
-                <GripVertical />
-              </span>
-            </Button>
-            {/* Where the menu opens from; takes no pointer events, so it never competes with the grip. */}
-            <DropdownMenuTrigger asChild>
-              <span aria-hidden tabIndex={-1} className="pointer-events-none absolute inset-0" />
-            </DropdownMenuTrigger>
-          </div>
-          <DropdownMenuContent side="bottom" align="start" className="w-52">
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger>
-                <Repeat2 />
-                Turn into
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent className="w-48">
-                {TURN_INTO_BLOCKS.map((block) => (
-                  <DropdownMenuItem key={block.id} onSelect={act((t) => turnBlockInto(editor, t, block))}>
-                    <block.icon />
-                    {block.label}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger>
-                <Palette />
-                Color
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent className="flex items-end gap-2 p-2">
-                <ColorSwatchPicker
-                  size="sm"
-                  value=""
-                  onChange={(color) => {
-                    if (target) colorBlock(editor, target, color);
-                    openMenu(false);
-                  }}
-                  aria-label="Line color"
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="xs"
-                  onClick={() => {
-                    if (target) colorBlock(editor, target, null);
-                    openMenu(false);
+        {!isEmpty && (
+          <DropdownMenu open={menuOpen} onOpenChange={openMenu}>
+            <div className="relative">
+              {/* The grip is a plain span: a Radix trigger or a <button> under the pointer keeps the native drag from starting. */}
+              <Button asChild variant="ghost" size="icon-sm" className="cursor-grab text-muted-foreground active:cursor-grabbing">
+                <span
+                  role="button"
+                  tabIndex={0}
+                  aria-label="Drag to move, click for options"
+                  title="Drag to move, click for options"
+                  aria-haspopup="menu"
+                  aria-expanded={menuOpen}
+                  onClick={() => openMenu(!menuOpen)}
+                  onKeyDown={(e) => {
+                    if (e.key !== "Enter" && e.key !== " ") return;
+                    e.preventDefault();
+                    openMenu(!menuOpen);
                   }}
                 >
-                  Default
-                </Button>
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
-            <DropdownMenuItem onSelect={act((t) => duplicateBlock(editor, t))}>
-              <Copy />
-              Duplicate
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem variant="destructive" onSelect={act((t) => deleteBlock(editor, t))}>
-              <Trash2 />
-              Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+                  <GripVertical />
+                </span>
+              </Button>
+              {/* Where the menu opens from; takes no pointer events, so it never competes with the grip. */}
+              <DropdownMenuTrigger asChild>
+                <span aria-hidden tabIndex={-1} className="pointer-events-none absolute inset-0" />
+              </DropdownMenuTrigger>
+            </div>
+            <DropdownMenuContent side="bottom" align="start" className="w-52">
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>
+                  <Repeat2 />
+                  Turn into
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent className="w-48">
+                  {TURN_INTO_BLOCKS.map((block) => (
+                    <DropdownMenuItem key={block.id} onSelect={act((t) => turnBlockInto(editor, t, block))}>
+                      <block.icon />
+                      {block.label}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>
+                  <Palette />
+                  Color
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent className="flex items-end gap-2 p-2">
+                  <ColorSwatchPicker
+                    size="sm"
+                    value=""
+                    onChange={(color) => {
+                      if (target) colorBlock(editor, target, color);
+                      openMenu(false);
+                    }}
+                    aria-label="Line color"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="xs"
+                    onClick={() => {
+                      if (target) colorBlock(editor, target, null);
+                      openMenu(false);
+                    }}
+                  >
+                    Default
+                  </Button>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+              <DropdownMenuItem onSelect={act((t) => duplicateBlock(editor, t))}>
+                <Copy />
+                Duplicate
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem variant="destructive" onSelect={act((t) => deleteBlock(editor, t))}>
+                <Trash2 />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
     </DragHandle>
   );
