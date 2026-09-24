@@ -6,6 +6,7 @@ import { XIcon } from "lucide-react"
 import { Dialog as SheetPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
+import { keepOpenOnLocalEscape } from "@/lib/escapeLocal"
 import { sheetContentVariants } from "@/components/ui/sheet-variants"
 
 function Sheet({ ...props }: React.ComponentProps<typeof SheetPrimitive.Root>) {
@@ -51,6 +52,7 @@ function SheetContent({
   children,
   side = "right",
   showCloseButton = true,
+  onEscapeKeyDown,
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Content> &
   VariantProps<typeof sheetContentVariants> & {
@@ -62,6 +64,11 @@ function SheetContent({
       <SheetPrimitive.Content
         data-slot="sheet-content"
         className={cn(sheetContentVariants({ side }), className)}
+        // Esc from an in-place edit cancels the edit; only an Esc from anywhere else closes this.
+        onEscapeKeyDown={(event) => {
+          keepOpenOnLocalEscape(event)
+          onEscapeKeyDown?.(event)
+        }}
         {...props}
       >
         {children}

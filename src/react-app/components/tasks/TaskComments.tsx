@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { JSONContent } from "@tiptap/react";
 import { toast } from "sonner";
-import { Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { AttachmentPreview } from "./TaskCommentAttachment";
+import { Card } from "@/components/ui/card";
+import { CommentComposer } from "./CommentComposer";
+import { useTaskImageUpload } from "@/hooks/useTaskImageUpload";
+import { EMPTY_DOC } from "@/lib/richText";
 import { CommentRow } from "./TaskCommentRow";
 import { TaskActivityRow } from "./TaskActivityRow";
-import { MentionInput } from "./MentionInput";
 import {
   PENDING_COMMENT_PREFIX,
   useCreateTaskComment,
@@ -15,11 +17,8 @@ import {
   useTaskComments,
   useUpdateTaskComment,
 } from "@/hooks/useTaskComments";
-import { useUploadTaskAttachment } from "@/hooks/useTasks";
-import { imageFile, imageProblem } from "@/lib/taskCommentAttachments";
 import { useAuth } from "@/hooks/useAuth";
 import { useWorkspaceRole } from "@/hooks/useWorkspaceRole";
-import { encodeMentions, type MentionPerson } from "@shared/mentions";
 import type { WorkspaceMember } from "@/hooks/useWorkspaceRole";
 import { TASK_COMMENTS_PAGE_SIZE, type TaskComment } from "@shared/schemas";
 import { cn } from "@/lib/utils";
@@ -57,43 +56,22 @@ export function TaskComments({ taskId, members, docked = false }: TaskCommentsPr
   const createComment = useCreateTaskComment(taskId);
   const updateComment = useUpdateTaskComment(taskId);
   const deleteComment = useDeleteTaskComment(taskId);
-  const uploadAttachment = useUploadTaskAttachment();
-
-  const [body, setBody] = useState("");
-  const [picked, setPicked] = useState<MentionPerson[]>([]);
-  const [attachment, setAttachment] = useState<{ id: string; url: string } | null>(null);
+  const { uploadImage, deleteOrphanedImage } = useTaskImageUpload(taskId);
+  // A new key mounts a fresh composer: cleared after a send, or holding the text again if the send failed.
+  const [composer, setComposer] = useState<{ key: number; initial: JSONContent }>({ key: 0, initial: EMPTY_DOC });
   // Deleting a comment has no undo toast, so it goes through ConfirmDialog first.
   const [pendingDelete, setPendingDelete] = useState<TaskComment | null>(null);
 
-  const attach = async (file: File | null) => {
-    if (!file) return;
-    const problem = imageProblem(file);
-    if (problem) return toast.error(problem);
-    const uploaded = await uploadAttachment.mutateAsync({ taskId, file });
-    setAttachment({ id: uploaded.id, url: uploaded.url });
-  };
-
   // The composer clears at once (the comment is already on screen); a failure puts the text back.
-  const submit = () => {
-    const text = body.trim();
-    if (!text) return;
-    const sent = { attachment, picked };
-    setBody("");
-    setPicked([]);
-    setAttachment(null);
+  const submit = (body: string) => {
+    setComposer((c) => ({ key: c.key + 1, initial: EMPTY_DOC }));
     createComment.mutate(
-      {
-        // "@Name" typed or picked becomes a tag; the server reads who is mentioned from the text.
-        body: encodeMentions(text, [...sent.picked, ...members]),
-        attachmentId: sent.attachment?.id ?? null,
-        attachmentUrl: sent.attachment?.url ?? null,
-      },
+      // The server reads who is mentioned from the doc itself.
+      { body, attachmentId: null, attachmentUrl: null },
       {
         onError: (error) => {
           toast.error(error.message || "Failed to post comment");
-          setBody((current) => current || text);
-          setPicked((current) => (current.length ? current : sent.picked));
-          setAttachment((current) => current ?? sent.attachment);
+          setComposer((c) => ({ key: c.key + 1, initial: JSON.parse(body) as JSONContent }));
         },
       }
     );
@@ -105,7 +83,7 @@ export function TaskComments({ taskId, members, docked = false }: TaskCommentsPr
       <div className={cn(docked ? "flex min-h-0 flex-1 flex-col gap-4" : "space-y-4")}>
         {/* Each comment is its own card; the feed is only the stack that scrolls them. */}
         {feed.length > 0 && (
-          <div ref={feedRef} className={cn("flex flex-col gap-2", docked && "min-h-0 flex-1 overflow-y-auto")}>
+          <div ref={feedRef} className={cn("flex flex-col gap-3", docked && "min-h-0 flex-1 overflow-y-auto")}>
             {mayHaveOlder && (
               <div className="flex justify-center p-2">
                 <Button
@@ -144,32 +122,19 @@ export function TaskComments({ taskId, members, docked = false }: TaskCommentsPr
           </div>
         )}
 
-        <div className={cn("space-y-2 rounded-md border px-4 py-3", docked && "mt-auto shrink-0 bg-popover")}>
-          <MentionInput
-            variant="bare"
-            value={body}
-            onValueChange={setBody}
+        {/* The same card as a comment: what you write already looks like what it becomes. */}
+        <Card size="compact" look="outlined" className={cn(docked && "mt-auto shrink-0")}>
+          <CommentComposer
+            key={composer.key}
+            initial={composer.initial}
             members={members}
-            onPick={(member) => setPicked((list) => [...list, { userId: member.userId, name: member.name }])}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) submit();
-            }}
-            onPaste={(e) => attach(imageFile(e.clipboardData?.items))}
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={(e) => {
-              e.preventDefault();
-              attach(imageFile(e.dataTransfer?.files));
-            }}
-            placeholder="Write a comment… @ to mention someone, paste or drop an image to attach it"
+            onUploadImage={uploadImage}
+            onDeleteImage={deleteOrphanedImage}
+            onSubmit={submit}
+            submitLabel="Comment"
+            placeholder="Write a comment… type / for blocks, @ to mention someone"
           />
-          {attachment && <AttachmentPreview url={attachment.url} onRemove={() => setAttachment(null)} />}
-          <div className="flex items-center justify-end">
-            <Button size="sm" className="gap-1.5" disabled={!body.trim()} onClick={submit}>
-              <Send className="h-3.5 w-3.5" />
-              Comment
-            </Button>
-          </div>
-        </div>
+        </Card>
       </div>
 
       <ConfirmDialog

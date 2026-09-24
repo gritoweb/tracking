@@ -22,20 +22,21 @@ describe("Card", () => {
       </Card>
     )
     const el = screen.getByTestId("item")
-    expect(el).toHaveClass("px-4", "py-3")
+    expect(el).toHaveClass("px-5", "py-4")
     expect(el).not.toHaveClass("py-6")
     expect(el.className).not.toMatch(/\bborder\b/)
   })
 
-  it("tone=muted is the step for a card sitting on an overlay surface", () => {
+  it("look=outlined is the thread entry: hairline, tighter corner, the surface's own background", () => {
     render(
-      <Card data-testid="card" tone="muted">
+      <Card data-testid="card" look="outlined">
         content
       </Card>
     )
     const el = screen.getByTestId("card")
-    expect(el).toHaveClass("bg-muted")
-    expect(el.className).not.toMatch(/\bborder\b/)
+    expect(el).toHaveClass("border", "rounded-lg", "bg-transparent")
+    expect(el).not.toHaveClass("rounded-container")
+    expect(el).not.toHaveClass("bg-card")
   })
 
   it("tone=destructive adds a wash, never a border", () => {

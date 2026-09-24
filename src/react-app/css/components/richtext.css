@@ -210,3 +210,14 @@
 .tt-richtext .tt-drag-source {
   opacity: 0.4;
 }
+/* Compact density (comments): the body at the comment size; headings keep their em scale, with less air above. */
+.tt-richtext.tt-richtext-compact {
+  min-height: 1.5em;
+  font-size: var(--text-sm);
+}
+.tt-richtext.tt-richtext-compact :is(h1, h2, h3) {
+  margin-top: 0.75em;
+}
+.tt-richtext.tt-richtext-compact > :first-child {
+  margin-top: 0;
+}

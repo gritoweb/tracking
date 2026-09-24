@@ -2,7 +2,7 @@ import { clsx, type ClassValue } from "clsx";
 import { extendTailwindMerge } from "tailwind-merge";
 
 /**
- * tailwind-merge has to be told about `text-micro` and `text-display`.
+ * tailwind-merge has to be told about `text-micro`, `text-display` and `rounded-container`.
  *
  * It classifies `text-*` by a built-in list of font sizes; `micro` and `display` are ours
  * (`--text-micro` / `--text-display` in css/global/theme.css), so out of the box it reads
@@ -15,7 +15,11 @@ import { extendTailwindMerge } from "tailwind-merge";
  * which is exactly why this hid: the same class worked in most of the app.
  */
 const twMerge = extendTailwindMerge({
-  extend: { classGroups: { "font-size": [{ text: ["micro", "display"] }] } },
+  extend: {
+    classGroups: { "font-size": [{ text: ["micro", "display"] }] },
+    // `rounded-container` is our radius token too; unknown to tailwind-merge, a variant's `rounded-lg` couldn't replace it.
+    theme: { radius: ["container"] },
+  },
 });
 
 export function cn(...inputs: ClassValue[]) {

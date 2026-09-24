@@ -901,14 +901,15 @@ export const TaskCommentsQuerySchema = z.object({
   before: z.string().min(1).optional(),
 });
 
+// A body can be the description's rich doc, so it shares the description's cap.
 export const CreateTaskCommentSchema = z.object({
-  body: z.string().min(1).max(4000),
+  body: z.string().min(1).max(TASK_DESCRIPTION_MAX),
   mentionedUserIds: z.array(z.string()).max(50).optional(),
   attachmentId: z.string().nullable().optional(),
 });
 
 export const UpdateTaskCommentSchema = z.object({
-  body: z.string().min(1).max(4000),
+  body: z.string().min(1).max(TASK_DESCRIPTION_MAX),
   mentionedUserIds: z.array(z.string()).max(50).optional(),
   attachmentId: z.string().nullable().optional(),
 });

@@ -4,6 +4,7 @@ import { XIcon } from "lucide-react"
 import { Dialog as DialogPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
+import { keepOpenOnLocalEscape } from "@/lib/escapeLocal"
 import { Button } from "@/components/ui/button"
 import { dialogContentVariants } from "@/components/ui/dialog-variants"
 
@@ -52,6 +53,7 @@ function DialogContent({
   children,
   size,
   showCloseButton = true,
+  onEscapeKeyDown,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> &
   VariantProps<typeof dialogContentVariants> & {
@@ -63,6 +65,11 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(dialogContentVariants({ size }), className)}
+        // Esc from an in-place edit cancels the edit; only an Esc from anywhere else closes this.
+        onEscapeKeyDown={(event) => {
+          keepOpenOnLocalEscape(event)
+          onEscapeKeyDown?.(event)
+        }}
         {...props}
       >
         {children}

@@ -1,5 +1,6 @@
 // Tasks: the plan side — list, edit, statuses, comments and image attachments.
 import { z } from "zod";
+import { commentText } from "@shared/comment-body";
 import type { CreateTask, Task, TaskActivity, TaskAttachment, TaskComment, TaskStatus, UpdateTask } from "@shared/schemas";
 import {
   ArchiveTaskStatusSchema, CreateTaskCommentSchema, CreateTaskSchema, CreateTaskStatusSchema,
@@ -92,7 +93,8 @@ function commentView(c: TaskComment, base: string) {
     id: c.id,
     url: taskUrl(base, c.taskId, "comments"),
     author: { userId: c.userId, name: c.userName },
-    body: c.body,
+    // A rich comment reads as text too, mentions in the same @[Name](user:ID) form the tools document.
+    body: commentText(c.body),
     mentionedUserIds: c.mentionedUserIds,
     attachmentId: c.attachmentId,
     createdAt: c.createdAt,

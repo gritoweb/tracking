@@ -207,3 +207,7 @@ A task description can be edited by several people at once when `COLLAB_DESCRIPT
 - **Source of truth stays D1.** The room keeps no storage (`hibernate: false`, state in memory while anyone is connected). Editors keep saving the tiptap JSON through the existing REST path on blur, so validation, activity and broadcasts are unchanged.
 - **Seeding**: an empty room is filled from D1 by exactly one editor. After syncing, an editor with an empty doc sends `seed?`; the room grants only while its fragment is empty and no other seeder holds the grant. Without this, two people opening an idle room together would both insert the description.
 - **Known limit**: a write that bypasses the editors (MCP, the Assistant) while a room is open is overwritten by the next editor save. Acceptable while the feature is local-only; the fix is for `PUT /api/tasks/:id` to reset an open room.
+
+## Comment bodies
+
+A task comment's `body` is one of two things: legacy text, where a tagged person is `@[Name](user:ID)`, or (since the rich composer) the same tiptap JSON doc as a description. Nothing on the server reads `body` directly: `commentText` (`src/shared/comment-body.ts`) turns either into the text form, and mention lookup, the mention notification's text and MCP's comment view all read that, so the two formats behave the same and MCP/the Assistant can keep writing plain text. The client opens either kind in the editor through `commentDoc`. The size cap is the description's (`TASK_DESCRIPTION_MAX`); a body with no text, mention or image is refused.

@@ -1,21 +1,21 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
+import type { JSONContent } from "@tiptap/react";
 import { formatStamp } from "@/lib/dateUtils";
 import { useUIStore } from "@/stores/uiStore";
-import { toast } from "sonner";
 import { Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { useEscapeLocal } from "@/hooks/useEscapeLocal";
 import { UserAvatar } from "@/components/layout/UserAvatar";
 import { AttachmentPreview } from "./TaskCommentAttachment";
-import { MentionInput } from "./MentionInput";
-import { MentionText } from "./MentionText";
-import { useUploadTaskAttachment } from "@/hooks/useTasks";
-import { imageFile, imageProblem } from "@/lib/taskCommentAttachments";
-import { decodeMentions, encodeMentions, taggedPeople, type MentionPerson } from "@shared/mentions";
+import { CommentComposer } from "./CommentComposer";
+import { RichTextEditor } from "./RichTextEditor";
+import { useTaskImageUpload } from "@/hooks/useTaskImageUpload";
+import { commentDoc } from "@shared/comment-body";
 import type { WorkspaceMember } from "@/hooks/useWorkspaceRole";
 import type { TaskComment } from "@shared/schemas";
 
-/** One comment as its own card, or its own edit form in that card when the author is editing it in place. */
+/** One comment as its own card; editing happens in that same card, under the same header, with the description's editor. */
 export function CommentRow({
   comment,
   taskId,
@@ -33,92 +33,60 @@ export function CommentRow({
   onDelete: () => void;
   onSave: (body: string, attachmentId: string | null) => void;
 }) {
-  const uploadAttachment = useUploadTaskAttachment();
   const timeFormat = useUIStore((s) => s.timeFormat);
   const [editing, setEditing] = useState(false);
-  // Edited as "@Name" text; the tags come back on save.
-  const [body, setBody] = useState(() => decodeMentions(comment.body, members));
-  const [picked, setPicked] = useState<MentionPerson[]>(() => taggedPeople(comment.body, members));
-  const [attachment, setAttachment] = useState<{ id: string; url: string } | null>(
-    comment.attachmentId && comment.attachmentUrl ? { id: comment.attachmentId, url: comment.attachmentUrl } : null
+  const { uploadImage, deleteOrphanedImage } = useTaskImageUpload(taskId);
+  const escapeLocal = useEscapeLocal(() => setEditing(false));
+  // Old comments are text with @[Name](user:ID) tags; both kinds open as the same doc.
+  const doc = commentDoc(comment.body) as JSONContent;
+
+  const header = (actions?: ReactNode) => (
+    <div className="flex items-center gap-2">
+      <UserAvatar name={comment.userName} image={comment.userImage} className="h-6 w-6 shrink-0" />
+      <span className="truncate text-sm font-medium">{comment.userName}</span>
+      <span className="shrink-0 text-micro text-muted-foreground">
+        {formatStamp(comment.createdAt, timeFormat)}
+        {comment.editedAt && " · edited"}
+      </span>
+      {actions}
+    </div>
   );
 
-  const attach = async (file: File | null) => {
-    if (!file) return;
-    const problem = imageProblem(file);
-    if (problem) return toast.error(problem);
-    const uploaded = await uploadAttachment.mutateAsync({ taskId, file });
-    setAttachment({ id: uploaded.id, url: uploaded.url });
-  };
+  // An image sent with an old comment (before images went inline) stays shown, and stays attached through an edit.
+  const legacyAttachment = comment.attachmentUrl ? (
+    <AttachmentPreview url={comment.attachmentUrl} filename={comment.attachmentFilename} />
+  ) : null;
 
   if (editing) {
     return (
-      <Card size="compact" tone="muted">
-        <div className="flex items-center gap-2">
-          <UserAvatar name={comment.userName} image={comment.userImage} className="h-6 w-6 shrink-0" />
-          <span className="text-sm font-medium">{comment.userName}</span>
-        </div>
-        {/* Same frame as the composer below the thread: a bare field inside it, actions inside it. */}
-        <div className="min-w-0 space-y-2 rounded-md border px-3 py-2">
-          <MentionInput
-            variant="bare"
-            aria-label="Edit comment"
-            value={body}
-            onValueChange={setBody}
-            members={members}
-            onPick={(member) => setPicked((list) => [...list, { userId: member.userId, name: member.name }])}
-            onPaste={(e) => attach(imageFile(e.clipboardData?.items))}
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={(e) => {
-              e.preventDefault();
-              attach(imageFile(e.dataTransfer?.files));
-            }}
-            autoFocus
-          />
-          {attachment && <AttachmentPreview url={attachment.url} onRemove={() => setAttachment(null)} />}
-          <div className="flex justify-end gap-1.5">
-            <Button variant="ghost" size="sm" onClick={() => setEditing(false)}>
-              Cancel
-            </Button>
-            <Button
-              size="sm"
-              disabled={!body.trim()}
-              onClick={() => {
-                onSave(encodeMentions(body.trim(), [...picked, ...members]), attachment?.id ?? null);
-                setEditing(false);
-              }}
-            >
-              Save
-            </Button>
-          </div>
-        </div>
+      // Esc cancels the edit (a "/" or "@" menu open above takes its own Esc first).
+      <Card size="compact" look="outlined" {...escapeLocal}>
+        {header()}
+        {legacyAttachment}
+        <CommentComposer
+          initial={doc}
+          members={members}
+          onUploadImage={uploadImage}
+          onDeleteImage={deleteOrphanedImage}
+          onSubmit={(body) => {
+            onSave(body, comment.attachmentId ?? null);
+            setEditing(false);
+          }}
+          onCancel={() => setEditing(false)}
+          submitLabel="Save"
+          autoFocus
+        />
       </Card>
     );
   }
 
   return (
-    <Card size="compact" tone="muted" className="group">
-      <div className="flex items-center gap-2">
-        <UserAvatar name={comment.userName} image={comment.userImage} className="h-6 w-6 shrink-0" />
-        <span className="truncate text-sm font-medium">{comment.userName}</span>
-        <span className="shrink-0 text-micro text-muted-foreground">
-          {formatStamp(comment.createdAt, timeFormat)}
-          {comment.editedAt && " · edited"}
-        </span>
-        {(isAuthor || canDelete) && (
+    <Card size="compact" look="outlined" className="group">
+      {header(
+        (isAuthor || canDelete) && (
           <div className="tt-reveal ml-auto flex shrink-0 items-center gap-0.5">
             {isAuthor && (
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                aria-label="Edit comment"
-                onClick={() => {
-                  // Members may have loaded since this row mounted, so decode when editing starts.
-                  setBody(decodeMentions(comment.body, members));
-                  setPicked(taggedPeople(comment.body, members));
-                  setEditing(true);
-                }}
-              >
+              <Button variant="ghost" size="icon-xs" aria-label="Edit comment" onClick={() => setEditing(true)}>
                 <Pencil className="h-3 w-3" />
               </Button>
             )}
@@ -128,12 +96,10 @@ export function CommentRow({
               </Button>
             )}
           </div>
-        )}
-      </div>
-      {comment.attachmentUrl && (
-        <AttachmentPreview url={comment.attachmentUrl} filename={comment.attachmentFilename} />
+        )
       )}
-      <MentionText body={comment.body} members={members} />
+      {legacyAttachment}
+      <RichTextEditor readOnly density="compact" aria-label="Comment" content={doc} members={members} />
     </Card>
   );
 }

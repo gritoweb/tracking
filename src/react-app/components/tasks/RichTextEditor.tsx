@@ -1,23 +1,22 @@
-import { useEffect } from "react";
-import { useEditor, EditorContent, Extension, type JSONContent } from "@tiptap/react";
+import { useEffect, useRef, type ReactNode } from "react";
+import { useEditor, EditorContent, type JSONContent } from "@tiptap/react";
 import { StarterKit } from "@tiptap/starter-kit";
 import { TaskList } from "@tiptap/extension-task-list";
 import { TaskItem } from "@tiptap/extension-task-item";
 import { Placeholder } from "@tiptap/extension-placeholder";
 import { Image } from "@tiptap/extension-image";
 import { TextStyle, Color } from "@tiptap/extension-text-style";
-import { Plugin, PluginKey, type EditorState } from "@tiptap/pm/state";
-import { Decoration, DecorationSet, type EditorView } from "@tiptap/pm/view";
 import { setMentionMembers, useEditorMentions } from "./useEditorMentions";
 import { dropHandleSlash, useEditorSlashCommands } from "./useEditorSlashCommands";
 import { RichTextBubbleMenu } from "./RichTextBubbleMenu";
 import { BlockHandle } from "./BlockHandle";
+import { EditorToolbar } from "./EditorToolbar";
+import { imageFile, insertUploadedImage, UploadPlaceholderExtension } from "./editorUpload";
 import { refreshMentionLabels } from "@/lib/mentionLabels";
 import { cn } from "@/lib/utils";
 import { getContrastColor } from "@/lib/colorUtils";
 import { NEUTRAL_SWATCH } from "@shared/colors";
 import type { WorkspaceMember } from "@/hooks/useWorkspaceRole";
-import { toastApiError } from "@/lib/toastApiError";
 import { Collaboration } from "@tiptap/extension-collaboration";
 import { CollaborationCaret } from "@tiptap/extension-collaboration-caret";
 import type { DescriptionCollab } from "@/hooks/useDescriptionCollab";
@@ -28,7 +27,20 @@ const LINE_HINT = "Write, or type / for commands";
 
 interface RichTextEditorProps {
   content: JSONContent;
-  onBlur: (doc: JSONContent) => void;
+  /** Autosave: the description writes on blur, not per keystroke. */
+  onBlur?: (doc: JSONContent) => void;
+  /** Every change, for a caller that holds the doc itself (a comment composer). */
+  onChange?: (doc: JSONContent) => void;
+  /** Ctrl/⌘+Enter: a composer's send. */
+  onSubmit?: (doc: JSONContent) => void;
+  /** Shows the doc with the same rendering, but nothing to edit: no handle, no menus, no caret. */
+  readOnly?: boolean;
+  autoFocus?: boolean;
+  /** The `EditorToolbar` row under the text ("+", clip, "@"), with `footer` (e.g. a send button) at its end. */
+  toolbar?: boolean;
+  footer?: ReactNode;
+  /** `document` for a description; `compact` sets the text at the comment size, headings scaling with it. */
+  density?: "document" | "compact";
   placeholder?: string;
   className?: string;
   "aria-label"?: string;
@@ -44,64 +56,6 @@ interface RichTextEditorProps {
   collab?: DescriptionCollab | null;
 }
 
-function imageFile(items: DataTransferItemList | FileList | null | undefined): File | null {
-  if (!items) return null;
-  for (const item of items) {
-    const file = "getAsFile" in item ? item.getAsFile() : (item as File);
-    if (file?.type.startsWith("image/")) return file;
-  }
-  return null;
-}
-
-interface PlaceholderSpec {
-  id: string;
-}
-
-type PlaceholderAction = { add: { id: string; pos: number } } | { remove: { id: string } };
-
-const uploadPlaceholderKey = new PluginKey<DecorationSet>("upload-placeholder");
-
-function placeholderDOM(): HTMLElement {
-  const span = document.createElement("span");
-  span.textContent = "Uploading image…";
-  span.style.opacity = "0.6";
-  span.style.fontStyle = "italic";
-  return span;
-}
-
-/** Tracks in-flight uploads as widget decorations mapped through every transaction, so an insert lands wherever the spot ended up rather than the position captured at upload time. */
-function uploadPlaceholderPlugin() {
-  return new Plugin<DecorationSet>({
-    key: uploadPlaceholderKey,
-    state: {
-      init: () => DecorationSet.empty,
-      apply(tr, set) {
-        set = set.map(tr.mapping, tr.doc);
-        const action = tr.getMeta(uploadPlaceholderKey) as PlaceholderAction | undefined;
-        if (action && "add" in action) {
-          set = set.add(tr.doc, [
-            Decoration.widget(action.add.pos, placeholderDOM, { id: action.add.id }),
-          ]);
-        } else if (action && "remove" in action) {
-          const stale = set.find(undefined, undefined, (spec: PlaceholderSpec) => spec.id === action.remove.id);
-          set = set.remove(stale);
-        }
-        return set;
-      },
-    },
-    props: {
-      decorations: (state) => uploadPlaceholderKey.getState(state),
-    },
-  });
-}
-
-const UploadPlaceholderExtension = Extension.create({
-  name: "uploadPlaceholder",
-  addProseMirrorPlugins() {
-    return [uploadPlaceholderPlugin()];
-  },
-});
-
 /** Another editor's caret; the name's ink follows the swatch, since white vanishes on the palette's light colours. */
 function renderCaret(user: { name?: string; color?: string }) {
   const color = user.color ?? NEUTRAL_SWATCH;
@@ -115,45 +69,6 @@ function renderCaret(user: { name?: string; color?: string }) {
   label.textContent = user.name ?? "";
   caret.appendChild(label);
   return caret;
-}
-
-function findPlaceholderPos(state: EditorState, id: string): number | null {
-  const set = uploadPlaceholderKey.getState(state);
-  const found = set?.find(undefined, undefined, (spec: PlaceholderSpec) => spec.id === id)?.[0];
-  return found ? found.from : null;
-}
-
-/** Reserves `pos` with a placeholder immediately, then resolves the upload against wherever that spot mapped to — never the position captured at drop/paste time. */
-function insertUploadedImage(
-  view: EditorView,
-  pos: number,
-  file: File,
-  onUploadImage: (file: File) => Promise<{ url: string; id: string }>,
-  onDeleteImage: ((id: string) => void) | undefined
-) {
-  const id = crypto.randomUUID();
-  view.dispatch(view.state.tr.setMeta(uploadPlaceholderKey, { add: { id, pos } } satisfies PlaceholderAction));
-
-  onUploadImage(file)
-    .then(({ url, id: attachmentId }) => {
-      const mappedPos = findPlaceholderPos(view.state, id);
-      const tr = view.state.tr.setMeta(uploadPlaceholderKey, { remove: { id } } satisfies PlaceholderAction);
-      if (mappedPos === null) {
-        // The upload already succeeded but its target text is gone — insert nowhere, clean up instead.
-        view.dispatch(tr);
-        onDeleteImage?.(attachmentId);
-        toastApiError(
-          new Error("Upload target position was removed before it finished"),
-          "Image uploaded but its spot in the text was deleted — removed"
-        );
-        return;
-      }
-      view.dispatch(tr.insert(mappedPos, view.state.schema.nodes.image.create({ src: url })));
-    })
-    .catch(() => {
-      // The upload itself already reported its own error (type/size checks or the mutation's own toast).
-      view.dispatch(view.state.tr.setMeta(uploadPlaceholderKey, { remove: { id } } satisfies PlaceholderAction));
-    });
 }
 
 /**
@@ -175,7 +90,21 @@ export function RichTextEditor({
   members = [],
   collab = null,
   editorClassName,
+  onChange,
+  onSubmit,
+  readOnly = false,
+  autoFocus = false,
+  toolbar = false,
+  footer,
+  density = "document",
 }: RichTextEditorProps) {
+  // tiptap keeps the options it was built with, so the handlers are read through refs to stay current.
+  const onChangeRef = useRef(onChange);
+  const onSubmitRef = useRef(onSubmit);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+    onSubmitRef.current = onSubmit;
+  });
   const mentions = useEditorMentions(members);
   const slash = useEditorSlashCommands();
   const editor = useEditor({
@@ -205,11 +134,24 @@ export function RichTextEditor({
         : []),
     ],
     content: collab ? undefined : content,
+    editable: !readOnly,
+    autofocus: autoFocus ? "end" : false,
+    onUpdate: ({ editor: e }) => onChangeRef.current?.(e.getJSON()),
     editorProps: {
+      handleKeyDown: (_view, event) => {
+        if (event.key !== "Enter" || !(event.metaKey || event.ctrlKey) || !onSubmitRef.current || !editorRef.current) return false;
+        onSubmitRef.current(editorRef.current.getJSON());
+        return true;
+      },
       attributes: {
         role: "textbox",
         ...(ariaLabel ? { "aria-label": ariaLabel } : {}),
-        class: cn("tt-richtext min-h-16 px-0 py-0", "focus:outline-none", editorClassName),
+        class: cn(
+          "tt-richtext px-0 py-0",
+          density === "compact" ? "tt-richtext-compact" : "min-h-16",
+          "focus:outline-none",
+          editorClassName
+        ),
       },
       handleDOMEvents: {
         click: (_view, event) => {
@@ -237,18 +179,22 @@ export function RichTextEditor({
     onBlur: ({ editor: e }) => {
       // A "/" the "+" handle left behind must not be saved as text.
       dropHandleSlash(e);
-      onBlur(e.getJSON());
+      onBlur?.(e.getJSON());
     },
   }, [collab?.doc]);
+  const editorRef = useRef(editor);
+  useEffect(() => {
+    editorRef.current = editor;
+  });
 
   // The sheet reopens on a different task without remounting this component — sync the content in.
   useEffect(() => {
     // In a live room the shared doc is the truth; pushing a refetched copy in would fight everyone's typing.
-    if (!editor || collab || editor.isFocused) return;
+    if (!editor || collab || (editor.isFocused && !readOnly)) return;
     const current = JSON.stringify(editor.getJSON());
     const next = JSON.stringify(content);
     if (current !== next) editor.commands.setContent(content);
-  }, [editor, content, collab]);
+  }, [editor, content, collab, readOnly]);
 
   // An empty room is filled from D1 by one editor only — the one the room grants — or two first arrivals would both insert it.
   useEffect(() => {
@@ -280,9 +226,17 @@ export function RichTextEditor({
 
   if (!editor) return null;
 
+  if (readOnly) return <EditorContent editor={editor} className={className} />;
+
   return (
     <>
       <EditorContent editor={editor} className={className} />
+      {toolbar && (
+        <div className="flex items-center justify-between gap-2">
+          <EditorToolbar editor={editor} onUploadImage={onUploadImage} onDeleteImage={onDeleteImage} />
+          {footer}
+        </div>
+      )}
       <RichTextBubbleMenu editor={editor} />
       <BlockHandle editor={editor} />
       {mentions.ui}

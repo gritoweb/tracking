@@ -1,9 +1,8 @@
 import { taskPath, type TaskTab } from "@shared/task-links";
-import { imageProblem } from "@/lib/taskCommentAttachments";
+import { useTaskImageUpload } from "@/hooks/useTaskImageUpload";
 import { useSyncedField } from "@/hooks/useSyncedField";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { toast } from "sonner";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { TaskDetailToolbar } from "./TaskDetailToolbar";
 import { TaskModalShell } from "./TaskModalShell";
@@ -21,7 +20,6 @@ import {
   useCompleteTask,
   useUpdateTask,
   useTaskAttachments,
-  useUploadTaskAttachment,
   useDeleteTaskAttachment,
 } from "@/hooks/useTasks";
 import { useWorkspaceMembers } from "@/hooks/useWorkspaceRole";
@@ -61,8 +59,8 @@ export function TaskDetail({ open, onClose, task, tab, onTabChange, onRequestDel
   const { data: allTasks = [] } = useAllTasks();
   const { data: attachments = [], isLoading: attachmentsLoading } = useTaskAttachments(task?.id ?? null);
   const { data: comments = [] } = useTaskComments(task?.id ?? null);
-  const uploadAttachment = useUploadTaskAttachment();
   const deleteAttachment = useDeleteTaskAttachment();
+  const { uploadImage, deleteOrphanedImage } = useTaskImageUpload(task?.id ?? null);
   const { startTimer, stopTimer } = useTimer();
   const runningEntry = useTimerStore((s) => s.runningEntry);
 
@@ -112,18 +110,6 @@ export function TaskDetail({ open, onClose, task, tab, onTabChange, onRequestDel
 
   // The only way an image reaches this task: pasted/dropped into the description or a
   // comment. The "Attachments" section below is a read-only gallery of what lands here.
-  const uploadImage = async (file: File): Promise<{ url: string; id: string }> => {
-    const problem = imageProblem(file);
-    if (problem) {
-      toast.error(problem);
-      throw new Error(problem);
-    }
-    const attachment = await uploadAttachment.mutateAsync({ taskId: task.id, file });
-    return { url: attachment.url, id: attachment.id };
-  };
-
-  // Only fires when an upload's insertion spot vanished mid-flight, leaving an orphan in R2 (RichTextEditor).
-  const deleteOrphanedImage = (id: string) => deleteAttachment.mutate({ taskId: task.id, id });
 
   const toolbar = (
     <TaskDetailToolbar

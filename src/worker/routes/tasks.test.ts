@@ -175,6 +175,25 @@ describe("POST /:id/comments — mentions written in the text", () => {
     expect(inserts[0].params[5]).toBe("u-ana");
   });
 
+  it("reads the people tagged in a rich (editor doc) body, same as in legacy text", async () => {
+    const doc = JSON.stringify({
+      type: "doc",
+      content: [{ type: "paragraph", content: [{ type: "text", text: "oi " }, { type: "mention", attrs: { id: "u-ana", label: "Ana" } }] }],
+    });
+    const { inserts, request } = post(doc, ["u-ana"]);
+    const res = await request();
+    expect(res.status).toBe(201);
+    expect(inserts[0].params[5]).toBe("u-ana");
+  });
+
+  it("refuses a rich body with nothing in it, as it would empty text", async () => {
+    const empty = JSON.stringify({ type: "doc", content: [{ type: "paragraph" }] });
+    const { inserts, request } = post(empty, []);
+    const res = await request();
+    expect(res.status).toBe(400);
+    expect(inserts).toHaveLength(0);
+  });
+
   it("still honours the ids a client sends (the MCP tool), next to the ones in the text", async () => {
     const { inserts, request } = post("oi @[Ana](user:u-ana)", ["u-ana", "u-bo"], { mentionedUserIds: ["u-bo"] });
     await request();

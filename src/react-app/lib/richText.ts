@@ -1,6 +1,6 @@
 import type { JSONContent } from "@tiptap/react";
 
-const EMPTY_DOC: JSONContent = { type: "doc", content: [{ type: "paragraph" }] };
+export const EMPTY_DOC: JSONContent = { type: "doc", content: [{ type: "paragraph" }] };
 
 /** A doc with no visible content — the editor's own default empty state. */
 function isEmptyDoc(doc: JSONContent): boolean {

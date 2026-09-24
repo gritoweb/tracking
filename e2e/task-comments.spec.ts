@@ -19,13 +19,14 @@ test("posting, editing and deleting a comment through the panel", async ({ page 
   // The modal (default) keeps comments beside the content, so there's no tab to open first.
   await expect(panel.getByRole("tab", { name: "Comments" })).toHaveCount(0);
 
-  await panel.getByPlaceholder("Write a comment…").fill("First pass looks good");
-  await panel.getByRole("button", { name: "Comment" }).click();
+  // The composer is the description's editor, found by its name (a contenteditable has no placeholder attribute).
+  await panel.getByRole("textbox", { name: "Write a comment" }).fill("First pass looks good");
+  await panel.getByRole("button", { name: "Comment", exact: true }).click();
   await expect(panel.getByText("First pass looks good")).toBeVisible();
   await expect(panel.getByText("Test User")).toBeVisible();
 
   await panel.getByRole("button", { name: "Edit comment" }).click();
-  const editBox = panel.getByRole("combobox", { name: "Edit comment" });
+  const editBox = panel.getByRole("textbox", { name: "Edit comment" });
   await editBox.fill("First pass looks good — ship it");
   await panel.getByRole("button", { name: "Save" }).click();
   await expect(panel.getByText("First pass looks good — ship it")).toBeVisible();

@@ -11,4 +11,8 @@ describe("cn", () => {
     expect(cn("text-sm", "text-micro")).toBe("text-micro");
     expect(cn("text-display", "text-muted-foreground")).toBe("text-display text-muted-foreground");
   });
+
+  it("lets a later radius replace our own rounded-container token", () => {
+    expect(cn("rounded-container", "rounded-lg")).toBe("rounded-lg");
+  });
 });

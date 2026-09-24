@@ -14,6 +14,7 @@ import {
 import { nextOccurrence, normalizeRecurRule } from "@shared/task-recurrence";
 import { taskPath } from "@shared/task-links";
 import { docMentions, mentionedIds } from "@shared/mentions";
+import { commentIsEmpty, commentText } from "@shared/comment-body";
 import { sqliteUtcToIso, sqliteUtcToIsoOrNull } from "../lib/sqlite-time";
 import { listActivity, memberNames, recordActivity, statusName, type ActivityInput } from "../lib/task-activity";
 import { broadcast, requestOrigin } from "../db/queries";
@@ -932,13 +933,14 @@ export const tasksRouter = new Hono<{
     if (!task) return c.json({ error: "Not found" }, 404);
 
     const { body, mentionedUserIds = [], attachmentId } = c.req.valid("json");
+    if (commentIsEmpty(body) && !attachmentId) return c.json({ error: "A comment needs text or an image" }, 400);
     // Never trust an attachment id from the client — it must belong to this task.
     const attachment = attachmentId
       ? await c.env.DB.prepare(`SELECT id FROM task_attachments WHERE id = ? AND task_id = ? AND workspace_id = ?`)
           .bind(attachmentId, taskId, workspaceId).first<{ id: string }>()
       : null;
     // Who's tagged (persisted, shown on the comment) is not who's notified — see below. The tags in the text count, and so do the ids a client sends (MCP).
-    const mentions = await currentMemberIds(c.env.DB, workspaceId, [...mentionedUserIds, ...mentionedIds(body)]);
+    const mentions = await currentMemberIds(c.env.DB, workspaceId, [...mentionedUserIds, ...mentionedIds(commentText(body))]);
     // A self-mention is never a notification.
     const notifyTargets = mentions.filter((m) => m !== userId);
 
@@ -964,7 +966,7 @@ export const tasksRouter = new Hono<{
         notifyMentions(c.env, workspaceId, notifyTargets, {
           type: "task_mention",
           title: `${author} mentioned you`,
-          body: `${task.name}: ${body}`,
+          body: `${task.name}: ${commentText(body)}`,
           link: taskPath(taskId, "comments"),
         })
       );
@@ -988,7 +990,8 @@ export const tasksRouter = new Hono<{
     if (existing.user_id !== userId) return c.json({ error: "Only the author can edit this comment" }, 403);
 
     const { body, mentionedUserIds = [], attachmentId } = c.req.valid("json");
-    const mentions = await currentMemberIds(c.env.DB, workspaceId, [...mentionedUserIds, ...mentionedIds(body)]);
+    if (commentIsEmpty(body) && !attachmentId) return c.json({ error: "A comment needs text or an image" }, 400);
+    const mentions = await currentMemberIds(c.env.DB, workspaceId, [...mentionedUserIds, ...mentionedIds(commentText(body))]);
     const attachment = attachmentId
       ? await c.env.DB.prepare(`SELECT id FROM task_attachments WHERE id = ? AND task_id = ? AND workspace_id = ?`)
           .bind(attachmentId, taskId, workspaceId).first<{ id: string }>()
