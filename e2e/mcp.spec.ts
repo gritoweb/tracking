@@ -107,8 +107,10 @@ test("mcp: a read-only key gets the read tools and none of the write tools", asy
   const names = (tools.result as { tools: { name: string }[] }).tools.map((t) => t.name);
   expect(names).toContain("get_time_summary");
   expect(names).toContain("get_project_pacing");
-  // The full catalog is 25 read + 39 write tools; a read key sees only the reads.
-  expect(names).toHaveLength(25);
+  expect(names).toContain("list_task_activity");
+  expect(names).not.toContain("fork_task_statuses");
+  // The full catalog is 26 read + 40 write tools; a read key sees only the reads.
+  expect(names).toHaveLength(26);
 
   // Every read tool must advertise itself as read-only, so a client can badge
   // it and skip the approval prompt it would otherwise raise.
@@ -125,7 +127,7 @@ test("mcp: a read-only key gets the read tools and none of the write tools", asy
   expect(names).not.toContain("start_favorite");
 });
 
-test("mcp: a read_write key gets the full catalog, 25 read tools plus 39 write tools", async ({
+test("mcp: a read_write key gets the full catalog, 26 read tools plus 40 write tools", async ({
   page,
 }) => {
   await signUp(page);
@@ -163,9 +165,9 @@ test("mcp: a read_write key gets the full catalog, 25 read tools plus 39 write t
   );
   const list = (tools.result as { tools: { name: string; annotations?: Record<string, boolean> }[] })
     .tools;
-  expect(list).toHaveLength(64);
-  expect(list.filter((t) => t.annotations?.readOnlyHint === true)).toHaveLength(25);
-  expect(list.filter((t) => t.annotations?.readOnlyHint !== true)).toHaveLength(39);
+  expect(list).toHaveLength(66);
+  expect(list.filter((t) => t.annotations?.readOnlyHint === true)).toHaveLength(26);
+  expect(list.filter((t) => t.annotations?.readOnlyHint !== true)).toHaveLength(40);
 
   const names = list.map((t) => t.name);
   expect(names).toContain("log_time");

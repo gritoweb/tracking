@@ -7,6 +7,7 @@
   - `list_tasks` returns a lean row per task (`taskListView`: id, name, url, status, project, and due date, priority, assignees, subtasks, repeat or done only when set); notes and the rest come from `get_task`.
   - `get_task` read the whole workspace's task list to find one task; it now asks for that task (new `GET /api/tasks/:id`, same `readTask` query and role scope as the rest) and its subtasks (new `parentId` filter on `GET /api/tasks`), subtasks in the lean row.
   - The `items` list inside the listable tools no longer repeats each field's explanation (`listableInput`); it saves little (tool definitions 14.4k → 14.2k tokens, vs 12.3k before `items` existed) because what repeats is the per-item validation itself, which stays.
+- e2e (local): task, Assistant and MCP specs 60 passed, 1 skipped, after updating `mcp.spec.ts`'s pinned catalog to 26 read + 40 write tools (the two tools added in (90)) and polling the modal-width check, which measured mid-way through the dialog's zoom-in and read 1629 instead of 1632.
 - Verified: `tsc -b` (0), `lint` (0), `vitest run` 1020/1020 (new: `get_task` returns the task and its subtasks; a task id from another workspace is "not found" and its name never appears), `pnpm check` (0).
 
 ## 2026-09-24 (94)

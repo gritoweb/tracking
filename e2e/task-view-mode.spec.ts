@@ -134,9 +134,8 @@ test.describe("on a 1920px screen", () => {
 
     await page.goto(`/tasks/${task.id}`);
     const panel = page.getByRole("dialog", { name: "Cutover plan" });
-    await expect(panel).toBeVisible();
-    const box = (await panel.boundingBox())!;
-    expect(Math.round(box.width)).toBe(1632);
-    expect(Math.round(box.x)).toBe(144);
+    // Polled: the dialog opens with a zoom from 95%, so a measure taken mid-animation reads a few pixels short.
+    await expect.poll(async () => Math.round((await panel.boundingBox())!.width)).toBe(1632);
+    expect(Math.round((await panel.boundingBox())!.x)).toBe(144);
   });
 });
