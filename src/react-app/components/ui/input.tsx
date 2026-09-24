@@ -9,13 +9,14 @@ function Input({
   type,
   size,
   variant,
+  focusRing,
   ...props
 }: Omit<React.ComponentProps<"input">, "size"> & VariantProps<typeof inputVariants>) {
   return (
     <input
       type={type}
       data-slot="input"
-      className={cn(inputVariants({ size, variant }), className)}
+      className={cn(inputVariants({ size, variant, focusRing }), className)}
       {...props}
     />
   )

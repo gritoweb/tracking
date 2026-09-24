@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-09-24 (86)
+### Changed
+- **No `eslint-disable` left in the project**, at Luis's request (a suppression hides the problem instead of fixing it). The seven remaining ones were fixed at the root by a Sonnet agent, reviewed and re-verified here:
+  - `lib/errorReporter.ts` and `routes/attachments.test.ts`: an empty `.catch(() => {})` now logs the failure (the reporter still can't re-report itself, which would recurse).
+  - `TimerBar`'s inset focus ring became `Input`'s `focusRing="inset"` variant; the board's drag overlay shadow became `ui/drag-overlay-variants.ts`. Same classes rendered, now owned by the primitives.
+  - `integrations/url-guard.ts` (SSRF guard's text sanitiser): the control-character regex became a code-point predicate with identical behaviour (each run of unsafe characters → one space, then spaces collapsed). Its test got an **independent** oracle rather than the agent's first version, which checked the output with the very predicate under test.
+  - `TimerWorkspace`'s flash-on-open effect reads the link's `entry` once via `useState(() => …)` and declares its real dependencies.
+- Verified: `tsc -b` (0), `lint` (0), `vitest run` 996/996, `pnpm check` (0), `grep eslint-disable` over `src`, `extension`, `e2e` → nothing.
+
 ## 2026-09-24 (85)
 ### Fixed
 - **Pressing Enter several times on the subtask field created one subtask per press.** Reported by Luis from real use. Root cause, both sides: `QuickAddTask` clears the field only when the server answers (`onSuccess: reset`, deliberate so a failure never loses what was typed), so each Enter while the POST was in flight sent the same create again; and `POST /api/tasks` had nothing to recognise a repeat. Proven before the fix: the new route test against the old handler got `201` four times for one create.

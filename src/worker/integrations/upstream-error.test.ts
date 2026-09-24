@@ -136,8 +136,12 @@ describe("upstream text cannot pass as a system message (S-13)", () => {
     const message = await pushError(workfrontAdapter, workfront);
     console.log(`forged upstream text surfaced as: ${JSON.stringify(message)}`);
     expect(message.startsWith("Workfront push failed: [acme.my.workfront.com] Session expired.")).toBe(true);
-    // eslint-disable-next-line no-control-regex
-    expect(message).not.toMatch(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/);
+    // An oracle independent of url-guard's own predicate: C0, DEL, C1 and the two Unicode separators.
+    const unsafe = [...message].filter((ch) => {
+      const code = ch.charCodeAt(0);
+      return code < 0x20 || (code >= 0x7f && code <= 0x9f) || code === 0x2028 || code === 0x2029;
+    });
+    expect(unsafe).toEqual([]);
     expect(message.length).toBeLessThanOrEqual("Workfront push failed: [acme.my.workfront.com] ".length + 200);
   });
 

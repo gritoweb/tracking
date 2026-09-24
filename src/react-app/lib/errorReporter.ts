@@ -20,8 +20,10 @@ export function reportClientError(error: unknown, { kind, route }: ReportClientE
       route: route ?? window.location.pathname,
       kind,
     }),
-    // eslint-disable-next-line no-restricted-syntax -- reporting a reporting failure would recurse into this same path
-  }).catch(() => {});
+  }).catch((err) => {
+    // Logging, not re-reporting: calling reportClientError here would recurse into this same path.
+    console.error("Failed to send client error report", err);
+  });
 }
 
 /** Wired once at startup, catching what no boundary sees. */

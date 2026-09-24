@@ -90,12 +90,11 @@ export function TimerWorkspace() {
   const today = useMemo(() => parseISO(dayKey), [dayKey]);
   const anchor = anchorOverride ?? today;
 
+  // Captured once at mount: only the link's initial load should flash, never a later, unrelated param change.
+  const [initialFlashEntryId] = useState(() => searchParams.get("entry"));
   useEffect(() => {
-    const entryId = searchParams.get("entry");
-    if (entryId) flashEntry(entryId);
-    // Only the link's initial load should flash — never re-run on an unrelated param change.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (initialFlashEntryId) flashEntry(initialFlashEntryId);
+  }, [initialFlashEntryId, flashEntry]);
 
   const isListView = effectiveView === "list";
   const { since, until } = useMemo(

@@ -18,8 +18,12 @@ function fakeEnv(handlers: D1StubHandlers) {
   return { env: { DB: db, ATTACHMENTS: { delete: async () => {} } } as unknown as Env, calls };
 }
 
-// eslint-disable-next-line no-restricted-syntax -- background work is not under test here
-const fakeCtx = { waitUntil: (p: Promise<unknown>) => { p.catch(() => {}); }, passThroughOnException: () => {} } as unknown as ExecutionContext;
+const fakeCtx = {
+  waitUntil: (p: Promise<unknown>) => {
+    p.catch((err) => console.error("background waitUntil task rejected in test", err));
+  },
+  passThroughOnException: () => {},
+} as unknown as ExecutionContext;
 
 describe("DELETE /:id (SEC-2: author or manager only)", () => {
   it("403s a plain member who neither uploaded the attachment nor manages the workspace", async () => {

@@ -15,10 +15,16 @@ export const inputVariants = cva(
         // rounded-md + px-2, never the pill with px-0: Chrome clips an input's text to its rounded box, cutting the first letters.
         bare: "rounded-md border-0 bg-transparent px-2 shadow-none focus-visible:ring-0 dark:bg-transparent",
       },
+      focusRing: {
+        outset: "",
+        // A borderless field's only focus signal (WCAG 2.4.7); the house outset ring would draw outside a 0-border field.
+        inset: "focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:ring-inset",
+      },
     },
     defaultVariants: {
       size: "default",
       variant: "default",
+      focusRing: "outset",
     },
   }
 )

@@ -198,6 +198,7 @@ export function TimerBar() {
       {/* Plain description field: free text, no suggestions dropdown. */}
       <Input
         variant="bare"
+        focusRing="inset"
         ref={descRef}
         value={description}
         onChange={(e) => setDescription(e.target.value)}
@@ -208,10 +209,8 @@ export function TimerBar() {
         }}
         placeholder="What are you working on?"
         className={cn(
-          // Inset + full opacity: border-0 leaves this ring as the input's only focus signal (WCAG 2.4.7).
           // min-w-0 lets flex-1 yield at xl; without it the overflow pushes the rightmost control off-screen.
-          // eslint-disable-next-line no-restricted-syntax -- an inset ring: the house ring would draw outside this borderless field
-          "tt-touch basis-full text-sm placeholder:text-muted-foreground focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:ring-inset xl:min-w-0 xl:flex-1 xl:basis-auto",
+          "tt-touch basis-full text-sm placeholder:text-muted-foreground xl:min-w-0 xl:flex-1 xl:basis-auto",
           isRunning && "font-medium"
         )}
       />

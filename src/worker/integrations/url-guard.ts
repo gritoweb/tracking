@@ -99,11 +99,23 @@ const ERROR_READ_BYTES = 2048;
 const ERROR_TEXT_CHARS = 200;
 
 // Control characters, C1, and the Unicode line/paragraph separators: none may reach a person's screen from upstream text.
-// eslint-disable-next-line no-control-regex
-const UNSAFE_TEXT = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]+/g;
+function isUnsafeCodePoint(code: number): boolean {
+  return code <= 0x1f || (code >= 0x7f && code <= 0x9f) || code === 0x2028 || code === 0x2029;
+}
 
 function flatten(text: string): string {
-  return text.replace(UNSAFE_TEXT, " ").replace(/ {2,}/g, " ").trim();
+  let out = "";
+  let inUnsafeRun = false;
+  for (const ch of text) {
+    if (isUnsafeCodePoint(ch.codePointAt(0)!)) {
+      if (!inUnsafeRun) out += " ";
+      inUnsafeRun = true;
+    } else {
+      out += ch;
+      inUnsafeRun = false;
+    }
+  }
+  return out.replace(/ {2,}/g, " ").trim();
 }
 
 /** Reads at most ERROR_READ_BYTES of an upstream error body, then drops the rest of the stream. */

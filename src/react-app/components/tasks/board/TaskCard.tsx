@@ -19,6 +19,7 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { ProjectBadge } from "@/components/ProjectBadge";
+import { dragOverlayVariants } from "@/components/ui/drag-overlay-variants";
 import { AssignButton } from "@/components/ui/assign-button";
 import { AvatarStack } from "@/components/ui/avatar";
 import { MultiSelect } from "@/components/pickers/MultiSelect";
@@ -109,8 +110,7 @@ export function TaskCard({ task, onOpen, onRequestDelete, overlay = false }: Tas
         !overlay && sortable.isDragging && "opacity-40",
         // The overlay renders in a portal, outside the column's own width — without this it
         // sizes to its content instead of matching the card it was picked up from.
-        // eslint-disable-next-line no-restricted-syntax -- the drag overlay floats over the board, so it is an overlay shadow
-        overlay && "w-(--size-board-column) shadow-lg cursor-grabbing"
+        overlay && cn("w-(--size-board-column) cursor-grabbing", dragOverlayVariants())
       )}
       onClick={(e) => {
         if (overlay) return;
