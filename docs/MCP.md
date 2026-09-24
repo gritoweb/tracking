@@ -116,9 +116,11 @@ reach — 25 on a read key, 64 on read+write (25 read + 39 write).
 |---|---|---|
 | Time | `get_running_timer`, `list_time_entries`, `get_time_entry`, `get_time_summary`, `run_report`, `list_drafts` | `log_time`, `update_time_entry`, `delete_time_entry`, `copy_week`, `draft_day` |
 | Catalog | `list_projects`, `list_clients`, `list_tags`, `get_project_pacing` | `create_project`, `update_project`, `archive_project`, `create_client`, `update_client`, `archive_client`, `create_tag`, `update_tag`, `delete_tag` |
-| Tasks | `list_tasks`, `get_task`, `list_task_statuses`, `list_task_comments`, `list_task_attachments` | `create_task`, `update_task`, `move_task`, `delete_task`, `create_task_status`, `update_task_status`, `archive_task_status`, `add_task_comment`, `edit_task_comment`, `delete_task_comment`, `upload_task_attachment`, `delete_task_attachment` |
+| Tasks | `list_tasks`, `get_task`, `list_task_statuses`, `list_task_comments`, `list_task_activity`, `list_task_attachments` | `create_task`, `update_task`, `move_task`, `delete_task`, `fork_task_statuses`, `create_task_status`, `update_task_status`, `archive_task_status`, `add_task_comment`, `edit_task_comment`, `delete_task_comment`, `upload_task_attachment`, `delete_task_attachment` |
 | Productivity | `list_favorites`, `list_recurring`, `list_saved_reports`, `get_planner` | `create_favorite`, `delete_favorite`, `create_recurring`, `update_recurring`, `delete_recurring`, `create_saved_report`, `delete_saved_report`, `set_planner_hours` |
 | Account | `whoami`, `list_members`, `list_api_keys`, `list_notifications`, `get_settings`, `get_calendar_status` | `mark_notification_read`, `mark_all_notifications_read`, `delete_notification`, `update_settings`, `set_calendar_auto_track` |
+
+`move_task` goes through the same route as dragging a card on the board: closing a task closes its subtasks (reopening brings them back), the card lands at the end of the new column, the change is recorded in the task's history (`list_task_activity`) and open boards update live. Pass `completedOn` (the person's local date) when closing a repeating task so its next occurrence is scheduled. `fork_task_statuses` gives one project its own columns (owners/admins).
 
 `list_task_comments` returns a task's newest 100 comments, oldest first. Pass `limit` (1–200) for a different page size and `before` (a comment id) to read the ones older than it.
 

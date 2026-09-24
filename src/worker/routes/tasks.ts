@@ -240,35 +240,6 @@ async function replayedTask(
   return row ? { task: formatTask(row), created: false } : null;
 }
 
-/** The MCP `move_task` tool's own minimal path to a status change — the REST routes' board-drag and dialog-save paths have more surface (subtask cascade, recurrence spawn) this doesn't need. */
-export async function moveTaskStatus(
-  db: D1Database,
-  workspaceId: string,
-  taskId: string,
-  statusId: string,
-  scopeUserId: string | null
-): Promise<{ task: Task; previousStatusId: string | null } | { error: string }> {
-  const existing = await db.prepare(`SELECT * FROM tasks WHERE id = ? AND workspace_id = ?`)
-    .bind(taskId, workspaceId).first<TaskRow>();
-  if (!existing) return { error: "Task not found" };
-
-  const status = await resolveStatus(db, workspaceId, statusId);
-  if (!status) return { error: "Status not found" };
-
-  const { active, completedAt } = syncFromCategory(
-    status.category,
-    Boolean(existing.active),
-    existing.completed_at ?? null
-  );
-  await db.prepare(
-    `UPDATE tasks SET status_id = ?, active = ?, completed_at = ? WHERE id = ? AND workspace_id = ?`
-  ).bind(status.id, active, completedAt, taskId, workspaceId).run();
-
-  const row = await readTask(db, taskId, workspaceId, scopeUserId);
-  if (!row) return { error: "Task moved but could not be read back" };
-  return { task: formatTask(row), previousStatusId: existing.status_id ?? null };
-}
-
 /**
  * Resolve a requested parent to a real, same-workspace, **top-level** task.
  *
@@ -691,7 +662,14 @@ export const tasksRouter = new Hono<{
     await c.env.DB.prepare(
       `UPDATE tasks SET status_id = ?, board_order = ?, active = ?, completed_at = ?
         WHERE id = ? AND workspace_id = ?`
-    ).bind(change.status.id, boardOrder, change.active, change.completedAt, id, workspaceId).run();
+    ).bind(
+      change.status.id,
+      boardOrder ?? (await nextBoardOrder(c.env.DB, workspaceId, change.status.id)),
+      change.active,
+      change.completedAt,
+      id,
+      workspaceId
+    ).run();
 
     if (change.status.id !== existing.status_id) {
       await recordActivity(c.env.DB, workspaceId, id, userId, [

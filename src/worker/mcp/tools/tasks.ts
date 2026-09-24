@@ -1,13 +1,11 @@
 // Tasks: the plan side — list, edit, statuses, comments and image attachments.
 import { z } from "zod";
-import type { Task, TaskAttachment, TaskComment } from "@shared/schemas";
+import type { Task, TaskActivity, TaskAttachment, TaskComment } from "@shared/schemas";
 import {
   ArchiveTaskStatusSchema, CreateTaskCommentSchema, CreateTaskSchema, CreateTaskStatusSchema,
-  UpdateTaskCommentSchema, UpdateTaskSchema, UpdateTaskStatusSchema,
+  MoveTaskSchema, UpdateTaskCommentSchema, UpdateTaskSchema, UpdateTaskStatusSchema,
 } from "@shared/schemas";
 import { findActiveProject } from "../../lib/projects";
-import { createTask, moveTaskStatus } from "../../routes/tasks";
-import { actorDisplayName, notifyAssigneesOfStatusChange, notifyNewAssignees } from "../../lib/notifications";
 import { appUrl } from "../../lib/app-url";
 import { taskUrl } from "../links";
 import { segment } from "../rest-bridge";
@@ -150,6 +148,21 @@ export function registerTaskReads(d: ToolDeps): void {
   );
 
   server.registerTool(
+    "list_task_activity",
+    {
+      title: "List a task's history",
+      description:
+        "What changed on a task and who changed it, oldest first: status, due date, priority and assignee changes (the same lines the app shows between the comments). Comments themselves come from list_task_comments.",
+      inputSchema: { taskId: IdArg("task") },
+      annotations: READ_ONLY,
+    },
+    async ({ taskId }) =>
+      fromBridge(await bridge<TaskActivity[]>("GET", `/api/tasks/${segment(taskId)}/activity`), (list) =>
+        list.map((a) => ({ by: a.userName, change: a.kind, from: a.from, to: a.to, at: a.createdAt }))
+      )
+  );
+
+  server.registerTool(
     "list_task_attachments",
     {
       title: "List a task's attachments",
@@ -165,7 +178,7 @@ export function registerTaskReads(d: ToolDeps): void {
 }
 
 export function registerTaskWrites(d: ToolDeps): void {
-  const { server, env, db, workspaceId, userId, scopeUserId, bridge } = d;
+  const { server, env, db, workspaceId, bridge } = d;
 
   server.registerTool(
     "create_task",
@@ -178,19 +191,12 @@ export function registerTaskWrites(d: ToolDeps): void {
       annotations: MUTATES,
     },
     async (data) => {
+      // Checked here only for a message a model can act on; the route itself creates, notifies and broadcasts.
       const project = await findActiveProject(db, workspaceId, data.projectId);
       if (!project) {
         return refuse(`No active project with id ${data.projectId} in this workspace. Call list_projects and ask the person which project this task belongs to.`);
       }
-      const result = await createTask(db, workspaceId, data, await scopeUserId(), userId);
-      if ("error" in result) return refuse(result.error);
-      if (data.assigneeIds?.length) {
-        await notifyNewAssignees(
-          env, workspaceId, result.task.id, result.task.name, userId,
-          await actorDisplayName(db, userId), data.assigneeIds
-        );
-      }
-      return json(taskView(result.task, appUrl(env)));
+      return fromBridge(await bridge<Task>("POST", "/api/tasks", data), (t) => taskView(t, appUrl(env)));
     }
   );
 
@@ -199,21 +205,21 @@ export function registerTaskWrites(d: ToolDeps): void {
     {
       title: "Move a task to a different status",
       description:
-        "Change which column/status a task is in — the same as dragging its card on the board. Use list_projects then the app (or a prior list_time_entries-style lookup) to get the taskId; never guess it. Notifies the task's assignees, except whoever's key is making this call.",
-      inputSchema: { taskId: z.string(), statusId: z.string() },
+        "Change which column/status a task is in — exactly what dragging its card on the board does: moving a task into a completed status closes its subtasks too (and reopening brings them back), the card goes to the end of the new column, the change is recorded in the task's history, and the task's assignees are notified (except whoever's key makes this call). " +
+        "Get the taskId from list_tasks and the statusId from list_task_statuses; never guess either. " +
+        "When closing a repeating task, pass `completedOn` (the person's local date) so its next occurrence is scheduled.",
+      inputSchema: {
+        taskId: IdArg("task"),
+        statusId: IdArg("status"),
+        completedOn: MoveTaskSchema.shape.completedOn,
+      },
       annotations: MUTATES,
     },
-    async ({ taskId, statusId }) => {
-      const result = await moveTaskStatus(db, workspaceId, taskId, statusId, await scopeUserId());
-      if ("error" in result) return refuse(result.error);
-      if (result.task.statusId !== result.previousStatusId) {
-        await notifyAssigneesOfStatusChange(
-          env, workspaceId, taskId, result.task.name, userId,
-          await actorDisplayName(db, userId), result.task.statusName ?? "a new status"
-        );
-      }
-      return json(taskView(result.task, appUrl(env)));
-    }
+    async ({ taskId, statusId, completedOn }) =>
+      fromBridge(
+        await bridge<Task>("PATCH", `/api/tasks/${segment(taskId)}/move`, { statusId, ...(completedOn ? { completedOn } : {}) }),
+        (t) => taskView(t, appUrl(env))
+      )
   );
 
   server.registerTool(
@@ -324,6 +330,18 @@ export function registerTaskWrites(d: ToolDeps): void {
       annotations: DESTRUCTIVE,
     },
     async ({ attachmentId }) => fromBridge(await bridge("DELETE", `/api/attachments/${segment(attachmentId)}`))
+  );
+
+  server.registerTool(
+    "fork_task_statuses",
+    {
+      title: "Give a project its own statuses",
+      description:
+        "Copy the workspace's board columns into one project, so that project's columns can then be renamed, added or archived without touching the other projects. Owners and admins only. Get the projectId from list_projects; the result is the project's new column list.",
+      inputSchema: { projectId: IdArg("project") },
+      annotations: MUTATES,
+    },
+    async ({ projectId }) => fromBridge(await bridge("POST", "/api/task-statuses/fork", { projectId }))
   );
 
   server.registerTool(

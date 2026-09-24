@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-09-24 (90)
+### Fixed
+- **Moving a task through the MCP didn't do what the board does.** `move_task` ran its own short path (`moveTaskStatus`), whose comment claimed it didn't need the rest; it skipped five things dragging the card does: subtasks following their parent across the done line, a repeating task scheduling its next occurrence, the card going to the end of its new column (`board_order`), the status change in the task's history, and the live update to open boards. `move_task` now calls the board's own route (`PATCH /api/tasks/:id/move`) through the REST bridge and takes an optional `completedOn`; `MoveTaskSchema.boardOrder` became optional (omitted → end of the column); `moveTaskStatus` is deleted. `create_task` also goes through `POST /api/tasks` now, so it broadcasts to open boards (it didn't) and notifies assignees from one place. No MCP tool writes tasks outside the app's routes any more.
+### Added
+- MCP `list_task_activity` (a task's history: who changed status, dates, priority, assignees) and `fork_task_statuses` (a project's own columns; owners/admins). Scope agreed with Luis: tasks only; API keys stay out of the MCP by design.
+### Verified
+- New `src/worker/mcp/tools/tasks.test.ts` drives the real tools through the real bridge on an in-memory SQLite: all 7 cases **failed on the old code** (subtask left open, no next occurrence, no `tasks:changed`, card order unchanged, tools missing) and pass now; it also pins that a read-only key sees none of the task write tools and that a member is refused the fork. `tsc -b` (0), `lint` (0), `vitest run` 1007/1007, `pnpm check` (0).
+
 ## 2026-09-24 (89)
 ### Changed
 - **Comment and activity times read like ClickUp's**: "Just now" inside the first minute, then "Sep 22 at 12:01 pm" (the year added once it isn't this one), instead of date-fns' relative "less than a minute ago". It follows the person's 12h/24h preference ("Sep 22 at 12:01" in 24h). One helper, `formatStamp` in `lib/dateUtils.ts`, used by `TaskCommentRow` and `TaskActivityRow`; the notification bell keeps its relative time. Tests: four cases in `dateUtils.test.ts`; `vitest` all green, `lint` (0).

@@ -347,7 +347,8 @@ export const UpdateTaskSchema = z.object({
 /** What a drag on the board sends: the column it landed in and where in it. */
 export const MoveTaskSchema = z.object({
   statusId: z.string(),
-  boardOrder: z.number(),
+  /** Omitted (the MCP's move_task), the card goes to the end of its new column. */
+  boardOrder: z.number().optional(),
   /** The dropping client's local date, for the recurrence spawn — see UpdateTaskSchema. */
   completedOn: LocalDateSchema.optional(),
 });
