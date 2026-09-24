@@ -3,9 +3,9 @@ import { z } from "zod";
 import { buildReportWhere, durationExpr, formatEntry, ENTRY_SELECT } from "../../db/queries";
 import type { TimeEntryJoinRow } from "../../db/rows";
 import { generateDrafts, listDrafts } from "../../lib/drafts";
-import { BULK_ENTRY_IDS_MAX, BulkUpdateTimeEntriesSchema, UpdateTimeEntrySchema } from "@shared/schemas";
+import { UpdateTimeEntrySchema } from "@shared/schemas";
 import { segment, type BridgeResult } from "../rest-bridge";
-import { batchInput, rejected, runBatch } from "../batch";
+import { listableInput, rejected, runListable } from "../batch";
 import { entryUrl } from "../links";
 import { appUrl } from "../../lib/app-url";
 import type { TimeEntry } from "@shared/schemas";
@@ -308,7 +308,6 @@ export function registerEntryReads(d: ToolDeps): void {
 export function registerEntryWrites(d: ToolDeps): void {
   const { server, ctx, env, workspaceId, bridge } = d;
 
-  // One implementation shared by log_time and log_times.
   const logInput = {
     description: z.string().max(2000).describe("What the work was"),
     start: z.string().describe("ISO 8601 start instant with offset, e.g. 2026-09-18T14:00:00-03:00"),
@@ -334,24 +333,14 @@ export function registerEntryWrites(d: ToolDeps): void {
   server.registerTool(
     "log_time",
     {
-      title: "Log a time entry",
+      title: "Log time entries",
       description:
-        "Record work that has already happened, exactly as the app's manual entry does. Times are ISO 8601 instants — resolve relative phrasing against the person's local time first. Needs a project from list_projects; ask which one rather than choosing. Returns the new entry, whose id update_time_entry and delete_time_entry take. Not idempotent: a second call logs a second entry. For more than one entry use log_times: one call, one approval.",
-      inputSchema: logInput,
+        "Record work that has already happened, exactly as the app's manual entry does. Times are ISO 8601 instants — resolve relative phrasing against the person's local time first. Needs a project from list_projects; ask which one rather than choosing. Returns the new entry, whose id update_time_entry and delete_time_entry take. Not idempotent: a second call logs a second entry. " +
+        "Several at once: pass `items` (each with these same fields) — one call, one approval, a report per item.",
+      inputSchema: listableInput(logInput, "entries to log"),
       annotations: MUTATES,
     },
-    async (args) => fromBridge(await logOne(args), entryView)
-  );
-  server.registerTool(
-    "log_times",
-    {
-      title: "Log several time entries",
-      description:
-        "Record several entries in one call (one approval), in order; each item is what log_time takes, with the same rules (ISO 8601 instants, a project from list_projects for each). Reports which went through and which didn't.",
-      inputSchema: batchInput(logInput, "entries to log"),
-      annotations: MUTATES,
-    },
-    async ({ items }) => runBatch(items, logOne, entryView)
+    async (args) => runListable(logInput, args, logOne, entryView)
   );
 
   server.registerTool(
@@ -390,57 +379,42 @@ export function registerEntryWrites(d: ToolDeps): void {
     }
   );
 
+  const updateEntryInput = { entryId: IdArg("time entry"), ...UpdateTimeEntrySchema.shape };
+  const updateEntryOne = ({ entryId, ...patch }: { entryId: string } & Record<string, unknown>) =>
+    bridge<TimeEntry>("PUT", `/api/time_entries/${segment(entryId)}`, patch);
+  const deleteEntryInput = { entryId: IdArg("time entry") };
+
   server.registerTool(
     "update_time_entry",
     {
-      title: "Edit a time entry",
+      title: "Edit time entries",
       description:
-        "Change an entry's description, project, task, start/stop, billable flag or tags — only the fields passed change. Same rules as editing it in the app: a member edits only their own entries, and a running entry only by its owner. `tags` replaces the whole list.",
-      inputSchema: { entryId: IdArg("time entry"), ...UpdateTimeEntrySchema.shape },
+        "Change an entry's description, project, task, start/stop, billable flag or tags — only the fields passed change. Same rules as editing it in the app: a member edits only their own entries, and a running entry only by its owner. `tags` replaces the whole list. " +
+        "Several at once: pass `items` (each with these same fields) — one call, one approval, a report per item.",
+      inputSchema: listableInput(updateEntryInput, "edits"),
       annotations: { ...MUTATES, idempotentHint: true },
     },
-    async ({ entryId, ...patch }) =>
-      fromBridge(await bridge<TimeEntry>("PUT", `/api/time_entries/${segment(entryId)}`, patch), (e) => withEntryUrl(e, appUrl(env)))
+    async (args) => runListable(updateEntryInput, args, updateEntryOne, entryView)
   );
 
   server.registerTool(
     "delete_time_entry",
     {
-      title: "Delete a time entry",
-      description: "Permanently remove one entry. Only when the person asked for this exact entry to go — confirm which one first.",
-      inputSchema: { entryId: IdArg("time entry") },
+      title: "Delete time entries",
+      description:
+        "Permanently remove entries. Only when the person asked for these exact entries to go — list them and confirm first. " +
+        `Several at once: pass \`items\` ([{ entryId }], up to ${ROW_LIMIT}) — one call, one approval, all or nothing: if any isn't the caller's to delete, none are.`,
+      inputSchema: listableInput(deleteEntryInput, "entries to delete", ROW_LIMIT),
       annotations: DESTRUCTIVE,
     },
-    async ({ entryId }) => fromBridge(await bridge("DELETE", `/api/time_entries/${segment(entryId)}`))
-  );
-
-  server.registerTool(
-    "update_time_entries",
-    {
-      title: "Edit several time entries",
-      description:
-        "Apply the same change (project, task, billable, tags, description) to many entries in one call (one approval). All or nothing: if any entry isn't the caller's to edit, none change. Ids from list_time_entries; `tags` replaces each entry's whole list.",
-      inputSchema: {
-        entryIds: z.array(IdArg("time entry")).min(1).max(BULK_ENTRY_IDS_MAX).describe("Entry ids from list_time_entries"),
-        patch: BulkUpdateTimeEntriesSchema.shape.patch,
-      },
-      annotations: { ...MUTATES, idempotentHint: true },
-    },
-    async ({ entryIds, patch }) => fromBridge(await bridge("PATCH", "/api/time_entries/bulk", { ids: entryIds, patch }))
-  );
-
-  server.registerTool(
-    "delete_time_entries",
-    {
-      title: "Delete several time entries",
-      description:
-        "Permanently remove many entries in one call (one approval). All or nothing: if any entry isn't the caller's to delete, none are. Only when the person asked for exactly these to go — list them and confirm first.",
-      inputSchema: {
-        entryIds: z.array(IdArg("time entry")).min(1).max(BULK_ENTRY_IDS_MAX).describe("Entry ids from list_time_entries"),
-      },
-      annotations: DESTRUCTIVE,
-    },
-    async ({ entryIds }) => fromBridge(await bridge("DELETE", "/api/time_entries/bulk", { ids: entryIds }))
+    async (args) =>
+      runListable(
+        deleteEntryInput,
+        args,
+        ({ entryId }) => bridge("DELETE", `/api/time_entries/${segment(entryId)}`),
+        undefined,
+        (items) => bridge("DELETE", "/api/time_entries/bulk", { ids: items.map((i) => i.entryId) })
+      )
   );
 
   server.registerTool(

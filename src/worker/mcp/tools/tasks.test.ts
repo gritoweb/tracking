@@ -155,11 +155,11 @@ describe("MCP task history and project statuses", () => {
   });
 });
 
-describe("batch tools: several items, one call, one approval", () => {
-  it("creates several tasks in one call and reports each", async () => {
+describe("the same tools take a list: several items, one call, one approval", () => {
+  it("creates several tasks through create_task's items and reports each", async () => {
     const w = world();
     const admin = w.toolsFor("u-admin");
-    const res = await w.call(admin, "create_tasks", {
+    const res = await w.call(admin, "create_task", {
       items: [
         { name: "One", projectId: "p1" },
         { name: "Two", projectId: "p1" },
@@ -172,9 +172,18 @@ describe("batch tools: several items, one call, one approval", () => {
     expect(names).toEqual(["One", "Two"]);
   });
 
+  it("still takes one item exactly as before, and refuses one missing a required field", async () => {
+    const w = world();
+    const admin = w.toolsFor("u-admin");
+    const one = await w.call(admin, "create_task", { name: "Solo", projectId: "p1" });
+    expect(one.data).toMatchObject({ name: "Solo" });
+    const bad = await w.call(admin, "create_task", { name: "No project" });
+    expect(bad.error).toContain("projectId");
+  });
+
   it("is an error only when nothing went through", async () => {
     const w = world();
-    const res = await w.call(w.toolsFor("u-admin"), "create_tasks", { items: [{ name: "X", projectId: "missing" }] });
+    const res = await w.call(w.toolsFor("u-admin"), "create_task", { items: [{ name: "X", projectId: "missing" }] });
     expect(res.error).toContain("None of the 1 went through");
   });
 
@@ -185,7 +194,7 @@ describe("batch tools: several items, one call, one approval", () => {
     const p = (await w.call(admin, "create_task", { name: "P", projectId: "p1" })).data!;
     const k = (await w.call(admin, "create_task", { name: "K", projectId: "p1", parentId: p.id })).data!;
     const q = (await w.call(admin, "create_task", { name: "Q", projectId: "p1" })).data!;
-    const res = await w.call(admin, "move_tasks", { items: [{ taskId: p.id, statusId: closed }, { taskId: q.id, statusId: closed }] });
+    const res = await w.call(admin, "move_task", { items: [{ taskId: p.id, statusId: closed }, { taskId: q.id, statusId: closed }] });
     expect(res.data).toMatchObject({ done: 2, failed: [] });
     expect(w.row(k.id as string).active).toBe(0);
   });
@@ -195,15 +204,15 @@ describe("batch tools: several items, one call, one approval", () => {
     const admin = w.toolsFor("u-admin");
     const a = (await w.call(admin, "create_task", { name: "A", projectId: "p1" })).data!;
     const b = (await w.call(admin, "create_task", { name: "B", projectId: "p1" })).data!;
-    const res = await w.call(admin, "delete_tasks", { items: [{ taskId: a.id }, { taskId: b.id }] });
+    const res = await w.call(admin, "delete_task", { items: [{ taskId: a.id }, { taskId: b.id }] });
     expect(res.data).toMatchObject({ done: 2 });
     expect((w.raw.prepare(`SELECT COUNT(*) AS n FROM tasks`).get() as { n: number }).n).toBe(0);
   });
 
-  it("logs several entries, then deletes them all in one call", async () => {
+  it("logs several entries through log_time, then deletes them all in one delete_time_entry call", async () => {
     const w = world();
     const admin = w.toolsFor("u-admin");
-    const logged = await w.call(admin, "log_times", {
+    const logged = await w.call(admin, "log_time", {
       items: [
         { description: "Standup", start: "2026-09-24T12:00:00Z", stop: "2026-09-24T12:15:00Z", projectId: "p1" },
         { description: "Review", start: "2026-09-24T13:00:00Z", stop: "2026-09-24T14:00:00Z", projectId: "p1" },
@@ -212,15 +221,15 @@ describe("batch tools: several items, one call, one approval", () => {
     });
     expect(logged.data).toMatchObject({ done: 2, failed: [{ index: 2, error: "stop must be after start." }] });
     const ids = (w.raw.prepare(`SELECT id FROM time_entries`).all() as { id: string }[]).map((r) => r.id);
-    const removed = await w.call(admin, "delete_time_entries", { entryIds: ids });
+    const removed = await w.call(admin, "delete_time_entry", { items: ids.map((entryId) => ({ entryId })) });
     expect(removed.error).toBeNull();
     expect((w.raw.prepare(`SELECT COUNT(*) AS n FROM time_entries`).get() as { n: number }).n).toBe(0);
   });
 
-  it("hides every batch write tool from a read-only key", () => {
-    const read = world().toolsFor("u-admin", "read");
+  it("has no duplicated batch twins in the catalog", () => {
+    const tools = world().toolsFor("u-admin");
     for (const name of ["create_tasks", "move_tasks", "update_tasks", "delete_tasks", "log_times", "update_time_entries", "delete_time_entries"]) {
-      expect(read.has(name)).toBe(false);
+      expect(tools.has(name)).toBe(false);
     }
   });
 });

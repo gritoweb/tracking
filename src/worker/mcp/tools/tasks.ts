@@ -9,7 +9,7 @@ import { findActiveProject } from "../../lib/projects";
 import { appUrl } from "../../lib/app-url";
 import { taskUrl } from "../links";
 import { segment, type BridgeResult } from "../rest-bridge";
-import { batchInput, rejected, runBatch } from "../batch";
+import { listableInput, rejected, runListable } from "../batch";
 import { DESTRUCTIVE, IdArg, MUTATES, READ_ONLY, ROW_LIMIT, fromBridge, hours, json, refuse, richTextToPlain, type ToolDeps } from "../shared";
 
 /** Largest image a tool accepts, matching the upload route's own limit. */
@@ -238,90 +238,50 @@ export function registerTaskWrites(d: ToolDeps): void {
     "Get taskId from list_tasks and statusId from list_task_statuses; never guess either. When closing a repeating task, pass `completedOn` (the person's local date) so its next occurrence is scheduled.";
   const DELETE_DOC =
     "Permanently deletes with subtasks, comments and attachments. Only the author or a workspace owner/admin may. Tracked time logged against it stays. Confirm with the person first.";
-  const BATCH_DOC = " For more than one, use the batch tool: one call, one approval, and a per-item report of what went through.";
+  const LIST_DOC = " Several at once: pass `items` (each with these same fields) — one call, one approval, a report per item.";
 
   server.registerTool(
     "create_task",
     {
-      title: "Create a task",
-      description: "Add a task to a project's plan — the thing to be done, separate from tracked time. " + CREATE_DOC + BATCH_DOC.replace("the batch tool", "create_tasks"),
-      inputSchema: createInput,
+      title: "Create tasks",
+      description: "Add a task to a project's plan — the thing to be done, separate from tracked time. " + CREATE_DOC + LIST_DOC,
+      inputSchema: listableInput(createInput, "tasks to create"),
       annotations: MUTATES,
     },
-    async (data) => fromBridge(await createOne(data), view)
-  );
-  server.registerTool(
-    "create_tasks",
-    {
-      title: "Create several tasks",
-      description: "Add several tasks in one call (one approval), in order; each item is what create_task takes. " + CREATE_DOC,
-      inputSchema: batchInput(createInput, "tasks to create"),
-      annotations: MUTATES,
-    },
-    async ({ items }) => runBatch(items, createOne, view)
+    async (args) => runListable(createInput, args, createOne, view)
   );
 
   server.registerTool(
     "move_task",
     {
-      title: "Move a task to a different status",
-      description: "Change which column/status a task is in. " + MOVE_DOC + BATCH_DOC.replace("the batch tool", "move_tasks"),
-      inputSchema: moveInput,
+      title: "Move tasks to a different status",
+      description: "Change which column/status a task is in. " + MOVE_DOC + LIST_DOC,
+      inputSchema: listableInput(moveInput, "moves"),
       annotations: MUTATES,
     },
-    async (args) => fromBridge(await moveOne(args), view)
-  );
-  server.registerTool(
-    "move_tasks",
-    {
-      title: "Move several tasks",
-      description: "Move several tasks in one call (one approval), in order; each item is what move_task takes. " + MOVE_DOC,
-      inputSchema: batchInput(moveInput, "moves"),
-      annotations: MUTATES,
-    },
-    async ({ items }) => runBatch(items, moveOne, view)
+    async (args) => runListable(moveInput, args, moveOne, view)
   );
 
   server.registerTool(
     "update_task",
     {
-      title: "Edit a task",
-      description: UPDATE_DOC + BATCH_DOC.replace("the batch tool", "update_tasks"),
-      inputSchema: updateInput,
+      title: "Edit tasks",
+      description: UPDATE_DOC + LIST_DOC,
+      inputSchema: listableInput(updateInput, "edits"),
       annotations: { ...MUTATES, idempotentHint: true },
     },
-    async (args) => fromBridge(await updateOne(args), view)
-  );
-  server.registerTool(
-    "update_tasks",
-    {
-      title: "Edit several tasks",
-      description: "Edit several tasks in one call (one approval), in order; each item is what update_task takes. " + UPDATE_DOC,
-      inputSchema: batchInput(updateInput, "edits"),
-      annotations: { ...MUTATES, idempotentHint: true },
-    },
-    async ({ items }) => runBatch(items, updateOne, view)
+    async (args) => runListable(updateInput, args, updateOne, view)
   );
 
   server.registerTool(
     "delete_task",
     {
-      title: "Delete a task",
-      description: "Permanently delete a task. " + DELETE_DOC + BATCH_DOC.replace("the batch tool", "delete_tasks"),
-      inputSchema: deleteInput,
+      title: "Delete tasks",
+      description: "Permanently delete a task. " + DELETE_DOC + LIST_DOC,
+      inputSchema: listableInput(deleteInput, "tasks to delete"),
       annotations: DESTRUCTIVE,
     },
-    async (args) => fromBridge(await deleteOne(args))
-  );
-  server.registerTool(
-    "delete_tasks",
-    {
-      title: "Delete several tasks",
-      description: "Delete several tasks in one call (one approval). " + DELETE_DOC,
-      inputSchema: batchInput(deleteInput, "tasks to delete"),
-      annotations: DESTRUCTIVE,
-    },
-    async ({ items }) => runBatch(items, deleteOne)
+    async (args) => runListable(deleteInput, args, deleteOne)
   );
 
   server.registerTool(

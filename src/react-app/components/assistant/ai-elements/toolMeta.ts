@@ -28,7 +28,7 @@ export function humanizeToolName(name: string): string {
 }
 
 function iconFor(name: string): LucideIcon {
-  if (name === "log_time" || name === "log_times" || name === "copy_week") return Clock;
+  if (name === "log_time" || name === "copy_week") return Clock;
   if (name === "get_time_summary" || name === "run_report" || name === "get_project_pacing") return BarChart3;
   if (name === "draft_day") return CalendarClock;
   if (/^(delete|archive)_/.test(name)) return Trash2;
