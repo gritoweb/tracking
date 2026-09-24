@@ -244,14 +244,38 @@ describe("list_tasks answers 'my tasks' with every open task, as a list of links
     const done = (await w.call(admin, "create_task", { name: "Finished", projectId: "p1" })).data!;
     await w.call(admin, "move_task", { taskId: done.id, statusId: closed });
 
-    const listed = (await w.call(admin, "list_tasks", {})).data as unknown as { name: string; url: string; status: { category: string } }[];
+    const listed = (await w.call(admin, "list_tasks", {})).data as unknown as { name: string; url: string; done?: boolean }[];
 
     expect(listed.map((t) => t.name)).toEqual(expect.arrayContaining(["Due next month", "No date"]));
     expect(listed.map((t) => t.name)).not.toContain("Finished");
     // Each is its own item with a url, which is what the Assistant's card turns into a link.
     expect(listed.every((t) => t.url.startsWith("http://localhost:5173/tasks/"))).toBe(true);
 
-    const withDone = (await w.call(admin, "list_tasks", { includeDone: true })).data as unknown as { status: { category: string } }[];
-    expect(withDone.at(-1)?.status.category).toBe("completed");
+    const withDone = (await w.call(admin, "list_tasks", { includeDone: true })).data as unknown as { name: string; done?: boolean }[];
+    expect(withDone.at(-1)).toMatchObject({ name: "Finished", done: true });
+  });
+});
+
+describe("get_task reads one task, not the whole workspace", () => {
+  it("returns the task with its subtasks", async () => {
+    const w = world();
+    const admin = w.toolsFor("u-admin");
+    const parent = (await w.call(admin, "create_task", { name: "Parent", projectId: "p1" })).data!;
+    await w.call(admin, "create_task", { name: "Kid", projectId: "p1", parentId: parent.id });
+    const got = await w.call(admin, "get_task", { taskId: parent.id });
+    expect(got.data).toMatchObject({ name: "Parent", subtaskList: [{ name: "Kid" }] });
+  });
+
+  it("refuses a task from another workspace as not found, revealing nothing", async () => {
+    const w = world();
+    w.raw.exec(`
+      INSERT INTO workspaces (id, name) VALUES ('ws-B', 'B');
+      INSERT INTO clients (id, workspace_id, name) VALUES ('cl-B', 'ws-B', 'Other');
+      INSERT INTO projects (id, workspace_id, name, client_id) VALUES ('pB', 'ws-B', 'Other', 'cl-B');
+      INSERT INTO tasks (id, workspace_id, project_id, name) VALUES ('secret', 'ws-B', 'pB', 'Secret plan');
+    `);
+    const got = await w.call(w.toolsFor("u-admin"), "get_task", { taskId: "secret" });
+    expect(got.error).toContain("No task with id secret");
+    expect(got.error).not.toContain("Secret plan");
   });
 });

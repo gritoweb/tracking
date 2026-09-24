@@ -8,10 +8,13 @@ export const BATCH_MAX = 50;
 
 /** A tool's input that takes one item exactly as before, or `items` for several of the same. */
 export function listableInput<S extends ZodRawShape>(shape: S, what: string, max = BATCH_MAX) {
+  // Same rules per item, without repeating each field's explanation: the single-item fields already carry it, and the
+  // whole schema is sent to the model with every message.
+  const bare = Object.fromEntries(Object.entries(shape).map(([key, field]) => [key, (field as z.ZodType).meta({ description: undefined })]));
   return {
     ...z.object(shape).partial().shape,
     items: z
-      .array(z.object(shape))
+      .array(z.object(bare))
       .min(1)
       .max(max)
       .optional()

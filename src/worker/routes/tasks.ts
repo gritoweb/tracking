@@ -342,13 +342,14 @@ export const tasksRouter = new Hono<{
   // ─── List tasks ───────────────────────────────────────────────────────────
   .get("/", async (c) => {
     const workspaceId = c.get("workspaceId");
-    const { projectId, statusId, includeInactive, assignee } = c.req.query();
+    const { projectId, statusId, includeInactive, assignee, parentId } = c.req.query();
 
     let where = `WHERE tk.workspace_id = ?`;
     const bindings: unknown[] = [workspaceId];
 
     if (projectId) { where += ` AND tk.project_id = ?`; bindings.push(projectId); }
     if (statusId) { where += ` AND tk.status_id = ?`; bindings.push(statusId); }
+    if (parentId) { where += ` AND tk.parent_id = ?`; bindings.push(parentId); }
     if (!includeInactive) { where += ` AND tk.active = 1`; }
     if (assignee) {
       const assigneeId = assignee === "me" ? c.get("userId") : assignee;
@@ -366,6 +367,12 @@ export const tasksRouter = new Hono<{
     ).bind(...(scopeUserId ? [scopeUserId] : []), ...bindings).all<TaskJoinRow>();
 
     return c.json(results.map(formatTask), 200);
+  })
+  // One task — the MCP's get_task used to load the whole workspace's list to find it.
+  .get("/:id", async (c) => {
+    const row = await readTask(c.env.DB, c.req.param("id"), c.get("workspaceId"), await taskScope(c));
+    if (!row) return c.json({ error: "Not found" }, 404);
+    return c.json(formatTask(row), 200);
   })
   // ─── Create ───────────────────────────────────────────────────────────────
   .post("/", zValidator("json", CreateTaskSchema), async (c) => {

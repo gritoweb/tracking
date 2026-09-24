@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-09-24 (95)
+### Changed
+- **The MCP spends far fewer tokens per answer.** Measured on 20 realistic tasks (notes, a due date, an assignee): `list_tasks` went from 18,332 to 5,211 characters (~4,600 → ~1,300 tokens, −72%).
+  - Every tool result is unindented JSON now (`mcp/shared.ts` `json`): a model reads it the same, and the indentation was paid for on every result of every tool.
+  - `list_tasks` returns a lean row per task (`taskListView`: id, name, url, status, project, and due date, priority, assignees, subtasks, repeat or done only when set); notes and the rest come from `get_task`.
+  - `get_task` read the whole workspace's task list to find one task; it now asks for that task (new `GET /api/tasks/:id`, same `readTask` query and role scope as the rest) and its subtasks (new `parentId` filter on `GET /api/tasks`), subtasks in the lean row.
+  - The `items` list inside the listable tools no longer repeats each field's explanation (`listableInput`); it saves little (tool definitions 14.4k → 14.2k tokens, vs 12.3k before `items` existed) because what repeats is the per-item validation itself, which stays.
+- Verified: `tsc -b` (0), `lint` (0), `vitest run` 1020/1020 (new: `get_task` returns the task and its subtasks; a task id from another workspace is "not found" and its name never appears), `pnpm check` (0).
+
 ## 2026-09-24 (94)
 ### Fixed
 - **`lint-catch-rules.test.ts` failed now and then in a full run** ("flags an empty handler", its first case). The first case paid for loading the repo's whole ESLint config, which under the parallel suite passed vitest's 5s default; alone it always passed. The load now happens once in a `beforeAll` with its own 60s allowance. Note: (93) was committed and pushed after a run where this test had failed — the commit and push weren't gated on the run's result; a rerun was green, and this makes the run reliable. `vitest run` 1018/1018.

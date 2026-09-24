@@ -10,7 +10,7 @@ import { appUrl } from "../../lib/app-url";
 import { taskUrl } from "../links";
 import { segment, type BridgeResult } from "../rest-bridge";
 import { listableInput, rejected, runListable } from "../batch";
-import { DESTRUCTIVE, IdArg, MUTATES, READ_ONLY, ROW_LIMIT, fromBridge, hours, json, refuse, richTextToPlain, type ToolDeps } from "../shared";
+import { DESTRUCTIVE, IdArg, MUTATES, READ_ONLY, ROW_LIMIT, compact, fromBridge, hours, json, refuse, richTextToPlain, type ToolDeps } from "../shared";
 
 /** Largest image a tool accepts, matching the upload route's own limit. */
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
@@ -24,6 +24,24 @@ export function sortByColumn(tasks: Task[], columnOrder: string[]): Task[] {
     return i >= 0 ? i : columnOrder.length + (CATEGORY_ORDER[t.statusCategory as keyof typeof CATEGORY_ORDER] ?? 3);
   };
   return [...tasks].sort((a, b) => rank(a) - rank(b));
+}
+
+/** A task in a list: what it takes to pick one and link it — notes and the rest come from get_task. Empty fields are left out. */
+function taskListView(t: Task, base: string) {
+  return {
+    id: t.id,
+    name: t.name,
+    url: taskUrl(base, t.id),
+    status: t.statusName,
+    project: t.projectName,
+    ...(t.dueDate ? { dueDate: t.dueDate } : {}),
+    ...(t.priority < 4 ? { priority: t.priority } : {}),
+    ...(t.assignees.length ? { assignees: t.assignees.map((a) => a.name) } : {}),
+    ...(t.parentId ? { parentId: t.parentId } : {}),
+    ...(t.subtaskTotal ? { subtasks: `${t.subtaskDone}/${t.subtaskTotal}` } : {}),
+    ...(t.recurRule ? { repeats: t.recurRule } : {}),
+    ...(t.active ? {} : { done: true }),
+  };
 }
 
 /** A task as a model reads it: plain-text notes, hours, names instead of colours. */
@@ -70,7 +88,7 @@ export function registerTaskReads(d: ToolDeps): void {
     {
       title: "List tasks",
       description:
-        "Tasks in the workspace — the plan, not tracked time — in the board's column order (Backlog, Pendente, Em progresso, QA…), each with its status and url. Open tasks only unless `includeDone`, so completed ones are left out. " +
+        "Tasks in the workspace — the plan, not tracked time — in the board's column order (Backlog, Pendente, Em progresso, QA…), each with its status and url (notes and full details: get_task). Open tasks only unless `includeDone`, so completed ones are left out. " +
         "\"My tasks\" with no date means ALL of the person's open tasks: assignee `me` and NO dueBy — whatever their due date, or none. Pass dueBy only when the person names a day or period (\"today\", \"this week\"). " +
         "Filter by project, status, assignee (`me` for the key's owner) or due day. Use this to find a taskId before editing, moving, commenting or attaching.",
       inputSchema: {
@@ -100,7 +118,7 @@ export function registerTaskReads(d: ToolDeps): void {
       return fromBridge(tasks, (list) =>
         sortByColumn(list.filter((t) => !dueBy || (t.dueDate !== null && t.dueDate <= dueBy)), columnOrder)
           .slice(0, ROW_LIMIT)
-          .map((t) => taskView(t, appUrl(env)))
+          .map((t) => taskListView(t, appUrl(env)))
       );
     }
   );
@@ -114,14 +132,19 @@ export function registerTaskReads(d: ToolDeps): void {
       annotations: READ_ONLY,
     },
     async ({ taskId }) => {
-      const result = await bridge<Task[]>("GET", "/api/tasks?includeInactive=true");
-      if (!result.ok) return fromBridge(result);
-      const task = result.data.find((t) => t.id === taskId);
-      if (!task) return refuse(`No task with id ${taskId} in this workspace. Call list_tasks to find it.`);
-      return json({
-        ...taskView(task, appUrl(env)),
-        subtaskList: result.data.filter((t) => t.parentId === taskId).map((t) => taskView(t, appUrl(env))),
-      });
+      const [task, subtasks] = await Promise.all([
+        bridge<Task>("GET", `/api/tasks/${segment(taskId)}`),
+        bridge<Task[]>("GET", `/api/tasks?${new URLSearchParams({ parentId: taskId, includeInactive: "true" })}`),
+      ]);
+      if (!task.ok) {
+        return task.status === 404 ? refuse(`No task with id ${taskId} in this workspace. Call list_tasks to find it.`) : fromBridge(task);
+      }
+      return json(
+        compact({
+          ...taskView(task.data, appUrl(env)),
+          subtaskList: subtasks.ok ? subtasks.data.map((t) => taskListView(t, appUrl(env))) : [],
+        })
+      );
     }
   );
 

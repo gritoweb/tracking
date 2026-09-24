@@ -50,9 +50,9 @@ export interface ToolDeps {
   bridge: RestBridge;
 }
 
-/** MCP tool results are text; JSON is the most reliably parsed shape for one. */
+/** MCP tool results are text; JSON is the most reliably parsed shape for one. Unindented: a model reads it the same, and indentation is paid for in tokens on every result. */
 export function json(value: unknown) {
-  return { content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }] };
+  return { content: [{ type: "text" as const, text: JSON.stringify(value) }] };
 }
 
 export function text(value: string) {
