@@ -1,10 +1,12 @@
-import { formatDistanceToNow } from "date-fns";
 import { Avatar } from "@/components/ui/avatar";
+import { formatStamp } from "@/lib/dateUtils";
+import { useUIStore } from "@/stores/uiStore";
 import { describeActivity } from "@/lib/taskActivity";
 import type { TaskActivity } from "@shared/schemas";
 
 /** One change to the task, as a quiet line in the comments feed. */
 export function TaskActivityRow({ activity }: { activity: TaskActivity }) {
+  const timeFormat = useUIStore((s) => s.timeFormat);
   return (
     <div className="flex items-start gap-2 px-3 py-2 text-xs text-muted-foreground">
       <Avatar name={activity.userName} image={activity.userImage} size="xs" className="mt-0.5 shrink-0" />
@@ -21,7 +23,7 @@ export function TaskActivityRow({ activity }: { activity: TaskActivity }) {
         )}
         <span className="text-micro" title={new Date(activity.createdAt).toLocaleString()}>
           {" · "}
-          {formatDistanceToNow(new Date(activity.createdAt), { addSuffix: true })}
+          {formatStamp(activity.createdAt, timeFormat)}
         </span>
       </p>
     </div>

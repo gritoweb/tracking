@@ -1,6 +1,7 @@
 import { useState } from "react";
+import { formatStamp } from "@/lib/dateUtils";
+import { useUIStore } from "@/stores/uiStore";
 import { toast } from "sonner";
-import { formatDistanceToNow } from "date-fns";
 import { Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/layout/UserAvatar";
@@ -32,6 +33,7 @@ export function CommentRow({
   onSave: (body: string, attachmentId: string | null) => void;
 }) {
   const uploadAttachment = useUploadTaskAttachment();
+  const timeFormat = useUIStore((s) => s.timeFormat);
   const [editing, setEditing] = useState(false);
   // Edited as "@Name" text; the tags come back on save.
   const [body, setBody] = useState(() => decodeMentions(comment.body, members));
@@ -97,7 +99,7 @@ export function CommentRow({
         <div className="flex items-center gap-1.5">
           <span className="text-sm font-medium">{comment.userName}</span>
           <span className="text-micro text-muted-foreground">
-            {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}
+            {formatStamp(comment.createdAt, timeFormat)}
             {comment.editedAt && " · edited"}
           </span>
         </div>

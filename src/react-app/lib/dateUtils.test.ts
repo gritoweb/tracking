@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   formatDayHeader,
+  formatStamp,
   formatDurationShort,
   formatFullDate,
   formatListRangeLabel,
@@ -268,5 +269,21 @@ describe("summarizePeriod", () => {
     const since = new Date(2026, 0, 3);
     const until = new Date(2026, 0, 9);
     expect(summarizePeriod(since, until, 1)).toBe("Jan 3 – 9");
+  });
+});
+
+describe("formatStamp (ClickUp's comment/activity time)", () => {
+  const now = new Date(2026, 8, 24, 9, 42);
+  it("says Just now inside the first minute", () => {
+    expect(formatStamp(new Date(2026, 8, 24, 9, 41, 30).toISOString(), "12h", now)).toBe("Just now");
+  });
+  it("gives the day and a lowercase am/pm time in 12h", () => {
+    expect(formatStamp(new Date(2026, 8, 22, 12, 1).toISOString(), "12h", now)).toBe("Sep 22 at 12:01 pm");
+  });
+  it("gives a 24h time when that's the person's preference", () => {
+    expect(formatStamp(new Date(2026, 8, 22, 12, 1).toISOString(), "24h", now)).toBe("Sep 22 at 12:01");
+  });
+  it("adds the year once it isn't this one", () => {
+    expect(formatStamp(new Date(2025, 11, 31, 18, 5).toISOString(), "12h", now)).toBe("Dec 31, 2025 at 6:05 pm");
   });
 });

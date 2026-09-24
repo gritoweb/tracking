@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-09-24 (89)
+### Changed
+- **Comment and activity times read like ClickUp's**: "Just now" inside the first minute, then "Sep 22 at 12:01 pm" (the year added once it isn't this one), instead of date-fns' relative "less than a minute ago". It follows the person's 12h/24h preference ("Sep 22 at 12:01" in 24h). One helper, `formatStamp` in `lib/dateUtils.ts`, used by `TaskCommentRow` and `TaskActivityRow`; the notification bell keeps its relative time. Tests: four cases in `dateUtils.test.ts`; `vitest` all green, `lint` (0).
+
 ## 2026-09-24 (88)
 ### Changed
 - **The empty due-date and assignee buttons are one control now.** Luis saw the assignee icon larger than the date's beside it: the date was a hand-rolled button (~18px square, 14px icon, 50% ink) and the assignee the `AssignButton` primitive (20px dashed circle, 12px icon). New primitive `ui/slot-button.tsx` — the Dashed Rule's "empty, click to fill" circle, taking any icon — with `slot-button-variants.ts` (renamed from `assign-button-variants.ts`); `AssignButton` is now a `SlotButton` with the add-person icon, and the empty date in the quick-add line and in the task list rows uses the same `SlotButton`. A set date keeps its text chip.

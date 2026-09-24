@@ -107,6 +107,15 @@ export function formatEntryTime(isoString: string, timeFormat?: "24h" | "12h"): 
  * renders (list groups, the live day total, the moved-day flash, CSV export)
  * goes through here so they all agree with the clock on the wall.
  */
+/** When a comment or change happened, ClickUp's way: "Just now", "Sep 22 at 12:01 pm", with the year once it isn't this one. */
+export function formatStamp(isoString: string, timeFormat?: "24h" | "12h", now: Date = new Date()): string {
+  const date = new Date(isoString);
+  if (now.getTime() - date.getTime() < 60_000) return "Just now";
+  const time = (timeFormat ?? getTimeFormat()) === "12h" ? "h:mm aaa" : "HH:mm";
+  const day = date.getFullYear() === now.getFullYear() ? "MMM d" : "MMM d, yyyy";
+  return format(date, `${day} 'at' ${time}`);
+}
+
 export function localDayKey(isoString: string): string {
   return format(parseISO(isoString), "yyyy-MM-dd");
 }
