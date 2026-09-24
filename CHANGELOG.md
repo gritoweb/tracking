@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-09-24 (97)
+### Changed
+- `list_tasks`' description no longer gives example column names (Backlog, Pendente, Em progresso, QA): workspaces rename their columns (Luis's local ones are now To do / In progress…), and the examples could steer a model toward names that don't exist. Nothing in the MCP or the Assistant keys on a status name — moves use ids from `list_task_statuses`, "done" is the `completed` category — so renaming columns needs no change anywhere; the names in `DEFAULT_STATUSES` only seed a new workspace. `tsc -b` (0), `lint` (0), MCP tests green.
+
 ## 2026-09-24 (96)
 ### Changed
 - **`tools/mcp-grade.mjs` (the live grader of every MCP tool) runs with one key and proves today's behaviour.** It needed three keys (owner, read-only, member); the read and member keys are now optional and their checks print SKIP, never PASS. It refuses any host but localhost (it writes data), logs one ✔/✘ line per call, and covers what changed today: `items` on `create_task`, `update_task` (assignees), `move_task`, `delete_task`, `log_time`, `update_time_entry`, `delete_time_entry`; a parent closed/reopened through `move_task` taking its subtask along; `list_task_activity` recording both moves; a repeating task closed with `completedOn` spawning the next day's; `fork_task_statuses`; `list_tasks` with no date returning linked tasks; the catalog at 66 with no batch twins. Run on the local dev server with Luis's admin key: `GRADE: all 66 at 10`, exit 0, 99 ✔ lines, no ✘. Documented in CLAUDE.md "Commands".

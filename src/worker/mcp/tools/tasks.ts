@@ -17,7 +17,7 @@ const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 
 const CATEGORY_ORDER = { not_started: 0, active: 1, completed: 2 } as const;
 
-/** Tasks in the board's column order (Backlog, Pendente, Em progresso…); a project's own columns follow by category. */
+/** Tasks in the board's column order, first column first; a project's own columns follow by category. */
 export function sortByColumn(tasks: Task[], columnOrder: string[]): Task[] {
   const rank = (t: Task) => {
     const i = t.statusId ? columnOrder.indexOf(t.statusId) : -1;
@@ -88,7 +88,7 @@ export function registerTaskReads(d: ToolDeps): void {
     {
       title: "List tasks",
       description:
-        "Tasks in the workspace — the plan, not tracked time — in the board's column order (Backlog, Pendente, Em progresso, QA…), each with its status and url (notes and full details: get_task). Open tasks only unless `includeDone`, so completed ones are left out. " +
+        "Tasks in the workspace — the plan, not tracked time — in the board's column order (whatever the workspace named its columns; list_task_statuses has them), each with its status and url (notes and full details: get_task). Open tasks only unless `includeDone`, so completed ones are left out. " +
         "\"My tasks\" with no date means ALL of the person's open tasks: assignee `me` and NO dueBy — whatever their due date, or none. Pass dueBy only when the person names a day or period (\"today\", \"this week\"). " +
         "Filter by project, status, assignee (`me` for the key's owner) or due day. Use this to find a taskId before editing, moving, commenting or attaching.",
       inputSchema: {
