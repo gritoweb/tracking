@@ -1,7 +1,7 @@
 import { cva } from "class-variance-authority"
 
 // Dashed Rule (DESIGN.md §5): dashed border means empty, click to fill — never a "can't" signal.
-export const assignButtonVariants = cva(
+export const slotButtonVariants = cva(
   "inline-flex shrink-0 items-center justify-center rounded-full border border-dashed transition-colors duration-fast ease-out-quart hit-area outline-none focus-ring hover:border-muted-foreground hover:text-muted-foreground",
   {
     variants: {

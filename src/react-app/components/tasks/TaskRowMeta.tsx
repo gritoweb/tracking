@@ -4,6 +4,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ProjectBadge } from "@/components/ProjectBadge";
 import { AssignButton } from "@/components/ui/assign-button";
+import { SlotButton } from "@/components/ui/slot-button";
 import { AvatarStack } from "@/components/ui/avatar";
 import { MultiSelect } from "@/components/pickers/MultiSelect";
 import { TaskStatusChip } from "./TaskStatusChip";
@@ -68,17 +69,22 @@ export function TaskRowMeta({
           is how you change the date. */}
       <Popover open={dueOpen} onOpenChange={onDueOpenChange}>
         <PopoverTrigger asChild>
-          <button
-            aria-label={task.dueDate ? `Due ${formatDueDate(task.dueDate)} — change` : "Set due date"}
-            className={cn(
-              "shrink-0 rounded px-1 text-xs transition-colors duration-fast ease-out-quart hover:bg-muted",
-              task.dueDate
-                ? DUE_TONE_CLASS[tone ?? "later"]
-                : "tt-reveal text-muted-foreground/50 hover:text-muted-foreground"
-            )}
-          >
-            {task.dueDate ? formatDueDate(task.dueDate) : <CalendarDays className="h-3.5 w-3.5" />}
-          </button>
+          {task.dueDate ? (
+            <button
+              aria-label={`Due ${formatDueDate(task.dueDate)} — change`}
+              className={cn(
+                "shrink-0 rounded px-1 text-xs transition-colors duration-fast ease-out-quart hover:bg-muted",
+                DUE_TONE_CLASS[tone ?? "later"]
+              )}
+            >
+              {formatDueDate(task.dueDate)}
+            </button>
+          ) : (
+            // Empty, it's the same dashed slot as the assignee beside it.
+            <SlotButton className="shrink-0" aria-label="Set due date">
+              <CalendarDays />
+            </SlotButton>
+          )}
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="end">
           <Calendar

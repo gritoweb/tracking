@@ -79,9 +79,25 @@ export function TaskAttachments({ attachments, loading, onOpenLightbox, onDelete
         void send([...e.dataTransfer.files]);
       }}
     >
-      <div className="flex items-center justify-between">
-        <Label className="text-base font-semibold">Attachments</Label>
-        <Button type="button" variant="ghost" size="sm" onClick={() => picker.current?.click()} disabled={uploading > 0}>
+      <Label className="text-base font-semibold">Attachments</Label>
+      {loading ? (
+        <Skeleton className="h-20 w-20" />
+      ) : attachments.length > 0 ? (
+        <div className="flex flex-wrap gap-2">
+          {attachments.map((a) => (
+            <AttachmentThumb key={a.id} attachment={a} onOpen={() => onOpenLightbox(a)} onDelete={() => setPendingDelete(a)} />
+          ))}
+        </div>
+      ) : (
+        <p className="flex items-center gap-1.5 text-micro text-muted-foreground">
+          <Paperclip className="h-3 w-3" />
+          No images yet — attach one, drop it here, or paste it into the description or a comment.
+        </p>
+      )}
+
+      {/* Below what's there, not beside the title: the action follows the content it adds to. */}
+      <div>
+        <Button type="button" variant="outline" size="sm" onClick={() => picker.current?.click()} disabled={uploading > 0}>
           {uploading > 0 ? <Spinner size="sm" /> : <Paperclip className="h-3.5 w-3.5" />}
           Attach image
         </Button>
@@ -98,20 +114,6 @@ export function TaskAttachments({ attachments, loading, onOpenLightbox, onDelete
           }}
         />
       </div>
-      {loading ? (
-        <Skeleton className="h-20 w-20" />
-      ) : attachments.length > 0 ? (
-        <div className="flex flex-wrap gap-2">
-          {attachments.map((a) => (
-            <AttachmentThumb key={a.id} attachment={a} onOpen={() => onOpenLightbox(a)} onDelete={() => setPendingDelete(a)} />
-          ))}
-        </div>
-      ) : (
-        <p className="flex items-center gap-1.5 text-micro text-muted-foreground">
-          <Paperclip className="h-3 w-3" />
-          No images yet — attach one, drop it here, or paste it into the description or a comment.
-        </p>
-      )}
 
       <ConfirmDialog
         open={!!pendingDelete}

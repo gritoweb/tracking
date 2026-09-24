@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-24 (88)
+### Changed
+- **The empty due-date and assignee buttons are one control now.** Luis saw the assignee icon larger than the date's beside it: the date was a hand-rolled button (~18px square, 14px icon, 50% ink) and the assignee the `AssignButton` primitive (20px dashed circle, 12px icon). New primitive `ui/slot-button.tsx` — the Dashed Rule's "empty, click to fill" circle, taking any icon — with `slot-button-variants.ts` (renamed from `assign-button-variants.ts`); `AssignButton` is now a `SlotButton` with the add-person icon, and the empty date in the quick-add line and in the task list rows uses the same `SlotButton`. A set date keeps its text chip.
+- **Attachments: "Attach image" sits below the images (or the empty note), left-aligned**, instead of beside the title, as an outline button so its edge lines up with the text.
+- Verified: `tsc -b` (0), `lint` (0), component tests 141/141, task e2e 36 passed (a first run had two failures, one `ECONNRESET` from the dev server; the rerun passed all 36). Screenshot of the subtask row and attachments checked.
+
 ## 2026-09-24 (87)
 ### Added
 - **A subtask shows "Subtask of" its parent above its name**, with the parent's status dot (hover: "Current status: …") and one click to open the parent, as ClickUp does (`TaskParentLink`, in both the modal and the sidebar).

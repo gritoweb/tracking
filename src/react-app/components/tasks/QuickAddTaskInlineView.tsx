@@ -7,6 +7,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { MultiSelect } from "@/components/pickers/MultiSelect";
 import { AssignButton } from "@/components/ui/assign-button";
+import { SlotButton } from "@/components/ui/slot-button";
 import { AvatarStack } from "@/components/ui/avatar";
 import { ProjectPicker } from "@/components/pickers/ProjectPicker";
 import { formatDueDate, dateToLocalDate, localDateToDate, PRIORITY_LABEL, type ParsedQuickAdd } from "@/lib/taskUtils";
@@ -99,13 +100,13 @@ export function QuickAddTaskInlineView({
 
         <Popover open={dueOpen} onOpenChange={onDueOpenChange}>
           <PopoverTrigger asChild>
-            <button
-              type="button"
+            <SlotButton
+              reveal="always"
+              className="shrink-0"
               aria-label={manualDueDate ? `Due ${formatDueDate(manualDueDate)} — change` : "Set due date"}
-              className="shrink-0 rounded p-0.5 text-muted-foreground/50 transition-colors duration-fast ease-out-quart hover:bg-muted hover:text-muted-foreground"
             >
-              <CalendarDays className="h-3.5 w-3.5" />
-            </button>
+              <CalendarDays />
+            </SlotButton>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0" align="end">
             <Calendar
