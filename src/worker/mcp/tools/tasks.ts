@@ -1,6 +1,6 @@
 // Tasks: the plan side — list, edit, statuses, comments and image attachments.
 import { z } from "zod";
-import type { Task, TaskActivity, TaskAttachment, TaskComment } from "@shared/schemas";
+import type { CreateTask, Task, TaskActivity, TaskAttachment, TaskComment, TaskStatus, UpdateTask } from "@shared/schemas";
 import {
   ArchiveTaskStatusSchema, CreateTaskCommentSchema, CreateTaskSchema, CreateTaskStatusSchema,
   MoveTaskSchema, UpdateTaskCommentSchema, UpdateTaskSchema, UpdateTaskStatusSchema,
@@ -8,11 +8,32 @@ import {
 import { findActiveProject } from "../../lib/projects";
 import { appUrl } from "../../lib/app-url";
 import { taskUrl } from "../links";
-import { segment } from "../rest-bridge";
+import { segment, type BridgeResult } from "../rest-bridge";
+import { batchInput, rejected, runBatch } from "../batch";
 import { DESTRUCTIVE, IdArg, MUTATES, READ_ONLY, ROW_LIMIT, fromBridge, hours, json, refuse, richTextToPlain, type ToolDeps } from "../shared";
 
 /** Largest image a tool accepts, matching the upload route's own limit. */
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+
+const CATEGORY_ORDER = { not_started: 0, active: 1, completed: 2 } as const;
+
+/** Tasks as a person reads a board: one group per status, in the columns' order; a project's own columns follow by category. */
+export function groupByStatus(tasks: Task[], columnOrder: string[]) {
+  const groups = new Map<string, { status: string; category: string | null; tasks: Task[] }>();
+  for (const t of tasks) {
+    const key = t.statusId ?? "none";
+    const group = groups.get(key) ?? { status: t.statusName ?? "No status", category: t.statusCategory, tasks: [] };
+    group.tasks.push(t);
+    groups.set(key, group);
+  }
+  const rank = (id: string, category: string | null) => {
+    const i = columnOrder.indexOf(id);
+    return i >= 0 ? i : columnOrder.length + (CATEGORY_ORDER[category as keyof typeof CATEGORY_ORDER] ?? 3);
+  };
+  return [...groups.entries()]
+    .sort(([a, ga], [b, gb]) => rank(a, ga.category) - rank(b, gb.category))
+    .map(([, g]) => ({ status: g.status, category: g.category, count: g.tasks.length, tasks: g.tasks }));
+}
 
 /** A task as a model reads it: plain-text notes, hours, names instead of colours. */
 function taskView(t: Task, base: string) {
@@ -58,7 +79,9 @@ export function registerTaskReads(d: ToolDeps): void {
     {
       title: "List tasks",
       description:
-        "Tasks in the workspace — the plan, not tracked time. Open tasks only unless `includeDone`. Filter by project, status, assignee (`me` for the key's owner) or due day. Use this to find a taskId before editing, moving, commenting or attaching, and with assignee `me` + dueBy today for \"what do I have today\".",
+        "Tasks in the workspace — the plan, not tracked time — grouped by status in the board's column order (Backlog, Pendente, Em progresso, QA…). Open tasks only unless `includeDone`, so completed ones are left out. " +
+        "\"My tasks\" with no date means ALL of the person's open tasks: assignee `me` and NO dueBy — whatever their due date, or none. Pass dueBy only when the person names a day or period (\"today\", \"this week\"). " +
+        "Filter by project, status, assignee (`me` for the key's owner) or due day. Use this to find a taskId before editing, moving, commenting or attaching.",
       inputSchema: {
         projectId: z.string().optional().describe("From list_projects"),
         statusId: z.string().optional().describe("From list_task_statuses"),
@@ -68,7 +91,7 @@ export function registerTaskReads(d: ToolDeps): void {
           .string()
           .regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD")
           .optional()
-          .describe("Only tasks due on or before this local day, overdue included — pass today for 'what do I have today'"),
+          .describe("Only tasks due on or before this local day, overdue included. Only when the person named a day or period: today's date for 'today', the week's last day for 'this week'. Omit for 'my tasks'."),
       },
       annotations: READ_ONLY,
     },
@@ -78,11 +101,16 @@ export function registerTaskReads(d: ToolDeps): void {
       if (statusId) query.set("statusId", statusId);
       if (assignee) query.set("assignee", assignee);
       if (includeDone) query.set("includeInactive", "true");
-      return fromBridge(await bridge<Task[]>("GET", `/api/tasks?${query}`), (tasks) =>
-        tasks
-          .filter((t) => !dueBy || (t.dueDate !== null && t.dueDate <= dueBy))
-          .slice(0, ROW_LIMIT)
-          .map((t) => taskView(t, appUrl(env)))
+      const [tasks, statuses] = await Promise.all([
+        bridge<Task[]>("GET", `/api/tasks?${query}`),
+        bridge<TaskStatus[]>("GET", "/api/task-statuses"),
+      ]);
+      const columnOrder = statuses.ok ? statuses.data.map((st) => st.id) : [];
+      return fromBridge(tasks, (list) =>
+        groupByStatus(
+          list.filter((t) => !dueBy || (t.dueDate !== null && t.dueDate <= dueBy)).slice(0, ROW_LIMIT),
+          columnOrder
+        ).map((group) => ({ ...group, tasks: group.tasks.map((t) => taskView(t, appUrl(env))) }))
       );
     }
   );
@@ -179,72 +207,121 @@ export function registerTaskReads(d: ToolDeps): void {
 
 export function registerTaskWrites(d: ToolDeps): void {
   const { server, env, db, workspaceId, bridge } = d;
+  const view = (t: Task) => taskView(t, appUrl(env));
+
+  // One implementation per action, shared by the single-item tool and its batch twin.
+  const createOne = async (data: Omit<CreateTask, "id">): Promise<BridgeResult<Task>> => {
+    // Checked here only for a message a model can act on; the route itself creates, notifies and broadcasts.
+    if (!(await findActiveProject(db, workspaceId, data.projectId))) {
+      return rejected(`No active project with id ${data.projectId} in this workspace. Call list_projects and ask the person which project this task belongs to.`);
+    }
+    return bridge<Task>("POST", "/api/tasks", data);
+  };
+  const updateOne = ({ taskId, ...patch }: UpdateTask & { taskId: string }) =>
+    bridge<Task>("PUT", `/api/tasks/${segment(taskId)}`, patch);
+  const moveOne = ({ taskId, statusId, completedOn }: { taskId: string; statusId: string; completedOn?: string }) =>
+    bridge<Task>("PATCH", `/api/tasks/${segment(taskId)}/move`, { statusId, ...(completedOn ? { completedOn } : {}) });
+  const deleteOne = ({ taskId }: { taskId: string }) => bridge("DELETE", `/api/tasks/${segment(taskId)}`);
+
+  // No `id`: a model must never pick one; the retry guard is for forms, which mint their own.
+  const createInput = CreateTaskSchema.omit({ id: true }).shape;
+  const updateInput = { taskId: IdArg("task"), ...UpdateTaskSchema.shape };
+  const moveInput = { taskId: IdArg("task"), statusId: IdArg("status"), completedOn: MoveTaskSchema.shape.completedOn };
+  const deleteInput = { taskId: IdArg("task") };
+
+  const CREATE_DOC =
+    "Only when the person asked for this task. Use list_projects for the projectId; never guess it. `assigneeIds` must already be workspace members — ask the person who, rather than guessing; one task for several people is ONE task with several assigneeIds.";
+  const UPDATE_DOC =
+    "Change a task's name, notes, due date (a local YYYY-MM-DD day), priority (1 highest … 4 none), estimate, parent, project, repeat rule, status or assignees — only the fields passed change. To mark it done, set `active: false` and pass `completedOn` (the person's local date) so a repeating task schedules its next occurrence. `assigneeIds` replaces the whole list.";
+  const MOVE_DOC =
+    "Exactly what dragging a card on the board does: moving into a completed status closes the subtasks too (reopening brings them back), the card goes to the end of the new column, the change is recorded in the task's history, and the assignees are notified (except whoever's key makes this call). " +
+    "Get taskId from list_tasks and statusId from list_task_statuses; never guess either. When closing a repeating task, pass `completedOn` (the person's local date) so its next occurrence is scheduled.";
+  const DELETE_DOC =
+    "Permanently deletes with subtasks, comments and attachments. Only the author or a workspace owner/admin may. Tracked time logged against it stays. Confirm with the person first.";
+  const BATCH_DOC = " For more than one, use the batch tool: one call, one approval, and a per-item report of what went through.";
 
   server.registerTool(
     "create_task",
     {
       title: "Create a task",
-      description:
-        "Add a task to a project's plan — the thing to be done, separate from tracked time. Only when the person asked for this task. Use list_projects for the projectId; never guess it. `assigneeIds` must already be workspace members — ask the person who, rather than guessing.",
-      // No `id`: a model must never pick one; the retry guard is for forms, which mint their own.
-      inputSchema: CreateTaskSchema.omit({ id: true }).shape,
+      description: "Add a task to a project's plan — the thing to be done, separate from tracked time. " + CREATE_DOC + BATCH_DOC.replace("the batch tool", "create_tasks"),
+      inputSchema: createInput,
       annotations: MUTATES,
     },
-    async (data) => {
-      // Checked here only for a message a model can act on; the route itself creates, notifies and broadcasts.
-      const project = await findActiveProject(db, workspaceId, data.projectId);
-      if (!project) {
-        return refuse(`No active project with id ${data.projectId} in this workspace. Call list_projects and ask the person which project this task belongs to.`);
-      }
-      return fromBridge(await bridge<Task>("POST", "/api/tasks", data), (t) => taskView(t, appUrl(env)));
-    }
+    async (data) => fromBridge(await createOne(data), view)
+  );
+  server.registerTool(
+    "create_tasks",
+    {
+      title: "Create several tasks",
+      description: "Add several tasks in one call (one approval), in order; each item is what create_task takes. " + CREATE_DOC,
+      inputSchema: batchInput(createInput, "tasks to create"),
+      annotations: MUTATES,
+    },
+    async ({ items }) => runBatch(items, createOne, view)
   );
 
   server.registerTool(
     "move_task",
     {
       title: "Move a task to a different status",
-      description:
-        "Change which column/status a task is in — exactly what dragging its card on the board does: moving a task into a completed status closes its subtasks too (and reopening brings them back), the card goes to the end of the new column, the change is recorded in the task's history, and the task's assignees are notified (except whoever's key makes this call). " +
-        "Get the taskId from list_tasks and the statusId from list_task_statuses; never guess either. " +
-        "When closing a repeating task, pass `completedOn` (the person's local date) so its next occurrence is scheduled.",
-      inputSchema: {
-        taskId: IdArg("task"),
-        statusId: IdArg("status"),
-        completedOn: MoveTaskSchema.shape.completedOn,
-      },
+      description: "Change which column/status a task is in. " + MOVE_DOC + BATCH_DOC.replace("the batch tool", "move_tasks"),
+      inputSchema: moveInput,
       annotations: MUTATES,
     },
-    async ({ taskId, statusId, completedOn }) =>
-      fromBridge(
-        await bridge<Task>("PATCH", `/api/tasks/${segment(taskId)}/move`, { statusId, ...(completedOn ? { completedOn } : {}) }),
-        (t) => taskView(t, appUrl(env))
-      )
+    async (args) => fromBridge(await moveOne(args), view)
+  );
+  server.registerTool(
+    "move_tasks",
+    {
+      title: "Move several tasks",
+      description: "Move several tasks in one call (one approval), in order; each item is what move_task takes. " + MOVE_DOC,
+      inputSchema: batchInput(moveInput, "moves"),
+      annotations: MUTATES,
+    },
+    async ({ items }) => runBatch(items, moveOne, view)
   );
 
   server.registerTool(
     "update_task",
     {
       title: "Edit a task",
-      description:
-        "Change a task's name, notes, due date (a local YYYY-MM-DD day), priority (1 highest … 4 none), estimate, parent, project, repeat rule, status or assignees — only the fields passed change. To mark it done, set `active: false` and pass `completedOn` (the person's local date) so a repeating task schedules its next occurrence. `assigneeIds` replaces the whole list.",
-      inputSchema: { taskId: IdArg("task"), ...UpdateTaskSchema.shape },
+      description: UPDATE_DOC + BATCH_DOC.replace("the batch tool", "update_tasks"),
+      inputSchema: updateInput,
       annotations: { ...MUTATES, idempotentHint: true },
     },
-    async ({ taskId, ...patch }) =>
-      fromBridge(await bridge<Task>("PUT", `/api/tasks/${segment(taskId)}`, patch), (t) => taskView(t, appUrl(env)))
+    async (args) => fromBridge(await updateOne(args), view)
+  );
+  server.registerTool(
+    "update_tasks",
+    {
+      title: "Edit several tasks",
+      description: "Edit several tasks in one call (one approval), in order; each item is what update_task takes. " + UPDATE_DOC,
+      inputSchema: batchInput(updateInput, "edits"),
+      annotations: { ...MUTATES, idempotentHint: true },
+    },
+    async ({ items }) => runBatch(items, updateOne, view)
   );
 
   server.registerTool(
     "delete_task",
     {
       title: "Delete a task",
-      description:
-        "Permanently delete a task with its subtasks, comments and attachments. Only its author or a workspace owner/admin may. Tracked time logged against it stays. Confirm with the person first.",
-      inputSchema: { taskId: IdArg("task") },
+      description: "Permanently delete a task. " + DELETE_DOC + BATCH_DOC.replace("the batch tool", "delete_tasks"),
+      inputSchema: deleteInput,
       annotations: DESTRUCTIVE,
     },
-    async ({ taskId }) => fromBridge(await bridge("DELETE", `/api/tasks/${segment(taskId)}`))
+    async (args) => fromBridge(await deleteOne(args))
+  );
+  server.registerTool(
+    "delete_tasks",
+    {
+      title: "Delete several tasks",
+      description: "Delete several tasks in one call (one approval). " + DELETE_DOC,
+      inputSchema: batchInput(deleteInput, "tasks to delete"),
+      annotations: DESTRUCTIVE,
+    },
+    async ({ items }) => runBatch(items, deleteOne)
   );
 
   server.registerTool(

@@ -75,6 +75,8 @@ Working with it:
 - Money comes from each project's own hourly rate. A project with no rate contributes 0 to any amount — report that as "no rate set", never as "earned nothing".
 - Drafted entries are PROPOSALS, not tracked time. They appear in no report and no total until a person reviews and confirms them in the app; \`draft_day\` creates them, it does not log time.
 - Tasks are the plan, entries are the actual time. Due dates are local days (YYYY-MM-DD), never instants.
+- "My tasks" with no day named means every open task of the person (\`list_tasks\` with assignee \`me\` and no \`dueBy\`), answered grouped by status as the tool returns it; filter by date only when the person names a day or period. Completed tasks are left out unless the person asks which are done — then pass \`includeDone\` and report the groups whose category is \`completed\`.
+- Several items at once (create, move, edit or delete several tasks; log, edit or delete several entries) go in ONE call to the batch tool (\`create_tasks\`, \`move_tasks\`, \`update_tasks\`, \`delete_tasks\`, \`log_times\`, \`update_time_entries\`, \`delete_time_entries\`), never one call per item: the person approves once. One task for several people is ONE task with several \`assigneeIds\`.
 - Every tool obeys the same permissions as the app for the key's owner: a member edits only their own entries, and editing projects, clients, statuses and budgets is for owners/admins. A refusal is the app's answer — report it, don't work around it.
 - Before any delete or archive, confirm with the person which exact item they mean.
 - To tag a person in a comment write @[Name](user:ID) using their id from \`list_members\`; never invent an id.

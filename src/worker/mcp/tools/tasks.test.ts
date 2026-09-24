@@ -154,3 +154,96 @@ describe("MCP task history and project statuses", () => {
     expect(read.has("list_task_activity")).toBe(true);
   });
 });
+
+describe("batch tools: several items, one call, one approval", () => {
+  it("creates several tasks in one call and reports each", async () => {
+    const w = world();
+    const admin = w.toolsFor("u-admin");
+    const res = await w.call(admin, "create_tasks", {
+      items: [
+        { name: "One", projectId: "p1" },
+        { name: "Two", projectId: "p1" },
+        { name: "Nope", projectId: "missing" },
+      ],
+    });
+    expect(res.error).toBeNull();
+    expect(res.data).toMatchObject({ done: 2, failed: [{ index: 2 }] });
+    const names = (w.raw.prepare(`SELECT name FROM tasks ORDER BY name`).all() as { name: string }[]).map((r) => r.name);
+    expect(names).toEqual(["One", "Two"]);
+  });
+
+  it("is an error only when nothing went through", async () => {
+    const w = world();
+    const res = await w.call(w.toolsFor("u-admin"), "create_tasks", { items: [{ name: "X", projectId: "missing" }] });
+    expect(res.error).toContain("None of the 1 went through");
+  });
+
+  it("moves several tasks with the board's rules for each", async () => {
+    const w = world();
+    const admin = w.toolsFor("u-admin");
+    const closed = await closedStatusId(w, admin);
+    const p = (await w.call(admin, "create_task", { name: "P", projectId: "p1" })).data!;
+    const k = (await w.call(admin, "create_task", { name: "K", projectId: "p1", parentId: p.id })).data!;
+    const q = (await w.call(admin, "create_task", { name: "Q", projectId: "p1" })).data!;
+    const res = await w.call(admin, "move_tasks", { items: [{ taskId: p.id, statusId: closed }, { taskId: q.id, statusId: closed }] });
+    expect(res.data).toMatchObject({ done: 2, failed: [] });
+    expect(w.row(k.id as string).active).toBe(0);
+  });
+
+  it("deletes several tasks in one call", async () => {
+    const w = world();
+    const admin = w.toolsFor("u-admin");
+    const a = (await w.call(admin, "create_task", { name: "A", projectId: "p1" })).data!;
+    const b = (await w.call(admin, "create_task", { name: "B", projectId: "p1" })).data!;
+    const res = await w.call(admin, "delete_tasks", { items: [{ taskId: a.id }, { taskId: b.id }] });
+    expect(res.data).toMatchObject({ done: 2 });
+    expect((w.raw.prepare(`SELECT COUNT(*) AS n FROM tasks`).get() as { n: number }).n).toBe(0);
+  });
+
+  it("logs several entries, then deletes them all in one call", async () => {
+    const w = world();
+    const admin = w.toolsFor("u-admin");
+    const logged = await w.call(admin, "log_times", {
+      items: [
+        { description: "Standup", start: "2026-09-24T12:00:00Z", stop: "2026-09-24T12:15:00Z", projectId: "p1" },
+        { description: "Review", start: "2026-09-24T13:00:00Z", stop: "2026-09-24T14:00:00Z", projectId: "p1" },
+        { description: "Backwards", start: "2026-09-24T15:00:00Z", stop: "2026-09-24T14:00:00Z", projectId: "p1" },
+      ],
+    });
+    expect(logged.data).toMatchObject({ done: 2, failed: [{ index: 2, error: "stop must be after start." }] });
+    const ids = (w.raw.prepare(`SELECT id FROM time_entries`).all() as { id: string }[]).map((r) => r.id);
+    const removed = await w.call(admin, "delete_time_entries", { entryIds: ids });
+    expect(removed.error).toBeNull();
+    expect((w.raw.prepare(`SELECT COUNT(*) AS n FROM time_entries`).get() as { n: number }).n).toBe(0);
+  });
+
+  it("hides every batch write tool from a read-only key", () => {
+    const read = world().toolsFor("u-admin", "read");
+    for (const name of ["create_tasks", "move_tasks", "update_tasks", "delete_tasks", "log_times", "update_time_entries", "delete_time_entries"]) {
+      expect(read.has(name)).toBe(false);
+    }
+  });
+});
+
+describe("list_tasks answers 'my tasks' the way a board reads", () => {
+  it("returns every open task whatever its due date, grouped by column in board order, without the completed ones", async () => {
+    const w = world();
+    const admin = w.toolsFor("u-admin");
+    const closed = await closedStatusId(w, admin);
+    await w.call(admin, "create_task", { name: "Due next month", projectId: "p1", dueDate: "2026-10-30" });
+    await w.call(admin, "create_task", { name: "No date", projectId: "p1" });
+    const done = (await w.call(admin, "create_task", { name: "Finished", projectId: "p1" })).data!;
+    await w.call(admin, "move_task", { taskId: done.id, statusId: closed });
+
+    const listed = await w.call(admin, "list_tasks", {});
+    const groups = listed.data as unknown as { status: string; category: string; count: number; tasks: { name: string }[] }[];
+
+    const names = groups.flatMap((g) => g.tasks.map((t) => t.name));
+    expect(names).toEqual(expect.arrayContaining(["Due next month", "No date"]));
+    expect(names).not.toContain("Finished");
+    expect(groups.every((g) => g.category !== "completed")).toBe(true);
+
+    const withDone = (await w.call(admin, "list_tasks", { includeDone: true })).data as unknown as { category: string }[];
+    expect(withDone.at(-1)?.category).toBe("completed");
+  });
+});

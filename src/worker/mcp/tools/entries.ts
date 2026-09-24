@@ -3,14 +3,15 @@ import { z } from "zod";
 import { buildReportWhere, durationExpr, formatEntry, ENTRY_SELECT } from "../../db/queries";
 import type { TimeEntryJoinRow } from "../../db/rows";
 import { generateDrafts, listDrafts } from "../../lib/drafts";
-import { UpdateTimeEntrySchema } from "@shared/schemas";
-import { segment } from "../rest-bridge";
+import { BULK_ENTRY_IDS_MAX, BulkUpdateTimeEntriesSchema, UpdateTimeEntrySchema } from "@shared/schemas";
+import { segment, type BridgeResult } from "../rest-bridge";
+import { batchInput, rejected, runBatch } from "../batch";
 import { entryUrl } from "../links";
 import { appUrl } from "../../lib/app-url";
 import type { TimeEntry } from "@shared/schemas";
 import {
   DESTRUCTIVE, DateArg, IdArg, MUTATES, READ_ONLY, ROW_LIMIT, TimezoneArg,
-  fromBridge, hours, json, rangeToIso, refuse, type ToolDeps,
+  fromBridge, hours, json, rangeToIso, type ToolDeps,
 } from "../shared";
 
 /** `get_time_summary`'s own aggregation, shared by the totals row and each breakdown row. */
@@ -307,37 +308,50 @@ export function registerEntryReads(d: ToolDeps): void {
 export function registerEntryWrites(d: ToolDeps): void {
   const { server, ctx, env, workspaceId, bridge } = d;
 
+  // One implementation shared by log_time and log_times.
+  const logInput = {
+    description: z.string().max(2000).describe("What the work was"),
+    start: z.string().describe("ISO 8601 start instant with offset, e.g. 2026-09-18T14:00:00-03:00"),
+    stop: z.string().describe("ISO 8601 stop instant, after start"),
+    projectId: z.string().describe("A project id from list_projects — every entry needs one; ask the person rather than choosing for them"),
+    taskId: z.string().optional().describe("Task id from list_tasks, to count the time against a task"),
+    tags: z.array(z.string().max(100)).max(50).optional(),
+    billable: z.boolean().optional().describe("Omit to log the entry as billable, the default for every entry"),
+  };
+  const logOne = async ({ start, stop, ...rest }: { start: string; stop: string; description: string; projectId: string; taskId?: string; tags?: string[]; billable?: boolean }): Promise<BridgeResult<TimeEntry>> => {
+    const startMs = new Date(start).getTime();
+    const stopMs = new Date(stop).getTime();
+    if (Number.isNaN(startMs) || Number.isNaN(stopMs)) return rejected("start and stop must be ISO 8601 timestamps.");
+    if (stopMs <= startMs) return rejected("stop must be after start.");
+    return bridge<TimeEntry>("POST", "/api/time_entries", {
+      ...rest,
+      start: new Date(startMs).toISOString(),
+      stop: new Date(stopMs).toISOString(),
+    });
+  };
+  const entryView = (e: TimeEntry) => withEntryUrl(e, appUrl(env));
+
   server.registerTool(
     "log_time",
     {
       title: "Log a time entry",
       description:
-        "Record work that has already happened, exactly as the app's manual entry does. Times are ISO 8601 instants — resolve relative phrasing against the person's local time first. Needs a project from list_projects; ask which one rather than choosing. Returns the new entry, whose id update_time_entry and delete_time_entry take. Not idempotent: a second call logs a second entry.",
-      inputSchema: {
-        description: z.string().max(2000).describe("What the work was"),
-        start: z.string().describe("ISO 8601 start instant with offset, e.g. 2026-09-18T14:00:00-03:00"),
-        stop: z.string().describe("ISO 8601 stop instant, after start"),
-        projectId: z.string().describe("A project id from list_projects — every entry needs one; ask the person rather than choosing for them"),
-        taskId: z.string().optional().describe("Task id from list_tasks, to count the time against a task"),
-        tags: z.array(z.string().max(100)).max(50).optional(),
-        billable: z.boolean().optional().describe("Omit to log the entry as billable, the default for every entry"),
-      },
+        "Record work that has already happened, exactly as the app's manual entry does. Times are ISO 8601 instants — resolve relative phrasing against the person's local time first. Needs a project from list_projects; ask which one rather than choosing. Returns the new entry, whose id update_time_entry and delete_time_entry take. Not idempotent: a second call logs a second entry. For more than one entry use log_times: one call, one approval.",
+      inputSchema: logInput,
       annotations: MUTATES,
     },
-    async ({ start, stop, ...rest }) => {
-      const startMs = new Date(start).getTime();
-      const stopMs = new Date(stop).getTime();
-      if (Number.isNaN(startMs) || Number.isNaN(stopMs)) return refuse("start and stop must be ISO 8601 timestamps.");
-      if (stopMs <= startMs) return refuse("stop must be after start.");
-      return fromBridge(
-        await bridge<TimeEntry>("POST", "/api/time_entries", {
-          ...rest,
-          start: new Date(startMs).toISOString(),
-          stop: new Date(stopMs).toISOString(),
-        }),
-        (e) => withEntryUrl(e, appUrl(env))
-      );
-    }
+    async (args) => fromBridge(await logOne(args), entryView)
+  );
+  server.registerTool(
+    "log_times",
+    {
+      title: "Log several time entries",
+      description:
+        "Record several entries in one call (one approval), in order; each item is what log_time takes, with the same rules (ISO 8601 instants, a project from list_projects for each). Reports which went through and which didn't.",
+      inputSchema: batchInput(logInput, "entries to log"),
+      annotations: MUTATES,
+    },
+    async ({ items }) => runBatch(items, logOne, entryView)
   );
 
   server.registerTool(
@@ -398,6 +412,35 @@ export function registerEntryWrites(d: ToolDeps): void {
       annotations: DESTRUCTIVE,
     },
     async ({ entryId }) => fromBridge(await bridge("DELETE", `/api/time_entries/${segment(entryId)}`))
+  );
+
+  server.registerTool(
+    "update_time_entries",
+    {
+      title: "Edit several time entries",
+      description:
+        "Apply the same change (project, task, billable, tags, description) to many entries in one call (one approval). All or nothing: if any entry isn't the caller's to edit, none change. Ids from list_time_entries; `tags` replaces each entry's whole list.",
+      inputSchema: {
+        entryIds: z.array(IdArg("time entry")).min(1).max(BULK_ENTRY_IDS_MAX).describe("Entry ids from list_time_entries"),
+        patch: BulkUpdateTimeEntriesSchema.shape.patch,
+      },
+      annotations: { ...MUTATES, idempotentHint: true },
+    },
+    async ({ entryIds, patch }) => fromBridge(await bridge("PATCH", "/api/time_entries/bulk", { ids: entryIds, patch }))
+  );
+
+  server.registerTool(
+    "delete_time_entries",
+    {
+      title: "Delete several time entries",
+      description:
+        "Permanently remove many entries in one call (one approval). All or nothing: if any entry isn't the caller's to delete, none are. Only when the person asked for exactly these to go — list them and confirm first.",
+      inputSchema: {
+        entryIds: z.array(IdArg("time entry")).min(1).max(BULK_ENTRY_IDS_MAX).describe("Entry ids from list_time_entries"),
+      },
+      annotations: DESTRUCTIVE,
+    },
+    async ({ entryIds }) => fromBridge(await bridge("DELETE", "/api/time_entries/bulk", { ids: entryIds }))
   );
 
   server.registerTool(

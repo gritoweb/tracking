@@ -2,6 +2,8 @@ import { Sparkles } from "lucide-react";
 import { useAgentChat } from "@cloudflare/ai-chat/react";
 import { Spinner } from "@/components/ui/spinner";
 import { ToolCard } from "./ai-elements/ToolCard";
+import { ApprovalBatchBar } from "./ai-elements/ApprovalBatchBar";
+import { pendingApprovalIds } from "./ai-elements/pendingApprovals";
 import { AssistantMarkdown } from "./ai-elements/AssistantMarkdown";
 import { MessageActions } from "./ai-elements/MessageActions";
 
@@ -40,6 +42,7 @@ export function AssistantMessageList({
             <Sparkles className="mt-1 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
           )}
           <div className="min-w-0 flex-1 space-y-2">
+            {m.role === "assistant" && <ApprovalBatchBar ids={pendingApprovalIds(m.parts)} onApprove={onApprove} />}
             {m.parts.map((part, i) => {
               if (part.type === "text") {
                 return m.role === "user" ? (

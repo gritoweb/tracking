@@ -29,6 +29,9 @@ export function ToolApprovalPrompt({
     details.push(`${new Date(input.start).toLocaleString()} → ${new Date(input.stop).toLocaleString()}`);
   }
   if (typeof input.billable === "boolean") details.push(input.billable ? "billable" : "non-billable");
+  // A batch tool: say how much it touches, so one approval is still an informed one.
+  const batch = Array.isArray(input.items) ? input.items : Array.isArray(input.entryIds) ? input.entryIds : null;
+  if (batch) details.push(`${batch.length} item${batch.length === 1 ? "" : "s"}`);
 
   return (
     <div className="space-y-2">
