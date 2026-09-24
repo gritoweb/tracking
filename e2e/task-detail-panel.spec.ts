@@ -81,7 +81,7 @@ test("an assigned task shows the avatar on the card, in the panel, and under Ass
   // The avatar renders on the card — no image on this account, so initials ("Outsider" → "OU").
   await owner.goto("/tasks");
   await owner.getByRole("radio", { name: "Board" }).click();
-  await expect(owner.getByRole("region", { name: "Pendente" }).getByText("OU", { exact: true })).toBeVisible();
+  await expect(owner.getByRole("region", { name: "To do" }).getByText("OU", { exact: true })).toBeVisible();
 
   // And in the detail panel's Assignees field.
   await owner.getByText("Cutover plan").click();
@@ -94,7 +94,7 @@ test("an assigned task shows the avatar on the card, in the panel, and under Ass
   await member.getByRole("radio", { name: "Board" }).click();
   await member.getByRole("button", { name: "Assigned to me" }).click();
   await expect(
-    member.getByRole("region", { name: "Pendente" }).getByText("Cutover plan")
+    member.getByRole("region", { name: "To do" }).getByText("Cutover plan")
   ).toBeVisible();
 
   await owner.context().close();
@@ -127,7 +127,7 @@ test("picking an assignee updates the panel and the board card without closing a
   await panel.getByRole("button", { name: "Close" }).click();
   await expect(panel).not.toBeVisible();
   await expect(
-    page.getByRole("region", { name: "Pendente" }).getByText("TU", { exact: true })
+    page.getByRole("region", { name: "To do" }).getByText("TU", { exact: true })
   ).toBeVisible();
 });
 

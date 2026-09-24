@@ -22,9 +22,9 @@ export const DEFAULT_STATUSES: {
   isDefault: boolean;
 }[] = [
   { name: "Backlog", color: swatch("Slate"), category: "not_started", isDefault: false },
-  { name: "On hold", color: swatch("Red"), category: "active", isDefault: false },
-  { name: "Pendente", color: swatch("Blue"), category: "not_started", isDefault: true }, // capture lands here
-  { name: "Em progresso", color: swatch("Violet"), category: "active", isDefault: false },
+  { name: "On hold / Stuck", color: swatch("Red"), category: "active", isDefault: false },
+  { name: "To do", color: swatch("Blue"), category: "not_started", isDefault: true }, // capture lands here
+  { name: "In progress", color: swatch("Violet"), category: "active", isDefault: false },
   { name: "QA", color: swatch("Orange"), category: "active", isDefault: false },
   // A darker pink than the picker's stock swatch, short of purple — asked for by name.
   { name: "Client review", color: swatch("Pink"), category: "active", isDefault: false },

@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-09-24 (98)
+### Changed
+- **A new workspace's default columns are Backlog, On hold / Stuck, To do, In progress, QA, Client review, Closed** (were On hold, Pendente, Em progresso for three of them), the names Luis now uses. `DEFAULT_STATUSES` only seeds a workspace that has no columns yet, so existing workspaces are untouched: Luis renamed production's columns by hand in the panel. **No migration renames anyone's columns** — one was drafted and removed at Luis's request before any commit (it had only run on the local DB, where it did the rename he asked for); a data rewrite on the shared remote D1 isn't worth its risk when the panel does it. `task-statuses.test.ts` still pins the defaults' colour, category and position against migration 0047's literals, under their first names. e2e specs, CLAUDE.md, ARCHITECTURE.md and USER_GUIDE.md follow the new names. Nothing in the MCP or the Assistant depends on a column's name or language (moves use ids; "done" is the `completed` category), so renaming columns in any language needs no change. Verified: `tsc -b` (0), `lint` (0), `vitest run` 1020/1020, `pnpm check` (0); e2e `task-board`, `task-detail-panel` pass (`workspace-member-removal`'s "removed by the owner" is the known pre-existing failure from (82)).
+
 ## 2026-09-24 (97)
 ### Changed
 - `list_tasks`' description no longer gives example column names (Backlog, Pendente, Em progresso, QA): workspaces rename their columns (Luis's local ones are now To do / In progress…), and the examples could steer a model toward names that don't exist. Nothing in the MCP or the Assistant keys on a status name — moves use ids from `list_task_statuses`, "done" is the `completed` category — so renaming columns needs no change anywhere; the names in `DEFAULT_STATUSES` only seed a new workspace. `tsc -b` (0), `lint` (0), MCP tests green.

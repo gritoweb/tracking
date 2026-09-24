@@ -145,7 +145,7 @@ test.describe("workspace member removal", () => {
     await parkInSecondWorkspace(browser, member, email, memberHeaders);
 
     const live = await statuses(owner);
-    const inProgress = byName(live, "Em progresso");
+    const inProgress = byName(live, "In progress");
     const movedWhileMember = await owner.request.patch(`/api/tasks/${task.id}/move`, {
       data: { statusId: inProgress.id, boardOrder: 1 },
     });
