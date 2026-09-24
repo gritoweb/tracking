@@ -10,9 +10,12 @@ type Rec = Record<string, unknown>;
 export function ToolCard({
   part,
   onApprove,
+  settled,
 }: {
   part: ToolPart;
   onApprove: (id: string, approved: boolean) => void;
+  /** The turn is over: nothing more will arrive for this card. */
+  settled: boolean;
 }) {
   const name = toolNameOf(part);
   const meta = toolMetaFor(name);
@@ -32,6 +35,10 @@ export function ToolCard({
         <ToolApprovalPrompt part={part} name={name} input={input} onApprove={onApprove} />
       </ToolResultCard>
     );
+  }
+  // Approved but never ran, and the turn is over: say so, or the chat reads as if it happened.
+  if (state === "approved" && settled) {
+    return <ToolResultCard icon={AlertTriangle} tone="error" title={`${meta.label} was approved but didn't run — ask again to retry`} />;
   }
   if (state === "denied") {
     return <ToolResultCard icon={X} tone="muted" title={`${meta.label} — declined`} />;

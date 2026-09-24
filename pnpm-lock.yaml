@@ -18,6 +18,11 @@ overrides:
   postcss: ^8.5.28
   brace-expansion: ^5.0.9
 
+patchedDependencies:
+  agents@0.17.4:
+    hash: 47a390296e99a80bb71a1f404bca8c08958f1d4c46ab1a9469b034983b4ababb
+    path: patches/agents@0.17.4.patch
+
 importers:
 
   .:
@@ -33,7 +38,7 @@ importers:
         version: 0.4.0
       '@cloudflare/ai-chat':
         specifier: ^0.9.3
-        version: 0.9.3(@ai-sdk/react@3.0.232(react@19.2.7)(zod@4.4.3))(agents@0.17.4(@ai-sdk/react@3.0.232(react@19.2.7)(zod@4.4.3))(@babel/core@7.29.7)(@babel/runtime@7.29.7)(ai@6.0.230(zod@4.4.3))(react@19.2.7)(rolldown@1.1.5)(vite@8.1.4(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.0))(zod@4.4.3))(ai@6.0.230(zod@4.4.3))(react@19.2.7)(zod@4.4.3)
+        version: 0.9.3(@ai-sdk/react@3.0.232(react@19.2.7)(zod@4.4.3))(agents@0.17.4(patch_hash=47a390296e99a80bb71a1f404bca8c08958f1d4c46ab1a9469b034983b4ababb)(@ai-sdk/react@3.0.232(react@19.2.7)(zod@4.4.3))(@babel/core@7.29.7)(@babel/runtime@7.29.7)(ai@6.0.230(zod@4.4.3))(react@19.2.7)(rolldown@1.1.5)(vite@8.1.4(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.0))(zod@4.4.3))(ai@6.0.230(zod@4.4.3))(react@19.2.7)(zod@4.4.3)
       '@dnd-kit/core':
         specifier: ^6.3.1
         version: 6.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -117,7 +122,7 @@ importers:
         version: 3.31.3(@floating-ui/dom@1.8.0)(@tiptap/core@3.31.3(@tiptap/pm@3.31.3))(@tiptap/pm@3.31.3)
       agents:
         specifier: ^0.17.4
-        version: 0.17.4(@ai-sdk/react@3.0.232(react@19.2.7)(zod@4.4.3))(@babel/core@7.29.7)(@babel/runtime@7.29.7)(ai@6.0.230(zod@4.4.3))(react@19.2.7)(rolldown@1.1.5)(vite@8.1.4(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.0))(zod@4.4.3)
+        version: 0.17.4(patch_hash=47a390296e99a80bb71a1f404bca8c08958f1d4c46ab1a9469b034983b4ababb)(@ai-sdk/react@3.0.232(react@19.2.7)(zod@4.4.3))(@babel/core@7.29.7)(@babel/runtime@7.29.7)(ai@6.0.230(zod@4.4.3))(react@19.2.7)(rolldown@1.1.5)(vite@8.1.4(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.0))(zod@4.4.3)
       ai:
         specifier: ^6.0.230
         version: 6.0.230(zod@4.4.3)
@@ -6033,10 +6038,10 @@ snapshots:
 
   '@cfworker/json-schema@4.1.1': {}
 
-  '@cloudflare/ai-chat@0.9.3(@ai-sdk/react@3.0.232(react@19.2.7)(zod@4.4.3))(agents@0.17.4(@ai-sdk/react@3.0.232(react@19.2.7)(zod@4.4.3))(@babel/core@7.29.7)(@babel/runtime@7.29.7)(ai@6.0.230(zod@4.4.3))(react@19.2.7)(rolldown@1.1.5)(vite@8.1.4(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.0))(zod@4.4.3))(ai@6.0.230(zod@4.4.3))(react@19.2.7)(zod@4.4.3)':
+  '@cloudflare/ai-chat@0.9.3(@ai-sdk/react@3.0.232(react@19.2.7)(zod@4.4.3))(agents@0.17.4(patch_hash=47a390296e99a80bb71a1f404bca8c08958f1d4c46ab1a9469b034983b4ababb)(@ai-sdk/react@3.0.232(react@19.2.7)(zod@4.4.3))(@babel/core@7.29.7)(@babel/runtime@7.29.7)(ai@6.0.230(zod@4.4.3))(react@19.2.7)(rolldown@1.1.5)(vite@8.1.4(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.0))(zod@4.4.3))(ai@6.0.230(zod@4.4.3))(react@19.2.7)(zod@4.4.3)':
     dependencies:
       '@ai-sdk/react': 3.0.232(react@19.2.7)(zod@4.4.3)
-      agents: 0.17.4(@ai-sdk/react@3.0.232(react@19.2.7)(zod@4.4.3))(@babel/core@7.29.7)(@babel/runtime@7.29.7)(ai@6.0.230(zod@4.4.3))(react@19.2.7)(rolldown@1.1.5)(vite@8.1.4(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.0))(zod@4.4.3)
+      agents: 0.17.4(patch_hash=47a390296e99a80bb71a1f404bca8c08958f1d4c46ab1a9469b034983b4ababb)(@ai-sdk/react@3.0.232(react@19.2.7)(zod@4.4.3))(@babel/core@7.29.7)(@babel/runtime@7.29.7)(ai@6.0.230(zod@4.4.3))(react@19.2.7)(rolldown@1.1.5)(vite@8.1.4(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.0))(zod@4.4.3)
       ai: 6.0.230(zod@4.4.3)
       nanoid: 3.3.19
       react: 19.2.7
@@ -8172,7 +8177,7 @@ snapshots:
 
   acorn@8.17.0: {}
 
-  agents@0.17.4(@ai-sdk/react@3.0.232(react@19.2.7)(zod@4.4.3))(@babel/core@7.29.7)(@babel/runtime@7.29.7)(ai@6.0.230(zod@4.4.3))(react@19.2.7)(rolldown@1.1.5)(vite@8.1.4(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.0))(zod@4.4.3):
+  agents@0.17.4(patch_hash=47a390296e99a80bb71a1f404bca8c08958f1d4c46ab1a9469b034983b4ababb)(@ai-sdk/react@3.0.232(react@19.2.7)(zod@4.4.3))(@babel/core@7.29.7)(@babel/runtime@7.29.7)(ai@6.0.230(zod@4.4.3))(react@19.2.7)(rolldown@1.1.5)(vite@8.1.4(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.0))(zod@4.4.3):
     dependencies:
       '@babel/plugin-proposal-decorators': 8.0.2(@babel/core@7.29.7)
       '@cfworker/json-schema': 4.1.1

@@ -1,0 +1,14 @@
+diff --git a/dist/message-builder-BymO4N_D.js b/dist/message-builder-BymO4N_D.js
+index 87900ffbfcd4eacb842436b3c804d2731e775cc4..593a04621d69dfa1f3d377ff21e7b777db5b69f3 100644
+--- a/dist/message-builder-BymO4N_D.js
++++ b/dist/message-builder-BymO4N_D.js
+@@ -209,7 +209,8 @@ function applyChunkToParts(parts, chunk) {
+ 				p.state = "approval-requested";
+ 				p.approval = {
+ 					id: chunk.approvalId,
+-					...chunk.approvalDescriptor !== void 0 && { descriptor: chunk.approvalDescriptor }
++					...chunk.approvalDescriptor !== void 0 && { descriptor: chunk.approvalDescriptor },
++					...chunk.signature !== void 0 && { signature: chunk.signature }
+ 				};
+ 			}
+ 			return true;

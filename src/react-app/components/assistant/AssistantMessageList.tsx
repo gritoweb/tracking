@@ -52,7 +52,7 @@ export function AssistantMessageList({
                 );
               }
               if (typeof part.type === "string" && part.type.startsWith("tool-")) {
-                return <ToolCard key={i} part={part} onApprove={onApprove} />;
+                return <ToolCard key={i} part={part} onApprove={onApprove} settled={!busy} />;
               }
               return null;
             })}

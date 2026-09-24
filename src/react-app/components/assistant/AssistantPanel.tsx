@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Sparkles, CheckCircle2, Eraser } from "lucide-react";
+import { AlertTriangle, Sparkles, CheckCircle2, Eraser } from "lucide-react";
 import { useAgent } from "agents/react";
 import { useAgentChat } from "@cloudflare/ai-chat/react";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Sheet,
   SheetContent,
@@ -60,6 +61,7 @@ export function AssistantPanel() {
     clearHistory,
     addToolApprovalResponse,
     isStreaming,
+    error,
   } = useAgentChat({
     agent,
     // Sent per request; ChatAgent.onChatMessage reads options.body for local time.
@@ -173,6 +175,14 @@ export function AssistantPanel() {
                 onApprove={approve}
                 onRegenerate={() => regenerate()}
               />
+              {error && !busy && (
+                <Alert variant="destructive">
+                  <AlertTriangle />
+                  <AlertDescription>
+                    The last request didn't finish, so anything it was doing may not have happened. Check it, then try again.
+                  </AlertDescription>
+                </Alert>
+              )}
             </div>
           </ConversationContent>
           <ConversationScrollButton />
