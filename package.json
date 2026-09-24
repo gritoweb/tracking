@@ -78,7 +78,7 @@
 		"@cloudflare/vite-plugin": "1.44.0",
 		"@playwright/test": "^1.61.1",
 		"@react-email/ui": "^6.9.0",
-		"@tailwindcss/vite": "^4.3.2",
+		"@tailwindcss/vite": "^4.3.3",
 		"@testing-library/jest-dom": "^7.0.1",
 		"@testing-library/react": "^16.3.3",
 		"@timetracker/eslint-config": "workspace:*",
