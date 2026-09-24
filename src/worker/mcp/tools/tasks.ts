@@ -153,7 +153,9 @@ export function registerTaskReads(d: ToolDeps): void {
     {
       title: "List task statuses",
       description:
-        "The board's columns in order, with each one's category (not_started, active, completed) and which is the default for new tasks. Pass projectId to get that project's own columns when it has forked them.",
+        "The board's columns in order, with each one's category (not_started, active, completed) and which is the default for new tasks. " +
+        "Before moving or creating a task in a column, call this with THAT task's projectId: a project may have its own columns, and a task only accepts a column of its own board (any other is refused, with the valid ones listed). " +
+        "Names are whatever the workspace chose, in any language — never assume one exists.",
       inputSchema: { projectId: z.string().optional().describe("Return this project's own columns when it has forked them (from list_projects)") },
       annotations: READ_ONLY,
     },
@@ -248,7 +250,9 @@ export function registerTaskWrites(d: ToolDeps): void {
     "Change a task's name, notes, due date (a local YYYY-MM-DD day), priority (1 highest … 4 none), estimate, parent, project, repeat rule, status or assignees — only the fields passed change. To mark it done, set `active: false` and pass `completedOn` (the person's local date) so a repeating task schedules its next occurrence. `assigneeIds` replaces the whole list.";
   const MOVE_DOC =
     "Exactly what dragging a card on the board does: moving into a completed status closes the subtasks too (reopening brings them back), the card goes to the end of the new column, the change is recorded in the task's history, and the assignees are notified (except whoever's key makes this call). " +
-    "Get taskId from list_tasks and statusId from list_task_statuses; never guess either. When closing a repeating task, pass `completedOn` (the person's local date) so its next occurrence is scheduled.";
+    "Get taskId from list_tasks, then statusId from list_task_statuses called with that task's projectId — only a column of the task's own board is accepted. " +
+    "Match the person's words to a column name; if none matches, pick by meaning using the category (to do / not started → not_started, doing → active, done → completed) and say which column you chose, or ask when it's ambiguous. Never invent a column. " +
+    "When closing a repeating task, pass `completedOn` (the person's local date) so its next occurrence is scheduled.";
   const DELETE_DOC =
     "Permanently deletes with subtasks, comments and attachments. Only the author or a workspace owner/admin may. Tracked time logged against it stays. Confirm with the person first.";
   const LIST_DOC = " Several at once: pass `items` (each with these same fields) — one call, one approval, a report per item.";

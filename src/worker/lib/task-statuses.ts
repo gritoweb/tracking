@@ -151,6 +151,25 @@ export async function resolveStatus(
   return row ? formatStatus(row) : null;
 }
 
+/**
+ * A column on the board of `projectId` (its own columns if it forked them, else the workspace's), or null: a column from
+ * another project's board, an archived one or an unknown id is refused, whatever the client — app, MCP or Assistant.
+ */
+export async function statusOnBoard(
+  db: D1Database,
+  workspaceId: string,
+  projectId: string | null,
+  statusId: string
+): Promise<{ status: TaskStatus | null; board: TaskStatus[] }> {
+  const board = await listStatuses(db, workspaceId, projectId);
+  return { status: board.find((s) => s.id === statusId) ?? null, board };
+}
+
+/** The refusal for a column that isn't on the task's board, listing the ones that are, so any client can pick again. */
+export function offBoardError(board: TaskStatus[]): string {
+  return `That status isn't a column on this task's board. Its columns: ${board.map((s) => `${s.name} (${s.id}, ${s.category})`).join("; ")}.`;
+}
+
 /** Where a new task lands, and where a reopened one returns to. */
 export async function defaultStatus(
   db: D1Database,

@@ -181,6 +181,7 @@ export interface TaskRow {
   status_name?: string | null;
   status_color?: string | null;
   status_category?: TaskStatusCategory | null;
+  status_sort_order?: number | null;
   subtask_total?: number;
 }
 
@@ -191,6 +192,7 @@ export interface TaskJoinRow extends TaskRow {
   status_name: string | null;
   status_color: string | null;
   status_category: TaskStatusCategory | null;
+  status_sort_order: number | null;
   tracked_seconds: number;
   subtask_total: number;
   subtask_done: number;

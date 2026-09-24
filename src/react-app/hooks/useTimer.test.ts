@@ -59,6 +59,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     statusName: "To do",
     statusColor: "#000",
     statusCategory: "not_started",
+    statusPosition: 3,
     estimatedSeconds: null,
     trackedSeconds: 0,
     dueDate: null,

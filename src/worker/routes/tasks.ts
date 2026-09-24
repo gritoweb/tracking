@@ -22,9 +22,13 @@ import { parseJsonColumn } from "../lib/json";
 import {
   completedStatus,
   defaultStatus,
+  listStatuses,
+  offBoardError,
   resolveStatus,
+  statusOnBoard,
   syncFromCategory,
 } from "../lib/task-statuses";
+import { nearestColumn } from "@shared/task-columns";
 import { ImageDecodeError, processImage, sniffImage } from "../lib/image";
 import { formatAttachment } from "./attachments";
 import { actorDisplayName, notifyAssigneesOfStatusChange, notifyMentions, notifyNewAssignees } from "../lib/notifications";
@@ -53,6 +57,7 @@ function formatTask(row: TaskJoinRow): Task {
     statusName: row.status_name ?? null,
     statusColor: row.status_color ?? null,
     statusCategory: row.status_category ?? null,
+    statusPosition: row.status_sort_order ?? null,
     estimatedSeconds: row.estimated_seconds ?? null,
     trackedSeconds: row.tracked_seconds ?? 0,
     dueDate: row.due_date ?? null,
@@ -103,7 +108,7 @@ function taskSelect(scoped: boolean): string {
   return `
   SELECT tk.*,
     p.name AS project_name, p.color AS project_color,
-    s.name AS status_name, s.color AS status_color, s.category AS status_category,
+    s.name AS status_name, s.color AS status_color, s.category AS status_category, s.sort_order AS status_sort_order,
     (SELECT COALESCE(SUM(te.duration), 0) FROM time_entries te
        WHERE te.workspace_id = tk.workspace_id AND te.stop IS NOT NULL${scoped ? " AND te.user_id = ?" : ""}
          AND (te.task_id = tk.id
@@ -182,10 +187,14 @@ export async function createTask(
   const recurRule = parentId ? null : normalizeRecurRule(data.recurRule);
 
   // A subtask is born in its own project's default too, never in its parent's column.
-  const status = data.statusId
-    ? await resolveStatus(db, workspaceId, data.statusId)
-    : await defaultStatus(db, workspaceId, projectId);
-  if (!status) return { error: "Status not found", status: 400 };
+  let status: TaskStatus;
+  if (data.statusId) {
+    const onBoard = await statusOnBoard(db, workspaceId, projectId, data.statusId);
+    if (!onBoard.status) return { error: offBoardError(onBoard.board), status: 400 };
+    status = onBoard.status;
+  } else {
+    status = await defaultStatus(db, workspaceId, projectId);
+  }
   const born = syncFromCategory(status.category, true, null);
 
   // ON CONFLICT: two copies of the same create racing past the replay check above; the loser reads the winner's row.
@@ -310,13 +319,16 @@ async function resolveStatusChange(
   db: D1Database,
   workspaceId: string,
   existing: TaskRow,
-  data: { statusId?: string; active?: boolean }
-): Promise<{ status: TaskStatus; active: 0 | 1; completedAt: string | null } | undefined | null> {
+  data: { statusId?: string; active?: boolean },
+  /** The task's project after this write — a project change in the same PUT decides which board the column must be on. */
+  projectId: string | null = existing.project_id ?? null
+): Promise<{ status: TaskStatus; active: 0 | 1; completedAt: string | null } | undefined | { error: string }> {
   let status: TaskStatus | null;
   if (data.statusId !== undefined) {
-    status = await resolveStatus(db, workspaceId, data.statusId);
+    const onBoard = await statusOnBoard(db, workspaceId, projectId, data.statusId);
+    if (!onBoard.status) return { error: offBoardError(onBoard.board) };
+    status = onBoard.status;
   } else if (data.active !== undefined) {
-    const projectId = existing.project_id ?? null;
     // The checkbox: done goes to the first completed column, reopening to the default.
     status = data.active
       ? await defaultStatus(db, workspaceId, projectId)
@@ -324,7 +336,7 @@ async function resolveStatusChange(
   } else {
     return undefined;
   }
-  if (!status) return null; // caller answers 400
+  if (!status) return { error: "Status not found" };
 
   const wasActive = Boolean(existing.active);
   const { active, completedAt } = syncFromCategory(
@@ -445,9 +457,28 @@ export const tasksRouter = new Hono<{
       }
     }
 
+    // The project this write leaves the task in: its column must be on that project's board.
+    const targetProjectId =
+      data.parentId ? (await resolveParent(c.env.DB, data.parentId, workspaceId))?.projectId ?? existing.project_id
+      : data.projectId !== undefined && !isSubtask ? data.projectId
+      : existing.project_id;
+
     // `active` and `statusId` are the same decision from two surfaces — one resolver for both.
-    const change = await resolveStatusChange(c.env.DB, workspaceId, existing, data);
-    if (change === null) return c.json({ error: "Status not found" }, 400);
+    let change = await resolveStatusChange(c.env.DB, workspaceId, existing, data, targetProjectId);
+    if (change && "error" in change) return c.json({ error: change.error }, 400);
+
+    // Moved to a project with its own columns and no column named: the same-category column nearest where it was.
+    if (!change && targetProjectId !== existing.project_id && existing.status_id) {
+      const stay = await statusOnBoard(c.env.DB, workspaceId, targetProjectId, existing.status_id);
+      if (!stay.status) {
+        const was = await resolveStatus(c.env.DB, workspaceId, existing.status_id);
+        const nearest = nearestColumn(stay.board, was?.category ?? null, was?.sortOrder ?? null);
+        if (nearest) {
+          change = await resolveStatusChange(c.env.DB, workspaceId, existing, { statusId: nearest.id }, targetProjectId);
+          if (change && "error" in change) return c.json({ error: change.error }, 400);
+        }
+      }
+    }
 
     const wasActive = Boolean(existing.active);
     const completing = !!change && change.active === 0 && wasActive;
@@ -529,10 +560,24 @@ export const tasksRouter = new Hono<{
       }
     }
 
-    // Subtasks carry their parent's project badge — moving the parent moves them too.
+    // Subtasks carry their parent's project badge — moving the parent moves them too, each into a column of the new board.
     if (data.projectId !== undefined && !isSubtask) {
       await c.env.DB.prepare(`UPDATE tasks SET project_id = ? WHERE parent_id = ? AND workspace_id = ?`)
         .bind(data.projectId, id, workspaceId).run();
+      const board = await listStatuses(c.env.DB, workspaceId, data.projectId);
+      const onBoard = new Set(board.map((s) => s.id));
+      const { results: kids } = await c.env.DB.prepare(
+        `SELECT k.id, k.status_id, st.category, st.sort_order FROM tasks k LEFT JOIN task_statuses st ON st.id = k.status_id
+          WHERE k.parent_id = ? AND k.workspace_id = ?`
+      ).bind(id, workspaceId).all<{ id: string; status_id: string | null; category: string | null; sort_order: number | null }>();
+      const moves = kids.flatMap((k) => {
+        if (k.status_id && onBoard.has(k.status_id)) return [];
+        const nearest = nearestColumn(board, k.category, k.sort_order);
+        return nearest
+          ? [c.env.DB.prepare(`UPDATE tasks SET status_id = ? WHERE id = ? AND workspace_id = ?`).bind(nearest.id, k.id, workspaceId)]
+          : [];
+      });
+      if (moves.length) await c.env.DB.batch(moves);
     }
 
     // Ticking a parent ticks its children: a parent left "done" over five open
@@ -660,6 +705,7 @@ export const tasksRouter = new Hono<{
 
     const change = await resolveStatusChange(c.env.DB, workspaceId, existing, { statusId });
     if (!change) return c.json({ error: "Status not found" }, 400);
+    if ("error" in change) return c.json({ error: change.error }, 400);
 
     const wasActive = Boolean(existing.active);
     const completing = change.active === 0 && wasActive;

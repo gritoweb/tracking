@@ -12,6 +12,7 @@ import {
   listStatuses,
   nextStatusColor,
   nextStatusOrder,
+  offBoardError,
   resolveStatus,
 } from "../lib/task-statuses";
 
@@ -234,8 +235,9 @@ export const taskStatusesRouter = new Hono<{
         );
       }
       if (moveTo === id) return c.json({ error: "Pick a different status to move tasks to" }, 400);
-      target = await resolveStatus(c.env.DB, workspaceId, moveTo);
-      if (!target) return c.json({ error: "Target status not found" }, 400);
+      // Only a column of the same board: another project's column would leave these tasks off their own board.
+      target = others.find((s) => s.id === moveTo) ?? null;
+      if (!target) return c.json({ error: offBoardError(others) }, 400);
     }
 
     const writes: D1PreparedStatement[] = [];

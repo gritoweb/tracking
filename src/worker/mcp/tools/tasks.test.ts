@@ -279,3 +279,52 @@ describe("get_task reads one task, not the whole workspace", () => {
     expect(got.error).not.toContain("Secret plan");
   });
 });
+
+describe("a task only takes a column of its own board", () => {
+  async function forkedWorld() {
+    const w = world();
+    w.raw.exec(`INSERT INTO projects (id, workspace_id, name, client_id) VALUES ('p2', 'ws-A', 'Two', 'cl-A');`);
+    const admin = w.toolsFor("u-admin");
+    const forked = (await w.call(admin, "fork_task_statuses", { projectId: "p2" })).data as unknown as { id: string; category: string; sortOrder: number }[];
+    const global = (await w.call(admin, "list_task_statuses", {})).data as unknown as { id: string; category: string; sortOrder: number }[];
+    return { w, admin, forked, global };
+  }
+
+  it("refuses a move to another board's column, lists the valid ones, and leaves the task where it was", async () => {
+    const { w, admin, forked } = await forkedWorld();
+    const t = (await w.call(admin, "create_task", { name: "On the global board", projectId: "p1" })).data!;
+    const before = w.row(t.id as string).status_id;
+    const res = await w.call(admin, "move_task", { taskId: t.id, statusId: forked[3].id });
+    expect(res.error).toContain("isn't a column on this task's board");
+    expect(res.error).toContain("Its columns:");
+    expect(w.row(t.id as string).status_id).toBe(before);
+  });
+
+  it("refuses to create a task in another board's column", async () => {
+    const { w, admin, global } = await forkedWorld();
+    const res = await w.call(admin, "create_task", { name: "Wrong column", projectId: "p2", statusId: global[0].id });
+    expect(res.error).toContain("isn't a column on this task's board");
+  });
+
+  it("moves a task and its subtasks into the matching column when the task changes project", async () => {
+    const { w, admin, forked, global } = await forkedWorld();
+    // Columns come in board order; the fourth is the active one after the default (the MCP drops sortOrder as noise).
+    const inProgress = global[3];
+    const parent = (await w.call(admin, "create_task", { name: "Moves project", projectId: "p1", statusId: inProgress.id })).data!;
+    const kid = (await w.call(admin, "create_task", { name: "Kid", projectId: "p1", parentId: parent.id, statusId: inProgress.id })).data!;
+
+    await w.call(admin, "update_task", { taskId: parent.id, projectId: "p2" });
+
+    const twin = forked[3];
+    expect(w.row(parent.id as string).status_id).toBe(twin.id);
+    expect(w.row(kid.id as string).status_id).toBe(twin.id);
+  });
+
+  it("refuses to archive a column into another board's column", async () => {
+    const { w, admin, forked, global } = await forkedWorld();
+    const qa = global[4];
+    await w.call(admin, "create_task", { name: "Sits in QA", projectId: "p1", statusId: qa.id });
+    const res = await w.call(admin, "archive_task_status", { statusId: qa.id, moveTo: forked[0].id });
+    expect(res.error).toContain("isn't a column on this task's board");
+  });
+});

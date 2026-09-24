@@ -33,6 +33,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     statusName: null,
     statusColor: null,
     statusCategory: null,
+    statusPosition: null,
     estimatedSeconds: null,
     trackedSeconds: 0,
     dueDate: null,

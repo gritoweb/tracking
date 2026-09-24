@@ -278,6 +278,8 @@ export const TaskSchema = z.object({
   statusName: z.string().nullable(),
   statusColor: z.string().nullable(),
   statusCategory: TaskStatusCategorySchema.nullable(),
+  /** Where the task's column sits on its own board (a project's own columns included) — lets another board place it by position, never by name. */
+  statusPosition: z.number().nullable(),
   estimatedSeconds: z.number().nullable(),
   /** Own tracked time **plus** every subtask's — see TASK_SELECT. */
   trackedSeconds: z.number(),

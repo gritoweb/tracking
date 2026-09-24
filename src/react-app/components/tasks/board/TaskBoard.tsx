@@ -34,6 +34,7 @@ import {
   type StatusFilter,
 } from "@/lib/taskUtils";
 import { todayLocalDate } from "@shared/task-recurrence";
+import { nearestColumn } from "@shared/task-columns";
 import type { Task } from "@shared/schemas";
 
 const COLUMN_PREFIX = "column:";
@@ -98,12 +99,11 @@ export function TaskBoard({
     for (const s of statuses) map.set(s.id, []);
     for (const task of visible) {
       const bucket = task.statusId ? map.get(task.statusId) : undefined;
-      // The task's own status isn't one of the columns on screen — either archived out
-      // from under it, or (viewing "All tasks" unfiltered) it belongs to a project whose
-      // fork has its own columns instead of the global set shown here. Either way, the
-      // nearest same-category column beats losing the card off the board entirely.
-      const fallback = statuses.find((s) => s.category === task.statusCategory) ?? statuses[0];
-      (bucket ?? map.get(fallback?.id ?? "") ?? []).push(task);
+      // The task's own status isn't one of the columns on screen — archived out from under it, or (on "All tasks") a
+      // project's own column. Place it in the same-category column nearest its position, never by name: the names are
+      // whatever each workspace or project calls them, in any language.
+      const fallback = nearestColumn(statuses, task.statusCategory, task.statusPosition);
+      (bucket ?? map.get(fallback?.id ?? statuses[0]?.id ?? "") ?? []).push(task);
     }
     // "Plan order" is the manual drag sequence; any other sort reorders the display only.
     const compare = sortBy === "plan" ? (a: Task, b: Task) => a.boardOrder - b.boardOrder : SORTERS[sortBy];
