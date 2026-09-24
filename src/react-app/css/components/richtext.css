@@ -57,7 +57,9 @@
   padding-left: 28px;
   list-style: disc;
 }
-.tt-richtext p.is-editor-empty:first-child::before {
+.tt-richtext p.is-editor-empty:first-child::before,
+/* The empty line with the caret, only while editing: at rest a blank line stays blank. */
+.tt-richtext.ProseMirror-focused p.is-empty::before {
   float: left;
   height: 0;
   color: var(--muted-foreground);

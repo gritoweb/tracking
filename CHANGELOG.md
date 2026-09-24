@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-09-24 (108) — on `refactor`, not deployed
+### Changed
+- **An empty line says what it's for while you edit**: the line holding the caret shows "Write, or type / for commands" (`LINE_HINT`, through the `Placeholder` extension's `showOnlyCurrent`), only while the editor has focus, so a blank line at rest stays blank. The whole-empty description keeps its own placeholder. No AI wording.
+- **The "Description" heading above the editor is gone**; the text sits right under the fields. The editor keeps `aria-label="Description"`, so screen readers and the e2e selectors still find it.
+### Verified
+- `tsc -b` (0), `lint` (0), `vitest run` 1061/1061; in the browser: heading gone, the hint on exactly one line (the caret's) while focused and on none after blur.
+
 ## 2026-09-24 (107) — on `refactor`, not deployed
 ### Changed
 - **An empty line shows only "+"**, with no grip: there is nothing on it to move. A line with text shows only the grip. One control at a time also keeps the gutter quiet.

@@ -5,7 +5,6 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
 import { TaskDetailToolbar } from "./TaskDetailToolbar";
 import { TaskModalShell } from "./TaskModalShell";
 import { TaskSidebarShell } from "./TaskSidebarShell";
@@ -168,8 +167,8 @@ export function TaskDetail({ open, onClose, task, tab, onTabChange, onRequestDel
         onChangePriority={(priority) => updateTask.mutate({ id: task.id, data: { priority } })}
       />
 
-      <div className="space-y-1.5 border-t pt-4">
-        <Label className="text-base font-semibold">Description</Label>
+      {/* No heading: the text sits right under the fields, and the empty editor's own placeholder says what goes there. */}
+      <div className="border-t pt-4">
         <TaskDescriptionField
           key={task.id}
           task={task}

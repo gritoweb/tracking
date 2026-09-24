@@ -23,6 +23,9 @@ import { CollaborationCaret } from "@tiptap/extension-collaboration-caret";
 import type { DescriptionCollab } from "@/hooks/useDescriptionCollab";
 import { DESCRIPTION_FIELD, SEED_GRANTED, SEED_REQUEST } from "@shared/description-collab";
 
+/** Shown on the empty line the caret sits on, so a blank line says what it's for. */
+const LINE_HINT = "Write, or type / for commands";
+
 interface RichTextEditorProps {
   content: JSONContent;
   onBlur: (doc: JSONContent) => void;
@@ -188,7 +191,8 @@ export function RichTextEditor({
       Color,
       TaskList,
       TaskItem.configure({ nested: true }),
-      Placeholder.configure({ placeholder }),
+      // The field's own placeholder while the whole doc is empty; otherwise a hint on the empty line holding the caret.
+      Placeholder.configure({ placeholder: ({ editor: e }) => (e.isEmpty ? (placeholder ?? "") : LINE_HINT) }),
       Image,
       UploadPlaceholderExtension,
       mentions.extension,
