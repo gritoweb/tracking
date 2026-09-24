@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import { Plus, CalendarDays } from "lucide-react";
+import { CalendarDays } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Input } from "@/components/ui/input";
@@ -82,7 +82,6 @@ export function QuickAddTaskInlineView({
             : "rounded-md border border-dashed focus-within:border-solid focus-within:border-ring"
         )}
       >
-        <Plus className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
         <Input
           variant="bare"
           ref={inputRef}
