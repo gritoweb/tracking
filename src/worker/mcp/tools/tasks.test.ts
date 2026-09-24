@@ -234,8 +234,8 @@ describe("the same tools take a list: several items, one call, one approval", ()
   });
 });
 
-describe("list_tasks answers 'my tasks' the way a board reads", () => {
-  it("returns every open task whatever its due date, grouped by column in board order, without the completed ones", async () => {
+describe("list_tasks answers 'my tasks' with every open task, as a list of links", () => {
+  it("returns every open task whatever its due date, in board column order, without the completed ones", async () => {
     const w = world();
     const admin = w.toolsFor("u-admin");
     const closed = await closedStatusId(w, admin);
@@ -244,15 +244,14 @@ describe("list_tasks answers 'my tasks' the way a board reads", () => {
     const done = (await w.call(admin, "create_task", { name: "Finished", projectId: "p1" })).data!;
     await w.call(admin, "move_task", { taskId: done.id, statusId: closed });
 
-    const listed = await w.call(admin, "list_tasks", {});
-    const groups = listed.data as unknown as { status: string; category: string; count: number; tasks: { name: string }[] }[];
+    const listed = (await w.call(admin, "list_tasks", {})).data as unknown as { name: string; url: string; status: { category: string } }[];
 
-    const names = groups.flatMap((g) => g.tasks.map((t) => t.name));
-    expect(names).toEqual(expect.arrayContaining(["Due next month", "No date"]));
-    expect(names).not.toContain("Finished");
-    expect(groups.every((g) => g.category !== "completed")).toBe(true);
+    expect(listed.map((t) => t.name)).toEqual(expect.arrayContaining(["Due next month", "No date"]));
+    expect(listed.map((t) => t.name)).not.toContain("Finished");
+    // Each is its own item with a url, which is what the Assistant's card turns into a link.
+    expect(listed.every((t) => t.url.startsWith("http://localhost:5173/tasks/"))).toBe(true);
 
-    const withDone = (await w.call(admin, "list_tasks", { includeDone: true })).data as unknown as { category: string }[];
-    expect(withDone.at(-1)?.category).toBe("completed");
+    const withDone = (await w.call(admin, "list_tasks", { includeDone: true })).data as unknown as { status: { category: string } }[];
+    expect(withDone.at(-1)?.status.category).toBe("completed");
   });
 });

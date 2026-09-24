@@ -17,22 +17,13 @@ const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 
 const CATEGORY_ORDER = { not_started: 0, active: 1, completed: 2 } as const;
 
-/** Tasks as a person reads a board: one group per status, in the columns' order; a project's own columns follow by category. */
-export function groupByStatus(tasks: Task[], columnOrder: string[]) {
-  const groups = new Map<string, { status: string; category: string | null; tasks: Task[] }>();
-  for (const t of tasks) {
-    const key = t.statusId ?? "none";
-    const group = groups.get(key) ?? { status: t.statusName ?? "No status", category: t.statusCategory, tasks: [] };
-    group.tasks.push(t);
-    groups.set(key, group);
-  }
-  const rank = (id: string, category: string | null) => {
-    const i = columnOrder.indexOf(id);
-    return i >= 0 ? i : columnOrder.length + (CATEGORY_ORDER[category as keyof typeof CATEGORY_ORDER] ?? 3);
+/** Tasks in the board's column order (Backlog, Pendente, Em progresso…); a project's own columns follow by category. */
+export function sortByColumn(tasks: Task[], columnOrder: string[]): Task[] {
+  const rank = (t: Task) => {
+    const i = t.statusId ? columnOrder.indexOf(t.statusId) : -1;
+    return i >= 0 ? i : columnOrder.length + (CATEGORY_ORDER[t.statusCategory as keyof typeof CATEGORY_ORDER] ?? 3);
   };
-  return [...groups.entries()]
-    .sort(([a, ga], [b, gb]) => rank(a, ga.category) - rank(b, gb.category))
-    .map(([, g]) => ({ status: g.status, category: g.category, count: g.tasks.length, tasks: g.tasks }));
+  return [...tasks].sort((a, b) => rank(a) - rank(b));
 }
 
 /** A task as a model reads it: plain-text notes, hours, names instead of colours. */
@@ -79,7 +70,7 @@ export function registerTaskReads(d: ToolDeps): void {
     {
       title: "List tasks",
       description:
-        "Tasks in the workspace — the plan, not tracked time — grouped by status in the board's column order (Backlog, Pendente, Em progresso, QA…). Open tasks only unless `includeDone`, so completed ones are left out. " +
+        "Tasks in the workspace — the plan, not tracked time — in the board's column order (Backlog, Pendente, Em progresso, QA…), each with its status and url. Open tasks only unless `includeDone`, so completed ones are left out. " +
         "\"My tasks\" with no date means ALL of the person's open tasks: assignee `me` and NO dueBy — whatever their due date, or none. Pass dueBy only when the person names a day or period (\"today\", \"this week\"). " +
         "Filter by project, status, assignee (`me` for the key's owner) or due day. Use this to find a taskId before editing, moving, commenting or attaching.",
       inputSchema: {
@@ -107,10 +98,9 @@ export function registerTaskReads(d: ToolDeps): void {
       ]);
       const columnOrder = statuses.ok ? statuses.data.map((st) => st.id) : [];
       return fromBridge(tasks, (list) =>
-        groupByStatus(
-          list.filter((t) => !dueBy || (t.dueDate !== null && t.dueDate <= dueBy)).slice(0, ROW_LIMIT),
-          columnOrder
-        ).map((group) => ({ ...group, tasks: group.tasks.map((t) => taskView(t, appUrl(env))) }))
+        sortByColumn(list.filter((t) => !dueBy || (t.dueDate !== null && t.dueDate <= dueBy)), columnOrder)
+          .slice(0, ROW_LIMIT)
+          .map((t) => taskView(t, appUrl(env)))
       );
     }
   );

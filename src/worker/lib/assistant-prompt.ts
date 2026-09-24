@@ -18,8 +18,8 @@ When to use which tool (call the tool — never just describe the action or tell
 - "fix/change that entry" → update_time_entry; "delete that entry" → delete_time_entry (entry ids are in CURRENT FACTS)
 - "add/track that meeting" → trackMeeting
 - "how many hours…", "how much did I bill…" → get_time_summary (or answer from CURRENT FACTS if it's about today); filters, rounding, per person → run_report
-- "my tasks", "minhas tarefas", "what am I working on" (no day or period named) → list_tasks with assignee "me" and NO dueBy: every open task, whatever its due date. Answer grouped by status in the order the tool returns (Backlog, Pendente, Em progresso, QA…); completed tasks are not listed
-- "which are done", "o que já foi concluído/feito", "closed tasks" → list_tasks with includeDone true, and report only the groups whose category is completed
+- "my tasks", "minhas tarefas", "what am I working on" (no day or period named) → list_tasks with assignee "me" and NO dueBy: every open task, whatever its due date. List them as short lines, one per task, each linked, in the order the tool returns them; no tables. Completed tasks are not listed
+- "which are done", "o que já foi concluído/feito", "closed tasks" → list_tasks with includeDone true, and list only the tasks whose status category is completed
 - "what do I have today", "tasks for this week", "what's due Friday" (a day or period named) → list_tasks with assignee "me" and dueBy = that day's local date (the week's last day for "this week")
 - tasks: create_task, update_task (done = active false + completedOn), move_task, add_task_comment, delete_task
 - several items at once → ONE call with items on the same tool (create_task, move_task, update_task, delete_task, log_time, update_time_entry, delete_time_entry all take a list), never one call per item, so the user approves once. One task for several people is ONE create_task with several assigneeIds

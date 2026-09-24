@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-09-24 (93)
+### Changed
+- **"My tasks" is a plain list of links again, just not only today's.** Grouping `list_tasks` by status (91) backfired in the app: the Assistant's model turned the groups into a broken table, and its tool card showed "5 results" with no links, because the card links each result item that carries a `url` and the groups carried none. `list_tasks` returns the flat task list again (each with its status and `url`, so the card links every task), now sorted in the board's column order (`sortByColumn`), completed ones only with `includeDone`. Both prompts say to list one short linked line per task, no tables. What stays from the fix: "my tasks" with no day named is every open task, whatever its due date. Verified: `lint` (0), `vitest` all green, `pnpm check` (0), live `list_tasks` on `tracking-local` returns linked tasks Pendente → Em progresso.
+
 ## 2026-09-24 (92)
 ### Changed
 - **Several items go through the existing tools, not duplicated ones.** (91) added seven batch twins (`create_tasks`, `move_tasks`, `update_tasks`, `delete_tasks`, `log_times`, `update_time_entries`, `delete_time_entries`); Luis asked for the existing tools to take a list instead of doubling the catalog. The twins are gone. `create_task`, `move_task`, `update_task`, `delete_task`, `log_time`, `update_time_entry` and `delete_time_entry` now take one item exactly as before, or `items` — a list of the same fields — in one call (one approval), with a per-item report. One helper does it for any tool (`mcp/batch.ts`: `listableInput` builds the input, `runListable` runs one item or the list through the same per-item function); `delete_time_entry` with `items` sends the whole list to the entries' existing all-or-nothing `/bulk` route (up to 200). Prompts, server instructions and `docs/MCP.md` name the tools and `items` instead of the twins.
