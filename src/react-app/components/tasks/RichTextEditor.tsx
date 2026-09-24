@@ -5,9 +5,11 @@ import { TaskList } from "@tiptap/extension-task-list";
 import { TaskItem } from "@tiptap/extension-task-item";
 import { Placeholder } from "@tiptap/extension-placeholder";
 import { Image } from "@tiptap/extension-image";
+import { TextStyle, Color } from "@tiptap/extension-text-style";
 import { Plugin, PluginKey, type EditorState } from "@tiptap/pm/state";
 import { Decoration, DecorationSet, type EditorView } from "@tiptap/pm/view";
 import { useEditorMentions } from "./useEditorMentions";
+import { RichTextBubbleMenu } from "./RichTextBubbleMenu";
 import { refreshMentionLabels } from "@/lib/mentionLabels";
 import { cn } from "@/lib/utils";
 import type { WorkspaceMember } from "@/hooks/useWorkspaceRole";
@@ -125,9 +127,9 @@ function insertUploadedImage(
 }
 
 /**
- * A task's description: bold/heading/lists plus a markable checklist — tiptap, headless, styled
- * to this app's own tokens rather than its default look. No fixed toolbar — markdown-style typing
- * (`**bold**`, `# heading`, `- item`, `[] item`) is StarterKit's own input rules, not a button row.
+ * A task's description: headings, marks, text color, lists plus a markable checklist — tiptap, headless,
+ * styled to this app's own tokens. No fixed toolbar: selecting text raises `RichTextBubbleMenu` (as in
+ * ClickUp), and markdown-style typing (`**bold**`, `# heading`, `[] item`) still works.
  * Autosaves on blur, same as every other field on the sheet — not per keystroke, which would fire
  * a write per letter typed.
  */
@@ -144,7 +146,9 @@ export function RichTextEditor({
   const mentions = useEditorMentions(members);
   const editor = useEditor({
     extensions: [
-      StarterKit.configure({ codeBlock: false, horizontalRule: false }),
+      StarterKit.configure({ codeBlock: false, horizontalRule: false, heading: { levels: [1, 2, 3] } }),
+      TextStyle,
+      Color,
       TaskList,
       TaskItem.configure({ nested: true }),
       Placeholder.configure({ placeholder }),
@@ -157,7 +161,7 @@ export function RichTextEditor({
       attributes: {
         role: "textbox",
         ...(ariaLabel ? { "aria-label": ariaLabel } : {}),
-        class: cn("tt-richtext min-h-16 px-0 py-0 text-lg", "focus:outline-none"),
+        class: cn("tt-richtext min-h-16 px-0 py-0", "focus:outline-none"),
       },
       handleDOMEvents: {
         click: (_view, event) => {
@@ -203,6 +207,7 @@ export function RichTextEditor({
   return (
     <>
       <EditorContent editor={editor} className={className} />
+      <RichTextBubbleMenu editor={editor} />
       {mentions.ui}
     </>
   );

@@ -1,14 +1,41 @@
 /* Task description editor (tiptap ships unstyled) — plain prose at the app's own tokens. */
+/* Type scale measured from ClickUp's task description (2026-09-24): 16/24 body, headings as multiples of it, 700 weight. */
+.tt-richtext {
+  font-size: var(--text-base);
+  line-height: 1.5;
+}
 .tt-richtext p {
   margin: 0;
+  padding: 2px 0;
 }
-.tt-richtext p + p {
-  margin-top: 0.5em;
+.tt-richtext h1,
+.tt-richtext h2,
+.tt-richtext h3 {
+  margin: 22px 0 0;
+  padding: 2px 0 4px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+.tt-richtext h1 {
+  font-size: 2em;
 }
 .tt-richtext h2 {
-  margin: 0.75em 0 0.25em;
-  font-size: var(--text-xl);
-  font-weight: 600;
+  font-size: 1.5em;
+}
+.tt-richtext h3 {
+  font-size: 1.25em;
+}
+.tt-richtext code {
+  border-radius: var(--radius-sm);
+  background-color: var(--muted);
+  padding: 2px 0.3em;
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+}
+.tt-richtext ol {
+  margin: 0.25em 0;
+  padding-left: 1.5em;
+  list-style: decimal;
 }
 /* A tagged person: the same chip the comments draw. */
 .tt-richtext .tt-mention {
@@ -19,7 +46,7 @@
   font-weight: 500;
   cursor: pointer;
 }
-.tt-richtext h2:first-child {
+.tt-richtext > :first-child {
   margin-top: 0;
 }
 .tt-richtext ul:not([data-type="taskList"]) {
@@ -88,4 +115,10 @@
   max-width: 100%;
   border-radius: var(--radius-md);
   margin: 0.5em 0;
+}
+.tt-richtext a {
+  color: var(--primary-ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
 }

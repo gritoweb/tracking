@@ -43,3 +43,10 @@ export function descriptionToPlainText(raw: string | null): string {
   walk(doc);
   return parts.join(" ").trim();
 }
+
+/** A bare "example.com" is meant as a web address, not a path relative to this app. */
+export function normalizeLinkHref(raw: string): string {
+  const href = raw.trim();
+  if (!href) return "";
+  return /^[a-z][a-z\d+.-]*:/i.test(href) ? href : `https://${href}`;
+}

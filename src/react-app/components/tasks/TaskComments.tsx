@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -22,9 +22,17 @@ import { useWorkspaceRole } from "@/hooks/useWorkspaceRole";
 import { encodeMentions, type MentionPerson } from "@shared/mentions";
 import type { WorkspaceMember } from "@/hooks/useWorkspaceRole";
 import { TASK_COMMENTS_PAGE_SIZE, type TaskComment } from "@shared/schemas";
+import { cn } from "@/lib/utils";
+
+interface TaskCommentsProps {
+  taskId: string;
+  members: WorkspaceMember[];
+  /** Fill the parent's height: the feed scrolls and the composer stays pinned below it (the modal's column). */
+  docked?: boolean;
+}
 
 /** Flat, single-level comments on one task — no reply/thread, same as a WhatsApp group chat. */
-export function TaskComments({ taskId, members }: { taskId: string; members: WorkspaceMember[] }) {
+export function TaskComments({ taskId, members, docked = false }: TaskCommentsProps) {
   const { user } = useAuth();
   const { canManage } = useWorkspaceRole();
   // A full page means there may be older comments; each click asks for one more page.
@@ -41,6 +49,11 @@ export function TaskComments({ taskId, members }: { taskId: string; members: Wor
       ].sort((a, b) => a.at.localeCompare(b.at)),
     [comments, activity]
   );
+  const feedRef = useRef<HTMLDivElement>(null);
+  // Docked, the newest item sits at the bottom of a scroll box — keep it in view as the feed grows.
+  useEffect(() => {
+    if (docked && feedRef.current) feedRef.current.scrollTop = feedRef.current.scrollHeight;
+  }, [docked, feed.length]);
   const createComment = useCreateTaskComment(taskId);
   const updateComment = useUpdateTaskComment(taskId);
   const deleteComment = useDeleteTaskComment(taskId);
@@ -87,11 +100,11 @@ export function TaskComments({ taskId, members }: { taskId: string; members: Wor
   };
 
   return (
-    <div className="space-y-2">
+    <div className={cn(docked ? "flex min-h-0 flex-1 flex-col" : "space-y-2")}>
       {/* Two things, kept apart: the conversation in its frame, and below it, with a gap, the field in a frame of its own. */}
-      <div className="space-y-4">
+      <div className={cn(docked ? "flex min-h-0 flex-1 flex-col gap-4" : "space-y-4")}>
         {feed.length > 0 && (
-          <div className="divide-y rounded-md border">
+          <div ref={feedRef} className={cn("divide-y rounded-md border", docked && "min-h-0 flex-1 overflow-y-auto bg-popover")}>
             {mayHaveOlder && (
               <div className="flex justify-center p-2">
                 <Button
@@ -130,7 +143,7 @@ export function TaskComments({ taskId, members }: { taskId: string; members: Wor
           </div>
         )}
 
-        <div className="space-y-2 rounded-md border px-4 py-3">
+        <div className={cn("space-y-2 rounded-md border px-4 py-3", docked && "mt-auto shrink-0 bg-popover")}>
           <MentionInput
             variant="bare"
             value={body}

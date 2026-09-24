@@ -121,7 +121,7 @@ test("picking an assignee updates the panel and the board card without closing a
   await page.getByRole("option", { name: "Test User" }).click();
 
   await expect(panel).toBeVisible();
-  await expect(panel.getByText("Test User")).toBeVisible();
+  await expect(panel.getByRole("button", { name: "Edit assignees" })).toContainText("Test User");
 
   // And on the card behind it, without a reload.
   await panel.getByRole("button", { name: "Close" }).click();

@@ -10,6 +10,8 @@ export const dialogContentVariants = cva(
         md: "sm:max-w-lg",
         lg: "sm:max-w-2xl max-h-(--size-cap-85vh) overflow-y-auto",
         full: "sm:max-w-4xl max-h-(--size-cap-85vh) overflow-y-auto",
+        // The task detail modal: the viewport less a 24px margin (ClickUp's), two columns that each scroll themselves.
+        task: "h-[calc(100dvh-3rem)] max-w-[calc(100%-3rem)] gap-0 overflow-hidden p-0",
       },
     },
     defaultVariants: {

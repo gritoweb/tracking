@@ -16,7 +16,8 @@ test("posting, editing and deleting a comment through the panel", async ({ page 
   await page.goto(`/tasks/${task.id}`);
   const panel = page.getByRole("dialog", { name: "Cutover plan" });
   await expect(panel).toBeVisible();
-  await panel.getByRole("tab", { name: "Comments" }).click();
+  // The modal (default) keeps comments beside the content, so there's no tab to open first.
+  await expect(panel.getByRole("tab", { name: "Comments" })).toHaveCount(0);
 
   await panel.getByPlaceholder("Write a comment…").fill("First pass looks good");
   await panel.getByRole("button", { name: "Comment" }).click();

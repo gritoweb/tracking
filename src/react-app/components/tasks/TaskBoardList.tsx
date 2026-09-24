@@ -7,7 +7,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { TaskBoardListToolbar } from "./TaskBoardListToolbar";
 import { TaskListView } from "./TaskListView";
 import { TaskDialog } from "./TaskDialog";
-import { TaskSheet } from "./TaskSheet";
+import { TaskDetail } from "./TaskDetail";
 import { TaskBoard } from "./board/TaskBoard";
 import { TaskProjectRail } from "./TaskProjectRail";
 import { useAllTasks, useDeleteTask, useUpdateTask } from "@/hooks/useTasks";
@@ -264,7 +264,7 @@ export function TaskBoardList({ openTaskId = null, openTab = "task" }: TaskBoard
         defaultDueDate={defaultDueDate}
       />
 
-      <TaskSheet
+      <TaskDetail
         open={!!openTask}
         task={openTask}
         tab={openTab}

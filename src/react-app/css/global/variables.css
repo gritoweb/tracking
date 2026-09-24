@@ -53,7 +53,7 @@
   --size-grid-label: 6.75rem; /* TimesheetView/PlannerView's duplicated `w-[108px]` row-label column. */
   --size-grid-meta: 7.75rem; /* TimesheetView/PlannerView's duplicated `w-[124px]` row-meta column. */
   --size-cap-60vh: 60vh; /* DetailedTable's scroll body. */
-  --size-cap-80vh: 80vh; /* TaskSheet's lightbox image. */
+  --size-cap-80vh: 80vh; /* TaskDetail's lightbox image. */
   --size-cap-85vh: 85vh; /* TaskDialog's content; also `ui/dialog.tsx`'s `size="lg"`/`"full"`. */
 }
 

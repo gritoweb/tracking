@@ -1,0 +1,191 @@
+import { useState, type ReactNode } from "react";
+import { useEditorState, type Editor } from "@tiptap/react";
+import { BubbleMenu } from "@tiptap/react/menus";
+import {
+  Bold,
+  Code,
+  Heading1,
+  Heading2,
+  Heading3,
+  Italic,
+  Link,
+  List,
+  ListChecks,
+  ListOrdered,
+  Palette,
+  Pilcrow,
+  Strikethrough,
+  Underline,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { ColorSwatchPicker } from "@/components/ui/color-swatch-picker";
+import { floatingToolbarVariants } from "@/components/ui/floating-toolbar-variants";
+import { normalizeLinkHref } from "@/lib/richText";
+
+function ToolButton({
+  label,
+  active,
+  onClick,
+  children,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <Button
+      type="button"
+      variant={active ? "secondary" : "ghost"}
+      size="icon-sm"
+      aria-label={label}
+      title={label}
+      aria-pressed={active}
+      onClick={onClick}
+    >
+      {children}
+    </Button>
+  );
+}
+
+const Divider = () => <div className="mx-0.5 h-5 w-px bg-border" aria-hidden />;
+
+/** The formatting bar that floats over a text selection — ClickUp's description editing, on tiptap. */
+export function RichTextBubbleMenu({ editor }: { editor: Editor }) {
+  // One secondary row at a time under the buttons: the color swatches or the link field.
+  const [panel, setPanel] = useState<"color" | "link" | null>(null);
+  const [href, setHref] = useState("");
+  const state = useEditorState({
+    editor,
+    selector: ({ editor: e }) => ({
+      paragraph: e.isActive("paragraph"),
+      h1: e.isActive("heading", { level: 1 }),
+      h2: e.isActive("heading", { level: 2 }),
+      h3: e.isActive("heading", { level: 3 }),
+      bold: e.isActive("bold"),
+      italic: e.isActive("italic"),
+      underline: e.isActive("underline"),
+      strike: e.isActive("strike"),
+      code: e.isActive("code"),
+      bulletList: e.isActive("bulletList"),
+      orderedList: e.isActive("orderedList"),
+      taskList: e.isActive("taskList"),
+      link: e.isActive("link"),
+      color: (e.getAttributes("textStyle").color as string | undefined) ?? "",
+    }),
+  });
+  const chain = () => editor.chain().focus();
+  const togglePanel = (next: "color" | "link") => {
+    if (next === "link") setHref((editor.getAttributes("link").href as string | undefined) ?? "");
+    setPanel((current) => (current === next ? null : next));
+  };
+  const applyLink = () => {
+    const next = normalizeLinkHref(href);
+    if (next) chain().extendMarkRange("link").setLink({ href: next }).run();
+    else chain().extendMarkRange("link").unsetLink().run();
+    setPanel(null);
+  };
+
+  return (
+    <BubbleMenu
+      editor={editor}
+      options={{ strategy: "fixed", placement: "top-start", onHide: () => setPanel(null) }}
+      // Keeps the editor's selection: a click in the bar must not move focus out of the text it formats (the link field excepted).
+      onMouseDown={(e) => {
+        if (!(e.target instanceof HTMLInputElement)) e.preventDefault();
+      }}
+      className={floatingToolbarVariants()}
+    >
+      <div role="toolbar" aria-label="Text formatting" className="flex flex-wrap items-center gap-0.5">
+        <ToolButton label="Text" active={state.paragraph} onClick={() => chain().setParagraph().run()}>
+          <Pilcrow className="h-4 w-4" />
+        </ToolButton>
+        <ToolButton label="Heading 1" active={state.h1} onClick={() => chain().toggleHeading({ level: 1 }).run()}>
+          <Heading1 className="h-4 w-4" />
+        </ToolButton>
+        <ToolButton label="Heading 2" active={state.h2} onClick={() => chain().toggleHeading({ level: 2 }).run()}>
+          <Heading2 className="h-4 w-4" />
+        </ToolButton>
+        <ToolButton label="Heading 3" active={state.h3} onClick={() => chain().toggleHeading({ level: 3 }).run()}>
+          <Heading3 className="h-4 w-4" />
+        </ToolButton>
+        <Divider />
+        <ToolButton label="Bold" active={state.bold} onClick={() => chain().toggleBold().run()}>
+          <Bold className="h-4 w-4" />
+        </ToolButton>
+        <ToolButton label="Italic" active={state.italic} onClick={() => chain().toggleItalic().run()}>
+          <Italic className="h-4 w-4" />
+        </ToolButton>
+        <ToolButton label="Underline" active={state.underline} onClick={() => chain().toggleUnderline().run()}>
+          <Underline className="h-4 w-4" />
+        </ToolButton>
+        <ToolButton label="Strikethrough" active={state.strike} onClick={() => chain().toggleStrike().run()}>
+          <Strikethrough className="h-4 w-4" />
+        </ToolButton>
+        <ToolButton label="Inline code" active={state.code} onClick={() => chain().toggleCode().run()}>
+          <Code className="h-4 w-4" />
+        </ToolButton>
+        <ToolButton label="Text color" active={panel === "color"} onClick={() => togglePanel("color")}>
+          <Palette className="h-4 w-4" style={state.color ? { color: state.color } : undefined} />
+        </ToolButton>
+        <ToolButton label="Link" active={state.link || panel === "link"} onClick={() => togglePanel("link")}>
+          <Link className="h-4 w-4" />
+        </ToolButton>
+        <Divider />
+        <ToolButton label="Bulleted list" active={state.bulletList} onClick={() => chain().toggleBulletList().run()}>
+          <List className="h-4 w-4" />
+        </ToolButton>
+        <ToolButton label="Numbered list" active={state.orderedList} onClick={() => chain().toggleOrderedList().run()}>
+          <ListOrdered className="h-4 w-4" />
+        </ToolButton>
+        <ToolButton label="Checklist" active={state.taskList} onClick={() => chain().toggleTaskList().run()}>
+          <ListChecks className="h-4 w-4" />
+        </ToolButton>
+      </div>
+
+      {panel === "link" && (
+        <form
+          className="flex items-center gap-1.5 border-t px-1 pt-1.5 pb-0.5"
+          onSubmit={(e) => {
+            e.preventDefault();
+            applyLink();
+          }}
+        >
+          <Input
+            size="sm"
+            autoFocus
+            aria-label="Link address"
+            placeholder="Paste or type a link"
+            value={href}
+            onChange={(e) => setHref(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                e.preventDefault();
+                setPanel(null);
+                editor.commands.focus();
+              }
+            }}
+          />
+          <Button type="submit" size="sm">
+            {href.trim() ? "Apply" : "Remove"}
+          </Button>
+        </form>
+      )}
+
+      {panel === "color" && (
+        <div className="flex items-end gap-2 border-t px-1.5 pt-2 pb-1">
+          <ColorSwatchPicker
+            size="sm"
+            value={state.color}
+            onChange={(color) => chain().setColor(color).run()}
+            aria-label="Text color"
+          />
+          <Button type="button" variant="ghost" size="xs" onClick={() => chain().unsetColor().run()}>
+            Default
+          </Button>
+        </div>
+      )}
+    </BubbleMenu>
+  );
+}

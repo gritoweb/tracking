@@ -29,6 +29,8 @@ const DEFAULT_PRODUCTIVITY: ProductivitySettings = {
   pomodoroBreakMinutes: 5,
 };
 
+export type TaskViewMode = "modal" | "sidebar";
+
 interface UIStore {
   sidebarCollapsed: boolean;
   theme: "light" | "dark" | "system";
@@ -93,6 +95,9 @@ interface UIStore {
   /** The task rail beside the Timer grid. Persisted — it's a workspace layout choice. */
   taskRailOpen: boolean;
   setTaskRailOpen: (v: boolean) => void;
+  /** How a task opens: a centered two-column modal (default) or the side panel. Persisted per browser. */
+  taskViewMode: TaskViewMode;
+  setTaskViewMode: (v: TaskViewMode) => void;
   /** Client groups folded shut in the Tasks page's project rail ("none" = the no-client group). Persisted. */
   collapsedRailClients: string[];
   toggleRailClient: (key: string) => void;
@@ -245,6 +250,8 @@ export const useUIStore = create<UIStore>()(
       closeTaskLogTime: () => set({ logTimeTaskId: null }),
       taskRailOpen: false,
       setTaskRailOpen: (v) => set({ taskRailOpen: v }),
+      taskViewMode: "modal",
+      setTaskViewMode: (v) => set({ taskViewMode: v }),
       collapsedRailClients: [],
       toggleRailClient: (key) =>
         set((s) => ({
@@ -276,6 +283,7 @@ export const useUIStore = create<UIStore>()(
       partialize: (s) => ({
         sidebarCollapsed: s.sidebarCollapsed,
         taskRailOpen: s.taskRailOpen,
+        taskViewMode: s.taskViewMode,
         collapsedRailClients: s.collapsedRailClients,
         theme: s.theme,
         timeFormat: s.timeFormat,

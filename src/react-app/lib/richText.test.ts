@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { descriptionToPlainText, parseDescription, serializeDescription } from "./richText";
+import { descriptionToPlainText, normalizeLinkHref, parseDescription, serializeDescription } from "./richText";
 
 describe("parseDescription", () => {
   it("returns the editor's empty doc for null/empty input", () => {
@@ -82,5 +82,37 @@ describe("descriptionToPlainText", () => {
       ],
     };
     expect(descriptionToPlainText(JSON.stringify(doc))).toBe("Hello world one");
+  });
+});
+
+describe("formatting from the selection bar", () => {
+  it("reads headings and colored text as plain text, dropping the marks", () => {
+    const doc = {
+      type: "doc",
+      content: [
+        { type: "heading", attrs: { level: 1 }, content: [{ type: "text", text: "Scope" }] },
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "urgent", marks: [{ type: "textStyle", attrs: { color: "#ef4444" } }] }],
+        },
+        { type: "heading", attrs: { level: 3 }, content: [{ type: "text", text: "Notes" }] },
+      ],
+    };
+    expect(descriptionToPlainText(JSON.stringify(doc))).toBe("Scope urgent Notes");
+  });
+});
+
+describe("normalizeLinkHref", () => {
+  it("treats a bare domain as a web address", () => {
+    expect(normalizeLinkHref("example.com/page")).toBe("https://example.com/page");
+  });
+
+  it("keeps an explicit scheme and trims whitespace", () => {
+    expect(normalizeLinkHref("  mailto:team@example.com ")).toBe("mailto:team@example.com");
+    expect(normalizeLinkHref("http://example.com")).toBe("http://example.com");
+  });
+
+  it("returns empty for an empty field, which removes the link", () => {
+    expect(normalizeLinkHref("   ")).toBe("");
   });
 });
