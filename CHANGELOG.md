@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-24 (100)
+### Fixed
+- **An AI could create the same task twice.** In Luis's local DB, "Desenvolver tracking" exists twice, 2.5 minutes apart with different notes: a model re-creating a task instead of editing it (the other local duplicates were the double-Enter bug fixed in (85) and another session's probes). The form path already can't duplicate (client id, (85)); a model has no id to send. Now `create_task` — the MCP's and the Assistant's, which share it — first looks for an **open** task with the same name (case and spaces ignored) in the same project, or under the same parent for a subtask, created in the last 10 minutes; if there is one it returns that task with `alreadyExisted: true` and a note to use `update_task`, instead of a duplicate. A done task, an older one, another project or another parent still allows a new one, and the app's own forms are unaffected. The tool description and the Assistant's prompt say to change a task with `update_task`/`move_task`, never by creating it again. Moving never created tasks (the one exception, closing a repeating task, schedules its next occurrence on purpose).
+### Verified
+- `tsc -b` (0), `lint` (0), `vitest run` 1031/1031 (new: the same create twice leaves one task and returns it flagged; another project, another parent, a done twin or an old one still create; a list with the same name twice makes one), `pnpm check` (0). Live `tools/mcp-grade.mjs` on the local server: `GRADE: all 66 at 10`, including a new check that a repeated `create_task` returns the first task.
+
 ## 2026-09-24 (99)
 ### Fixed
 - **A task could be put in a column that isn't on its board.** Luis asked the Assistant to move a task "to To do"; it landed in "Em progresso" and showed up under "On hold / Stuck". Traced in the local DB: the task's project had its own columns (forked by the MCP grader, so still carrying the old default names), the model picked one of them, and the "All tasks" board, not finding that column among the global ones, dropped the card into the **first** global column of the same category. Three causes, all fixed on the server so every client (the app, the MCP, the Assistant) gets the same answer:

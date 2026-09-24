@@ -328,3 +328,41 @@ describe("a task only takes a column of its own board", () => {
     expect(res.error).toContain("isn't a column on this task's board");
   });
 });
+
+describe("create_task through the MCP doesn't duplicate a task made minutes ago", () => {
+  it("returns the task already made instead of a second one with the same name", async () => {
+    const w = world();
+    const admin = w.toolsFor("u-admin");
+    const first = (await w.call(admin, "create_task", { name: "Deploy tracking", projectId: "p1" })).data!;
+    const again = await w.call(admin, "create_task", { name: "  deploy TRACKING ", projectId: "p1", description: "retry" });
+    expect(again.data).toMatchObject({ id: first.id, alreadyExisted: true });
+    expect((w.raw.prepare(`SELECT COUNT(*) AS n FROM tasks WHERE lower(name) = 'deploy tracking'`).get() as { n: number }).n).toBe(1);
+  });
+
+  it("still creates it in another project, under another parent, once the first is done, or once it's old", async () => {
+    const w = world();
+    const admin = w.toolsFor("u-admin");
+    w.raw.exec(`INSERT INTO projects (id, workspace_id, name, client_id) VALUES ('p2', 'ws-A', 'Two', 'cl-A');`);
+    const closed = await closedStatusId(w, admin);
+    const first = (await w.call(admin, "create_task", { name: "Standup", projectId: "p1" })).data!;
+    expect((await w.call(admin, "create_task", { name: "Standup", projectId: "p2" })).data).not.toHaveProperty("alreadyExisted");
+    const parent = (await w.call(admin, "create_task", { name: "Parent", projectId: "p1" })).data!;
+    expect((await w.call(admin, "create_task", { name: "Standup", projectId: "p1", parentId: parent.id })).data).not.toHaveProperty("alreadyExisted");
+
+    await w.call(admin, "move_task", { taskId: first.id, statusId: closed });
+    const afterDone = (await w.call(admin, "create_task", { name: "Standup", projectId: "p1" })).data!;
+    expect(afterDone).not.toHaveProperty("alreadyExisted");
+
+    w.raw.prepare(`UPDATE tasks SET created_at = '2020-01-01T00:00:00.000Z' WHERE id = ?`).run(afterDone.id as string);
+    expect((await w.call(admin, "create_task", { name: "Standup", projectId: "p1" })).data).not.toHaveProperty("alreadyExisted");
+  });
+
+  it("dedupes repeated names inside one list of items too", async () => {
+    const w = world();
+    const res = await w.call(w.toolsFor("u-admin"), "create_task", {
+      items: [{ name: "Twice", projectId: "p1" }, { name: "Twice", projectId: "p1" }],
+    });
+    expect(res.data).toMatchObject({ done: 2 });
+    expect((w.raw.prepare(`SELECT COUNT(*) AS n FROM tasks WHERE name = 'Twice'`).get() as { n: number }).n).toBe(1);
+  });
+});

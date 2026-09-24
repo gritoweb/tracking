@@ -216,6 +216,9 @@ async function runScenario(owner, member, stats) {
       dueDate: state.today,
     });
     state.taskId = data.id;
+    // The same create again minutes later (a model retrying) returns that task instead of a duplicate.
+    const { data: again } = await call(owner, stats, "create_task", { name: `MCP Grader Task ${ts}`, projectId: state.projectId });
+    check(stats, "create_task twice returns the first task, no duplicate", again?.id === data.id && again?.alreadyExisted === true);
   }
   // The owner on purpose: the local seed gives them two `member` rows, which crashed setAssignees before currentMemberIds deduplicated.
   await call(owner, stats, "update_task", {

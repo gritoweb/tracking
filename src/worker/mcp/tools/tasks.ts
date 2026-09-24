@@ -15,6 +15,9 @@ import { DESTRUCTIVE, IdArg, MUTATES, READ_ONLY, ROW_LIMIT, compact, fromBridge,
 /** Largest image a tool accepts, matching the upload route's own limit. */
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 
+/** How far back create_task looks for the same task before making another: long enough for a retry or a re-ask. */
+const DUPLICATE_WINDOW_MS = 10 * 60 * 1000;
+
 const CATEGORY_ORDER = { not_started: 0, active: 1, completed: 2 } as const;
 
 /** Tasks in the board's column order, first column first; a project's own columns follow by category. */
@@ -225,13 +228,42 @@ export function registerTaskWrites(d: ToolDeps): void {
   const view = (t: Task) => taskView(t, appUrl(env));
 
   // One implementation per action, shared by the single-item tool and its batch twin.
-  const createOne = async (data: Omit<CreateTask, "id">): Promise<BridgeResult<Task>> => {
+  /** An open task with this name, in the same place (project, or parent for a subtask), made in the last few minutes. */
+  const recentTwin = async (data: Omit<CreateTask, "id">): Promise<Task | null> => {
+    const query = new URLSearchParams(data.parentId ? { parentId: data.parentId } : { projectId: data.projectId });
+    const open = await bridge<Task[]>("GET", `/api/tasks?${query}`);
+    if (!open.ok) return null;
+    const name = data.name.trim().toLowerCase();
+    const since = Date.now() - DUPLICATE_WINDOW_MS;
+    return (
+      open.data.find(
+        (t) =>
+          t.name.trim().toLowerCase() === name &&
+          (t.parentId ?? null) === (data.parentId ?? null) &&
+          Date.parse(t.createdAt) >= since
+      ) ?? null
+    );
+  };
+
+  const createOne = async (data: Omit<CreateTask, "id">): Promise<BridgeResult<Task & { alreadyExisted?: true }>> => {
     // Checked here only for a message a model can act on; the route itself creates, notifies and broadcasts.
     if (!(await findActiveProject(db, workspaceId, data.projectId))) {
       return rejected(`No active project with id ${data.projectId} in this workspace. Call list_projects and ask the person which project this task belongs to.`);
     }
+    // A model retries or re-asks where a form can't: the same task twice in a few minutes is a duplicate, not a second task.
+    const twin = await recentTwin(data);
+    if (twin) return { ok: true, status: 200, data: { ...twin, alreadyExisted: true } };
     return bridge<Task>("POST", "/api/tasks", data);
   };
+  const createdView = (t: Task & { alreadyExisted?: true }) => ({
+    ...view(t),
+    ...(t.alreadyExisted
+      ? {
+          alreadyExisted: true,
+          note: "An open task with this name was created here in the last few minutes, so it was returned instead of making a duplicate. To change it, use update_task on this id.",
+        }
+      : {}),
+  });
   const updateOne = ({ taskId, ...patch }: UpdateTask & { taskId: string }) =>
     bridge<Task>("PUT", `/api/tasks/${segment(taskId)}`, patch);
   const moveOne = ({ taskId, statusId, completedOn }: { taskId: string; statusId: string; completedOn?: string }) =>
@@ -245,6 +277,7 @@ export function registerTaskWrites(d: ToolDeps): void {
   const deleteInput = { taskId: IdArg("task") };
 
   const CREATE_DOC =
+    "Never re-create a task to change it — use update_task/move_task. An open task with the same name in the same project (or under the same parent) created in the last 10 minutes is returned with `alreadyExisted: true` instead of a duplicate. " +
     "Only when the person asked for this task. Use list_projects for the projectId; never guess it. `assigneeIds` must already be workspace members — ask the person who, rather than guessing; one task for several people is ONE task with several assigneeIds.";
   const UPDATE_DOC =
     "Change a task's name, notes, due date (a local YYYY-MM-DD day), priority (1 highest … 4 none), estimate, parent, project, repeat rule, status or assignees — only the fields passed change. To mark it done, set `active: false` and pass `completedOn` (the person's local date) so a repeating task schedules its next occurrence. `assigneeIds` replaces the whole list.";
@@ -265,7 +298,7 @@ export function registerTaskWrites(d: ToolDeps): void {
       inputSchema: listableInput(createInput, "tasks to create"),
       annotations: MUTATES,
     },
-    async (args) => runListable(createInput, args, createOne, view)
+    async (args) => runListable(createInput, args, createOne, createdView)
   );
 
   server.registerTool(

@@ -22,6 +22,7 @@ When to use which tool (call the tool — never just describe the action or tell
 - "which are done", "o que já foi concluído/feito", "closed tasks" → list_tasks with includeDone true, and list only the tasks whose status category is completed
 - "what do I have today", "tasks for this week", "what's due Friday" (a day or period named) → list_tasks with assignee "me" and dueBy = that day's local date (the week's last day for "this week")
 - tasks: create_task, update_task (done = active false + completedOn), move_task, add_task_comment, delete_task
+- changing an existing task (its name, notes, column, dates, people) is update_task or move_task on its id from list_tasks — never create_task again; create_task returns a task made minutes ago with the same name instead of duplicating it
 - moving a task: call list_task_statuses with that task's projectId and use one of THOSE columns (a project may have its own). If no column has the name the user said, choose by meaning from the category and say which column you picked, or ask; never use a column that isn't listed
 - several items at once → ONE call with items on the same tool (create_task, move_task, update_task, delete_task, log_time, update_time_entry, delete_time_entry all take a list), never one call per item, so the user approves once. One task for several people is ONE create_task with several assigneeIds
 - To tag someone in a comment write @[Name](user:ID) in the body with their id from list_members (never a guessed id); it shows as a clickable @Name and notifies them
