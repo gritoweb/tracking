@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-09-24 (104)
+### Deployed
+- **(84)–(103) are live in production**, at Luis's request: the task modal, the description editor's formatting bar and "/" menu, the create-once and duplicate guards, the board-column rule, the MCP list tools and token cuts, the approval-signature patch and the Assistant fixes. No migration and no `wrangler.jsonc` change in the set. Before: `refactor` CI green; full local e2e 139 passed, 7 failed — 4 the known pre-existing failures from (82), 3 passing on rerun (one was a "Network connection lost" from the local dev runtime, then 3/3). `master` fast-forwarded `743ea49` → `02609fc`, CI green (run 36029448721). **Workers Builds did not publish** — after ~5 minutes the live version was still `d35ef598-b200-482e-9c5b-37f743ee0d90`, and its log isn't visible from here — so it was deployed the documented way from a tree identical to `origin/master`: `pnpm check` (0), `pnpm run deploy` → Version ID `9736225c-694e-4c64-9e95-5feb7fe1fb96` (rollback target: `d35ef598-b200-482e-9c5b-37f743ee0d90`). Smoke check without credentials, no data touched: `GET /` and `/tasks` → 200; `GET /api/me`, `GET /api/tasks/x` and `POST /mcp` without a key → 401. Worth a look: the Workers Builds settings/log in the Cloudflare dashboard (see CLAUDE.md "Workers Builds … needs its Build command").
+
 ## 2026-09-24 (103)
 ### Changed
 - **The Assistant's step cap is 20** (`MAX_STEPS`), at Luis's request; (102)'s 10 hadn't reached his local chat yet (see below).
