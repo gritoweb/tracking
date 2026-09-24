@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-09-24 (110) — on `refactor`, not deployed
+### Changed
+- **Each comment is its own card** (author, time and hover actions on top, the text below), instead of rows inside one bordered box. Built on the `Card` primitive with two new variants, not classes in the screen: `size="compact"` (tight padding for a card per list item; `default` is unchanged) and `tone="muted"` (for a card on an overlay: `--card` equals `--popover` in dark, measured 1.00:1, so a default card vanished inside the modal; `--muted` measures 1.19:1 light / 1.17:1 dark). The comments column now sits on the page surface with a hairline instead of `bg-muted/50`.
+- **Inline code** uses the brand ink (`--primary-ink`, 5.48:1 light / 5.69:1 dark on its `--muted` chip) with `2px 4px` padding; **code blocks** are 13px mono at 1.5 line height, `8px 16px` padding and 5px between blocks, and code inside a block keeps the body colour. Values measured on the reference editor, colours from existing tokens only.
+### Verified
+- `tsc -b` (0), `lint` (0), `vitest run` (see below; new: `Card` `size` and `tone=muted`); in the browser: cards visible in light and dark, contrast ratios above measured on the live tokens.
+
 ## 2026-09-24 (109) — on `refactor`, not deployed
 ### Added
 - **Fold the comments column away in the task modal.** One button (`PanelRightClose` / `PanelRightOpen`) at the top right of the content column hides the comments and gives the content the full width, and brings them back; the choice persists per browser (`uiStore.taskActivityOpen`). The column slides (`grid-template-columns` over `duration-slow` / `ease-out-quart`, reduced motion honoured globally) instead of snapping; while folded it is `inert`. Opening a task from a comments link unfolds it. The button sits inside the scrolling content column and sticks to its top, so the column's scrollbar sits after it. Stacked (narrow) layouts don't show it.

@@ -6,6 +6,7 @@ import { cardVariants } from "@/components/ui/card-variants"
 
 function Card({
   className,
+  size,
   tone,
   interactive,
   ...props
@@ -13,7 +14,7 @@ function Card({
   return (
     <div
       data-slot="card"
-      className={cn(cardVariants({ tone, interactive }), className)}
+      className={cn(cardVariants({ size, tone, interactive }), className)}
       {...props}
     />
   )

@@ -90,9 +90,9 @@ export function TaskModalShell({
           <section
             ref={commentsRef}
             aria-label="Comments"
-            // Folded: out of the tab order and the accessibility tree while it slides shut and stays shut.
+            // Page background with a hairline, so each comment's --card step reads as a card. Inert while folded.
             inert={!showActivity}
-            className="flex min-h-0 min-w-0 flex-col gap-3 bg-muted/50 px-5 py-4 lg:w-(--size-task-activity) lg:overflow-hidden"
+            className="flex min-h-0 min-w-0 flex-col gap-3 border-t px-5 py-4 lg:w-(--size-task-activity) lg:overflow-hidden lg:border-t-0 lg:border-l"
           >
             <h2 className="flex shrink-0 items-center gap-1.5 text-sm font-semibold">
               <MessageCircle className="h-3.5 w-3.5" />

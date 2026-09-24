@@ -103,8 +103,9 @@ export function TaskComments({ taskId, members, docked = false }: TaskCommentsPr
     <div className={cn(docked ? "flex min-h-0 flex-1 flex-col" : "space-y-2")}>
       {/* Two things, kept apart: the conversation in its frame, and below it, with a gap, the field in a frame of its own. */}
       <div className={cn(docked ? "flex min-h-0 flex-1 flex-col gap-4" : "space-y-4")}>
+        {/* Each comment is its own card; the feed is only the stack that scrolls them. */}
         {feed.length > 0 && (
-          <div ref={feedRef} className={cn("divide-y rounded-md border", docked && "min-h-0 flex-1 overflow-y-auto bg-popover")}>
+          <div ref={feedRef} className={cn("flex flex-col gap-2", docked && "min-h-0 flex-1 overflow-y-auto")}>
             {mayHaveOlder && (
               <div className="flex justify-center p-2">
                 <Button

@@ -4,6 +4,7 @@ import { useUIStore } from "@/stores/uiStore";
 import { toast } from "sonner";
 import { Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { UserAvatar } from "@/components/layout/UserAvatar";
 import { AttachmentPreview } from "./TaskCommentAttachment";
 import { MentionInput } from "./MentionInput";
@@ -14,7 +15,7 @@ import { decodeMentions, encodeMentions, taggedPeople, type MentionPerson } from
 import type { WorkspaceMember } from "@/hooks/useWorkspaceRole";
 import type { TaskComment } from "@shared/schemas";
 
-/** One comment row, or its own edit form when the author is editing it in place. */
+/** One comment as its own card, or its own edit form in that card when the author is editing it in place. */
 export function CommentRow({
   comment,
   taskId,
@@ -52,10 +53,13 @@ export function CommentRow({
 
   if (editing) {
     return (
-      <div className="flex gap-2.5 px-3 py-2.5">
-        <UserAvatar name={comment.userName} image={comment.userImage} className="h-7 w-7 shrink-0" />
+      <Card size="compact" tone="muted">
+        <div className="flex items-center gap-2">
+          <UserAvatar name={comment.userName} image={comment.userImage} className="h-6 w-6 shrink-0" />
+          <span className="text-sm font-medium">{comment.userName}</span>
+        </div>
         {/* Same frame as the composer below the thread: a bare field inside it, actions inside it. */}
-        <div className="min-w-0 flex-1 space-y-2 rounded-md border px-3 py-2">
+        <div className="min-w-0 space-y-2 rounded-md border px-3 py-2">
           <MentionInput
             variant="bare"
             aria-label="Edit comment"
@@ -88,52 +92,48 @@ export function CommentRow({
             </Button>
           </div>
         </div>
-      </div>
+      </Card>
     );
   }
 
   return (
-    <div className="group flex gap-2.5 px-3 py-2.5">
-      <UserAvatar name={comment.userName} image={comment.userImage} className="h-7 w-7 shrink-0" />
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1.5">
-          <span className="text-sm font-medium">{comment.userName}</span>
-          <span className="text-micro text-muted-foreground">
-            {formatStamp(comment.createdAt, timeFormat)}
-            {comment.editedAt && " · edited"}
-          </span>
-        </div>
-        {comment.attachmentUrl && (
-          <div className="pb-1.5 pt-1">
-            <AttachmentPreview url={comment.attachmentUrl} filename={comment.attachmentFilename} />
+    <Card size="compact" tone="muted" className="group">
+      <div className="flex items-center gap-2">
+        <UserAvatar name={comment.userName} image={comment.userImage} className="h-6 w-6 shrink-0" />
+        <span className="truncate text-sm font-medium">{comment.userName}</span>
+        <span className="shrink-0 text-micro text-muted-foreground">
+          {formatStamp(comment.createdAt, timeFormat)}
+          {comment.editedAt && " · edited"}
+        </span>
+        {(isAuthor || canDelete) && (
+          <div className="tt-reveal ml-auto flex shrink-0 items-center gap-0.5">
+            {isAuthor && (
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                aria-label="Edit comment"
+                onClick={() => {
+                  // Members may have loaded since this row mounted, so decode when editing starts.
+                  setBody(decodeMentions(comment.body, members));
+                  setPicked(taggedPeople(comment.body, members));
+                  setEditing(true);
+                }}
+              >
+                <Pencil className="h-3 w-3" />
+              </Button>
+            )}
+            {canDelete && (
+              <Button variant="ghost" size="icon-xs" aria-label="Delete comment" onClick={onDelete}>
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            )}
           </div>
         )}
-        <MentionText body={comment.body} members={members} />
       </div>
-      {(isAuthor || canDelete) && (
-        <div className="tt-reveal flex shrink-0 items-start gap-0.5">
-          {isAuthor && (
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              aria-label="Edit comment"
-              onClick={() => {
-                // Members may have loaded since this row mounted, so decode when editing starts.
-                setBody(decodeMentions(comment.body, members));
-                setPicked(taggedPeople(comment.body, members));
-                setEditing(true);
-              }}
-            >
-              <Pencil className="h-3 w-3" />
-            </Button>
-          )}
-          {canDelete && (
-            <Button variant="ghost" size="icon-xs" aria-label="Delete comment" onClick={onDelete}>
-              <Trash2 className="h-3 w-3" />
-            </Button>
-          )}
-        </div>
+      {comment.attachmentUrl && (
+        <AttachmentPreview url={comment.attachmentUrl} filename={comment.attachmentFilename} />
       )}
-    </div>
+      <MentionText body={comment.body} members={members} />
+    </Card>
   );
 }
