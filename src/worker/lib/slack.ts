@@ -8,6 +8,8 @@ const SLACK_MAX_AGE_HOURS = 24;
 /** A person whose email matched no Slack user is looked up again after this long. */
 const LINK_RECHECK_HOURS = 24;
 const MAX_ITEMS_PER_DM = 10;
+/** Only what is about the person reaches Slack; a status change on their task stays in the bell. */
+export const SLACK_NOTIFICATION_TYPES = ["task_assigned", "task_mention"] as const;
 const SWEEP_LIMIT = 500;
 
 /** Errors after which the stored bot token is dead and the installation must go. */
@@ -203,12 +205,13 @@ export async function runSlackNotifications(env: Env): Promise<void> {
          JOIN "member" m ON m.organizationId = n.workspace_id AND m.userId = n.user_id
          JOIN "user" u ON u.id = n.user_id
         WHERE n.is_read = 0 AND n.slack_sent_at IS NULL
+          AND n.type IN (${SLACK_NOTIFICATION_TYPES.map(() => "?").join(", ")})
           AND n.created_at <= datetime('now', ?) AND n.created_at >= datetime('now', ?)
           AND u.slack_notify = 1 AND u.banned = 0
         ORDER BY n.created_at ASC
         LIMIT ${SWEEP_LIMIT}`
     )
-      .bind(`-${SLACK_DELAY_MINUTES} minutes`, `-${SLACK_MAX_AGE_HOURS} hours`)
+      .bind(...SLACK_NOTIFICATION_TYPES, `-${SLACK_DELAY_MINUTES} minutes`, `-${SLACK_MAX_AGE_HOURS} hours`)
       .all<PendingRow>();
     pending = results;
   } catch (e) {

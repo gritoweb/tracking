@@ -41,11 +41,11 @@ async function world({ installed = true } = {}) {
     ).run(credentials);
   }
   const env = { DB: db, AUTH_SECRET: SECRET, APP_URL: "http://app.test" } as unknown as Env;
-  const notify = (id: string, userId: string, age: string, isRead = 0) =>
+  const notify = (id: string, userId: string, age: string, isRead = 0, type = "task_assigned") =>
     raw.prepare(
       `INSERT INTO notifications (id, workspace_id, user_id, type, title, body, link, is_read, created_at)
-       VALUES (?, 'ws-A', ?, 'task_assigned', ?, 'body', ?, ?, datetime('now', ?))`
-    ).run(id, userId, `title ${id}`, `/tasks/${id}`, isRead, age);
+       VALUES (?, 'ws-A', ?, ?, ?, 'body', ?, ?, datetime('now', ?))`
+    ).run(id, userId, type, `title ${id}`, `/tasks/${id}`, isRead, age);
   const sentIds = () =>
     (raw.prepare(`SELECT id FROM notifications WHERE slack_sent_at IS NOT NULL ORDER BY id`).all() as { id: string }[]).map((r) => r.id);
   return { env, raw, notify, sentIds };
@@ -72,6 +72,18 @@ describe("runSlackNotifications", () => {
     expect(anaPost.args.text).toBe("You have 2 unread notifications in TimeTracker");
     expect(anaPost.args.blocks).toContain("http://app.test/tasks/n1");
     expect(sentIds()).toEqual(["n1", "n2", "n3"]);
+  });
+
+  it("sends only what is about the person: an assignment or a mention, never a status change", async () => {
+    const { env, notify, sentIds } = await world();
+    notify("assigned", "u-ana", "-20 minutes", 0, "task_assigned");
+    notify("mention", "u-ana", "-20 minutes", 0, "task_mention");
+    notify("status", "u-ana", "-20 minutes", 0, "task_status_changed");
+    const slack = mockSlack();
+    await runSlackNotifications(env);
+    expect(slack.posts()).toHaveLength(1);
+    expect(slack.posts()[0].args.blocks).not.toContain("title status");
+    expect(sentIds()).toEqual(["assigned", "mention"]);
   });
 
   it("never sends the same notification twice", async () => {

@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-09-25 (114) — on `refactor`, not deployed
+### Changed
+- **Slack only carries what is about you**: a task assigned to you, or someone mentioning you. A status change on your task still shows in the bell but no longer becomes a DM (`SLACK_NOTIFICATION_TYPES` in `lib/slack.ts`). Why: a DM for every column move is noise; the Slack channel is for things that need you.
+### Added
+- **Mentioning someone in a task's title notifies them** (`task_mention`, "in the title"), with the description's rule: only people newly tagged by the edit, never the editor, and only current members of the workspace (a name that matches nobody here is plain text). The title is read with the same `splitPlainMentions` the title chips use (`titleMentionIds` in `routes/tasks.ts`).
+- **Creating a task that already tags people** (in the title or the description) notifies them; before, only a later edit did. Someone tagged in both hears it once, "in the title".
+### Verified
+- `tsc -b` (0), `lint` (0), `vitest run` 1101/1101 (new: `tasks.mentions.test.ts` on a real migrated SQLite — newly tagged in title notified, self-tag and other-workspace name ignored, untouched tag quiet, create notifies title + description once each; Slack sweep sends assignment + mention and leaves the status change). Mutation check: adding `task_status_changed` back to the allowed types fails exactly the new Slack test. Nothing sent anywhere: tests mock `fetch`, no Resend or Slack call.
+
 ## 2026-09-25 (113) — on `refactor`, not deployed
 ### Added
 - **Subtask rows have a ⋯ menu** (Open subtask, Delete) in place of the lone hover-only trash icon, so a subtask is deleted without opening it. The row is now a plain `group`, so the `tt-reveal` hover reveal matches it (the named `group/subtask` never matched `.group:hover`).

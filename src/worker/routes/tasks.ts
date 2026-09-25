@@ -13,7 +13,7 @@ import {
 } from "@shared/schemas";
 import { nextOccurrence, normalizeRecurRule } from "@shared/task-recurrence";
 import { taskPath } from "@shared/task-links";
-import { docMentions, mentionedIds } from "@shared/mentions";
+import { docMentions, mentionedIds, splitPlainMentions, type MentionPerson } from "@shared/mentions";
 import { commentIsEmpty, commentText } from "@shared/comment-body";
 import { sqliteUtcToIso, sqliteUtcToIsoOrNull } from "../lib/sqlite-time";
 import { listActivity, memberNames, recordActivity, statusName, type ActivityInput } from "../lib/task-activity";
@@ -272,6 +272,16 @@ async function resolveParent(
 }
 
 /** A task plus its direct subtasks, resolved to a real id list — SQLite's `IN (a, (SELECT …))` is scalar and only matches the subquery's first row. */
+/** Members a task title tags: "@Name" matched against current members, the same reading as the title's chips. */
+async function titleMentionIds(db: D1Database, workspaceId: string, name: string): Promise<string[]> {
+  if (!name.includes("@")) return [];
+  const { results } = await db
+    .prepare(`SELECT u.id AS userId, u.name AS name FROM "member" m JOIN "user" u ON u.id = m.userId WHERE m.organizationId = ?`)
+    .bind(workspaceId)
+    .all<MentionPerson>();
+  return [...new Set(splitPlainMentions(name, results).flatMap((s) => (s.type === "mention" ? [s.userId] : [])))];
+}
+
 export async function taskAndSubtaskIds(db: D1Database, workspaceId: string, taskId: string): Promise<string[]> {
   const { results } = await db
     .prepare(`SELECT id FROM tasks WHERE workspace_id = ? AND (id = ? OR parent_id = ?)`)
@@ -406,6 +416,23 @@ export const tasksRouter = new Hono<{
       );
     }
 
+    // Tagged at creation: the title first, since that is where the reader will see it.
+    const inTitle = (await titleMentionIds(c.env.DB, workspaceId, data.name)).filter((id) => id !== userId);
+    const inDescription = docMentions(data.description ?? null)
+      .map((m) => m.userId)
+      .filter((id) => id !== userId && !inTitle.includes(id));
+    for (const [targets, where] of [[inTitle, "in the title"], [inDescription, "in the description"]] as const) {
+      if (!targets.length) continue;
+      c.executionCtx.waitUntil(
+        notifyMentions(c.env, workspaceId, targets, {
+          type: "task_mention",
+          title: `${await actorDisplayName(c.env.DB, userId)} mentioned you`,
+          body: `${result.task.name}: ${where}`,
+          link: taskPath(result.task.id),
+        })
+      );
+    }
+
     c.executionCtx.waitUntil(
       broadcast(c.env, workspaceId, "tasks:changed", null, requestOrigin(c))
     );
@@ -501,6 +528,24 @@ export const tasksRouter = new Hono<{
       await c.env.DB.prepare(
         `UPDATE tasks SET ${fields.join(", ")} WHERE id = ? AND workspace_id = ?`
       ).bind(...values, id, workspaceId).run();
+    }
+
+    // Same rule for the title: only people newly tagged by this edit, never the editor.
+    if (data.name !== undefined && data.name !== existing.name) {
+      const before = new Set(await titleMentionIds(c.env.DB, workspaceId, existing.name));
+      const fresh = (await titleMentionIds(c.env.DB, workspaceId, data.name)).filter(
+        (mentionId) => !before.has(mentionId) && mentionId !== userId
+      );
+      if (fresh.length) {
+        c.executionCtx.waitUntil(
+          notifyMentions(c.env, workspaceId, fresh, {
+            type: "task_mention",
+            title: `${await actorDisplayName(c.env.DB, userId)} mentioned you`,
+            body: `${data.name}: in the title`,
+            link: taskPath(id),
+          })
+        );
+      }
     }
 
     // Someone newly tagged in the description hears about it; whoever was already tagged, or the author, does not.

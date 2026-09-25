@@ -292,7 +292,7 @@ Both systems file time against a calendar day rather than a timestamp, and the d
 
 ## Slack notifications
 
-If a workspace owner or admin connects Slack (**Settings → Workspace → Integrations → Add to Slack**), notifications you haven't opened in the app within **15 minutes** — a task assigned to you, an @mention, a status change on your task — arrive as a direct message from the TimeTracker bot, with a button that opens the task. If you read the notification in time, Slack stays quiet.
+If a workspace owner or admin connects Slack (**Settings → Workspace → Integrations → Add to Slack**), notifications about **you** that you haven't opened in the app within **15 minutes** — a task assigned to you, or someone mentioning you in a task's title, description or a comment — arrive as a direct message from the TimeTracker bot, with a button that opens the task. If you read the notification in time, Slack stays quiet.
 
 - You're matched in Slack by the **email address** of your account. If they differ, the card tells you nothing can reach you there.
 - **Send me a test message** checks that it works for you.

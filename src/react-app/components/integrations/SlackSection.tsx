@@ -88,7 +88,7 @@ export function SlackSection() {
           <SettingsRow
             htmlFor="slack-notify"
             label="Send my unread notifications to Slack"
-            description="Anything you haven't opened here within 15 minutes arrives as a direct message from the TimeTracker bot."
+            description="When a task is assigned to you or someone mentions you, and you haven't seen it here within 15 minutes, the TimeTracker bot sends you a direct message."
           >
             <Switch
               id="slack-notify"

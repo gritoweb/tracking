@@ -1,9 +1,11 @@
 # Slack — notificações não lidas por DM
 
-Quando uma notificação do sininho (tarefa atribuída, @menção, mudança de status) continua **não lida
-por 15 minutos**, o bot do TimeTracker manda uma DM no Slack para a pessoa, com um botão que abre a
+Quando uma notificação **sobre você** — task atribuída a você, ou alguém te marcou (@) no título, na descrição
+ou num comentário — continua **não lida por 15 minutos**, o bot do TimeTracker manda uma DM no Slack para a pessoa, com um botão que abre a
 tarefa no app. Quem está com o app aberto e lê a notificação a tempo não recebe nada no Slack.
 
+- Mudança de status **não** vai para o Slack (fica só no sininho): só vai o que tem a ver com você
+  (`SLACK_NOTIFICATION_TYPES` em `lib/slack.ts`: `task_assigned`, `task_mention`).
 - Uma instalação do Slack por workspace, feita por owner/admin (Settings → Workspace → Integrations → **Add to Slack**).
 - A pessoa é encontrada no Slack **pelo e-mail** da conta (`users.lookupByEmail`). E-mail diferente = sem DM
   (o card avisa "No Slack user … has your email address").
