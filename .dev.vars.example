@@ -43,10 +43,12 @@ MICROSOFT_CALENDAR_TENANT=common
 # Production: `wrangler secret put ADMIN_EMAILS` (a wrangler.jsonc var is overwritten on deploy).
 ADMIN_EMAILS=
 
-# Slack app for DMing unread notifications (docs/SLACK.md). Optional — the
-# Settings "Add to Slack" button stays disabled until both are set.
+# Slack app that DMs people their unread assignments and mentions (docs/SLACK.md).
+# Optional — the Slack block in Settings → Workspace → Integrations stays hidden until both are set.
+# Where: https://api.slack.com/apps → your app → Basic Information → App Credentials.
 #   Redirect URL: http://localhost:5173/api/slack/callback
 #   Bot scopes: chat:write, users:read, users:read.email
+# Production: `wrangler secret put SLACK_CLIENT_ID` / `wrangler secret put SLACK_CLIENT_SECRET`.
 SLACK_CLIENT_ID=
 SLACK_CLIENT_SECRET=
 # 1 = log every Slack Web API call instead of sending it (local dev never messages anyone).
