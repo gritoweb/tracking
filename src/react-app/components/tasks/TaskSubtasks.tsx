@@ -1,5 +1,12 @@
-import { ListPlus, Trash2 } from "lucide-react";
+import { ExternalLink, ListPlus, MoreHorizontal, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { AvatarStack } from "@/components/ui/avatar";
@@ -30,7 +37,7 @@ export function TaskSubtasks({ task, subtasks, onToggle, onOpen, onRequestDelete
         {/* Rows in their own group, so `last:` reaches the last row and not the add field below it. */}
         <div>
           {subtasks.map((sub) => (
-            <div key={sub.id} className="group/subtask flex items-center gap-2 border-b px-1 py-1.5 last:border-b-0">
+            <div key={sub.id} className="group flex items-center gap-2 border-b px-1 py-1.5 last:border-b-0">
               <Checkbox
                 checked={!sub.active}
                 onCheckedChange={(checked) => onToggle(sub, checked === true)}
@@ -50,15 +57,24 @@ export function TaskSubtasks({ task, subtasks, onToggle, onOpen, onRequestDelete
               {sub.assignees.length > 0 && (
                 <AvatarStack members={sub.assignees.map((a) => ({ id: a.userId, name: a.name, image: a.image }))} max={3} size="xs" />
               )}
-              <Button
-                variant="ghost-destructive"
-                size="icon-xs"
-                aria-label={`Delete ${sub.name}`}
-                onClick={() => onRequestDelete(sub)}
-                className="tt-reveal"
-              >
-                <Trash2 className="h-3 w-3" />
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon-xs" aria-label={`More actions for ${sub.name}`} className="tt-reveal">
+                    <MoreHorizontal className="h-3 w-3" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-44">
+                  <DropdownMenuItem onSelect={() => onOpen(sub.id)}>
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    Open subtask
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem variant="destructive" onSelect={() => onRequestDelete(sub)}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           ))}
         </div>

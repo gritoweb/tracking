@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { CollectionHeader } from "@/components/layout/CollectionHeader";
@@ -87,11 +87,13 @@ export function TaskBoardList({ openTaskId = null, openTab = "task" }: TaskBoard
   const openTask = openTaskId ? tasks.find((t) => t.id === openTaskId) ?? null : null;
   const openTaskNotFound = !!openTaskId && !isLoading && !openTask;
   // A shared link to a task this person can't see (or that is gone) lands on the plain list, with the reason.
+  // Ids deleted from this screen: a stale route id for one is our own deletion, not a bad link (the list refetch can land before the navigation).
+  const deletedIds = useRef(new Set<string>());
   useEffect(() => {
-    if (!openTaskNotFound) return;
+    if (!openTaskNotFound || (openTaskId && deletedIds.current.has(openTaskId))) return;
     toast.error("That task doesn't exist or you don't have access to it");
     navigate("/tasks", { replace: true });
-  }, [openTaskNotFound, navigate]);
+  }, [openTaskNotFound, openTaskId, navigate]);
   const openSheet = (task: Task) => navigate(taskPath(task.id));
 
   const today = todayLocalDate();
@@ -276,7 +278,7 @@ export function TaskBoardList({ openTaskId = null, openTab = "task" }: TaskBoard
       <ConfirmDialog
         open={!!deleteTarget}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
-        title="Delete task?"
+        title={deleteTarget?.parentId ? "Delete subtask?" : "Delete task?"}
         description={
           deleteTarget?.subtaskTotal
             ? `"${deleteTarget.name}" and its ${deleteTarget.subtaskTotal} subtask${
@@ -285,7 +287,12 @@ export function TaskBoardList({ openTaskId = null, openTab = "task" }: TaskBoard
             : `"${deleteTarget?.name}" will be permanently deleted. This cannot be undone.`
         }
         onConfirm={() => {
-          if (deleteTarget) deleteTask.mutate(deleteTarget.id);
+          if (deleteTarget) {
+            deletedIds.current.add(deleteTarget.id);
+            deleteTask.mutate(deleteTarget.id);
+          }
+          // Deleting the subtask being viewed lands on its parent, which is still there.
+          if (deleteTarget?.parentId && deleteTarget.id === openTaskId) navigate(taskPath(deleteTarget.parentId));
           setDeleteTarget(null);
         }}
       />

@@ -115,9 +115,11 @@ export function TaskDetail({ open, onClose, task, tab, onTabChange, onRequestDel
     <TaskDetailToolbar
       mode={mode}
       onModeChange={setMode}
+      isSubtask={isSubtask}
       onDeleteTask={() => {
         onRequestDelete(task);
-        onClose();
+        // A subtask stays open behind the confirmation; confirming returns to its parent (TaskBoardList).
+        if (!isSubtask) onClose();
       }}
     />
   );
