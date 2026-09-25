@@ -290,6 +290,14 @@ Under **Settings → Integrations** you can connect **Adobe Workfront** or **Mic
 
 Both systems file time against a calendar day rather than a timestamp, and the day used is the one **you** were working in: the push sends your browser's timezone, so an entry tracked at 18:30 is filed on that date, not the next one. Pushing an older backlog is dated by the rule in force back then, so entries either side of a daylight-saving change still land on the right day.
 
+## Slack notifications
+
+If a workspace owner or admin connects Slack (**Settings → Workspace → Integrations → Add to Slack**), notifications you haven't opened in the app within **15 minutes** — a task assigned to you, an @mention, a status change on your task — arrive as a direct message from the TimeTracker bot, with a button that opens the task. If you read the notification in time, Slack stays quiet.
+
+- You're matched in Slack by the **email address** of your account. If they differ, the card tells you nothing can reach you there.
+- **Send me a test message** checks that it works for you.
+- To stop them, turn off **Send my unread notifications to Slack** in the same card.
+
 ## Keyboard shortcuts
 
 | Shortcut | Action |

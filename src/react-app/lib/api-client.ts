@@ -18,6 +18,7 @@ import {
   settingsClient,
   integrationsClient,
   calendarClient,
+  slackClient,
   aiClient,
   assistantClient,
   adminClient,
@@ -426,6 +427,14 @@ export const api = {
       request<CalendarEventsResponse>(`/calendar/events?${new URLSearchParams(params)}`),
     disconnect: (provider: CalendarProviderId) =>
       json(calendarClient[":provider"].$delete({ param: { provider } })),
+  },
+
+  // ─── Slack ────────────────────────────────────────────────────────────────
+  slack: {
+    status: () => json(slackClient.status.$get()),
+    setNotify: (notify: boolean) => json(slackClient.me.$patch({ json: { notify } })),
+    sendTest: () => json(slackClient.test.$post()),
+    disconnect: () => json(slackClient.index.$delete()),
   },
 
   // ─── AI ───────────────────────────────────────────────────────────────────

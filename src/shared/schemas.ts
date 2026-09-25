@@ -984,6 +984,20 @@ export const CalendarEventPreviewSchema = z.object({
   stop: z.string(),
 });
 
+// ─── Slack ─────────────────────────────────────────────────────────────────────
+
+export const SlackStatusSchema = z.object({
+  configured: z.boolean(),
+  connected: z.boolean(),
+  teamName: z.string().nullable(),
+  canManage: z.boolean(),
+  notify: z.boolean(),
+  // null = this person's email hasn't been looked up in Slack yet.
+  linked: z.boolean().nullable(),
+});
+
+export const UpdateSlackPrefsSchema = z.object({ notify: z.boolean() });
+
 // ─── Integrations ──────────────────────────────────────────────────────────────
 
 export const IntegrationTypeSchema = z.enum(["workfront", "dynamics"]);
@@ -1222,6 +1236,8 @@ export type CreateIntegration = z.infer<typeof CreateIntegrationSchema>;
 export type UpdateIntegration = z.infer<typeof UpdateIntegrationSchema>;
 export type CalendarProviderId = z.infer<typeof CalendarProviderIdSchema>;
 export type CalendarProviderStatus = z.infer<typeof CalendarProviderStatusSchema>;
+export type SlackStatus = z.infer<typeof SlackStatusSchema>;
+export type UpdateSlackPrefs = z.infer<typeof UpdateSlackPrefsSchema>;
 export type CalendarEventPreview = z.infer<typeof CalendarEventPreviewSchema>;
 export type WorkfrontCredentials = z.infer<typeof WorkfrontCredentialsSchema>;
 export type DynamicsCredentials = z.infer<typeof DynamicsCredentialsSchema>;

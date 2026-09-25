@@ -24,6 +24,7 @@ import { plannerRouter } from "./routes/planner";
 import { settingsRouter } from "./routes/settings";
 import { integrationsRouter } from "./routes/integrations";
 import { calendarRouter } from "./routes/calendar";
+import { slackRouter } from "./routes/slack";
 import { aiRouter } from "./routes/ai";
 import { assistantRouter } from "./routes/assistant";
 import { adminRouter } from "./routes/admin";
@@ -36,6 +37,7 @@ import { runAutoTrack } from "./lib/calendar-autotrack";
 import { runRecurring } from "./lib/recurring";
 import { runDigests } from "./lib/digest";
 import { pruneNotifications } from "./lib/notifications";
+import { runSlackNotifications } from "./lib/slack";
 import { routeAgentRequest } from "agents";
 import { createMcpHandler } from "agents/mcp";
 import { buildMcpServer } from "./mcp/server";
@@ -115,6 +117,7 @@ const app = new Hono<{ Bindings: Env }>()
   .use("/api/settings/digest/send", emailRateLimit)
   .use("/api/integrations/*", outboundRateLimit)
   .use("/api/calendar/convert", outboundRateLimit)
+  .use("/api/slack/test", outboundRateLimit)
   .use("/api/client-errors", clientErrorsRateLimit)
   .route("/api/time_entries", timeEntriesRouter)
   .route("/api/projects", projectsRouter)
@@ -132,6 +135,7 @@ const app = new Hono<{ Bindings: Env }>()
   .route("/api/settings", settingsRouter)
   .route("/api/integrations", integrationsRouter)
   .route("/api/calendar", calendarRouter)
+  .route("/api/slack", slackRouter)
   .route("/api/ai", aiRouter)
   .route("/api/assistant", assistantRouter)
   .route("/api/admin", adminRouter)
@@ -246,10 +250,13 @@ export default {
     return app.fetch(request, env, ctx);
   },
   // Cron (*/5): materialize finished calendar events for auto-track workspaces,
-  // any due recurring-entry occurrences, and any digest whose local send hour
-  // has arrived. Each sweep swallows its own per-workspace/per-user errors, so
-  // one broken connection can't stop the others.
+  // any due recurring-entry occurrences, any digest whose local send hour has
+  // arrived, and bell notifications left unread long enough to go to Slack.
+  // Each sweep swallows its own per-workspace/per-user errors, so one broken
+  // connection can't stop the others.
   scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext) {
-    ctx.waitUntil(Promise.all([runAutoTrack(env), runRecurring(env), runDigests(env), pruneNotifications(env)]));
+    ctx.waitUntil(
+      Promise.all([runAutoTrack(env), runRecurring(env), runDigests(env), pruneNotifications(env), runSlackNotifications(env)])
+    );
   },
 } satisfies ExportedHandler<Env>;

@@ -43,6 +43,7 @@ Cron (*/5 min) ─────────── scheduled()   → auto-track + 
 | `/api/settings` | `settings.ts` | per-user prefs stored on the Better Auth `user` row, incl. digest preferences; `POST /digest/send` mails one immediately |
 | `/api/keys` | `api-keys.ts` | workspace API keys for MCP/programmatic access — list/create/revoke. Session-only: a credential that can mint credentials must not be reachable from `/mcp` |
 | `/api/calendar` | `calendar.ts` | Multi-provider (Google, Microsoft): `GET /:provider/connect`, `GET /:provider/callback`, `DELETE /:provider`, `GET /status` (one row per provider), `GET /events` (merged read-through), `PATCH /auto-track`, `POST /convert` |
+| `/api/slack` | `slack.ts` | Slack as a delivery channel for unread notifications: `GET /status`, `PATCH /me` (per-person opt-out), `GET /connect` + `GET /callback` (OAuth, manager-only, state cookie bound to workspace + person), `DELETE /` (revoke + remove, manager-only), `POST /test`. See `docs/SLACK.md` |
 | `/api/ai` | `ai.ts` | `POST /quick-entry` (NL→entry), `POST /summary` (AI report draft); rate-limited |
 | `/api/assistant` | `assistant.ts` | `GET /nudges`, `POST /track-event`, memory list/delete. **Chat is NOT here** — see the Assistant below |
 | `/api/integrations` | `integrations.ts` | Workfront/Dynamics adapters, `POST /push` (takes the client's IANA `timezone`; the route resolves each entry's work date with `lib/local-date.ts` before handing it to an adapter), SSRF-guarded, outbound rate limits |
@@ -95,11 +96,13 @@ Notable decisions:
 
 ## Cron (`scheduled()`, every 5 minutes)
 
-Three independent, idempotent jobs, each iterating its own subjects and swallowing per-subject errors so one bad connection or address never blocks the sweep:
+Four independent, idempotent jobs, each iterating its own subjects and swallowing per-subject errors so one bad connection or address never blocks the sweep:
 
 - **Calendar auto-track** (`lib/calendar-autotrack.ts`) — for each person with a calendar connected + auto-track on, converts their *ended* events into their own entries. Provider-agnostic (`lib/calendar-connections.ts`); idempotent per person via `time_entries.calendar_event_id` + `user_id`. Recurring templates likewise mint entries for their author (`recurring_entries.user_id`).
 - **Recurring entries** (`lib/recurring.ts`) — materializes each active template once its scheduled UTC time passes. Idempotent via `last_materialized` (UTC date). Schedules stored as UTC weekday + minutes-of-day; the client converts to local time (`react-app/lib/recurrence.ts`).
 - **Email digests** (`lib/digest.ts`) — the morning briefing and the Monday weekly summary, for users who opted in. The cron has no request to read a timezone from, so it works off `user.digest_tz_offset` (reconciled client-side by `useHydrateSettings` whenever it drifts, so a DST change doesn't send an hour off for months). The 5-minute cron ticks twelve times inside the target hour, so the send is exactly-once by comparing `digest_daily_sent`/`digest_weekly_sent` against the user's **local** date rather than by locking.
+
+- **Slack notifications** (`lib/slack.ts`) — a bell notification still unread after 15 minutes (and under 24 hours old) goes to its person as a Slack DM, grouped per person. At most once: each row is claimed (`slack_sent_at`) before the send. Only current, unbanned members who haven't opted out; a revoked token removes the installation. `SLACK_DRY_RUN=1` (local) logs instead of calling Slack. See `docs/SLACK.md`.
 
 ## Drafting a day (`lib/drafts.ts`)
 
@@ -194,6 +197,7 @@ A fifth pass (September 2026, on the `refactor` branch) closed what the audit st
 | `docs/ARCHITECTURE.md` | devs | this file |
 | `docs/USER_GUIDE.md` | end users | every feature, by task |
 | `docs/CALENDAR_SYNC.md` | devs/self-hosters | Google Calendar setup + sync/auto-track design |
+| `docs/SLACK.md` | devs/admins | Slack app setup, unread-notification DMs, dry run |
 | `docs/MCP.md` | users/devs | MCP connector: API keys, per-client setup, tool reference, troubleshooting |
 | `PRODUCT.md` / `DESIGN.md` | design work | product register, design system (source of truth for UI) |
 | `ROADMAP.md` | devs | deferred/planned work |

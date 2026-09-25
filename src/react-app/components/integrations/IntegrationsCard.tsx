@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { IntegrationForm } from "./IntegrationForm";
+import { SlackSection } from "./SlackSection";
 import { useIntegrations, useDeleteIntegration } from "@/hooks/useIntegrations";
 import type { Integration, IntegrationType } from "@shared/schemas";
 
@@ -45,6 +46,7 @@ export function IntegrationsCard() {
         )}
       </CardHeader>
       <CardContent className="space-y-3">
+        <SlackSection />
         <p className="text-sm text-muted-foreground">
           Connect Adobe Workfront or Microsoft Dynamics 365 to push time entries.
           Assign a connection to a project from the project settings.

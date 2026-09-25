@@ -80,13 +80,15 @@ The server advertises `title` "TimeTracker", `websiteUrl`, a description and `ic
 
 ### Cron (`scheduled()` handler, `*/5 * * * *`)
 
-Configured in `wrangler.jsonc` under `triggers.crons`. Three independent jobs run every 5 minutes:
+Configured in `wrangler.jsonc` under `triggers.crons`. Four independent jobs run every 5 minutes:
 - **Calendar auto-track** (`runAutoTrack`): for each person with a connected calendar and auto-track enabled, materializes their calendar events that have already ended into their own time entries. Idempotent per person via `time_entries.calendar_event_id` + `user_id`.
 - **Recurring entries** (`runRecurring`): materializes each active `recurring_entries` template's occurrence once its scheduled UTC time has passed for the day. Idempotent via `recurring_entries.last_materialized` (UTC date). Schedules are stored in UTC weekday + minutes-of-day; the client converts to/from the browser's local timezone (`lib/recurrence.ts`).
 
 - **Email digests** (`runDigests`): the opt-in morning briefing and Monday weekly summary. The cron has no request to read a timezone from, so it works off `user.digest_tz_offset` (reconciled client-side in `useHydrateSettings` when it drifts, so a DST change doesn't send an hour off for months). Exactly-once per day by comparing `digest_daily_sent`/`digest_weekly_sent` against the user's **local** date — the cron ticks twelve times inside the target hour.
 
-All three jobs iterate their subjects independently and swallow per-subject errors, so one broken connection, template or address never blocks the rest of the sweep.
+- **Slack notifications** (`runSlackNotifications`, `lib/slack.ts` + `routes/slack.ts`): a bell notification still unread after 15 min goes to its person as a Slack DM (matched by email, one DM per person, claimed via `notifications.slack_sent_at` so at most once). One OAuth installation per workspace (`slack_installations`, manager-only), per-person opt-out `user.slack_notify`. **`SLACK_DRY_RUN=1` in `.dev.vars` means local runs never call slack.com** — keep it there. See `docs/SLACK.md`.
+
+All jobs iterate their subjects independently and swallow per-subject errors, so one broken connection, template or address never blocks the rest of the sweep.
 
 ### The app's own URL
 
