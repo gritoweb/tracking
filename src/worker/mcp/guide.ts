@@ -40,7 +40,8 @@ function examples(role: WorkspaceRole, scope: ApiKeyScope): string {
   const lines = [
     `- "Log 2h yesterday on ODL" → \`list_projects\` (find ODL; ask if two match or none does) → \`log_time\` with \`start\`/\`stop\` on yesterday in the person's own offset (e.g. \`2026-09-27T09:00:00-03:00\` to \`11:00\`) and a short \`description\` → reply with the entry's link.`,
     `- "Move task X to QA" → \`list_tasks\` with \`search: "X"\` → \`list_task_statuses\` with that task's \`projectId\` (pick the column named QA) → \`move_task\`.`,
-    `- "Write the acceptance criteria on task X" → \`get_task\` (keep what the notes already say) → \`update_task\` with \`description\` in Markdown: a \`## Acceptance criteria\` heading and \`- [ ]\` items.`,
+    `- "Create a task to review the landing page, with the goal, steps and acceptance criteria" → \`list_projects\` (ask which project if they didn't say) → \`create_task\` with \`name\` and \`description\` in the card shape below → reply with the task's link.`,
+    `- "Write the acceptance criteria on task X" → \`get_task\` (keep what the notes already say) → \`update_task\` with \`description\` in Markdown: the card's acceptance-criteria section (\`# ✅ Critério de aceite\` in Portuguese) with \`- [ ]\` items, the rest kept.`,
     manager
       ? `- "How many hours did the team do last week?" → \`get_time_summary\` for last Monday–Sunday with \`timezoneOffsetMinutes\` (per project), or \`run_report\` \`grouped\` with \`group: "user"\` for per person.`
       : `- "How many hours did the team do last week?" → you can't see the team's hours: say so, and offer your own week with \`get_time_summary\` (it answers with \`scope: own hours only\`).`,
@@ -66,7 +67,23 @@ ${permissions(role, scope)}
 - Answer in the language the person wrote in, and give the \`url\` of what you created or changed as a link.
 
 ## Writing task notes and comments
-They are **Markdown** and the app shows them formatted: \`##\` headings, \`- item\` and \`1. item\` lists, \`- [ ] todo\` / \`- [x] done\` checklists, **bold**, *italic*, \`code\`, quotes, links, \`@[Name](user:ID)\` to tag someone (they are notified; id from \`list_members\`). Use headings and checklists for steps and acceptance criteria rather than one long paragraph. When changing notes, read them first with \`get_task\` and send the whole text back with your change. A time entry's description is different: plain text, it can end up on a client's invoice.
+They are **Markdown** and the app shows them formatted: \`#\` headings for the notes' sections (\`##\`/\`###\` below them when a section needs parts), \`- item\` and \`1. item\` lists, \`- [ ] todo\` / \`- [x] done\` checklists, **bold**, *italic*, \`code\`, quotes, links, \`@[Name](user:ID)\` to tag someone (they are notified; id from \`list_members\`). Use headings, lists and checklists rather than one long paragraph.
+
+A new task's notes follow the team's card shape, unless the person asked for another. Section names go in the person's language; the emojis are the house style, not a requirement:
+\`\`\`
+# 🎯 Objetivo
+<what this task delivers and why, in one or two lines>
+
+# 📋 Contexto
+- <how things are today, and what was already decided>
+
+# ✅ Critério de aceite
+- [ ] <each thing that must be true for the task to be done>
+
+# 🔧 Specs técnicas
+- <how to do it: constraints, risks, the order of steps, what to check afterwards>
+\`\`\`
+Leave out a section the person gave nothing for, rather than inventing its content. When changing notes, read them first with \`get_task\` and send the whole text back with your change. A time entry's description is different: plain text, it can end up on a client's invoice.
 
 ## When something is refused
 A refusal is the app's answer for this person: tell them plainly what couldn't be done and who can do it. Never work around it (another tool, a new project, client or column, someone else's id).
