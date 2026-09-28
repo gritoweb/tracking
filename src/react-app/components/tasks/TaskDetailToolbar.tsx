@@ -15,7 +15,8 @@ import type { TaskViewMode } from "@/stores/uiStore";
 interface TaskDetailToolbarProps {
   mode: TaskViewMode;
   onModeChange: (mode: TaskViewMode) => void;
-  onDeleteTask: () => void;
+  /** Absent when this person may not delete the task, and then there is no actions menu. */
+  onDeleteTask?: () => void;
 }
 
 const MODES = [
@@ -74,6 +75,8 @@ function ViewModeMenu({ mode, onModeChange }: Pick<TaskDetailToolbarProps, "mode
 export function TaskDetailToolbar({ mode, onModeChange, onDeleteTask }: TaskDetailToolbarProps) {
   return (
     <div className="flex h-12 shrink-0 items-center gap-1 border-b px-4 pr-12">
+      {onDeleteTask && (
+        <>
       {/* "..." rather than a bare trash icon, so delete isn't a stray misclick. */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -95,6 +98,8 @@ export function TaskDetailToolbar({ mode, onModeChange, onDeleteTask }: TaskDeta
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+        </>
+      )}
       <ViewModeMenu mode={mode} onModeChange={onModeChange} />
     </div>
   );

@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-09-28 (6) — on `master`, not pushed or deployed
+### Added
+- **Delete a task from the board card's "…" on hover**, next to the existing right-click menu: **Edit task…** and **Delete**, the delete going through the same named confirmation (which also warns about subtasks) as the list. Both menus render one shared action list in `board/TaskCard.tsx`, so they can't drift apart. The list row's "…" and the open task's "…" already had Delete.
+### Changed
+- **Delete shows only to who may delete**: the task's creator or a workspace owner/admin, the rule the server and MCP `delete_task` already enforce (`canDeleteTask`). Before, everyone saw it and others got an error. Tasks now carry `createdBy` (the `created_by` column existed; no migration) and `hooks/useTaskPermissions.ts` answers it once for the board card, the list row and the open task (whose "…" disappears when it would be empty).
+### Verified
+- `tsc -b` (0), `lint` (0), `vitest run` 1124/1124, `pnpm check` (0). e2e with three real accounts in one workspace (owner, the task's author, another member): the other member's card "…" has **Edit task…** but no **Delete**; the author's card "…" → **Delete** → a confirmation naming the task → the card leaves the board without a reload, and a time entry logged on the task still exists with `taskId: null`. Mutation: showing Delete to everyone fails it. Task e2e (delete permissions, board, detail panel, planning): 31/32; the one failure (the board column's quick-add assignee field) also fails with this change stashed and passes alone — intermittent, not caused by it.
+- Hours kept on delete come from the schema: `time_entries.task_id … ON DELETE SET NULL` (migration 0003).
+
 ## 2026-09-28 (5) — on `master`, not pushed or deployed
 ### Added
 - **The guide teaches the team's card shape for a new task**: `#` headings (🎯 Objetivo, 📋 Contexto, ✅ Critério de aceite with a `- [ ]` checklist, 🔧 Specs técnicas), section names in the person's language, emojis as house style but not required, and a section left out rather than invented; plus a worked "create a task" example. Why: a model creating a task started straight at `##` because the guide only mentioned `##`, and it had no creation example. Checked by creating tasks through the local MCP as an agent would: stored as four level-1 headings, lists and a checklist, rendered as such.

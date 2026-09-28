@@ -268,6 +268,8 @@ export const TaskAttachmentSchema = z.object({
 export const TaskSchema = z.object({
   id: z.string(),
   workspaceId: z.string(),
+  // Who created it: that person and workspace owners/admins may delete it (lib/permissions canDeleteTask).
+  createdBy: z.string().nullable(),
   projectId: z.string(),
   projectName: z.string().nullable(),
   projectColor: z.string().nullable(),

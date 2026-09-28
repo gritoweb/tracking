@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { dateToLocalDate, localDateToDate, PRIORITIES, PRIORITY_LABEL } from "@/lib/taskUtils";
+import { useCanDeleteTask } from "@/hooks/useTaskPermissions";
 import type { Task } from "@shared/schemas";
 
 const RECUR_OPTIONS = [
@@ -47,6 +48,7 @@ export function TaskRowActions({
   onChangePriority,
   onChangeRecurRule,
 }: TaskRowActionsProps) {
+  const canDelete = useCanDeleteTask()(task);
   return (
     <div className="tt-reveal flex items-center gap-0.5">
       <Button
@@ -139,11 +141,16 @@ export function TaskRowActions({
             Log time
           </DropdownMenuItem>
 
-          <DropdownMenuSeparator />
-          <DropdownMenuItem variant="destructive" onSelect={() => onRequestDelete(task)}>
-            <Trash2 className="h-3.5 w-3.5" />
-            Delete
-          </DropdownMenuItem>
+          {/* Only its creator or an owner/admin may delete it; the server refuses anyone else. */}
+          {canDelete && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem variant="destructive" onSelect={() => onRequestDelete(task)}>
+                <Trash2 className="h-3.5 w-3.5" />
+                Delete
+              </DropdownMenuItem>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

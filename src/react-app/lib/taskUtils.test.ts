@@ -23,6 +23,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
   return {
     id: "t1",
     workspaceId: "w1",
+    createdBy: null,
     projectId: "p1",
     projectName: "Project",
     projectColor: "#000000",

@@ -25,6 +25,7 @@ import {
 } from "@/hooks/useTasks";
 import { useWorkspaceMembers, useWorkspaceRole } from "@/hooks/useWorkspaceRole";
 import { useAuth } from "@/hooks/useAuth";
+import { useCanDeleteTask } from "@/hooks/useTaskPermissions";
 import { useMediaQuery, BELOW_LG } from "@/hooks/useMediaQuery";
 import { useTimer } from "@/hooks/useTimer";
 import { useTimerStore } from "@/stores/timerStore";
@@ -54,6 +55,7 @@ export function TaskDetail({ open, onClose, task, tab, onTabChange, onRequestDel
   const navigate = useNavigate();
   const { user } = useAuth();
   const { canManage } = useWorkspaceRole();
+  const canDeleteTask = useCanDeleteTask();
   const mode = useUIStore((s) => s.taskViewMode);
   const setMode = useUIStore((s) => s.setTaskViewMode);
   const narrow = useMediaQuery(BELOW_LG);
@@ -119,10 +121,10 @@ export function TaskDetail({ open, onClose, task, tab, onTabChange, onRequestDel
     <TaskDetailToolbar
       mode={mode}
       onModeChange={setMode}
-      onDeleteTask={() => {
+      onDeleteTask={canDeleteTask(task) ? () => {
         onRequestDelete(task);
         onClose();
-      }}
+      } : undefined}
     />
   );
 

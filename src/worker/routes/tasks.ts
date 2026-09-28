@@ -51,6 +51,7 @@ function formatTask(row: TaskJoinRow): Task {
   return {
     id: row.id,
     workspaceId: row.workspace_id,
+    createdBy: row.created_by ?? null,
     projectId: row.project_id,
     projectName: row.project_name ?? null,
     projectColor: row.project_color ?? null,
