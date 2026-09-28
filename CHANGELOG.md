@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-28 (4) — deployed to production
+### Fixed
+- **"Uploading…" and the empty-line hint drew on top of each other** while a file uploaded into a description or comment. The in-flight marker is a widget on a line the editor still counts as empty, so the hint ("Write, or type / for commands" or the field's placeholder) kept showing through it. A line holding an upload now hides the hint (`:has(.tt-upload-placeholder)`, same selector weight as the hint rule and placed after it), and the marker's inline opacity/italic moved to the `.tt-upload-placeholder` class with `--muted-foreground`.
+### Verified
+- `tsc -b` (0), `lint` (0), `vitest run` 1115/1115, `pnpm check` (0). e2e: with the upload held open by the test, the line with "Uploading…" draws no hint (`::before` content `none`) in both the description and the comment field; removing the new rule fails it with the placeholder text showing. `editor-file-drop`, `task-detail-panel`, `task-comments`: 25/25.
+
 ## 2026-09-28 (3) — deployed to production (version 352aa3ed)
 ### Fixed
 - **A file pasted into a comment and taken out before posting stayed in Attachments**, and so did one in a comment closed without posting, or added while editing a comment and then cancelled. The editor now remembers what it uploaded in the current edit and deletes whatever the text no longer shows when the field is left or closed (`RichTextEditor` session uploads); a new comment that is never posted, and a cancelled edit, discard their uploads (`CommentComposer`). Files already saved in a text or uploaded by someone else are never touched.

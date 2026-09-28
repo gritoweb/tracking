@@ -36,9 +36,8 @@ const uploadPlaceholderKey = new PluginKey<DecorationSet>("upload-placeholder");
 
 function placeholderDOM(): HTMLElement {
   const span = document.createElement("span");
+  span.className = "tt-upload-placeholder";
   span.textContent = "Uploading…";
-  span.style.opacity = "0.6";
-  span.style.fontStyle = "italic";
   return span;
 }
 

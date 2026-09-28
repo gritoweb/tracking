@@ -291,3 +291,29 @@ test("a file already deleted leaves no trace: nothing shows, no note, and the de
     .poll(async () => ((await (await page.request.get(`/api/tasks/${task.id}`)).json()).description as string).includes("deleted-"))
     .toBe(false);
 });
+
+test("while a file uploads its line shows only Uploading…, not the empty-line hint drawn over it", async ({ page }) => {
+  const panel = await openTask(page);
+  // Hold each upload so the in-flight state can be looked at.
+  let release: () => void = () => {};
+  await page.route("**/api/tasks/*/attachments", async (route) => {
+    if (route.request().method() !== "POST") return route.continue();
+    await new Promise<void>((resolve) => (release = resolve));
+    await route.continue();
+  });
+  const hintOnUploadLine = (field: Locator) =>
+    field.evaluate((el) => {
+      const line = el.querySelector(".tt-upload-placeholder")?.closest("p");
+      return line ? getComputedStyle(line, "::before").content : "no upload line";
+    });
+
+  for (const name of ["Description", "Write a comment"]) {
+    const field = panel.getByRole("textbox", { name });
+    await field.click();
+    await giveFile(field, "paste", "held.png", makePng(400, 240).toString("base64"), "image/png");
+    await expect(field.getByText("Uploading…")).toBeVisible();
+    expect(await hintOnUploadLine(field)).toBe("none");
+    release();
+    await expect(field.locator("img")).toHaveCount(1, { timeout: 15_000 });
+  }
+});
