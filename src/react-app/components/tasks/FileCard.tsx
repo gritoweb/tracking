@@ -24,7 +24,7 @@ export function FileCard({ node, editor, deleteNode }: NodeViewProps) {
           <span className="min-w-0">
             <span className="block truncate text-sm font-medium">{filename}</span>
             <span className="block text-micro text-muted-foreground">
-              {fileExtension(filename).toUpperCase()}
+              {(fileExtension(filename) || "file").toUpperCase()}
               {size ? ` · ${formatFileSize(size)}` : ""}
             </span>
           </span>

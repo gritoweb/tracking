@@ -25,20 +25,14 @@ describe("imageProblem (description and comments)", () => {
   });
 });
 
-describe("attachmentProblem (the Attachments section)", () => {
-  it("accepts documents by extension, whatever mimetype the browser reports", () => {
-    for (const name of ["a.pdf", "a.docx", "a.xlsx", "a.pptx", "a.txt", "a.csv", "a.PNG", "a.jpeg"]) {
+describe("attachmentProblem (the Attachments section and the text)", () => {
+  it("accepts any kind of file", () => {
+    for (const name of ["a.pdf", "a.docx", "plan.md", "map.mmd", "a.exe", "a.zip", "a.svg", "a.html", "noextension"]) {
       expect(attachmentProblem(file(name, ""))).toBeNull();
     }
   });
 
-  it("refuses programs, scripts, macro documents, archives, SVG and HTML", () => {
-    for (const name of ["a.exe", "a.js", "a.docm", "a.xlsm", "a.zip", "a.svg", "a.html", "a.doc", "noextension"]) {
-      expect(attachmentProblem(file(name, ""))).toMatch(/^Only images/);
-    }
-  });
-
-  it("refuses a file over the shared limit", () => {
+  it("refuses only a file over the shared limit", () => {
     expect(attachmentProblem(sized("a.pdf", "application/pdf", MAX_ATTACHMENT_BYTES + 1))).toBe("File is larger than 25 MB");
   });
 });

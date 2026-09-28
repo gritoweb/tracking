@@ -187,7 +187,7 @@ describe("S-22 — an uploaded GIF is stored without non-frame bytes", () => {
   });
 });
 
-describe("documents — the type comes from the bytes and active content is refused", () => {
+describe("any file is accepted — the type comes from the bytes, never the name", () => {
   const stored = (w: ReturnType<typeof world>) =>
     w.raw.prepare(`SELECT filename, content_type, width, height FROM task_attachments WHERE task_id = 't1'`).get();
 
@@ -215,16 +215,95 @@ describe("documents — the type comes from the bytes and active content is refu
   });
 
   it.each([
-    ["a program", new Uint8Array([0x4d, 0x5a, 0x90, 0x00]), "setup.exe", /^Only images/],
-    ["HTML", encoder.encode("<html><script>alert(1)</script></html>"), "page.html", /^Only images/],
-    ["a PDF with a script", encoder.encode("%PDF-1.7\n<< /S /JavaScript /JS (x) >>"), "a.pdf", /scripts/],
-    ["a Word file with macros", makeZip({ ...DOCX, "word/vbaProject.bin": "x" }), "a.docx", /macros/],
-  ])("refuses %s with a 400 and stores nothing", async (_label, bytes, name, message) => {
+    ["a program", new Uint8Array([0x4d, 0x5a, 0x90, 0x00]), "setup.exe", "application/octet-stream", "setup.exe"],
+    ["HTML", encoder.encode("<html><script>alert(1)</script></html>"), "page.html", "text/plain; charset=utf-8", "page.html"],
+    ["Markdown", encoder.encode("# Plan\n\n- step"), "planejamento.md", "text/plain; charset=utf-8", "planejamento.md"],
+    ["a Mermaid diagram", encoder.encode("mindmap\n  root((Plan))"), "mapa.mmd", "text/plain; charset=utf-8", "mapa.mmd"],
+  ])("accepts %s, stored so it can never run or render", async (_label, bytes, name, contentType, filename) => {
     const w = world();
     const res = await w.app.request("/t1/attachments", smallUpload(bytes, true, name), w.env, w.ctx);
-    expect(res.status).toBe(400);
-    expect(((await res.json()) as { error: string }).error).toMatch(message);
-    expect(w.put).not.toHaveBeenCalled();
-    expect(w.count()).toBe(0);
+    expect(res.status).toBe(201);
+    expect(stored(w)).toMatchObject({ filename, content_type: contentType });
+  });
+});
+
+describe("a file taken out of the text leaves the task's attachments", () => {
+  const imageDoc = (...ids: string[]) =>
+    JSON.stringify({ type: "doc", content: ids.map((id) => ({ type: "image", attrs: { src: `/api/attachments/${id}` } })) });
+  const fileDoc = (id: string) =>
+    JSON.stringify({ type: "doc", content: [{ type: "fileAttachment", attrs: { href: `/api/attachments/${id}`, filename: "brief.pdf" } }] });
+  const empty = JSON.stringify({ type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "no files" }] }] });
+
+  function seeded(uploader = "u-ana") {
+    const w = world();
+    w.raw.exec(`
+      INSERT INTO "user" (id, name, email, createdAt, updatedAt) VALUES ('u-bo', 'Bo', 'bo@x.test', '2026-01-01 00:00:00', '2026-01-01 00:00:00');
+      INSERT INTO "member" (id, organizationId, userId, role, createdAt) VALUES ('m-bo', 'ws-A', 'u-bo', 'member', '2026-01-01 00:00:00');
+      INSERT INTO task_attachments (id, workspace_id, task_id, user_id, r2_key, filename, content_type, size) VALUES
+        ('img1', 'ws-A', 't1', '${uploader}', 'r2/img1', 'shot.png', 'image/png', 10),
+        ('pdf1', 'ws-A', 't1', '${uploader}', 'r2/pdf1', 'brief.pdf', 'application/pdf', 10),
+        ('gallery', 'ws-A', 't1', '${uploader}', 'r2/gallery', 'logo.png', 'image/png', 10);
+    `);
+    const ids = () => (w.raw.prepare(`SELECT id FROM task_attachments ORDER BY id`).all() as { id: string }[]).map((r) => r.id);
+    const send = (method: string, path: string, body?: unknown, as = "u-ana") => {
+      const app = new Hono<{ Bindings: Env; Variables: { workspaceId: string; userId: string } }>()
+        .use("*", async (c, next) => {
+          c.set("workspaceId", "ws-A");
+          c.set("userId", as);
+          await next();
+        })
+        .route("/", tasksRouter);
+      const room = { idFromName: () => "r", get: () => ({ fetch: async () => new Response("ok") }) };
+      return app.request(
+        path,
+        { method, headers: { "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) },
+        { ...w.env, TIMER_ROOM: room, NOTIFICATION_ROOM: room } as unknown as Env,
+        w.ctx
+      );
+    };
+    return { ...w, ids, send, imageDoc, fileDoc, empty };
+  }
+
+  it("deletes an image removed from the description, from the table and from storage", async () => {
+    const w = seeded();
+    w.raw.prepare(`UPDATE tasks SET description = ? WHERE id = 't1'`).run(imageDoc("img1"));
+    const res = await w.send("PUT", "/t1", { description: empty });
+    expect(res.status).toBe(200);
+    expect(w.ids()).toEqual(["gallery", "pdf1"]);
+    expect(w.del).toHaveBeenCalledWith("r2/img1");
+  });
+
+  it("keeps a file that another text of the task still shows", async () => {
+    const w = seeded();
+    w.raw.prepare(`UPDATE tasks SET description = ? WHERE id = 't1'`).run(imageDoc("img1"));
+    w.raw.prepare(
+      `INSERT INTO task_comments (id, workspace_id, task_id, user_id, body) VALUES ('c1', 'ws-A', 't1', 'u-ana', ?)`
+    ).run(imageDoc("img1"));
+    await w.send("PUT", "/t1", { description: empty });
+    expect(w.ids()).toContain("img1");
+  });
+
+  it("never touches a file attached from the Attachments section, which was never in a text", async () => {
+    const w = seeded();
+    await w.send("PUT", "/t1", { description: empty });
+    expect(w.ids()).toEqual(["gallery", "img1", "pdf1"]);
+  });
+
+  it("leaves someone else's file alone when the editor couldn't delete it", async () => {
+    const w = seeded("u-bo");
+    w.raw.prepare(`UPDATE tasks SET description = ? WHERE id = 't1'`).run(imageDoc("img1"));
+    await w.send("PUT", "/t1", { description: empty }, "u-ana");
+    expect(w.ids()).toContain("img1");
+  });
+
+  it("deletes a file card removed by editing a comment, and a file whose comment is deleted", async () => {
+    const w = seeded();
+    w.raw.prepare(
+      `INSERT INTO task_comments (id, workspace_id, task_id, user_id, body) VALUES ('c1', 'ws-A', 't1', 'u-ana', ?), ('c2', 'ws-A', 't1', 'u-ana', ?)`
+    ).run(fileDoc("pdf1"), imageDoc("img1"));
+    expect((await w.send("PATCH", "/t1/comments/c1", { body: empty })).status).toBe(200);
+    expect(w.ids()).not.toContain("pdf1");
+    expect((await w.send("DELETE", "/t1/comments/c2")).status).toBe(200);
+    expect(w.ids()).toEqual(["gallery"]);
   });
 });

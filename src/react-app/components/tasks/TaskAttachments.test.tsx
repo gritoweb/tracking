@@ -11,7 +11,7 @@ const image = (name = "a.png", type = "image/png", size = 100) => new File([new 
 
 function setup(onUpload: (file: File) => Promise<unknown> = vi.fn(async () => undefined)) {
   const utils = render(
-    <TaskAttachments attachments={[]} loading={false} onOpen={() => {}} onDelete={() => {}} onUpload={onUpload} />
+    <TaskAttachments attachments={[]} loading={false} onOpen={() => {}} onDelete={() => {}} canDelete={() => true} onUpload={onUpload} />
   );
   return { onUpload: onUpload as ReturnType<typeof vi.fn>, ...utils };
 }
@@ -44,11 +44,11 @@ describe("TaskAttachments — attaching", () => {
     expect(onUpload).toHaveBeenCalledWith(pdf);
   });
 
-  it("refuses a program, saying which formats are accepted, and uploads nothing", async () => {
+  it("sends any kind of file — Markdown, a diagram, a program — for the server to type", async () => {
     const { onUpload } = setup();
-    choose([image("setup.exe", "application/x-msdownload")]);
-    await waitFor(() => expect(toastError).toHaveBeenCalledWith(expect.stringMatching(/^Only images .* PDF, Word, Excel/)));
-    expect(onUpload).not.toHaveBeenCalled();
+    choose([image("plan.md", "text/markdown"), image("map.mmd", ""), image("setup.exe", "application/x-msdownload")]);
+    await waitFor(() => expect(onUpload).toHaveBeenCalledTimes(3));
+    expect(toastError).not.toHaveBeenCalled();
   });
 
   it("refuses a file over 25 MB but still sends the valid one beside it", async () => {
@@ -60,9 +60,9 @@ describe("TaskAttachments — attaching", () => {
     expect(onUpload).toHaveBeenCalledTimes(1);
   });
 
-  it("tells people the formats and the size limit before they pick a file", () => {
+  it("tells people the size limit and what opens here before they pick a file", () => {
     setup();
-    expect(screen.getByText(/PDF, Word, Excel, PowerPoint, TXT or CSV — up to 25 MB each/)).toBeInTheDocument();
+    expect(screen.getByText(/Any file, up to 25 MB each\. Images, PDFs and text files open here; other files download\./)).toBeInTheDocument();
   });
 
   it("uploads images dropped on the area", async () => {
@@ -88,5 +88,25 @@ describe("TaskAttachments — attaching", () => {
     setup(onUpload);
     choose([image("a.png"), image("b.png")]);
     await waitFor(() => expect(onUpload).toHaveBeenCalledTimes(2));
+  });
+});
+
+describe("TaskAttachments — deleting", () => {
+  const file = (id: string, userId: string) =>
+    ({ id, userId, filename: `${id}.pdf`, contentType: "application/pdf", size: 10, width: null, height: null, url: `/api/attachments/${id}`, createdAt: "" }) as const;
+
+  it("offers delete only on the files this person may delete", () => {
+    render(
+      <TaskAttachments
+        attachments={[file("mine", "u-me"), file("theirs", "u-other")]}
+        loading={false}
+        onOpen={() => {}}
+        onDelete={() => {}}
+        canDelete={(a) => a.userId === "u-me"}
+        onUpload={async () => undefined}
+      />
+    );
+    expect(screen.getByRole("button", { name: "Delete mine.pdf" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Delete theirs.pdf" })).not.toBeInTheDocument();
   });
 });

@@ -4,7 +4,6 @@ import { StarterKit } from "@tiptap/starter-kit";
 import { TaskList } from "@tiptap/extension-task-list";
 import { TaskItem } from "@tiptap/extension-task-item";
 import { Placeholder } from "@tiptap/extension-placeholder";
-import { Image } from "@tiptap/extension-image";
 import { TextStyle, Color } from "@tiptap/extension-text-style";
 import { setMentionMembers, useEditorMentions } from "./useEditorMentions";
 import { dropHandleSlash, useEditorSlashCommands } from "./useEditorSlashCommands";
@@ -12,6 +11,7 @@ import { RichTextBubbleMenu } from "./RichTextBubbleMenu";
 import { BlockHandle } from "./BlockHandle";
 import { EditorToolbar } from "./EditorToolbar";
 import { FileAttachmentNode } from "./FileAttachmentNode";
+import { TaskImageNode } from "./TaskImageNode";
 import { pickedFile, insertUploadedFile, UploadPlaceholderExtension, type InlineUpload } from "./editorUpload";
 import { attachmentIdFromHref, useOpenAttachment } from "./attachment-viewer/AttachmentViewerContext";
 import { refreshMentionLabels } from "@/lib/mentionLabels";
@@ -130,7 +130,7 @@ export function RichTextEditor({
       TaskItem.configure({ nested: true }),
       // The field's own placeholder while the whole doc is empty; otherwise a hint on the empty line holding the caret.
       Placeholder.configure({ placeholder: ({ editor: e }) => (e.isEmpty ? (placeholder ?? "") : LINE_HINT) }),
-      Image,
+      TaskImageNode,
       FileAttachmentNode,
       UploadPlaceholderExtension,
       mentions.extension,

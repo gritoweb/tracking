@@ -94,10 +94,12 @@ export function useUpdateTask() {
       }
       toastApiError(err, "Failed to update task");
     },
-    onSettled: () => {
+    onSettled: (_data, _error, { id, data }) => {
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
       // A change to the task is a new line in its comments feed.
       queryClient.invalidateQueries({ queryKey: ["task-activity"] });
+      // A file taken out of the description leaves the task's Attachments too.
+      if (data.description !== undefined) queryClient.invalidateQueries({ queryKey: ["task-attachments", id] });
     },
   });
 }

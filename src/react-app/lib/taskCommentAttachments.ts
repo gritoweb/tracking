@@ -1,4 +1,4 @@
-import { ACCEPTED_FORMATS_LABEL, MAX_ATTACHMENT_BYTES, MAX_ATTACHMENT_LABEL, formatForFilename } from "@shared/attachments";
+import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENT_LABEL } from "@shared/attachments";
 
 export const IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
 
@@ -9,10 +9,8 @@ export function imageProblem(file: File): string | null {
   return null;
 }
 
-/** Why a file can't be attached to a task, or null — a first filter by name; the server decides from the bytes. */
+/** Why a file can't be attached to a task, or null: any file is accepted, only its size is limited. */
 export function attachmentProblem(file: File): string | null {
-  // A pasted screenshot can arrive without a usable name, so an image type counts too.
-  if (!formatForFilename(file.name) && !IMAGE_TYPES.includes(file.type)) return `Only ${ACCEPTED_FORMATS_LABEL} files can be attached`;
   if (file.size > MAX_ATTACHMENT_BYTES) return `File is larger than ${MAX_ATTACHMENT_LABEL}`;
   return null;
 }

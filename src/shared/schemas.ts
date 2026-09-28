@@ -254,6 +254,8 @@ export const TaskAssigneeSchema = z.object({
 // D7: an image attached to a task; `url` is the Worker-proxied download route, never the raw R2 key.
 export const TaskAttachmentSchema = z.object({
   id: z.string(),
+  // Who uploaded it: that person and workspace owners/admins may delete it (lib/permissions canDeleteAttachment).
+  userId: z.string().nullable(),
   filename: z.string(),
   contentType: z.string(),
   size: z.number(),

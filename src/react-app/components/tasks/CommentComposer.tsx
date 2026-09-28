@@ -53,6 +53,8 @@ export function CommentComposer({
       placeholder={placeholder}
       autoFocus={autoFocus}
       density="compact"
+      // Big images or long text scroll inside the field; the toolbar and Send below it never leave the screen.
+      className="max-h-(--size-cap-40vh) overflow-y-auto"
       toolbar
       footer={
         <div className="flex items-center gap-1.5">

@@ -33,6 +33,8 @@ function useCommentInvalidation(taskId: string) {
     queryClient.invalidateQueries({ queryKey: ["task-comments", taskId] });
     // The board card shows how many comments a task has.
     queryClient.invalidateQueries({ queryKey: ["tasks"] });
+    // A file taken out of the text (or with a deleted comment) leaves the task's Attachments too.
+    queryClient.invalidateQueries({ queryKey: ["task-attachments", taskId] });
   };
 }
 

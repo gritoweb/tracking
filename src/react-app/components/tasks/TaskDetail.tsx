@@ -23,7 +23,8 @@ import {
   useTaskAttachments,
   useDeleteTaskAttachment,
 } from "@/hooks/useTasks";
-import { useWorkspaceMembers } from "@/hooks/useWorkspaceRole";
+import { useWorkspaceMembers, useWorkspaceRole } from "@/hooks/useWorkspaceRole";
+import { useAuth } from "@/hooks/useAuth";
 import { useMediaQuery, BELOW_LG } from "@/hooks/useMediaQuery";
 import { useTimer } from "@/hooks/useTimer";
 import { useTimerStore } from "@/stores/timerStore";
@@ -51,6 +52,8 @@ interface TaskDetailProps {
  */
 export function TaskDetail({ open, onClose, task, tab, onTabChange, onRequestDelete }: TaskDetailProps) {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { canManage } = useWorkspaceRole();
   const mode = useUIStore((s) => s.taskViewMode);
   const setMode = useUIStore((s) => s.setTaskViewMode);
   const narrow = useMediaQuery(BELOW_LG);
@@ -181,6 +184,7 @@ export function TaskDetail({ open, onClose, task, tab, onTabChange, onRequestDel
         loading={attachmentsLoading}
         onOpen={(a) => setViewingId(a.id)}
         onDelete={(id) => deleteAttachment.mutate({ taskId: task.id, id })}
+        canDelete={(a) => canManage || a.userId === user?.id}
         onUpload={uploadFile}
       />
     </>

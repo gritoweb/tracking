@@ -7,6 +7,7 @@ import { isImageContentType } from "@shared/attachments";
 function formatAttachment(row: TaskAttachmentRow): TaskAttachment {
   return {
     id: row.id,
+    userId: row.user_id ?? null,
     filename: row.filename,
     contentType: row.content_type,
     size: row.size,

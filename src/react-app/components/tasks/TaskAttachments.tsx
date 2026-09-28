@@ -8,11 +8,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { attachmentProblem } from "@/lib/taskCommentAttachments";
 import { FileIcon } from "./attachment-viewer/FileIcon";
-import { ATTACHMENT_ACCEPT, MAX_ATTACHMENT_LABEL, fileExtension, formatFileSize, isImageContentType } from "@shared/attachments";
+import { MAX_ATTACHMENT_LABEL, fileExtension, formatFileSize, isImageContentType } from "@shared/attachments";
 import { cn } from "@/lib/utils";
 import type { TaskAttachment } from "@shared/schemas";
 
-function AttachmentThumb({ attachment, onOpen, onDelete }: { attachment: TaskAttachment; onOpen: () => void; onDelete: () => void }) {
+function AttachmentThumb({ attachment, onOpen, onDelete }: { attachment: TaskAttachment; onOpen: () => void; onDelete: (() => void) | null }) {
   const image = isImageContentType(attachment.contentType);
   const ext = fileExtension(attachment.filename);
   return (
@@ -25,19 +25,21 @@ function AttachmentThumb({ attachment, onOpen, onDelete }: { attachment: TaskAtt
             <FileIcon filename={attachment.filename} className="h-6 w-6 text-muted-foreground" />
             <span className="w-full truncate text-center text-micro font-medium">{attachment.filename}</span>
             <span className="text-micro text-muted-foreground">
-              {ext.toUpperCase()} · {formatFileSize(attachment.size)}
+              {(ext || "file").toUpperCase()} · {formatFileSize(attachment.size)}
             </span>
           </span>
         )}
       </button>
-      <button
-        type="button"
-        onClick={onDelete}
-        aria-label={`Delete ${attachment.filename}`}
-        className="absolute right-1 top-1 hidden rounded-full bg-background/90 p-0.5 text-muted-foreground group-hover:block hover:text-destructive"
-      >
-        <X className="h-3 w-3" />
-      </button>
+      {onDelete && (
+        <button
+          type="button"
+          onClick={onDelete}
+          aria-label={`Delete ${attachment.filename}`}
+          className="absolute right-1 top-1 hidden rounded-full bg-background/90 p-0.5 text-muted-foreground group-hover:block hover:text-destructive"
+        >
+          <X className="h-3 w-3" />
+        </button>
+      )}
     </div>
   );
 }
@@ -47,6 +49,8 @@ interface TaskAttachmentsProps {
   loading: boolean;
   onOpen: (attachment: TaskAttachment) => void;
   onDelete: (attachmentId: string) => void;
+  /** Whether this person may delete a given file: its uploader or a workspace owner/admin, as the server enforces. */
+  canDelete: (attachment: TaskAttachment) => boolean;
   /** Sends one file; the promise settles when it is stored (a refusal is the caller's toast, not ours). */
   onUpload: (file: File) => Promise<unknown>;
 }
@@ -55,7 +59,7 @@ interface TaskAttachmentsProps {
  * The task's files: images sent through the description or a comment, and images or documents attached
  * here with the button or by dropping them on the area (`attachmentProblem`, then the server's own check).
  */
-export function TaskAttachments({ attachments, loading, onOpen, onDelete, onUpload }: TaskAttachmentsProps) {
+export function TaskAttachments({ attachments, loading, onOpen, onDelete, canDelete, onUpload }: TaskAttachmentsProps) {
   const [pendingDelete, setPendingDelete] = useState<TaskAttachment | null>(null);
   const [uploading, setUploading] = useState(0);
   const [dragging, setDragging] = useState(false);
@@ -99,7 +103,7 @@ export function TaskAttachments({ attachments, loading, onOpen, onDelete, onUplo
       ) : attachments.length > 0 ? (
         <div className="flex flex-wrap gap-2">
           {attachments.map((a) => (
-            <AttachmentThumb key={a.id} attachment={a} onOpen={() => onOpen(a)} onDelete={() => setPendingDelete(a)} />
+            <AttachmentThumb key={a.id} attachment={a} onOpen={() => onOpen(a)} onDelete={canDelete(a) ? () => setPendingDelete(a) : null} />
           ))}
         </div>
       ) : (
@@ -116,14 +120,13 @@ export function TaskAttachments({ attachments, loading, onOpen, onDelete, onUplo
           Attach file
         </Button>
         <p className="mt-1.5 text-micro text-muted-foreground">
-          Images, PDF, Word, Excel, PowerPoint, TXT or CSV — up to {MAX_ATTACHMENT_LABEL} each.
+          Any file, up to {MAX_ATTACHMENT_LABEL} each. Images, PDFs and text files open here; other files download.
         </p>
         <input
           ref={picker}
           type="file"
           multiple
           hidden
-          accept={ATTACHMENT_ACCEPT}
           aria-label="Choose files to attach"
           onChange={(e) => {
             void send([...(e.target.files ?? [])]);

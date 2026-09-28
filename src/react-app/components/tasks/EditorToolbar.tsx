@@ -4,7 +4,6 @@ import { AtSign, Paperclip, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { insertUploadedFile, type InlineUpload } from "./editorUpload";
 import { markHandleSlash } from "./useEditorSlashCommands";
-import { ATTACHMENT_ACCEPT } from "@shared/attachments";
 
 interface EditorToolbarProps {
   editor: Editor;
@@ -58,7 +57,6 @@ export function EditorToolbar({ editor, onUploadFile, onDeleteImage }: EditorToo
           <input
             ref={fileRef}
             type="file"
-            accept={ATTACHMENT_ACCEPT}
             hidden
             onChange={(e) => {
               const file = e.target.files?.[0];

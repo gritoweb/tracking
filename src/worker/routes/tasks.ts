@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { canDeleteComment, canDeleteTask, currentMemberIds, entryScopeUserId, getMemberRole } from "../lib/permissions";
+import { canDeleteAttachment, canDeleteComment, canDeleteTask, currentMemberIds, entryScopeUserId, getMemberRole } from "../lib/permissions";
 import { zValidator } from "@hono/zod-validator";
 import {
   CreateTaskCommentSchema,
@@ -31,8 +31,9 @@ import {
 } from "../lib/task-statuses";
 import { nearestColumn } from "@shared/task-columns";
 import { ImageDecodeError, processImage, sniffImage } from "../lib/image";
-import { DocumentRejectedError, inspectDocument, safeFilename } from "../lib/document";
-import { ACCEPTED_FORMATS_LABEL, MAX_ATTACHMENT_BYTES, MAX_ATTACHMENT_LABEL } from "@shared/attachments";
+import { classifyDocument, safeFilename } from "../lib/document";
+import { attachmentIdsInDoc, attachmentsRemoved } from "@shared/rich-doc";
+import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENT_LABEL } from "@shared/attachments";
 import { formatAttachment } from "./attachments";
 import { actorDisplayName, notifyAssigneesOfStatusChange, notifyMentions, notifyNewAssignees } from "../lib/notifications";
 import type { CreateTask, Task, TaskComment, TaskStatus } from "@shared/schemas";
@@ -274,6 +275,37 @@ async function resolveParent(
 }
 
 /** A task plus its direct subtasks, resolved to a real id list — SQLite's `IN (a, (SELECT …))` is scalar and only matches the subquery's first row. */
+/**
+ * Deletes the task files an edit took out of the text, once no description or comment of the task shows them any
+ * more — and only when the editor could delete that file anyway. A file attached from the Attachments section was
+ * never in a text, so it is never a candidate.
+ */
+async function pruneRemovedAttachments(
+  c: { env: Env; executionCtx: { waitUntil(promise: Promise<unknown>): void } },
+  workspaceId: string,
+  taskId: string,
+  actorId: string,
+  removed: string[]
+): Promise<void> {
+  if (!removed.length) return;
+  const { results } = await c.env.DB.prepare(
+    `SELECT description AS text FROM tasks WHERE id = ? AND workspace_id = ?
+     UNION ALL SELECT body FROM task_comments WHERE task_id = ? AND workspace_id = ?`
+  ).bind(taskId, workspaceId, taskId, workspaceId).all<{ text: string | null }>();
+  const stillShown = new Set(results.flatMap((r) => [...attachmentIdsInDoc(r.text)]));
+  const role = await getMemberRole(c.env.DB, workspaceId, actorId);
+
+  for (const id of removed.filter((id) => !stillShown.has(id))) {
+    const row = await c.env.DB.prepare(
+      `SELECT r2_key, user_id FROM task_attachments WHERE id = ? AND task_id = ? AND workspace_id = ?
+         AND NOT EXISTS (SELECT 1 FROM task_comments WHERE attachment_id = task_attachments.id)`
+    ).bind(id, taskId, workspaceId).first<{ r2_key: string; user_id: string | null }>();
+    if (!row || !canDeleteAttachment(role, row.user_id, actorId)) continue;
+    await c.env.DB.prepare(`DELETE FROM task_attachments WHERE id = ?`).bind(id).run();
+    c.executionCtx.waitUntil(c.env.ATTACHMENTS.delete(row.r2_key));
+  }
+}
+
 export async function taskAndSubtaskIds(db: D1Database, workspaceId: string, taskId: string): Promise<string[]> {
   const { results } = await db
     .prepare(`SELECT id FROM tasks WHERE workspace_id = ? AND (id = ? OR parent_id = ?)`)
@@ -503,6 +535,10 @@ export const tasksRouter = new Hono<{
       await c.env.DB.prepare(
         `UPDATE tasks SET ${fields.join(", ")} WHERE id = ? AND workspace_id = ?`
       ).bind(...values, id, workspaceId).run();
+    }
+
+    if (data.description !== undefined) {
+      await pruneRemovedAttachments(c, workspaceId, id, userId, attachmentsRemoved(existing.description, data.description));
     }
 
     // Someone newly tagged in the description hears about it; whoever was already tagged, or the author, does not.
@@ -869,12 +905,11 @@ export const tasksRouter = new Hono<{
       if (imageKind) {
         processed = { ...processImage(bytes, imageKind), filename: file.name || "image" };
       } else {
-        const format = inspectDocument(bytes, file.name);
-        if (!format) return c.json({ error: `Only ${ACCEPTED_FORMATS_LABEL} files are accepted` }, 400);
+        const format = classifyDocument(bytes, file.name);
         processed = { bytes, contentType: format.contentType, width: null, height: null, filename: safeFilename(file.name, format) };
       }
     } catch (e) {
-      if (e instanceof ImageDecodeError || e instanceof DocumentRejectedError) return c.json({ error: e.message }, 400);
+      if (e instanceof ImageDecodeError) return c.json({ error: e.message }, 400);
       throw e;
     }
     const now = new Date();
@@ -991,8 +1026,8 @@ export const tasksRouter = new Hono<{
     const commentId = c.req.param("commentId");
     // task_id now bound too, not just workspace_id — SECURITY.md S-08.
     const existing = await c.env.DB.prepare(
-      `SELECT user_id FROM task_comments WHERE id = ? AND task_id = ? AND workspace_id = ?`
-    ).bind(commentId, taskId, workspaceId).first<{ user_id: string }>();
+      `SELECT user_id, body FROM task_comments WHERE id = ? AND task_id = ? AND workspace_id = ?`
+    ).bind(commentId, taskId, workspaceId).first<{ user_id: string; body: string }>();
     if (!existing) return c.json({ error: "Not found" }, 404);
     if (existing.user_id !== userId) return c.json({ error: "Only the author can edit this comment" }, 403);
 
@@ -1006,6 +1041,7 @@ export const tasksRouter = new Hono<{
     await c.env.DB.prepare(
       `UPDATE task_comments SET body = ?, mentioned_user_ids = ?, attachment_id = ?, edited_at = datetime('now') WHERE id = ?`
     ).bind(body, mentions.join(","), attachment?.id ?? null, commentId).run();
+    await pruneRemovedAttachments(c, workspaceId, taskId, userId, attachmentsRemoved(existing.body, body));
 
     const row = await c.env.DB.prepare(
       `SELECT tc.*, u.name AS user_name, u.email AS user_email, u.image AS user_image,
@@ -1028,8 +1064,8 @@ export const tasksRouter = new Hono<{
     const commentId = c.req.param("commentId");
     // See the matching comment on PATCH above (SECURITY.md S-08).
     const existing = await c.env.DB.prepare(
-      `SELECT user_id FROM task_comments WHERE id = ? AND task_id = ? AND workspace_id = ?`
-    ).bind(commentId, taskId, workspaceId).first<{ user_id: string }>();
+      `SELECT user_id, body FROM task_comments WHERE id = ? AND task_id = ? AND workspace_id = ?`
+    ).bind(commentId, taskId, workspaceId).first<{ user_id: string; body: string }>();
     if (!existing) return c.json({ error: "Not found" }, 404);
     const role = await getMemberRole(c.env.DB, workspaceId, userId);
     if (!canDeleteComment(role, existing.user_id, userId)) {
@@ -1037,6 +1073,7 @@ export const tasksRouter = new Hono<{
     }
 
     await c.env.DB.prepare(`DELETE FROM task_comments WHERE id = ?`).bind(commentId).run();
+    await pruneRemovedAttachments(c, workspaceId, taskId, userId, attachmentsRemoved(existing.body, null));
     c.executionCtx.waitUntil(
       broadcast(c.env, workspaceId, "task-comments:changed", { taskId }, requestOrigin(c))
     );

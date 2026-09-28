@@ -1,7 +1,7 @@
 // Tasks: the plan side — list, edit, statuses, comments and image attachments.
 import { z } from "zod";
 import { docJsonToMarkdown, markdownToDocJson } from "@shared/markdown-doc";
-import { ACCEPTED_FORMATS_LABEL, MAX_ATTACHMENT_BYTES, MAX_ATTACHMENT_LABEL } from "@shared/attachments";
+import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENT_LABEL } from "@shared/attachments";
 import type { CreateTask, Task, TaskActivity, TaskAttachment, TaskComment, TaskStatus, UpdateTask } from "@shared/schemas";
 import {
   ArchiveTaskStatusSchema, CreateTaskCommentSchema, CreateTaskSchema, CreateTaskStatusSchema,
@@ -425,7 +425,7 @@ export function registerTaskWrites(d: ToolDeps): void {
     "upload_task_attachment",
     {
       title: "Attach a file to a task",
-      description: `Upload ${ACCEPTED_FORMATS_LABEL} (up to ${MAX_ATTACHMENT_LABEL}) to a task, base64-encoded. The same checks as the app apply: the type is read from the bytes, images are decoded and resized when huge, and PDFs or Office files with scripts, macros or embedded programs are refused.`,
+      description: `Upload any file (up to ${MAX_ATTACHMENT_LABEL}) to a task, base64-encoded. As in the app, the type is read from the bytes: images are decoded and resized when huge, PDFs and text files open in the app's viewer, and anything else is stored as a download that the app never runs or renders.`,
       inputSchema: {
         taskId: IdArg("task"),
         filename: z.string().min(1).max(255),

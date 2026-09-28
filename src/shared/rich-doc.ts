@@ -47,3 +47,28 @@ export function docToText(doc: RichNode, mention: (id: string, label: string) =>
   visit(doc, 0);
   return out.join("").replace(/\n{3,}/g, "\n\n").trim();
 }
+
+const ATTACHMENT_URL = /^\/api\/attachments\/([\w-]+)$/;
+
+/** Ids of the task files a stored description or comment shows (images and file cards). */
+export function attachmentIdsInDoc(raw: string | null | undefined): Set<string> {
+  const ids = new Set<string>();
+  const doc = parseDoc(raw);
+  if (!doc) return ids;
+  const stack: { node: RichNode; depth: number }[] = [{ node: doc, depth: 0 }];
+  while (stack.length) {
+    const { node, depth } = stack.pop()!;
+    if (!node || typeof node !== "object" || depth > MAX_DEPTH) continue;
+    const url = node.type === "image" ? node.attrs?.src : node.type === FILE_ATTACHMENT_NODE ? node.attrs?.href : null;
+    const id = typeof url === "string" ? url.match(ATTACHMENT_URL)?.[1] : undefined;
+    if (id) ids.add(id);
+    node.content?.forEach((child) => stack.push({ node: child, depth: depth + 1 }));
+  }
+  return ids;
+}
+
+/** Files a text showed before an edit and no longer does. */
+export function attachmentsRemoved(before: string | null | undefined, after: string | null | undefined): string[] {
+  const now = attachmentIdsInDoc(after);
+  return [...attachmentIdsInDoc(before)].filter((id) => !now.has(id));
+}
