@@ -12,6 +12,8 @@ export const dialogContentVariants = cva(
         full: "sm:max-w-4xl max-h-(--size-cap-85vh) overflow-y-auto",
         // The task detail modal: the viewport less a 24px margin, capped at the reference width; two columns that each scroll themselves.
         task: "h-[calc(100dvh-3rem)] max-w-[min(calc(100%-3rem),var(--size-task-modal))] gap-0 overflow-hidden p-0",
+        // The attachment viewer: almost the whole viewport, a toolbar over a stage that owns its own scroll and zoom.
+        viewer: "flex h-[calc(100dvh-2rem)] max-w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden p-0",
       },
     },
     defaultVariants: {

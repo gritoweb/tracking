@@ -36,6 +36,9 @@ function withEntryUrl(entry: TimeEntry, base: string) {
   return { ...entry, url: entryUrl(base, entry.start, entry.id) };
 }
 
+/** On every total a member reads: their own hours are all they can see, so an answer must not pass for the team's. */
+const MEMBER_SCOPE_NOTE = "Your own hours only — members see only the time they tracked; owners/admins see everyone's.";
+
 export function registerEntryReads(d: ToolDeps): void {
   const { server, ctx, env, db, workspaceId, userId, scopeUserId, bridge } = d;
 
@@ -58,6 +61,7 @@ export function registerEntryReads(d: ToolDeps): void {
     },
     async ({ since, until, groupBy, timezoneOffsetMinutes }) => {
       const { sinceIso, untilIso } = rangeToIso(since, until, timezoneOffsetMinutes);
+      const ownOnly = (await scopeUserId()) !== null;
       const { where, bindings } = buildReportWhere({
         workspaceId,
         since: sinceIso,
@@ -120,6 +124,7 @@ export function registerEntryReads(d: ToolDeps): void {
       const row = totals.results[0];
       return json({
         range: { since, until },
+        ...(ownOnly ? { scope: MEMBER_SCOPE_NOTE } : {}),
         groupBy,
         totalHours: hours(row?.total ?? 0),
         billableHours: hours(row?.billable ?? 0),
@@ -295,12 +300,15 @@ export function registerEntryReads(d: ToolDeps): void {
     },
     async ({ kind, since, until, timezoneOffsetMinutes, ...filters }) => {
       const { sinceIso, untilIso } = rangeToIso(since, until, timezoneOffsetMinutes);
+      const ownOnly = (await scopeUserId()) !== null;
       const query = new URLSearchParams({ since: sinceIso, until: untilIso });
       for (const [key, value] of Object.entries(filters)) {
         if (value === undefined) continue;
         query.set(key, Array.isArray(value) ? value.join(",") : String(value));
       }
-      return fromBridge(await bridge("GET", `/api/reports/${kind}?${query}`));
+      const report = await bridge("GET", `/api/reports/${kind}?${query}`);
+      // A member's report is their own hours whatever `userIds` asked for; the result says so instead of looking complete.
+      return fromBridge(report, (data) => (ownOnly ? { scope: MEMBER_SCOPE_NOTE, report: data } : data));
     }
   );
 }

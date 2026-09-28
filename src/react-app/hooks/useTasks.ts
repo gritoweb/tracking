@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api } from "@/lib/api-client";
+import { announceAttachmentDeleted } from "@/lib/attachmentEvents";
 import { toastApiError } from "@/lib/toastApiError";
 import { useUIStore } from "@/stores/uiStore";
 import { formatDueDate } from "@/lib/taskUtils";
@@ -94,10 +95,12 @@ export function useUpdateTask() {
       }
       toastApiError(err, "Failed to update task");
     },
-    onSettled: () => {
+    onSettled: (_data, _error, { id, data }) => {
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
       // A change to the task is a new line in its comments feed.
       queryClient.invalidateQueries({ queryKey: ["task-activity"] });
+      // A file taken out of the description leaves the task's Attachments too.
+      if (data.description !== undefined) queryClient.invalidateQueries({ queryKey: ["task-attachments", id] });
     },
   });
 }
@@ -216,7 +219,7 @@ export function useUploadTaskAttachment() {
     onSuccess: (_result, { taskId }) => {
       queryClient.invalidateQueries({ queryKey: ["task-attachments", taskId] });
     },
-    onError: (error) => toastApiError(error, "Failed to upload image"),
+    onError: (error) => toastApiError(error, "Failed to upload file"),
   });
 }
 
@@ -224,8 +227,12 @@ export function useDeleteTaskAttachment() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id }: { taskId: string; id: string }) => api.tasks.attachments.delete(id),
-    onSuccess: (_result, { taskId }) => {
+    onSuccess: (_result, { taskId, id }) => {
       queryClient.invalidateQueries({ queryKey: ["task-attachments", taskId] });
+      // The server also took the file out of the description and comments that showed it; open editors drop it too.
+      announceAttachmentDeleted(id);
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["task-comments", taskId] });
     },
     onError: (error) => toastApiError(error, "Failed to delete attachment"),
   });

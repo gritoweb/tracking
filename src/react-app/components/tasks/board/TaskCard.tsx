@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { MessageCircle, Pencil, Play, Repeat, Square, Trash2 } from "lucide-react";
+import { MessageCircle, MoreHorizontal, Pencil, Play, Repeat, Square, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
@@ -28,6 +29,7 @@ import { useTimer } from "@/hooks/useTimer";
 import { TASK_TIMER_ENABLED } from "@/lib/features";
 import { useTimerStore } from "@/stores/timerStore";
 import { useUpdateTask } from "@/hooks/useTasks";
+import { useCanDeleteTask } from "@/hooks/useTaskPermissions";
 import { useWorkspaceMembers } from "@/hooks/useWorkspaceRole";
 import { formatDurationShort } from "@/lib/dateUtils";
 import {
@@ -54,7 +56,7 @@ const DUE_TONE_CLASS: Record<string, string> = {
 interface TaskCardProps {
   task: Task;
   onOpen: (task: Task) => void;
-  /** Right-click → Delete; opens the same confirm dialog as the list's "…" menu. */
+  /** Right-click or the card's "…" → Delete; opens the same confirm dialog as the list's "…" menu. */
   onRequestDelete?: (task: Task) => void;
   /** Rendered inside the DragOverlay — no sortable wiring, no transform. */
   overlay?: boolean;
@@ -68,6 +70,15 @@ export function TaskCard({ task, onOpen, onRequestDelete, overlay = false }: Tas
   const updateTask = useUpdateTask();
   const { data: members = [], isPending: membersLoading } = useWorkspaceMembers(!overlay);
   const [dueOpen, setDueOpen] = useState(false);
+  const canDelete = useCanDeleteTask()(task);
+  const menu = !overlay && onRequestDelete;
+  // One list for both menus (right-click and the "…" on hover), so they can't drift apart.
+  const actions = [
+    { key: "edit", label: "Edit task…", icon: Pencil, destructive: false, onSelect: () => onOpen(task) },
+    ...(canDelete && onRequestDelete
+      ? [{ key: "delete", label: "Delete", icon: Trash2, destructive: true, onSelect: () => onRequestDelete(task) }]
+      : []),
+  ];
 
   const saveAssignees = (assigneeIds: string[]) => {
     const optimisticAssignees = members
@@ -194,6 +205,30 @@ export function TaskCard({ task, onOpen, onRequestDelete, overlay = false }: Tas
             <Play className="h-3.5 w-3.5" />
           </Button>
         ))}
+
+        {menu && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                aria-label={`More actions for ${task.name}`}
+                title="More actions"
+                className="tt-reveal shrink-0 text-muted-foreground"
+              >
+                <MoreHorizontal className="h-3.5 w-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {actions.map(({ key, label, icon: Icon, destructive, onSelect }) => (
+                <DropdownMenuItem key={key} variant={destructive ? "destructive" : "default"} onSelect={onSelect}>
+                  <Icon />
+                  {label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
 
       {task.description && (
@@ -297,20 +332,18 @@ export function TaskCard({ task, onOpen, onRequestDelete, overlay = false }: Tas
     </div>
   );
 
-  if (overlay || !onRequestDelete) return card;
+  if (!menu) return card;
 
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>{card}</ContextMenuTrigger>
       <ContextMenuContent>
-        <ContextMenuItem onSelect={() => onOpen(task)}>
-          <Pencil />
-          Edit task…
-        </ContextMenuItem>
-        <ContextMenuItem variant="destructive" onSelect={() => onRequestDelete(task)}>
-          <Trash2 />
-          Delete
-        </ContextMenuItem>
+        {actions.map(({ key, label, icon: Icon, destructive, onSelect }) => (
+          <ContextMenuItem key={key} variant={destructive ? "destructive" : "default"} onSelect={onSelect}>
+            <Icon />
+            {label}
+          </ContextMenuItem>
+        ))}
       </ContextMenuContent>
     </ContextMenu>
   );

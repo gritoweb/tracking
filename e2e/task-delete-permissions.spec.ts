@@ -153,3 +153,52 @@ test.describe("task and attachment delete permissions", () => {
     }
   });
 });
+
+test.describe("deleting a task from the board", () => {
+  test("the card's … on hover deletes it after a named confirmation, keeps its hours, and shows Delete only to who may", async ({
+    browser,
+  }) => {
+    const { owner, author, outsider } = await workspaceWithTwoMembers(browser);
+    const project = await createProject(author, { name: "Board Delete Project" });
+    const task = (await (await author.request.post("/api/tasks", { data: { name: "Board card to delete", projectId: project.id } })).json()) as { id: string };
+    const entry = await author.request.post("/api/time_entries", {
+      data: {
+        description: "Worked on it",
+        projectId: project.id,
+        taskId: task.id,
+        start: "2026-09-01T12:00:00.000Z",
+        stop: "2026-09-01T13:00:00.000Z",
+      },
+    });
+    expect(entry.ok(), await entry.text()).toBeTruthy();
+    const entryId = ((await entry.json()) as { id: string }).id;
+
+    // Someone who didn't create it and isn't a manager: the … has Edit, not Delete.
+    await outsider.goto("/tasks");
+    const outsiderCard = outsider.getByRole("group", { name: "Move Board card to delete" });
+    await outsiderCard.hover();
+    await outsider.getByRole("button", { name: "More actions for Board card to delete" }).click();
+    await expect(outsider.getByRole("menuitem", { name: "Edit task…" })).toBeVisible();
+    await expect(outsider.getByRole("menuitem", { name: "Delete" })).toHaveCount(0);
+
+    // Its author: … → Delete → a confirmation naming the task → gone from the board without a reload.
+    await author.goto("/tasks");
+    const card = author.getByRole("group", { name: "Move Board card to delete" });
+    await card.hover();
+    await author.getByRole("button", { name: "More actions for Board card to delete" }).click();
+    await author.getByRole("menuitem", { name: "Delete" }).click();
+    const confirm = author.getByRole("alertdialog");
+    await expect(confirm).toContainText("Board card to delete");
+    await confirm.getByRole("button", { name: "Delete" }).click();
+    await expect(card).toHaveCount(0);
+
+    // The hours stay, just no longer tied to the task.
+    const kept = await author.request.get(`/api/time_entries/${entryId}`);
+    expect(kept.ok(), await kept.text()).toBeTruthy();
+    expect(((await kept.json()) as { taskId: string | null }).taskId).toBeNull();
+
+    await owner.context().close();
+    await author.context().close();
+    await outsider.context().close();
+  });
+});

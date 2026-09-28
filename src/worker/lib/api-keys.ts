@@ -21,11 +21,15 @@ export interface ApiKeyRecord {
   createdAt: string;
 }
 
+import type { WorkspaceRole } from "./permissions";
+
 export interface ResolvedApiKey {
   id: string;
   workspaceId: string;
   userId: string;
   scope: ApiKeyScope;
+  /** The key owner's role in the workspace, read with the membership check itself. */
+  role: WorkspaceRole;
 }
 
 function toBase64Url(bytes: Uint8Array): string {
@@ -139,13 +143,13 @@ export async function resolveApiKey(
 
   const row = await db
     .prepare(
-      `SELECT k.id, k.workspace_id, k.user_id, k.scope
+      `SELECT k.id, k.workspace_id, k.user_id, k.scope, m.role
        FROM api_keys k
        JOIN "member" m ON m.userId = k.user_id AND m.organizationId = k.workspace_id
        WHERE k.key_hash = ?`
     )
     .bind(await hashKey(token))
-    .first<{ id: string; workspace_id: string; user_id: string; scope: ApiKeyScope }>();
+    .first<{ id: string; workspace_id: string; user_id: string; scope: ApiKeyScope; role: WorkspaceRole }>();
   if (!row) return null;
 
   return {
@@ -153,6 +157,7 @@ export async function resolveApiKey(
     workspaceId: row.workspace_id,
     userId: row.user_id,
     scope: row.scope,
+    role: row.role,
   };
 }
 

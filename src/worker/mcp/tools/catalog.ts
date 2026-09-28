@@ -150,7 +150,7 @@ export function registerCatalogReads(d: ToolDeps): void {
 }
 
 export function registerCatalogWrites(d: ToolDeps): void {
-  const { server, db, workspaceId, scopeUserId, bridge } = d;
+  const { server, db, workspaceId, canManage, bridge } = d;
 
   server.registerTool(
     "create_client",
@@ -182,24 +182,47 @@ export function registerCatalogWrites(d: ToolDeps): void {
       if (!(await isActiveClient(db, workspaceId, data.clientId))) {
         return refuse(`No active client with id ${data.clientId} in this workspace. Call list_clients and ask the person which client this project belongs to.`);
       }
-      const manager = (await scopeUserId()) === null;
-      const project = await createProject(db, workspaceId, manager ? data : memberProjectInput(data));
-      return json(compact(project));
+      const project = await createProject(db, workspaceId, canManage ? data : memberProjectInput(data));
+      const dropped = canManage ? [] : Object.keys(data).filter((key) => !(key in memberProjectInput(data)));
+      // A member's rate and budget fields are not saved; say so rather than let it look like they were.
+      return json(
+        compact(
+          dropped.length
+            ? { ...project, note: `Not saved: ${dropped.join(", ")} — only workspace owners/admins set a project's rate and budget.` }
+            : project
+        )
+      );
     }
   );
 
-  server.registerTool(
-    "update_project",
-    {
-      title: "Edit a project",
-      description:
-        "Change a project's name, colour, client, rate, billable classification, dates or hour budget — only the fields passed change. Workspace owners/admins only (a member may only fill in a missing client). `active: true` brings back an archived project.",
-      inputSchema: { projectId: IdArg("project"), ...UpdateProjectSchema.shape },
-      annotations: { ...MUTATES, idempotentHint: true },
-    },
-    async ({ projectId, ...patch }) =>
-      fromBridge(await bridge("PUT", `/api/projects/${segment(projectId)}`, patch))
-  );
+  if (canManage) {
+    server.registerTool(
+      "update_project",
+      {
+        title: "Edit a project",
+        description:
+          "Change a project's name, colour, client, rate, billable classification, dates or hour budget — only the fields passed change. `active: true` brings back an archived project.",
+        inputSchema: { projectId: IdArg("project"), ...UpdateProjectSchema.shape },
+        annotations: { ...MUTATES, idempotentHint: true },
+      },
+      async ({ projectId, ...patch }) =>
+        fromBridge(await bridge("PUT", `/api/projects/${segment(projectId)}`, patch))
+    );
+  } else {
+    // The one project edit a member may make: a project with no client can't take time until it has one.
+    server.registerTool(
+      "update_project",
+      {
+        title: "Link a client to a project",
+        description:
+          "Give a client to a project that has none (`needsClient: true` in list_projects), so time can be logged to it. Changing anything else about a project, or a client it already has, is for workspace owners/admins.",
+        inputSchema: { projectId: IdArg("project"), clientId: IdArg("client") },
+        annotations: { ...MUTATES, idempotentHint: true },
+      },
+      async ({ projectId, clientId }) =>
+        fromBridge(await bridge("PUT", `/api/projects/${segment(projectId)}`, { clientId }))
+    );
+  }
 
   server.registerTool(
     "archive_project",

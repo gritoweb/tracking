@@ -1,18 +1,16 @@
-export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
-export const ACCEPTED_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
+import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENT_LABEL } from "@shared/attachments";
 
-/** Why a file can't be attached, in words for a toast, or null when it can. One rule for every way an image gets in. */
+export const IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
+
+/** Why an image can't go into a description or comment, in words for a toast, or null when it can. */
 export function imageProblem(file: File): string | null {
-  if (!ACCEPTED_TYPES.includes(file.type)) return "Only PNG, JPEG, WebP and GIF images are accepted";
-  if (file.size > MAX_ATTACHMENT_BYTES) return "Image is larger than 10 MB";
+  if (!IMAGE_TYPES.includes(file.type)) return "Only PNG, JPEG, WebP and GIF images can go into the text";
+  if (file.size > MAX_ATTACHMENT_BYTES) return `Image is larger than ${MAX_ATTACHMENT_LABEL}`;
   return null;
 }
 
-export function imageFile(items: DataTransferItemList | FileList | null | undefined): File | null {
-  if (!items) return null;
-  for (const item of items) {
-    const file = "getAsFile" in item ? item.getAsFile() : (item as File);
-    if (file?.type.startsWith("image/")) return file;
-  }
+/** Why a file can't be attached to a task, or null: any file is accepted, only its size is limited. */
+export function attachmentProblem(file: File): string | null {
+  if (file.size > MAX_ATTACHMENT_BYTES) return `File is larger than ${MAX_ATTACHMENT_LABEL}`;
   return null;
 }

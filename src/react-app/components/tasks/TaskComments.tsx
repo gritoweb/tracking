@@ -56,7 +56,7 @@ export function TaskComments({ taskId, members, docked = false }: TaskCommentsPr
   const createComment = useCreateTaskComment(taskId);
   const updateComment = useUpdateTaskComment(taskId);
   const deleteComment = useDeleteTaskComment(taskId);
-  const { uploadImage, deleteOrphanedImage } = useTaskImageUpload(taskId);
+  const { uploadInline, deleteOrphanedImage } = useTaskImageUpload(taskId);
   // A new key mounts a fresh composer: cleared after a send, or holding the text again if the send failed.
   const [composer, setComposer] = useState<{ key: number; initial: JSONContent }>({ key: 0, initial: EMPTY_DOC });
   // Deleting a comment has no undo toast, so it goes through ConfirmDialog first.
@@ -128,7 +128,7 @@ export function TaskComments({ taskId, members, docked = false }: TaskCommentsPr
             key={composer.key}
             initial={composer.initial}
             members={members}
-            onUploadImage={uploadImage}
+            onUploadFile={uploadInline}
             onDeleteImage={deleteOrphanedImage}
             onSubmit={submit}
             submitLabel="Comment"

@@ -1,7 +1,7 @@
 import { z, type ZodRawShape } from "zod";
-import { docToText, parseDoc } from "@shared/rich-doc";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ApiKeyScope } from "../lib/api-keys";
+import type { WorkspaceRole } from "../lib/permissions";
 import type { BridgeResult, RestBridge } from "./rest-bridge";
 
 /** Cap on rows any single tool returns, so one call can't blow the context window. */
@@ -32,6 +32,8 @@ export interface McpContext {
   workspaceId: string;
   userId: string;
   scope: ApiKeyScope;
+  /** Decides which tools exist: a member is not shown the ones only owners/admins may use. */
+  role: WorkspaceRole;
   executionCtx: ExecutionContext;
 }
 
@@ -48,6 +50,8 @@ export interface ToolDeps {
   userId: string;
   /** Null for owner/admin (whole workspace), the caller's id for a member (D3). */
   scopeUserId: () => Promise<string | null>;
+  /** Owner/admin: may edit projects, clients, statuses and budgets (lib/permissions `canManageWorkspace`). */
+  canManage: boolean;
   bridge: RestBridge;
 }
 
@@ -87,7 +91,7 @@ export function fromBridge<T>(result: BridgeResult<T>, shape?: (data: T) => unkn
 /** One description per field name, applied to every tool's input that doesn't carry its own. */
 const FIELD_DOCS: Record<string, string> = {
   name: "Display name",
-  description: "Free text: an entry's work description, a task's notes (plain text), a template's description",
+  description: "Free text: a time entry's work description or a template's description (plain text: it can reach a client's invoice); a task's notes take Markdown (see tracking_guide)",
   notes: "Free-text notes about the client",
   email: "Contact email",
   phone: "Contact phone",
@@ -205,10 +209,3 @@ export function hours(seconds: number): number {
   return Math.round((seconds / 3600) * 100) / 100;
 }
 
-/** A task description is a tiptap JSON doc (or legacy plain text); models read it as plain text. */
-export function richTextToPlain(raw: string | null | undefined): string | null {
-  if (!raw) return null;
-  const doc = parseDoc(raw);
-  if (!doc) return raw;
-  return docToText(doc, (_id, label) => `@${label}`) || null;
-}

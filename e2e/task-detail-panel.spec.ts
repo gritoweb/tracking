@@ -14,7 +14,6 @@ const TINY_PNG = Buffer.from(
   "base64"
 );
 
-const REJECTED_MESSAGE = "Only PNG, JPEG, WebP and GIF images are accepted";
 
 test("visiting /tasks/:id opens that task's detail panel directly (D5)", async ({ page }) => {
   await signUp(page);
@@ -163,7 +162,7 @@ test("attaching, viewing and deleting an image on a task (D7)", async ({ page })
   await expect(thumbnail).toHaveCount(0);
 });
 
-test("a non-image file is rejected before it reaches R2 (D7)", async ({ page }) => {
+test("a program is accepted but only ever downloaded, never served as something to run (D7)", async ({ page }) => {
   await signUp(page);
   const project = await createProject(page, { name: "ERP Migration", color: "#e11d48" });
   const created = await page.request.post("/api/tasks", {
@@ -172,10 +171,14 @@ test("a non-image file is rejected before it reaches R2 (D7)", async ({ page }) 
   const task = await created.json();
 
   const res = await page.request.post(`/api/tasks/${task.id}/attachments`, {
-    multipart: { file: { name: "notes.txt", mimeType: "text/plain", buffer: Buffer.from("not an image") } },
+    multipart: { file: { name: "setup.exe", mimeType: "application/x-msdownload", buffer: Buffer.from([0x4d, 0x5a, 0x90, 0x00]) } },
   });
-  expect(res.status()).toBe(400);
-  expect((await res.json()).error).toBe(REJECTED_MESSAGE);
+  expect(res.status()).toBe(201);
+  const attachment = await res.json();
+  const download = await page.request.get(attachment.url);
+  expect(download.headers()["content-type"]).toBe("application/octet-stream");
+  expect(download.headers()["content-disposition"]).toMatch(/^attachment; filename="setup.exe"/);
+  expect(download.headers()["x-content-type-options"]).toBe("nosniff");
 });
 
 test("pasting an image into the description uploads it and shows it in the gallery (D7)", async ({ page }) => {
@@ -187,6 +190,8 @@ test("pasting an image into the description uploads it and shows it in the galle
   const task = await created.json();
 
   await page.goto(`/tasks/${task.id}`);
+  // Locally the description may be co-edited: its editor is rebuilt once the shared doc loads, so let that settle first.
+  await page.waitForLoadState("networkidle");
   const panel = page.getByRole("dialog", { name: "Cutover plan" });
   await panel.getByRole("textbox", { name: "Description" }).click();
 

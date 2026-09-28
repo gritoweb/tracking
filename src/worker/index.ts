@@ -228,6 +228,7 @@ async function handleMcpRequest(
     workspaceId: resolved.workspaceId,
     userId: resolved.userId,
     scope: resolved.scope,
+    role: resolved.role,
     executionCtx: ctx,
   });
   const response = await createMcpHandler(server, { route: "/mcp" })(request, env, ctx);

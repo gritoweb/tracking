@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { commentDoc, commentText, legacyCommentToDoc } from "./comment-body";
+import { commentDoc, commentIsEmpty, commentText, legacyCommentToDoc } from "./comment-body";
 import { mentionedIds } from "./mentions";
 import { docToText, parseDoc } from "./rich-doc";
 
@@ -55,5 +55,20 @@ describe("docToText", () => {
     for (let i = 0; i < 1000; i++) node = { type: "blockquote", content: [node] };
     const parsed = parseDoc(doc(node));
     expect(() => docToText(parsed!, () => "")).not.toThrow();
+  });
+});
+
+describe("a file card in a comment", () => {
+  const withFile = JSON.stringify({
+    type: "doc",
+    content: [{ type: "fileAttachment", attrs: { href: "/api/attachments/a1", filename: "brief.pdf" } }],
+  });
+
+  it("is content on its own, so a comment that is only a file can be posted", () => {
+    expect(commentIsEmpty(withFile)).toBe(false);
+  });
+
+  it("reads as its file name in notifications and MCP", () => {
+    expect(commentText(withFile)).toBe("[brief.pdf]");
   });
 });

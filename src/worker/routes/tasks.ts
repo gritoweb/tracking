@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { canDeleteComment, canDeleteTask, currentMemberIds, entryScopeUserId, getMemberRole } from "../lib/permissions";
+import { canDeleteAttachment, canDeleteComment, canDeleteTask, currentMemberIds, entryScopeUserId, getMemberRole } from "../lib/permissions";
 import { zValidator } from "@hono/zod-validator";
 import {
   CreateTaskCommentSchema,
@@ -31,16 +31,19 @@ import {
 } from "../lib/task-statuses";
 import { nearestColumn } from "@shared/task-columns";
 import { ImageDecodeError, processImage, sniffImage } from "../lib/image";
+import { classifyDocument, safeFilename } from "../lib/document";
+import { attachmentIdsInDoc, attachmentsRemoved } from "@shared/rich-doc";
+import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENT_LABEL } from "@shared/attachments";
 import { formatAttachment } from "./attachments";
 import { actorDisplayName, notifyAssigneesOfStatusChange, notifyMentions, notifyNewAssignees } from "../lib/notifications";
 import type { CreateTask, Task, TaskComment, TaskStatus } from "@shared/schemas";
 
-const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 // Multipart framing (boundary + part headers) rides on top of the file itself.
 const MULTIPART_SLACK_BYTES = 64 * 1024;
-// Generous for screenshots on one task; bounds R2 growth per task to a known ceiling.
+// Generous for screenshots and documents on one task; bounds R2 growth per task to a known ceiling.
 const MAX_ATTACHMENTS_PER_TASK = 50;
-const TOO_MANY_ATTACHMENTS = `A task can hold at most ${MAX_ATTACHMENTS_PER_TASK} images`;
+const TOO_MANY_ATTACHMENTS = `A task can hold at most ${MAX_ATTACHMENTS_PER_TASK} files`;
+const TOO_LARGE = `File is larger than ${MAX_ATTACHMENT_LABEL}`;
 
 const taskAssigneeArray = z.array(TaskAssigneeSchema);
 
@@ -48,6 +51,7 @@ function formatTask(row: TaskJoinRow): Task {
   return {
     id: row.id,
     workspaceId: row.workspace_id,
+    createdBy: row.created_by ?? null,
     projectId: row.project_id,
     projectName: row.project_name ?? null,
     projectColor: row.project_color ?? null,
@@ -271,7 +275,6 @@ async function resolveParent(
   return { id: row.id, projectId: row.project_id };
 }
 
-/** A task plus its direct subtasks, resolved to a real id list — SQLite's `IN (a, (SELECT …))` is scalar and only matches the subquery's first row. */
 /** Members a task title tags: "@Name" matched against current members, the same reading as the title's chips. */
 async function titleMentionIds(db: D1Database, workspaceId: string, name: string): Promise<string[]> {
   if (!name.includes("@")) return [];
@@ -282,6 +285,38 @@ async function titleMentionIds(db: D1Database, workspaceId: string, name: string
   return [...new Set(splitPlainMentions(name, results).flatMap((s) => (s.type === "mention" ? [s.userId] : [])))];
 }
 
+/**
+ * Deletes the task files an edit took out of the text, once no description or comment of the task shows them any
+ * more — and only when the editor could delete that file anyway. A file attached from the Attachments section was
+ * never in a text, so it is never a candidate.
+ */
+async function pruneRemovedAttachments(
+  c: { env: Env; executionCtx: { waitUntil(promise: Promise<unknown>): void } },
+  workspaceId: string,
+  taskId: string,
+  actorId: string,
+  removed: string[]
+): Promise<void> {
+  if (!removed.length) return;
+  const { results } = await c.env.DB.prepare(
+    `SELECT description AS text FROM tasks WHERE id = ? AND workspace_id = ?
+     UNION ALL SELECT body FROM task_comments WHERE task_id = ? AND workspace_id = ?`
+  ).bind(taskId, workspaceId, taskId, workspaceId).all<{ text: string | null }>();
+  const stillShown = new Set(results.flatMap((r) => [...attachmentIdsInDoc(r.text)]));
+  const role = await getMemberRole(c.env.DB, workspaceId, actorId);
+
+  for (const id of removed.filter((id) => !stillShown.has(id))) {
+    const row = await c.env.DB.prepare(
+      `SELECT r2_key, user_id FROM task_attachments WHERE id = ? AND task_id = ? AND workspace_id = ?
+         AND NOT EXISTS (SELECT 1 FROM task_comments WHERE attachment_id = task_attachments.id)`
+    ).bind(id, taskId, workspaceId).first<{ r2_key: string; user_id: string | null }>();
+    if (!row || !canDeleteAttachment(role, row.user_id, actorId)) continue;
+    await c.env.DB.prepare(`DELETE FROM task_attachments WHERE id = ?`).bind(id).run();
+    c.executionCtx.waitUntil(c.env.ATTACHMENTS.delete(row.r2_key));
+  }
+}
+
+/** A task plus its direct subtasks, resolved to a real id list — SQLite's `IN (a, (SELECT …))` is scalar and only matches the subquery's first row. */
 export async function taskAndSubtaskIds(db: D1Database, workspaceId: string, taskId: string): Promise<string[]> {
   const { results } = await db
     .prepare(`SELECT id FROM tasks WHERE workspace_id = ? AND (id = ? OR parent_id = ?)`)
@@ -546,6 +581,10 @@ export const tasksRouter = new Hono<{
           })
         );
       }
+    }
+
+    if (data.description !== undefined) {
+      await pruneRemovedAttachments(c, workspaceId, id, userId, attachmentsRemoved(existing.description, data.description));
     }
 
     // Someone newly tagged in the description hears about it; whoever was already tagged, or the author, does not.
@@ -890,7 +929,7 @@ export const tasksRouter = new Hono<{
     // Refuse on the declared size first: parseBody() would buffer the whole upload before any check could run.
     const declaredBytes = Number(c.req.header("content-length"));
     if (Number.isFinite(declaredBytes) && declaredBytes > MAX_ATTACHMENT_BYTES + MULTIPART_SLACK_BYTES) {
-      return c.json({ error: "Image is larger than 10 MB" }, 413);
+      return c.json({ error: TOO_LARGE }, 413);
     }
 
     const existingCount = await c.env.DB.prepare(`SELECT COUNT(*) AS n FROM task_attachments WHERE task_id = ? AND workspace_id = ?`)
@@ -901,16 +940,20 @@ export const tasksRouter = new Hono<{
     const file = body.file;
     if (!(file instanceof File)) return c.json({ error: "Missing file" }, 400);
     if (file.size > MAX_ATTACHMENT_BYTES) {
-      return c.json({ error: "Image is larger than 10 MB" }, 400);
+      return c.json({ error: TOO_LARGE }, 400);
     }
 
     const bytes = new Uint8Array(await file.arrayBuffer());
-    const kind = sniffImage(bytes);
-    if (!kind) return c.json({ error: "Only PNG, JPEG, WebP and GIF images are accepted" }, 400);
-
-    let processed;
+    // The type comes from the bytes, never from the client's filename or mimetype.
+    let processed: { bytes: Uint8Array; contentType: string; width: number | null; height: number | null; filename: string };
     try {
-      processed = processImage(bytes, kind);
+      const imageKind = sniffImage(bytes);
+      if (imageKind) {
+        processed = { ...processImage(bytes, imageKind), filename: file.name || "image" };
+      } else {
+        const format = classifyDocument(bytes, file.name);
+        processed = { bytes, contentType: format.contentType, width: null, height: null, filename: safeFilename(file.name, format) };
+      }
     } catch (e) {
       if (e instanceof ImageDecodeError) return c.json({ error: e.message }, 400);
       throw e;
@@ -929,7 +972,7 @@ export const tasksRouter = new Hono<{
        WHERE (SELECT COUNT(*) FROM task_attachments WHERE task_id = ? AND workspace_id = ?) < ?`
     ).bind(
       id, workspaceId, taskId, userId, key,
-      file.name || "attachment", processed.contentType, processed.bytes.byteLength,
+      processed.filename, processed.contentType, processed.bytes.byteLength,
       processed.width, processed.height,
       taskId, workspaceId, MAX_ATTACHMENTS_PER_TASK
     ).run();
@@ -978,7 +1021,7 @@ export const tasksRouter = new Hono<{
     if (!task) return c.json({ error: "Not found" }, 404);
 
     const { body, mentionedUserIds = [], attachmentId } = c.req.valid("json");
-    if (commentIsEmpty(body) && !attachmentId) return c.json({ error: "A comment needs text or an image" }, 400);
+    if (commentIsEmpty(body) && !attachmentId) return c.json({ error: "A comment needs text, an image or a file" }, 400);
     // Never trust an attachment id from the client — it must belong to this task.
     const attachment = attachmentId
       ? await c.env.DB.prepare(`SELECT id FROM task_attachments WHERE id = ? AND task_id = ? AND workspace_id = ?`)
@@ -1029,13 +1072,13 @@ export const tasksRouter = new Hono<{
     const commentId = c.req.param("commentId");
     // task_id now bound too, not just workspace_id — SECURITY.md S-08.
     const existing = await c.env.DB.prepare(
-      `SELECT user_id FROM task_comments WHERE id = ? AND task_id = ? AND workspace_id = ?`
-    ).bind(commentId, taskId, workspaceId).first<{ user_id: string }>();
+      `SELECT user_id, body FROM task_comments WHERE id = ? AND task_id = ? AND workspace_id = ?`
+    ).bind(commentId, taskId, workspaceId).first<{ user_id: string; body: string }>();
     if (!existing) return c.json({ error: "Not found" }, 404);
     if (existing.user_id !== userId) return c.json({ error: "Only the author can edit this comment" }, 403);
 
     const { body, mentionedUserIds = [], attachmentId } = c.req.valid("json");
-    if (commentIsEmpty(body) && !attachmentId) return c.json({ error: "A comment needs text or an image" }, 400);
+    if (commentIsEmpty(body) && !attachmentId) return c.json({ error: "A comment needs text, an image or a file" }, 400);
     const mentions = await currentMemberIds(c.env.DB, workspaceId, [...mentionedUserIds, ...mentionedIds(commentText(body))]);
     const attachment = attachmentId
       ? await c.env.DB.prepare(`SELECT id FROM task_attachments WHERE id = ? AND task_id = ? AND workspace_id = ?`)
@@ -1044,6 +1087,7 @@ export const tasksRouter = new Hono<{
     await c.env.DB.prepare(
       `UPDATE task_comments SET body = ?, mentioned_user_ids = ?, attachment_id = ?, edited_at = datetime('now') WHERE id = ?`
     ).bind(body, mentions.join(","), attachment?.id ?? null, commentId).run();
+    await pruneRemovedAttachments(c, workspaceId, taskId, userId, attachmentsRemoved(existing.body, body));
 
     const row = await c.env.DB.prepare(
       `SELECT tc.*, u.name AS user_name, u.email AS user_email, u.image AS user_image,
@@ -1066,8 +1110,8 @@ export const tasksRouter = new Hono<{
     const commentId = c.req.param("commentId");
     // See the matching comment on PATCH above (SECURITY.md S-08).
     const existing = await c.env.DB.prepare(
-      `SELECT user_id FROM task_comments WHERE id = ? AND task_id = ? AND workspace_id = ?`
-    ).bind(commentId, taskId, workspaceId).first<{ user_id: string }>();
+      `SELECT user_id, body FROM task_comments WHERE id = ? AND task_id = ? AND workspace_id = ?`
+    ).bind(commentId, taskId, workspaceId).first<{ user_id: string; body: string }>();
     if (!existing) return c.json({ error: "Not found" }, 404);
     const role = await getMemberRole(c.env.DB, workspaceId, userId);
     if (!canDeleteComment(role, existing.user_id, userId)) {
@@ -1075,6 +1119,7 @@ export const tasksRouter = new Hono<{
     }
 
     await c.env.DB.prepare(`DELETE FROM task_comments WHERE id = ?`).bind(commentId).run();
+    await pruneRemovedAttachments(c, workspaceId, taskId, userId, attachmentsRemoved(existing.body, null));
     c.executionCtx.waitUntil(
       broadcast(c.env, workspaceId, "task-comments:changed", { taskId }, requestOrigin(c))
     );

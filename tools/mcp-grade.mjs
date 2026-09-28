@@ -129,6 +129,17 @@ async function runScenario(owner, member, stats) {
     state.ownerUserId = data.userId;
   }
   {
+    // The live manual: written for the key's role, indexing exactly the tools that key was given.
+    const { raw } = await call(owner, stats, "tracking_guide", {});
+    const guide = raw ? resultText(raw) : "";
+    check(stats, "owner guide speaks to an owner/admin and teaches Markdown notes", /workspace \*\*(owner|admin)\*\*/.test(guide) && /\*\*Markdown\*\*/.test(guide));
+    if (member) {
+      const { raw: memberRaw } = await call(member, stats, "tracking_guide", {});
+      const memberGuide = memberRaw ? resultText(memberRaw) : "";
+      check(stats, "member guide states a member's limits", /workspace \*\*member\*\*/.test(memberGuide) && /you see only your own time/.test(memberGuide));
+    }
+  }
+  {
     const { data } = await call(owner, stats, "list_members", {});
     state.memberUserId = data.find((m) => m.role === "member")?.userId ?? null;
   }
@@ -438,12 +449,12 @@ async function main() {
   );
   const globalChecks = [
     {
-      name: "read key lists exactly the 26 read tools",
+      name: "read key lists exactly the 27 read tools",
       skip: !ownerRoTools,
-      pass: readNames.size === 26 && [...readNames].every((n) => readOnlyToolNames.has(n)) &&
+      pass: readNames.size === 27 && [...readNames].every((n) => readOnlyToolNames.has(n)) &&
         [...readOnlyToolNames].every((n) => readNames.has(n)),
     },
-    { name: "owner rw key lists 66 tools", pass: rwNames.size === 66 },
+    { name: "owner rw key lists 67 tools", pass: rwNames.size === 67 },
     { name: "no duplicated batch twins in the catalog", pass: !["create_tasks", "move_tasks", "update_tasks", "delete_tasks", "log_times"].some((n) => rwNames.has(n)) },
     ...stats.checks.map((c) => ({ name: c.label, pass: c.pass })),
     {

@@ -49,7 +49,8 @@ function world() {
   const toolsFor = (userId: string, scope: "read" | "read_write" = "read_write") => {
     const tools = new Map<string, Handler>();
     const registrar = { registerTool: (name: string, _c: unknown, h: Handler) => tools.set(name, h) } as unknown as ToolRegistrar;
-    registerAllTools(registrar, { env, workspaceId: "ws-A", userId, scope, executionCtx });
+    const role = userId === "u-admin" ? "admin" : "member";
+    registerAllTools(registrar, { env, workspaceId: "ws-A", userId, scope, role, executionCtx });
     return tools;
   };
   const call = async (tools: Map<string, Handler>, name: string, args: Record<string, unknown> = {}) => {
@@ -139,12 +140,12 @@ describe("MCP task history and project statuses", () => {
     expect(JSON.stringify(history.data)).toContain("status");
   });
 
-  it("gives a project its own columns for an admin, and refuses a member", async () => {
+  it("gives a project its own columns for an admin, and a member no such tool", async () => {
     const w = world();
     const forked = await w.call(w.toolsFor("u-admin"), "fork_task_statuses", { projectId: "p1" });
     expect(forked.error).toBeNull();
-    const refused = await w.call(w.toolsFor("u-member"), "fork_task_statuses", { projectId: "p1" });
-    expect(refused.error).not.toBeNull();
+    // A member's key isn't given the tool at all (mcp/registry MANAGER_ONLY_TOOLS); the route still refuses underneath.
+    expect(w.toolsFor("u-member").has("fork_task_statuses")).toBe(false);
   });
 
   it("shows a read-only key none of the task write tools", () => {
@@ -390,5 +391,44 @@ describe("list_tasks search tolerates how people type a name", () => {
     expect(found.map((t) => t.name)).not.toContain("Write docs");
     const exact = (await w.call(admin, "list_tasks", { search: "develop tracking" })).data as unknown as { name: string }[];
     expect(exact[0].name).toBe("Develop tracking");
+  });
+});
+
+describe("MCP writes and reads a task's notes and comments as Markdown", () => {
+  const notes = "## Acceptance criteria\n\n- [ ] Copy approved\n- [x] Logo in place\n\nAsk @[Mel](user:u-member) for the copy.";
+
+  it("stores headings, checklists and mentions as the editor's blocks, and reads them back as the same Markdown", async () => {
+    const w = world();
+    const admin = w.toolsFor("u-admin");
+    const { data, error } = await w.call(admin, "create_task", { projectId: "p1", name: "Launch page", description: notes });
+    expect(error).toBeNull();
+    const id = String((data as { id: string }).id);
+
+    const stored = JSON.parse((w.raw.prepare(`SELECT description FROM tasks WHERE id = ?`).get(id) as { description: string }).description);
+    expect(stored.content.map((n: { type: string }) => n.type)).toEqual(["heading", "taskList", "paragraph"]);
+
+    const read = await w.call(admin, "get_task", { taskId: id });
+    expect((read.data as { task?: { notes: string }; notes?: string }).task?.notes ?? (read.data as { notes: string }).notes).toBe(notes);
+  });
+
+  it("notifies a member newly tagged when the notes are edited, as the app's editor would", async () => {
+    const w = world();
+    const admin = w.toolsFor("u-admin");
+    const task = (await w.call(admin, "create_task", { projectId: "p1", name: "Launch page" })).data as { id: string };
+    await w.call(admin, "update_task", { taskId: task.id, description: notes });
+    const n = w.raw.prepare(`SELECT user_id, type FROM notifications`).all();
+    expect(n).toEqual([{ user_id: "u-member", type: "task_mention" }]);
+  });
+
+  it("posts a comment's checklist as blocks and reads it back as Markdown", async () => {
+    const w = world();
+    const admin = w.toolsFor("u-admin");
+    const task = (await w.call(admin, "create_task", { projectId: "p1", name: "Launch page" })).data as { id: string };
+    const body = "**Blocked on:**\n\n- [ ] final copy";
+    const posted = await w.call(admin, "add_task_comment", { taskId: task.id, body });
+    expect(posted.error).toBeNull();
+    expect((posted.data as { body: string }).body).toBe(body);
+    const stored = JSON.parse((w.raw.prepare(`SELECT body FROM task_comments`).get() as { body: string }).body);
+    expect(stored.content.map((n: { type: string }) => n.type)).toEqual(["paragraph", "taskList"]);
   });
 });

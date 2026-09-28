@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Hono } from "hono";
 import { attachmentDisposition, attachmentsRouter } from "./attachments";
 import { createD1Stub, type D1StubHandlers } from "../../test/d1-stub";
+import { securityHeaders } from "../middleware/security-headers";
 
 function mountedApp(userId: string) {
   return new Hono<{ Bindings: Env; Variables: { workspaceId: string; userId: string } }>()
@@ -64,6 +65,19 @@ describe("GET /:id (SEC-7: an explicit disposition and a name that cannot break 
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Type")).toBe("image/png");
     expect(res.headers.get("Content-Disposition")).toBe(`inline; filename="screenshot.png"; filename*=UTF-8''screenshot.png`);
+  });
+
+  it("serves a PDF as a download, never rendered as a page of our origin", async () => {
+    const { env } = fakeEnv({ first: () => ({ r2_key: "k", content_type: "application/pdf", filename: "brief.pdf" }) });
+    (env as unknown as { ATTACHMENTS: unknown }).ATTACHMENTS = { get: async () => ({ body: new Uint8Array([1]) }) };
+    // Mounted behind the global security middleware, as in production, to prove it keeps the route's stricter CSP.
+    const app = new Hono<{ Bindings: Env; Variables: { workspaceId: string; userId: string } }>()
+      .use("*", securityHeaders)
+      .route("/", mountedApp("user-1"));
+    const res = await app.request("/att-1", {}, env, fakeCtx);
+    expect(res.headers.get("Content-Disposition")).toMatch(/^attachment; filename="brief.pdf"/);
+    expect(res.headers.get("X-Content-Type-Options")).toBe("nosniff");
+    expect(res.headers.get("Content-Security-Policy")).toMatch(/default-src 'none'.*sandbox/);
   });
 
   it("does not serve an attachment that belongs to another workspace", async () => {

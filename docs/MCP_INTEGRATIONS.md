@@ -28,7 +28,7 @@ tool and the screen cannot disagree about validation or roles.
 - [x] **Statuses:** `list_task_statuses`, `create_task_status`, `update_task_status`, `archive_task_status`
 - [x] **Assignees:** through `create_task` / `update_task` (`assigneeIds`), with ids from `list_members`
 - [x] **Comments:** `list_task_comments`, `add_task_comment`, `edit_task_comment`, `delete_task_comment` — flat, no replies (decision D8)
-- [x] **Attachments:** `list_task_attachments`, `upload_task_attachment` (PNG/JPEG/WebP/GIF, base64, 10 MB), `delete_task_attachment`
+- [x] **Attachments:** `list_task_attachments`, `upload_task_attachment` (images, PDF, docx/xlsx/pptx, TXT, CSV; base64, 25 MB), `delete_task_attachment`
 
 ### Productivity
 - [x] **Favorites:** `list_favorites`, `create_favorite`, `delete_favorite`

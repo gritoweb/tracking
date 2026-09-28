@@ -35,7 +35,7 @@ export function CommentRow({
 }) {
   const timeFormat = useUIStore((s) => s.timeFormat);
   const [editing, setEditing] = useState(false);
-  const { uploadImage, deleteOrphanedImage } = useTaskImageUpload(taskId);
+  const { uploadInline, deleteOrphanedImage } = useTaskImageUpload(taskId);
   const escapeLocal = useEscapeLocal(() => setEditing(false));
   // Old comments are text with @[Name](user:ID) tags; both kinds open as the same doc.
   const doc = commentDoc(comment.body) as JSONContent;
@@ -66,7 +66,7 @@ export function CommentRow({
         <CommentComposer
           initial={doc}
           members={members}
-          onUploadImage={uploadImage}
+          onUploadFile={uploadInline}
           onDeleteImage={deleteOrphanedImage}
           onSubmit={(body) => {
             onSave(body, comment.attachmentId ?? null);

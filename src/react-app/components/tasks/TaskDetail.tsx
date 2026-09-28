@@ -3,7 +3,8 @@ import { useTaskImageUpload } from "@/hooks/useTaskImageUpload";
 import { useSyncedField } from "@/hooks/useSyncedField";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { AttachmentViewer } from "./attachment-viewer/AttachmentViewer";
+import { AttachmentViewerContext } from "./attachment-viewer/AttachmentViewerContext";
 import { TaskDetailToolbar } from "./TaskDetailToolbar";
 import { TaskModalShell } from "./TaskModalShell";
 import { TaskSidebarShell } from "./TaskSidebarShell";
@@ -22,14 +23,16 @@ import {
   useTaskAttachments,
   useDeleteTaskAttachment,
 } from "@/hooks/useTasks";
-import { useWorkspaceMembers } from "@/hooks/useWorkspaceRole";
+import { useWorkspaceMembers, useWorkspaceRole } from "@/hooks/useWorkspaceRole";
+import { useAuth } from "@/hooks/useAuth";
+import { useCanDeleteTask } from "@/hooks/useTaskPermissions";
 import { useMediaQuery, BELOW_LG } from "@/hooks/useMediaQuery";
 import { useTimer } from "@/hooks/useTimer";
 import { useTimerStore } from "@/stores/timerStore";
 import { useUIStore } from "@/stores/uiStore";
 import { parseTimeInput, formatTimeInput } from "@/lib/dateUtils";
 import { serializeDescription } from "@/lib/richText";
-import type { Task, TaskAttachment } from "@shared/schemas";
+import type { Task } from "@shared/schemas";
 import type { JSONContent } from "@tiptap/react";
 
 interface TaskDetailProps {
@@ -50,6 +53,9 @@ interface TaskDetailProps {
  */
 export function TaskDetail({ open, onClose, task, tab, onTabChange, onRequestDelete }: TaskDetailProps) {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { canManage } = useWorkspaceRole();
+  const canDeleteTask = useCanDeleteTask();
   const mode = useUIStore((s) => s.taskViewMode);
   const setMode = useUIStore((s) => s.setTaskViewMode);
   const narrow = useMediaQuery(BELOW_LG);
@@ -60,7 +66,7 @@ export function TaskDetail({ open, onClose, task, tab, onTabChange, onRequestDel
   const { data: attachments = [], isLoading: attachmentsLoading } = useTaskAttachments(task?.id ?? null);
   const { data: comments = [] } = useTaskComments(task?.id ?? null);
   const deleteAttachment = useDeleteTaskAttachment();
-  const { uploadImage, deleteOrphanedImage } = useTaskImageUpload(task?.id ?? null);
+  const { uploadInline, uploadFile, deleteOrphanedImage } = useTaskImageUpload(task?.id ?? null);
   const { startTimer, stopTimer } = useTimer();
   const runningEntry = useTimerStore((s) => s.runningEntry);
 
@@ -68,7 +74,7 @@ export function TaskDetail({ open, onClose, task, tab, onTabChange, onRequestDel
   const [name, setName] = useSyncedField(task?.name ?? "", task?.id ?? null);
   const [estimate, setEstimate] = useSyncedField(formatTimeInput(task?.estimatedSeconds ?? null), task?.id ?? null);
   const [dueOpen, setDueOpen] = useState(false);
-  const [lightbox, setLightbox] = useState<TaskAttachment | null>(null);
+  const [viewingId, setViewingId] = useState<string | null>(null);
 
   if (!task) return null;
 
@@ -116,11 +122,11 @@ export function TaskDetail({ open, onClose, task, tab, onTabChange, onRequestDel
       mode={mode}
       onModeChange={setMode}
       isSubtask={isSubtask}
-      onDeleteTask={() => {
+      onDeleteTask={canDeleteTask(task) ? () => {
         onRequestDelete(task);
         // A subtask stays open behind the confirmation; confirming returns to its parent (TaskBoardList).
         if (!isSubtask) onClose();
-      }}
+      } : undefined}
     />
   );
 
@@ -161,7 +167,7 @@ export function TaskDetail({ open, onClose, task, tab, onTabChange, onRequestDel
           key={task.id}
           task={task}
           onSave={saveDescription}
-          onUploadImage={uploadImage}
+          onUploadFile={uploadInline}
           onDeleteImage={deleteOrphanedImage}
           members={members}
         />
@@ -180,9 +186,10 @@ export function TaskDetail({ open, onClose, task, tab, onTabChange, onRequestDel
       <TaskAttachments
         attachments={attachments}
         loading={attachmentsLoading}
-        onOpenLightbox={setLightbox}
+        onOpen={(a) => setViewingId(a.id)}
         onDelete={(id) => deleteAttachment.mutate({ taskId: task.id, id })}
-        onUpload={uploadImage}
+        canDelete={(a) => canManage || a.userId === user?.id}
+        onUpload={uploadFile}
       />
     </>
   );
@@ -216,21 +223,11 @@ export function TaskDetail({ open, onClose, task, tab, onTabChange, onRequestDel
     );
 
   return (
-    <>
+    // Links to the task's files, in the description or a comment, open in the viewer below.
+    <AttachmentViewerContext.Provider value={setViewingId}>
       {shell}
 
-      <Dialog open={!!lightbox} onOpenChange={(o) => !o && setLightbox(null)}>
-        <DialogContent className="max-w-3xl p-2">
-          <DialogTitle className="sr-only">{lightbox?.filename}</DialogTitle>
-          {lightbox && (
-            <img
-              src={lightbox.url}
-              alt={lightbox.filename}
-              className="max-h-(--size-cap-80vh) w-full rounded object-contain"
-            />
-          )}
-        </DialogContent>
-      </Dialog>
-    </>
+      <AttachmentViewer attachments={attachments} openId={viewingId} onOpenChange={setViewingId} />
+    </AttachmentViewerContext.Provider>
   );
 }
