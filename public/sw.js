@@ -20,6 +20,19 @@ async function writeShown(ids) {
   await cache.put(SHOWN_KEY, new Response(JSON.stringify(ids.slice(-SHOWN_LIMIT))));
 }
 
+/** One bell notification as a system notification; the tag is its id, so it is never shown twice at once. */
+function display(n) {
+  return self.registration.showNotification(n.title, {
+    body: n.body,
+    icon: "/logo192.png",
+    badge: "/maskable-192.png",
+    tag: n.id,
+    // Stays on screen until clicked or dismissed, instead of the system's few seconds.
+    requireInteraction: true,
+    data: { id: n.id, link: n.link },
+  });
+}
+
 async function showUnread() {
   const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
   // Someone looking at the app sees it arrive in the bell, so only the test (asked for from the app itself) pops up then.
@@ -41,17 +54,7 @@ async function showUnread() {
   if (!fresh.length) return;
 
   await writeShown([...shown, ...fresh.map((n) => n.id)]);
-  await Promise.all(
-    fresh.map((n) =>
-      self.registration.showNotification(n.title, {
-        body: n.body,
-        icon: "/logo192.png",
-        badge: "/maskable-192.png",
-        tag: n.id,
-        data: { id: n.id, link: n.link },
-      })
-    )
-  );
+  await Promise.all(fresh.map(display));
 }
 
 self.addEventListener("push", (event) => event.waitUntil(showUnread()));
@@ -64,13 +67,7 @@ self.addEventListener("message", (event) => {
     readShown().then(async (shown) => {
       if (shown.includes(n.id)) return;
       await writeShown([...shown, n.id]);
-      await self.registration.showNotification(n.title, {
-        body: n.body,
-        icon: "/logo192.png",
-        badge: "/maskable-192.png",
-        tag: n.id,
-        data: { id: n.id, link: n.link },
-      });
+      await display(n);
     })
   );
 });

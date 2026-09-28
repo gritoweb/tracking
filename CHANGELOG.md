@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-09-28 (11) — on `refactor`, local only, not pushed or deployed
+### Changed
+- **Desktop notifications stay on screen until clicked or dismissed** (`requireInteraction`), instead of the system's few seconds — Luis saw them vanish before he could act. Both display paths (push and the page's own) now go through one `display()` in `public/sw.js`, so the options live in one place. Some operating systems still decide on their own; Chrome/Edge on desktop honour it.
+
 ## 2026-09-28 (10) — on `refactor`, local only, not pushed or deployed
 ### Fixed
 - **"Send a test" showed nothing.** The service worker skips the popup while the app is focused (the bell already shows it), and the test is always clicked from inside the app, so it was always skipped. Found locally: Luis's browser had a live FCM subscription, both tests reached the bell, FCM accepted the push (no refusal logged, subscription kept), and no popup appeared. The test notification (`type: "test"`) now pops up even with the app focused; every other one still stays quiet while you're looking at the app.
