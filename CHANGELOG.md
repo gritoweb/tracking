@@ -1,6 +1,6 @@
 # Changelog
 
-## 2026-09-28 (6) — on `master`, not pushed or deployed
+## 2026-09-28 (6) — deployed to production (version b549ba2b)
 ### Added
 - **Delete a task from the board card's "…" on hover**, next to the existing right-click menu: **Edit task…** and **Delete**, the delete going through the same named confirmation (which also warns about subtasks) as the list. Both menus render one shared action list in `board/TaskCard.tsx`, so they can't drift apart. The list row's "…" and the open task's "…" already had Delete.
 ### Changed
@@ -9,7 +9,7 @@
 - `tsc -b` (0), `lint` (0), `vitest run` 1124/1124, `pnpm check` (0). e2e with three real accounts in one workspace (owner, the task's author, another member): the other member's card "…" has **Edit task…** but no **Delete**; the author's card "…" → **Delete** → a confirmation naming the task → the card leaves the board without a reload, and a time entry logged on the task still exists with `taskId: null`. Mutation: showing Delete to everyone fails it. Task e2e (delete permissions, board, detail panel, planning): 31/32; the one failure (the board column's quick-add assignee field) also fails with this change stashed and passes alone — intermittent, not caused by it.
 - Hours kept on delete come from the schema: `time_entries.task_id … ON DELETE SET NULL` (migration 0003).
 
-## 2026-09-28 (5) — on `master`, not pushed or deployed
+## 2026-09-28 (5) — deployed to production (version b549ba2b)
 ### Added
 - **The guide teaches the team's card shape for a new task**: `#` headings (🎯 Objetivo, 📋 Contexto, ✅ Critério de aceite with a `- [ ]` checklist, 🔧 Specs técnicas), section names in the person's language, emojis as house style but not required, and a section left out rather than invented; plus a worked "create a task" example. Why: a model creating a task started straight at `##` because the guide only mentioned `##`, and it had no creation example. Checked by creating tasks through the local MCP as an agent would: stored as four level-1 headings, lists and a checklist, rendered as such.
 - **`tracking_guide`: the MCP's live manual, written for the key that asks.** Its role (owner/admin or member) and what that role may and may not do, the rules (ids from list tools, `timezoneOffsetMinutes`, a project for every entry, confirm deletes/archives, answer in the person's language), how to write task notes and comments in Markdown, how to react to a refusal (explain, never work around), worked examples (log time, move a task, the team's hours as admin vs. member) and an index of exactly the tools the key was given, built from what was registered (`src/worker/mcp/guide.ts`). Why: the `/tracking` skill was a copy on each person's machine that never updated, and models learned the rules by trial and error. The server instructions now say to call it first; the Claude Code setup prompt installs a thin skill that only points to it, and is safe to re-paste (skips `claude mcp add` when `tracking` already exists). Updating what models know is now a deploy.
