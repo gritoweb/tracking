@@ -49,7 +49,8 @@ function world() {
   const toolsFor = (userId: string, scope: "read" | "read_write" = "read_write") => {
     const tools = new Map<string, Handler>();
     const registrar = { registerTool: (name: string, _c: unknown, h: Handler) => tools.set(name, h) } as unknown as ToolRegistrar;
-    registerAllTools(registrar, { env, workspaceId: "ws-A", userId, scope, executionCtx });
+    const role = userId === "u-admin" ? "admin" : "member";
+    registerAllTools(registrar, { env, workspaceId: "ws-A", userId, scope, role, executionCtx });
     return tools;
   };
   const call = async (tools: Map<string, Handler>, name: string, args: Record<string, unknown> = {}) => {
@@ -139,12 +140,12 @@ describe("MCP task history and project statuses", () => {
     expect(JSON.stringify(history.data)).toContain("status");
   });
 
-  it("gives a project its own columns for an admin, and refuses a member", async () => {
+  it("gives a project its own columns for an admin, and a member no such tool", async () => {
     const w = world();
     const forked = await w.call(w.toolsFor("u-admin"), "fork_task_statuses", { projectId: "p1" });
     expect(forked.error).toBeNull();
-    const refused = await w.call(w.toolsFor("u-member"), "fork_task_statuses", { projectId: "p1" });
-    expect(refused.error).not.toBeNull();
+    // A member's key isn't given the tool at all (mcp/registry MANAGER_ONLY_TOOLS); the route still refuses underneath.
+    expect(w.toolsFor("u-member").has("fork_task_statuses")).toBe(false);
   });
 
   it("shows a read-only key none of the task write tools", () => {

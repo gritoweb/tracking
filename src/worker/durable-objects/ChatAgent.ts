@@ -24,6 +24,7 @@ import { recallMemories, buildMemoryBlock } from "../lib/assistant-memory";
 import { withDedupedStreams } from "../lib/workers-ai-stream";
 import { isoOffset } from "../lib/local-date";
 import { buildAssistantSystemPrompt } from "../lib/assistant-prompt";
+import { getMemberRole } from "../lib/permissions";
 
 // Function calling over the 64-tool catalog; Scout picked the wrong tool most of the time (docs/IA.md).
 const MODEL = "@cf/zai-org/glm-4.7-flash";
@@ -75,9 +76,10 @@ export class ChatAgent extends AIChatAgent<Cloudflare.Env> {
     const rawOffset = Number(options?.body?.timezoneOffsetMinutes);
     const offset = Number.isFinite(rawOffset) ? Math.max(-14 * 60, Math.min(14 * 60, rawOffset)) : 0;
 
-    const [context, memories] = await Promise.all([
+    const [context, memories, role] = await Promise.all([
       buildAssistantContext(this.env, workspaceId, userId, offset),
       recallMemories(this.env.DB, workspaceId, userId),
+      getMemberRole(this.env.DB, workspaceId, userId),
     ]);
     const memoryBlock = buildMemoryBlock(memories);
 
@@ -93,7 +95,8 @@ export class ChatAgent extends AIChatAgent<Cloudflare.Env> {
       props: {},
     } as unknown as ExecutionContext;
     const tools = {
-      ...buildChatTools({ env: this.env, workspaceId, userId, scope: "read_write", executionCtx }),
+      // No role means no longer a member: the gate refuses that first, and the fewest tools is the safe answer anyway.
+      ...buildChatTools({ env: this.env, workspaceId, userId, scope: "read_write", role: role ?? "member", executionCtx }),
       ...buildAssistantTools({ env: this.env, workspaceId, userId, offsetMinutes: offset, executionCtx }),
     };
 

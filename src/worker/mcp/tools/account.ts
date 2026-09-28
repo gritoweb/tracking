@@ -3,7 +3,9 @@ import { z } from "zod";
 import { UpdateSettingsSchema } from "@shared/schemas";
 import { listApiKeys } from "../../lib/api-keys";
 import { segment } from "../rest-bridge";
-import { DESTRUCTIVE, IdArg, MUTATES, READ_ONLY, fromBridge, json, type ToolDeps } from "../shared";
+import { DESTRUCTIVE, IdArg, MUTATES, READ_ONLY, fromBridge, json, text, type ToolDeps } from "../shared";
+import { buildTrackingGuide } from "../guide";
+import type { RegisteredTool } from "../registry";
 
 interface MemberListRow {
   userId: string;
@@ -154,5 +156,21 @@ export function registerAccountWrites(d: ToolDeps): void {
       annotations: { ...MUTATES, idempotentHint: true },
     },
     async (body) => fromBridge(await bridge("PATCH", "/api/calendar/auto-track", body))
+  );
+}
+
+/** The live manual: what this key may do and how, with an index of exactly the tools it was given. */
+export function registerGuide(d: ToolDeps, registered: RegisteredTool[]): void {
+  const { server, ctx } = d;
+  server.registerTool(
+    "tracking_guide",
+    {
+      title: "How to work in TimeTracker",
+      description:
+        "Call this first, once per conversation: how to work in TimeTracker with this key — what its role may and may not do, the rules for dates, ids and confirmations, how to write task notes and comments (Markdown), what to do when something is refused, worked examples, and every tool available. Generated for this key, so always current.",
+      inputSchema: {},
+      annotations: READ_ONLY,
+    },
+    async () => text(buildTrackingGuide(ctx.role, ctx.scope, registered))
   );
 }

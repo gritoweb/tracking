@@ -67,6 +67,7 @@ const serverInfo = (env: Env) => ({
 const SERVER_INSTRUCTIONS = `TimeTracker holds one workspace's tracked time and its plan: entries, timers, projects, clients, tags, tasks with their comments and images, favorites, recurring entries, saved reports and the Planner.
 
 Working with it:
+- Call \`tracking_guide\` once, before the first action: it says what this key's role may and may not do, how to write task notes and comments, and worked examples — generated for this key, so always current.
 - Date ranges are the USER'S local calendar days. Pass \`timezoneOffsetMinutes\` (JS getTimezoneOffset sign: west of UTC is positive) on any tool that takes one, or the range silently means UTC days.
 - Ids are opaque and must never be guessed: get them from \`list_projects\`, \`list_clients\`, \`list_tasks\`, \`list_task_statuses\`, \`list_members\`, \`list_tags\`, \`list_time_entries\` and the other list tools.
 - Every entry needs a project, and every project a client. When the person didn't say which, ASK them and wait — never pick a project or client for them, and never create one to get past a refusal.

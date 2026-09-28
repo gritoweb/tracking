@@ -165,6 +165,15 @@ workspace's own database and nothing on the open internet.
 Write tools are **registered only for a read+write key**. A read-only key isn't
 shown them at all, rather than being refused when it calls one.
 
+## The live manual (`tracking_guide`) and the thin skill
+
+Everything a model needs to work well lives on the server and changes with each deploy — nothing is copied into anyone's machine to go stale.
+
+- **`tracking_guide`** returns a Markdown manual written for the key that calls it: its role (owner/admin or member) and what that role may and may not do, the rules (ids from list tools, `timezoneOffsetMinutes`, a project for every entry, confirm before deleting or archiving, answer in the person's language), how to write task notes and comments in Markdown, what to do when something is refused (explain it, never work around it), worked examples (log time, move a task, the team's hours as an admin vs. a member) and an **index of exactly the tools this key was given**, built from what was registered — so it can't list a tool that isn't there or miss a new one (`src/worker/mcp/guide.ts`). The server instructions tell every client to call it before the first action.
+- **Roles decide the catalog.** A member's key is not shown the tools only owners/admins may use — `get_project_pacing`, `archive_project`, `update_client`, `archive_client`, `fork_task_statuses`, `create_task_status`, `update_task_status`, `archive_task_status` — the same way a read key is not shown write tools; the routes still refuse them underneath. A member's `update_project` takes only `projectId` + `clientId` (link a client to a project that has none, the one project edit a member may make). The in-app Assistant gets the same filtered catalog.
+- **No silent limits.** A member's `create_project` says which fields it didn't save (rate, budget, dates), and a member's `get_time_summary` / `run_report` carry `scope: "Your own hours only…"`, so a member's total never passes for the team's.
+- **The skill is a pointer.** The Claude Code setup prompt (Settings → Workspace → MCP) installs a `SKILL.md` that only says when to use the server and to call `tracking_guide` first. Anyone with the older 5-rule skill keeps working (those rules still hold, and the server instructions point to the guide); re-pasting the setup prompt is safe — it skips `claude mcp add` when a `tracking` server already exists and just replaces the skill.
+
 ## What the model is told
 
 The server sends `instructions` on connect, which clients prepend to the model's
