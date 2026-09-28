@@ -31,34 +31,51 @@ async function openTask(page: import("@playwright/test").Page) {
 
 const PDF = makePdf().toString("base64");
 
-test("a PDF dropped into the description becomes a link to it and lands in Attachments", async ({ page }) => {
+const TINY_PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+
+test("a PDF dropped into the description becomes a clickable file card that opens the viewer", async ({ page }) => {
   const panel = await openTask(page);
   const description = panel.getByRole("textbox", { name: "Description" });
   await description.click();
   await giveFile(description, "drop", "brief.pdf", PDF, "application/pdf");
 
-  const link = description.getByRole("link", { name: "brief.pdf" });
-  await expect(link).toBeVisible({ timeout: 10_000 });
-  expect(await link.getAttribute("href")).toMatch(/^\/api\/attachments\//);
-  await expect(panel.getByRole("button", { name: "Open brief.pdf" })).toBeVisible();
+  const card = description.getByRole("button", { name: "Open brief.pdf" });
+  await expect(card).toBeVisible({ timeout: 10_000 });
+  await expect(card).toContainText("PDF");
+  await expect(card).toHaveCSS("cursor", "pointer");
+  await expect(description.getByRole("link")).toHaveCount(0);
 
-  // Clicking the link opens the viewer rather than downloading the file.
-  await link.click();
+  await card.click();
   const viewer = page.getByRole("dialog", { name: "brief.pdf" });
-  await expect(viewer).toBeVisible();
   await expect(viewer.getByLabel("Page 1")).toBeVisible({ timeout: 15_000 });
 });
 
-test("a PDF pasted into a comment is posted as a link to it", async ({ page }) => {
+test("a PDF pasted into a comment is posted as a file card that opens the viewer", async ({ page }) => {
   const panel = await openTask(page);
   const composer = panel.getByRole("textbox", { name: "Write a comment" });
   await composer.click();
   await giveFile(composer, "paste", "minutes.pdf", PDF, "application/pdf");
-  await expect(composer.getByRole("link", { name: "minutes.pdf" })).toBeVisible({ timeout: 10_000 });
+  await expect(composer.getByRole("button", { name: "Open minutes.pdf" })).toBeVisible({ timeout: 10_000 });
 
   await panel.getByRole("button", { name: "Comment", exact: true }).click();
   const posted = panel.getByRole("region", { name: "Comments" }).getByRole("textbox", { name: "Comment", exact: true });
-  await expect(posted.getByRole("link", { name: "minutes.pdf" })).toBeVisible();
+  await posted.getByRole("button", { name: "Open minutes.pdf" }).click();
+  await expect(page.getByRole("dialog", { name: "minutes.pdf" })).toBeVisible();
+});
+
+test("an image in a posted comment shows a pointer and opens the viewer when clicked", async ({ page }) => {
+  const panel = await openTask(page);
+  const composer = panel.getByRole("textbox", { name: "Write a comment" });
+  await composer.click();
+  await giveFile(composer, "paste", "shot.png", TINY_PNG, "image/png");
+  await expect(composer.locator("img")).toBeVisible({ timeout: 10_000 });
+  await panel.getByRole("button", { name: "Comment", exact: true }).click();
+
+  const posted = panel.getByRole("region", { name: "Comments" }).getByRole("textbox", { name: "Comment", exact: true });
+  const image = posted.locator("img");
+  await expect(image).toHaveCSS("cursor", "pointer");
+  await image.click();
+  await expect(page.getByRole("dialog", { name: "shot.png" })).toBeVisible();
 });
 
 test("a program dropped into the description is refused and nothing is inserted", async ({ page }) => {

@@ -940,7 +940,7 @@ export const tasksRouter = new Hono<{
     if (!task) return c.json({ error: "Not found" }, 404);
 
     const { body, mentionedUserIds = [], attachmentId } = c.req.valid("json");
-    if (commentIsEmpty(body) && !attachmentId) return c.json({ error: "A comment needs text or an image" }, 400);
+    if (commentIsEmpty(body) && !attachmentId) return c.json({ error: "A comment needs text, an image or a file" }, 400);
     // Never trust an attachment id from the client — it must belong to this task.
     const attachment = attachmentId
       ? await c.env.DB.prepare(`SELECT id FROM task_attachments WHERE id = ? AND task_id = ? AND workspace_id = ?`)
@@ -997,7 +997,7 @@ export const tasksRouter = new Hono<{
     if (existing.user_id !== userId) return c.json({ error: "Only the author can edit this comment" }, 403);
 
     const { body, mentionedUserIds = [], attachmentId } = c.req.valid("json");
-    if (commentIsEmpty(body) && !attachmentId) return c.json({ error: "A comment needs text or an image" }, 400);
+    if (commentIsEmpty(body) && !attachmentId) return c.json({ error: "A comment needs text, an image or a file" }, 400);
     const mentions = await currentMemberIds(c.env.DB, workspaceId, [...mentionedUserIds, ...mentionedIds(commentText(body))]);
     const attachment = attachmentId
       ? await c.env.DB.prepare(`SELECT id FROM task_attachments WHERE id = ? AND task_id = ? AND workspace_id = ?`)

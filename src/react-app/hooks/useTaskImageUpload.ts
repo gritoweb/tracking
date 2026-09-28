@@ -23,7 +23,14 @@ export function useTaskImageUpload(taskId: string | null) {
   /** A file into a task's rich text: an image shows inline, any other accepted file becomes a link to it. */
   const uploadInline = async (file: File): Promise<InlineUpload> => {
     const attachment = await uploadFile(file);
-    return { url: attachment.url, id: attachment.id, filename: attachment.filename, image: isImageContentType(attachment.contentType) };
+    return {
+      url: attachment.url,
+      id: attachment.id,
+      filename: attachment.filename,
+      contentType: attachment.contentType,
+      size: attachment.size,
+      image: isImageContentType(attachment.contentType),
+    };
   };
 
   // Only when an upload's insertion spot vanished mid-flight, leaving an orphan in R2.

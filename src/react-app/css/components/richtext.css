@@ -126,6 +126,10 @@
   border-radius: var(--radius-md);
   margin: 0.5em 0;
 }
+/* A task's own image opens the viewer on click (RichTextEditor), so it must look clickable. */
+.tt-richtext img[src^="/api/attachments/"] {
+  cursor: pointer;
+}
 .tt-richtext a {
   color: var(--primary-ink);
   text-decoration: underline;

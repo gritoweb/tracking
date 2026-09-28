@@ -1,5 +1,5 @@
 import { mentionToken, splitMentions } from "./mentions";
-import { docToText, parseDoc, type RichNode } from "./rich-doc";
+import { FILE_ATTACHMENT_NODE, docToText, parseDoc, type RichNode } from "./rich-doc";
 
 // A body is legacy text or the description's tiptap doc; every server reader goes through `commentText`.
 
@@ -29,15 +29,16 @@ export function commentDoc(body: string): RichNode {
   return parseDoc(body) ?? legacyCommentToDoc(body);
 }
 
-/** Nothing to post: no text, no mention and no image, in either kind of body. */
+/** Nothing to post: no text, no mention, no image and no file, in either kind of body. */
 export function commentIsEmpty(body: string): boolean {
   const doc = parseDoc(body);
   if (!doc) return !body.trim();
   const stack: RichNode[] = [doc];
-  // Depth is bounded by what parseDoc/docToText accept; an image or a mention counts as content with no text.
+  // Depth is bounded by what parseDoc/docToText accept; an image, a file or a mention counts as content with no text.
   while (stack.length) {
     const node = stack.pop()!;
-    if (node.type === "image" || node.type === "mention" || (node.type === "text" && node.text?.trim())) return false;
+    if (node.type === "image" || node.type === FILE_ATTACHMENT_NODE || node.type === "mention") return false;
+    if (node.type === "text" && node.text?.trim()) return false;
     node.content?.forEach((child) => stack.push(child));
   }
   return true;

@@ -10,6 +10,8 @@ export interface InlineUpload {
   url: string;
   id: string;
   filename: string;
+  contentType: string;
+  size: number;
   image: boolean;
 }
 
@@ -92,7 +94,7 @@ export function insertUploadedFile(
   view.dispatch(view.state.tr.setMeta(uploadPlaceholderKey, { add: { id, pos } } satisfies PlaceholderAction));
 
   onUploadFile(file)
-    .then(({ url, id: attachmentId, filename, image }) => {
+    .then(({ url, id: attachmentId, filename, contentType, size, image }) => {
       const mappedPos = findPlaceholderPos(view.state, id);
       const tr = view.state.tr.setMeta(uploadPlaceholderKey, { remove: { id } } satisfies PlaceholderAction);
       if (mappedPos === null) {
@@ -108,7 +110,7 @@ export function insertUploadedFile(
       const { schema } = view.state;
       const content = image
         ? schema.nodes.image.create({ src: url })
-        : [schema.text(filename, [schema.marks.link.create({ href: url })]), schema.text(" ")];
+        : schema.nodes.fileAttachment.create({ href: url, filename, contentType, size });
       view.dispatch(tr.insert(mappedPos, content));
     })
     .catch(() => {

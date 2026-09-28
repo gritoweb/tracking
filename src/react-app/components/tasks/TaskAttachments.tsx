@@ -1,22 +1,20 @@
 import { useRef, useState } from "react";
 import { toast } from "sonner";
-import { FileSpreadsheet, FileText, Paperclip, Presentation, X } from "lucide-react";
+import { Paperclip, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { attachmentProblem } from "@/lib/taskCommentAttachments";
+import { FileIcon } from "./attachment-viewer/FileIcon";
 import { ATTACHMENT_ACCEPT, MAX_ATTACHMENT_LABEL, fileExtension, formatFileSize, isImageContentType } from "@shared/attachments";
 import { cn } from "@/lib/utils";
 import type { TaskAttachment } from "@shared/schemas";
 
-const DOCUMENT_ICON: Record<string, typeof FileText> = { xlsx: FileSpreadsheet, csv: FileSpreadsheet, pptx: Presentation };
-
 function AttachmentThumb({ attachment, onOpen, onDelete }: { attachment: TaskAttachment; onOpen: () => void; onDelete: () => void }) {
   const image = isImageContentType(attachment.contentType);
   const ext = fileExtension(attachment.filename);
-  const Icon = DOCUMENT_ICON[ext] ?? FileText;
   return (
     <div className="group relative h-20 w-20 shrink-0 overflow-hidden rounded-md border bg-muted">
       <button type="button" onClick={onOpen} className="h-full w-full" aria-label={`Open ${attachment.filename}`} title={attachment.filename}>
@@ -24,7 +22,7 @@ function AttachmentThumb({ attachment, onOpen, onDelete }: { attachment: TaskAtt
           <img src={attachment.url} alt={attachment.filename} className="h-full w-full object-cover" />
         ) : (
           <span className="flex h-full w-full flex-col items-center justify-center gap-1 px-1.5">
-            <Icon className="h-6 w-6 text-muted-foreground" />
+            <FileIcon filename={attachment.filename} className="h-6 w-6 text-muted-foreground" />
             <span className="w-full truncate text-center text-micro font-medium">{attachment.filename}</span>
             <span className="text-micro text-muted-foreground">
               {ext.toUpperCase()} · {formatFileSize(attachment.size)}

@@ -10,7 +10,10 @@ export interface RichNode {
 const MAX_DEPTH = 100;
 
 // Nodes that end a line when read as text; everything else runs inline.
-const BLOCKS = new Set(["paragraph", "heading", "listItem", "taskItem", "codeBlock", "blockquote", "horizontalRule"]);
+const BLOCKS = new Set(["paragraph", "heading", "listItem", "taskItem", "codeBlock", "blockquote", "horizontalRule", "fileAttachment"]);
+
+/** The editor node for a non-image file in a description or comment: a card that opens the attachment. */
+export const FILE_ATTACHMENT_NODE = "fileAttachment";
 
 /** The stored JSON doc, or null when the value is not one (legacy plain text, broken JSON). */
 export function parseDoc(raw: string | null | undefined): RichNode | null {
@@ -30,6 +33,7 @@ export function docToText(doc: RichNode, mention: (id: string, label: string) =>
     if (!node || typeof node !== "object" || depth > MAX_DEPTH) return;
     if (node.type === "text") out.push(node.text ?? "");
     else if (node.type === "hardBreak") out.push("\n");
+    else if (node.type === FILE_ATTACHMENT_NODE) out.push(`[${String(node.attrs?.filename ?? "file")}]`);
     else if (node.type === "mention") {
       const id = String(node.attrs?.id ?? "");
       out.push(mention(id, String(node.attrs?.label ?? id)));

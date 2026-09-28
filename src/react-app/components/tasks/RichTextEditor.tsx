@@ -11,6 +11,7 @@ import { dropHandleSlash, useEditorSlashCommands } from "./useEditorSlashCommand
 import { RichTextBubbleMenu } from "./RichTextBubbleMenu";
 import { BlockHandle } from "./BlockHandle";
 import { EditorToolbar } from "./EditorToolbar";
+import { FileAttachmentNode } from "./FileAttachmentNode";
 import { pickedFile, insertUploadedFile, UploadPlaceholderExtension, type InlineUpload } from "./editorUpload";
 import { attachmentIdFromHref, useOpenAttachment } from "./attachment-viewer/AttachmentViewerContext";
 import { refreshMentionLabels } from "@/lib/mentionLabels";
@@ -130,6 +131,7 @@ export function RichTextEditor({
       // The field's own placeholder while the whole doc is empty; otherwise a hint on the empty line holding the caret.
       Placeholder.configure({ placeholder: ({ editor: e }) => (e.isEmpty ? (placeholder ?? "") : LINE_HINT) }),
       Image,
+      FileAttachmentNode,
       UploadPlaceholderExtension,
       mentions.extension,
       slash.extension,
@@ -163,9 +165,10 @@ export function RichTextEditor({
       handleDOMEvents: {
         click: (_view, event) => {
           mentions.onChipClick(event);
-          // A link to one of the task's files opens the viewer instead of downloading it.
-          const link = (event.target as HTMLElement | null)?.closest?.("a");
-          const attachmentId = attachmentIdFromHref(link?.getAttribute("href") ?? null);
+          // An image or a link to one of the task's files opens the viewer (a link would otherwise download).
+          const target = event.target as HTMLElement | null;
+          const image = target?.tagName === "IMG" ? target.getAttribute("src") : null;
+          const attachmentId = attachmentIdFromHref(image ?? target?.closest?.("a")?.getAttribute("href") ?? null);
           if (attachmentId && openAttachmentRef.current) {
             event.preventDefault();
             openAttachmentRef.current(attachmentId);
