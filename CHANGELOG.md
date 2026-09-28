@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-09-28 (12) — on `refactor`, local only, not pushed or deployed
+### Fixed
+- **Clicking a desktop notification opens the task first.** The click handler waited for "mark as read" before opening a window, and Chrome only lets a service worker open one right after the click; now opening and marking read run together, and the click logs `[sw] notificationclick` so a click that never reaches the page can be told apart. Found locally: Luis clicked a notification and nothing opened, and the notification stayed unread — while `PATCH /api/notifications/:id/read` from the service worker itself returned 200 and marked it read in a controlled Chromium, so on his machine the click never reached the service worker at all (still being narrowed down: popup vs. the system's notification list).
+
 ## 2026-09-28 (11) — on `refactor`, local only, not pushed or deployed
 ### Changed
 - Both display paths of a desktop notification (push and the page's own) go through one `display()` in `public/sw.js`, so its options live in one place. A notification still leaves the screen after the system's few seconds: keeping it up until clicked (`requireInteraction`) was tried and reverted at Luis's request.

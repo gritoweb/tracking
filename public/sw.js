@@ -74,23 +74,25 @@ self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const { id, link } = event.notification.data || {};
   const path = link || "/";
+  console.info("[sw] notificationclick", path);
+  // Opening a window is only allowed right after the click, so it goes first; marking read runs alongside it.
+  const open = (async () => {
+    const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    const tab = windows.find((w) => new URL(w.url).origin === self.location.origin);
+    if (tab) {
+      await tab.focus();
+      tab.postMessage({ type: "open-notification", link: path });
+      return;
+    }
+    await self.clients.openWindow(new URL(path, self.location.origin).href);
+  })();
+  // Opening it is reading it, so the bell clears and Slack stays quiet.
+  const markRead = id
+    ? fetch(`/api/notifications/${encodeURIComponent(id)}/read`, { method: "PATCH", credentials: "same-origin" })
+    : Promise.resolve();
   event.waitUntil(
-    (async () => {
-      // Opening it is reading it, so the bell clears and Slack stays quiet.
-      if (id) {
-        await fetch(`/api/notifications/${encodeURIComponent(id)}/read`, {
-          method: "PATCH",
-          credentials: "same-origin",
-        }).catch(() => {});
-      }
-      const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
-      const open = windows.find((w) => new URL(w.url).origin === self.location.origin);
-      if (open) {
-        await open.focus();
-        open.postMessage({ type: "open-notification", link: path });
-        return;
-      }
-      await self.clients.openWindow(new URL(path, self.location.origin).href);
-    })()
+    Promise.allSettled([open, markRead]).then((results) =>
+      results.forEach((r) => r.status === "rejected" && console.error("[sw] notificationclick failed", r.reason))
+    )
   );
 });
