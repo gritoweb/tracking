@@ -1,6 +1,6 @@
 # Changelog
 
-## 2026-09-28 (4) — deployed to production
+## 2026-09-28 (4) — deployed to production (version 4d946a4d)
 ### Fixed
 - **"Uploading…" and the empty-line hint drew on top of each other** while a file uploaded into a description or comment. The in-flight marker is a widget on a line the editor still counts as empty, so the hint ("Write, or type / for commands" or the field's placeholder) kept showing through it. A line holding an upload now hides the hint (`:has(.tt-upload-placeholder)`, same selector weight as the hint rule and placed after it), and the marker's inline opacity/italic moved to the `.tt-upload-placeholder` class with `--muted-foreground`.
 ### Verified
