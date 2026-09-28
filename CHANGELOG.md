@@ -2,7 +2,7 @@
 
 ## 2026-09-28 (11) — on `refactor`, local only, not pushed or deployed
 ### Changed
-- **Desktop notifications stay on screen until clicked or dismissed** (`requireInteraction`), instead of the system's few seconds — Luis saw them vanish before he could act. Both display paths (push and the page's own) now go through one `display()` in `public/sw.js`, so the options live in one place. Some operating systems still decide on their own; Chrome/Edge on desktop honour it.
+- Both display paths of a desktop notification (push and the page's own) go through one `display()` in `public/sw.js`, so its options live in one place. A notification still leaves the screen after the system's few seconds: keeping it up until clicked (`requireInteraction`) was tried and reverted at Luis's request.
 
 ## 2026-09-28 (10) — on `refactor`, local only, not pushed or deployed
 ### Fixed

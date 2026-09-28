@@ -27,8 +27,6 @@ function display(n) {
     icon: "/logo192.png",
     badge: "/maskable-192.png",
     tag: n.id,
-    // Stays on screen until clicked or dismissed, instead of the system's few seconds.
-    requireInteraction: true,
     data: { id: n.id, link: n.link },
   });
 }
