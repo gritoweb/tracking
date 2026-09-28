@@ -10,7 +10,7 @@ claude mcp add --transport http --scope user --header "Authorization: Bearer ${a
 name: tracking
 description: Manage my TimeTracker time entries, tasks, projects, clients and reports through the "tracking" MCP server. Use when I type /tracking or ask about my hours, timesheet, tasks or clients.
 ---
-Use the "tracking" MCP server for this. Before the first action, call its tracking_guide tool and follow it: it is generated for my key, so it is always the current version.
+Use the "tracking" MCP server for this. Before the first action, call its tracking_guide tool (the manual for working in TimeTracker) and follow it: it is generated for my key, so it is always the current version.
 Answer in the language I wrote in.
 
 3. Restart is not needed for the skill; for the server, run /mcp and confirm "tracking" is connected, then call its whoami tool.

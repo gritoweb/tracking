@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-09-28 (7) — on `master`, not pushed or deployed
+### Changed
+- The `/tracking` skill the Claude Code setup prompt installs now says what `tracking_guide` is ("the manual for working in TimeTracker"), so a person reading their `SKILL.md` can see where the rules come from.
+
 ## 2026-09-28 (6) — deployed to production (version b549ba2b)
 ### Added
 - **Delete a task from the board card's "…" on hover**, next to the existing right-click menu: **Edit task…** and **Delete**, the delete going through the same named confirmation (which also warns about subtasks) as the list. Both menus render one shared action list in `board/TaskCard.tsx`, so they can't drift apart. The list row's "…" and the open task's "…" already had Delete.
