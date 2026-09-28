@@ -2,6 +2,7 @@
 import type { ApiKeyScope } from "../lib/api-keys";
 import { canManageWorkspace, type WorkspaceRole } from "../lib/permissions";
 import type { RegisteredTool, ToolGroup } from "./registry";
+import { RICH_TEXT_SYNTAX, RICH_TEXT_UNSUPPORTED } from "@shared/markdown-doc";
 
 const GROUP_ORDER: ToolGroup[] = ["Time and reports", "Tasks", "Projects, clients and tags", "Planning and saved items", "You and the workspace"];
 
@@ -67,7 +68,10 @@ ${permissions(role, scope)}
 - Answer in the language the person wrote in, and give the \`url\` of what you created or changed as a link.
 
 ## Writing task notes and comments
-They are **Markdown** and the app shows them formatted: \`#\` headings for the notes' sections (\`##\`/\`###\` below them when a section needs parts), \`- item\` and \`1. item\` lists, \`- [ ] todo\` / \`- [x] done\` checklists, **bold**, *italic*, \`code\`, quotes, links, \`@[Name](user:ID)\` to tag someone (they are notified; id from \`list_members\`). Use headings, lists and checklists rather than one long paragraph.
+They are **Markdown**, and the app shows them in its rich editor. Everything the editor can show:
+${RICH_TEXT_SYNTAX.map(([what, how]) => `- ${what}: ${how}`).join("\n")}
+
+${RICH_TEXT_UNSUPPORTED} Use headings, lists and checklists rather than one long paragraph.
 
 A new task's notes follow the team's card shape, unless the person asked for another. Section names go in the person's language; the emojis are the house style, not a requirement:
 \`\`\`

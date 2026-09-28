@@ -77,3 +77,42 @@ describe("docJsonToMarkdown — what a model reads", () => {
     expect(docJsonToMarkdown(json)).toBe("[brief.pdf](/api/attachments/f1)\n\n5 \\* 3 \\[draft\\]");
   });
 });
+
+describe("every feature of the editor", () => {
+  it("reads underline and a palette colour as the editor's marks", () => {
+    const [p] = doc('<u>under</u> and <span style="color:#ef4444">red</span>').content as Array<{ content: unknown[] }>;
+    expect(p.content).toEqual([
+      { type: "text", text: "under", marks: [{ type: "underline" }] },
+      { type: "text", text: " and " },
+      { type: "text", text: "red", marks: [{ type: "textStyle", attrs: { color: "#ef4444" } }] },
+    ]);
+  });
+
+  it("keeps a colour outside the palette, and any other HTML, as plain text", () => {
+    const json = markdownToDocJson('<span style="color:#123456">x</span> <b>bold?</b>')!;
+    expect(json).not.toContain("textStyle");
+    expect(json).not.toContain('"bold"');
+    expect(json).toContain("<b>");
+  });
+
+  it("turns a line that is only a link to a task file into that file's card", () => {
+    expect(doc("[brief.pdf](/api/attachments/f1)").content).toEqual([
+      { type: "fileAttachment", attrs: { href: "/api/attachments/f1", filename: "brief.pdf" } },
+    ]);
+    // Inside a sentence it stays a link.
+    expect(JSON.stringify(doc("See [brief.pdf](/api/attachments/f1) first").content)).toContain('"type":"link"');
+  });
+
+  it("reads strike, dividers, code blocks, nested lists and line breaks", () => {
+    const { content } = doc("~~old~~\n\n---\n\n```ts\nconst a = 1;\n```\n\n- parent\n  - child\n\nline one\nline two");
+    expect(content.map((n) => n.type)).toEqual(["paragraph", "horizontalRule", "codeBlock", "bulletList", "paragraph"]);
+    expect(content[2]).toMatchObject({ attrs: { language: "ts" }, content: [{ text: "const a = 1;" }] });
+    expect(JSON.stringify(content[3])).toMatch(/"bulletList".*"bulletList"/);
+    expect(JSON.stringify(content[4])).toContain('"hardBreak"');
+  });
+
+  it("round-trips underline, colour and a file card, so editing notes through MCP keeps them", () => {
+    const markdown = '<u>under</u> <span style="color:#22c55e">green</span>\n\n[brief.pdf](/api/attachments/f1)';
+    expect(docJsonToMarkdown(markdownToDocJson(markdown))).toBe(markdown);
+  });
+});

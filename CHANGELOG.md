@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-28 (8) — deployed to production
+### Fixed
+- **MCP now covers everything the task editor can show, and says so.** A blind test found the guide listed only part of the editor and some features had no syntax at all. Added to the Markdown converter: `<u>underline</u>`, a text colour from the editor's own palette (`<span style="color:#…">`, anything off-palette stays plain text), and a line that is only a link to a task file becoming that file's **card** — which also fixes a round trip that turned file cards into links whenever notes were edited through MCP; reading back writes underline and colour the same way. The guide and the tool field docs are now generated from one list, `RICH_TEXT_SYNTAX` (headings to `###`, bold/italic/strike/underline, palette colours by name and hex, inline code and code blocks, nested lists, checklists, quotes, dividers, line breaks, links, mentions, images, file cards) plus what isn't supported (tables, other HTML).
+### Verified
+- `tsc -b` (0), `lint` (0), `vitest run` 1129/1129 (new converter tests: underline and palette colour marks, off-palette colour and other HTML kept as text, file-card line vs. an inline link, strike/divider/code block/nested list/line break, round trip of underline, colour and file card; the guide test now requires the full list), `pnpm check` (0). Through the local MCP, a task written with every feature (plus an uploaded image and PDF) stored 13 block types and every mark, and in the browser the rendered description had underline, the red colour, strike, a divider, a code block, a nested list, 2 checklist items, the image, the PDF's file card and a line break.
+
 ## 2026-09-28 (7) — on `master`, not pushed or deployed
 ### Changed
 - The `/tracking` skill the Claude Code setup prompt installs now says what `tracking_guide` is ("the manual for working in TimeTracker"), so a person reading their `SKILL.md` can see where the rules come from.

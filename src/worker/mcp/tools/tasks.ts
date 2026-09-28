@@ -1,6 +1,6 @@
 // Tasks: the plan side — list, edit, statuses, comments and image attachments.
 import { z } from "zod";
-import { docJsonToMarkdown, markdownToDocJson } from "@shared/markdown-doc";
+import { RICH_TEXT_SYNTAX, RICH_TEXT_UNSUPPORTED, docJsonToMarkdown, markdownToDocJson } from "@shared/markdown-doc";
 import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENT_LABEL } from "@shared/attachments";
 import type { CreateTask, Task, TaskActivity, TaskAttachment, TaskComment, TaskStatus, UpdateTask } from "@shared/schemas";
 import {
@@ -15,8 +15,7 @@ import { listableInput, rejected, runListable } from "../batch";
 import { DESTRUCTIVE, IdArg, MUTATES, READ_ONLY, ROW_LIMIT, compact, fromBridge, hours, json, refuse, type ToolDeps } from "../shared";
 
 // What the app's editor shows, in the Markdown a model already writes; converted both ways by @shared/markdown-doc.
-const RICH_TEXT_DOC =
-  "Markdown: `#`/`##`/`###` headings, `- item` and `1. item` lists, `- [ ] todo` / `- [x] done` checklists, **bold**, *italic*, ~~strike~~, `code`, ``` code blocks, `> quote`, `---`, [links](https://…), @[Name](user:ID) to tag a member (id from list_members; they are notified), and ![alt](/api/attachments/ID) for an image uploaded to the task. Blank line between paragraphs. It is shown formatted in the app.";
+const RICH_TEXT_DOC = `Markdown, shown in the app's rich editor: ${RICH_TEXT_SYNTAX.map(([, how]) => how.split(" — ")[0]).join("; ")}. ${RICH_TEXT_UNSUPPORTED} The full list and the team's task card shape are in tracking_guide.`;
 
 const commentBody = CreateTaskCommentSchema.shape.body.describe(`The comment. ${RICH_TEXT_DOC}`);
 

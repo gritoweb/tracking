@@ -1,5 +1,6 @@
 import { Lexer, type Token, type Tokens } from "marked";
 import { FILE_ATTACHMENT_NODE, parseDoc, type RichNode } from "./rich-doc";
+import { SWATCH_COLORS, SWATCH_COLOR_NAMES } from "./colors";
 
 // Markdown is how a model writes and reads rich text (MCP, the Assistant); the app stores the editor's JSON doc.
 
@@ -11,12 +12,19 @@ const MENTION_HREF = /^user:([\w-]+)$/;
 // An image in the text can only be one of the task's own uploads.
 const ATTACHMENT_SRC = /^\/api\/attachments\/[\w-]+$/;
 const MAX_HEADING = 3;
+// The editor's only HTML-looking syntax: underline, and a text colour from its own palette. Anything else stays text.
+const UNDERLINE_OPEN = /^<u>$/i;
+const UNDERLINE_CLOSE = /^<\/u>$/i;
+const COLOR_OPEN = /^<span style="color:\s*(#[0-9a-f]{6})\s*;?">$/i;
+const COLOR_CLOSE = /^<\/span>$/i;
 
 const ENTITIES: Record<string, string> = { "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": '"', "&#39;": "'" };
 const decode = (text: string) => text.replace(/&(amp|lt|gt|quot|#39);/g, (e) => ENTITIES[e]);
 
-function inline(tokens: Token[] | undefined, marks: Mark[] = []): RichNode[] {
+function inline(tokens: Token[] | undefined, outer: Mark[] = []): RichNode[] {
   const out: RichNode[] = [];
+  // <u>…</u> and <span style="color:…">…</span> arrive as separate open/close tokens around the text they mark.
+  let marks = outer;
   const text = (value: string, extra: Mark[] = marks) => {
     if (value) out.push(extra.length ? { type: "text", text: value, marks: extra } as RichNode : { type: "text", text: value });
   };
@@ -68,8 +76,19 @@ function inline(tokens: Token[] | undefined, marks: Mark[] = []): RichNode[] {
         else text(image.text);
         break;
       }
+      case "html": {
+        const raw = String(token.raw).trim();
+        const color = raw.match(COLOR_OPEN)?.[1]?.toLowerCase();
+        if (UNDERLINE_OPEN.test(raw)) marks = [...marks, { type: "underline" }];
+        else if (UNDERLINE_CLOSE.test(raw) && marks.some((m) => m.type === "underline")) marks = marks.filter((m) => m.type !== "underline");
+        else if (color && (SWATCH_COLORS as readonly string[]).includes(color)) marks = [...marks, { type: "textStyle", attrs: { color } }];
+        else if (COLOR_CLOSE.test(raw) && marks.some((m) => m.type === "textStyle")) marks = marks.filter((m) => m.type !== "textStyle");
+        // Any other HTML stays visible as the text that was written, never as markup.
+        else text(String(token.raw));
+        break;
+      }
       default:
-        // HTML and anything unknown stay visible as the text that was written, never as markup.
+        // Anything unknown stays visible as the text that was written, never as markup.
         text("raw" in token ? String(token.raw) : "");
     }
   }
@@ -105,7 +124,13 @@ function paragraphs(content: RichNode[]): RichNode[] {
   }
   flush();
   for (const block of out) if (block.content) block.content = mergeText(block.content);
-  return out.length ? out : [{ type: "paragraph" }];
+  // A line that is only a link to one of the task's files is that file's card, as the editor shows it.
+  const blocks = out.map((block) => {
+    const only = block.content?.length === 1 ? (block.content[0] as RichNode & { marks?: Mark[] }) : null;
+    const href = only?.type === "text" && only.marks?.length === 1 && only.marks[0].type === "link" ? String(only.marks[0].attrs?.href) : "";
+    return ATTACHMENT_SRC.test(href) ? { type: FILE_ATTACHMENT_NODE, attrs: { href, filename: only!.text } } : block;
+  });
+  return blocks.length ? blocks : [{ type: "paragraph" }];
 }
 
 function blocks(tokens: Token[]): RichNode[] {
@@ -165,6 +190,30 @@ function blocks(tokens: Token[]): RichNode[] {
   return out;
 }
 
+/** Everything the task editor can show, as the Markdown this converter reads — one list for the guide and the tool docs. */
+export const RICH_TEXT_SYNTAX: readonly (readonly [what: string, how: string])[] = [
+  ["Headings, up to 3 levels", "`# `, `## `, `### `"],
+  ["Bold, italic, strike, underline", "`**bold**`, `*italic*`, `~~strike~~`, `<u>underline</u>`"],
+  [
+    "Text colour, from the editor's palette only",
+    `\`<span style="color:${SWATCH_COLORS[0]}">${SWATCH_COLOR_NAMES[SWATCH_COLORS[0]].toLowerCase()} text</span>\` — ${SWATCH_COLORS.map((c) => `${SWATCH_COLOR_NAMES[c]} ${c}`).join(", ")}`,
+  ],
+  ["Inline code and code blocks", "`` `code` ``, and a block between two ```` ``` ```` lines (a language after the first is kept)"],
+  ["Lists, nested by indenting two spaces", "`- item`, `1. item`"],
+  ["Checklist", "`- [ ] to do`, `- [x] done`"],
+  ["Quote", "`> text`"],
+  ["Divider", "`---` on a line of its own"],
+  ["Line break inside a paragraph", "a single newline (a blank line starts a new paragraph)"],
+  ["Link", "`[text](https://…)` — http, https, mailto or an app path; anything else stays plain text"],
+  ["Mention (the person is notified)", "`@[Name](user:ID)`, the id from list_members"],
+  ["Image", "`![alt](/api/attachments/ID)`, for an image uploaded to the task (upload_task_attachment)"],
+  ["File card", "`[file name](/api/attachments/ID)` alone on a line, for any other file uploaded to the task"],
+];
+
+/** What the editor can't show, so a model doesn't try. */
+export const RICH_TEXT_UNSUPPORTED =
+  "No tables (each row becomes a line of text), no headings below `###`, no colours outside the palette, and no other HTML (it is shown as typed).";
+
 /** Markdown (what a model writes) → the editor's doc, as the JSON string the app stores; null for empty. */
 export function markdownToDocJson(markdown: string | null | undefined): string | null {
   if (!markdown?.trim()) return null;
@@ -189,6 +238,9 @@ function inlineMarkdown(nodes: RichNode[] | undefined): string {
       if (marks.includes("bold")) text = `**${text}**`;
       if (marks.includes("italic")) text = `*${text}*`;
       if (marks.includes("strike")) text = `~~${text}~~`;
+      if (marks.includes("underline")) text = `<u>${text}</u>`;
+      const color = (node as RichNode & { marks?: Mark[] }).marks?.find((m) => m.type === "textStyle")?.attrs?.color;
+      if (typeof color === "string" && color) text = `<span style="color:${color}">${text}</span>`;
       if (link) text = `[${text}](${String(link.attrs?.href ?? "")})`;
       return text;
     })

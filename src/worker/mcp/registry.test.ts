@@ -111,7 +111,10 @@ describe("tracking_guide", () => {
     const w = world();
     const guide = await w.call(w.toolsFor("member").tools, "tracking_guide");
     expect(guide).toMatch(/\*\*Markdown\*\*/);
-    expect(guide).toMatch(/- \[ \] todo/);
+    // The editor's whole feature list reaches the model, from the one list in @shared/markdown-doc.
+    for (const syntax of ["- [ ] to do", "~~strike~~", "<u>underline</u>", '<span style="color:', "---", "File card"]) {
+      expect(guide).toContain(syntax);
+    }
   });
 });
 
