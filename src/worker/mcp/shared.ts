@@ -1,5 +1,4 @@
 import { z, type ZodRawShape } from "zod";
-import { docToText, parseDoc } from "@shared/rich-doc";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ApiKeyScope } from "../lib/api-keys";
 import type { BridgeResult, RestBridge } from "./rest-bridge";
@@ -205,10 +204,3 @@ export function hours(seconds: number): number {
   return Math.round((seconds / 3600) * 100) / 100;
 }
 
-/** A task description is a tiptap JSON doc (or legacy plain text); models read it as plain text. */
-export function richTextToPlain(raw: string | null | undefined): string | null {
-  if (!raw) return null;
-  const doc = parseDoc(raw);
-  if (!doc) return raw;
-  return docToText(doc, (_id, label) => `@${label}`) || null;
-}

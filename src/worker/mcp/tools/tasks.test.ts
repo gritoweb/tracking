@@ -392,3 +392,42 @@ describe("list_tasks search tolerates how people type a name", () => {
     expect(exact[0].name).toBe("Develop tracking");
   });
 });
+
+describe("MCP writes and reads a task's notes and comments as Markdown", () => {
+  const notes = "## Acceptance criteria\n\n- [ ] Copy approved\n- [x] Logo in place\n\nAsk @[Mel](user:u-member) for the copy.";
+
+  it("stores headings, checklists and mentions as the editor's blocks, and reads them back as the same Markdown", async () => {
+    const w = world();
+    const admin = w.toolsFor("u-admin");
+    const { data, error } = await w.call(admin, "create_task", { projectId: "p1", name: "Launch page", description: notes });
+    expect(error).toBeNull();
+    const id = String((data as { id: string }).id);
+
+    const stored = JSON.parse((w.raw.prepare(`SELECT description FROM tasks WHERE id = ?`).get(id) as { description: string }).description);
+    expect(stored.content.map((n: { type: string }) => n.type)).toEqual(["heading", "taskList", "paragraph"]);
+
+    const read = await w.call(admin, "get_task", { taskId: id });
+    expect((read.data as { task?: { notes: string }; notes?: string }).task?.notes ?? (read.data as { notes: string }).notes).toBe(notes);
+  });
+
+  it("notifies a member newly tagged when the notes are edited, as the app's editor would", async () => {
+    const w = world();
+    const admin = w.toolsFor("u-admin");
+    const task = (await w.call(admin, "create_task", { projectId: "p1", name: "Launch page" })).data as { id: string };
+    await w.call(admin, "update_task", { taskId: task.id, description: notes });
+    const n = w.raw.prepare(`SELECT user_id, type FROM notifications`).all();
+    expect(n).toEqual([{ user_id: "u-member", type: "task_mention" }]);
+  });
+
+  it("posts a comment's checklist as blocks and reads it back as Markdown", async () => {
+    const w = world();
+    const admin = w.toolsFor("u-admin");
+    const task = (await w.call(admin, "create_task", { projectId: "p1", name: "Launch page" })).data as { id: string };
+    const body = "**Blocked on:**\n\n- [ ] final copy";
+    const posted = await w.call(admin, "add_task_comment", { taskId: task.id, body });
+    expect(posted.error).toBeNull();
+    expect((posted.data as { body: string }).body).toBe(body);
+    const stored = JSON.parse((w.raw.prepare(`SELECT body FROM task_comments`).get() as { body: string }).body);
+    expect(stored.content.map((n: { type: string }) => n.type)).toEqual(["paragraph", "taskList"]);
+  });
+});

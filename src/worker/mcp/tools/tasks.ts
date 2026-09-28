@@ -1,6 +1,6 @@
 // Tasks: the plan side — list, edit, statuses, comments and image attachments.
 import { z } from "zod";
-import { commentText } from "@shared/comment-body";
+import { docJsonToMarkdown, markdownToDocJson } from "@shared/markdown-doc";
 import { ACCEPTED_FORMATS_LABEL, MAX_ATTACHMENT_BYTES, MAX_ATTACHMENT_LABEL } from "@shared/attachments";
 import type { CreateTask, Task, TaskActivity, TaskAttachment, TaskComment, TaskStatus, UpdateTask } from "@shared/schemas";
 import {
@@ -12,7 +12,22 @@ import { appUrl } from "../../lib/app-url";
 import { taskUrl } from "../links";
 import { segment, type BridgeResult } from "../rest-bridge";
 import { listableInput, rejected, runListable } from "../batch";
-import { DESTRUCTIVE, IdArg, MUTATES, READ_ONLY, ROW_LIMIT, compact, fromBridge, hours, json, refuse, richTextToPlain, type ToolDeps } from "../shared";
+import { DESTRUCTIVE, IdArg, MUTATES, READ_ONLY, ROW_LIMIT, compact, fromBridge, hours, json, refuse, type ToolDeps } from "../shared";
+
+// What the app's editor shows, in the Markdown a model already writes; converted both ways by @shared/markdown-doc.
+const RICH_TEXT_DOC =
+  "Markdown: `#`/`##`/`###` headings, `- item` and `1. item` lists, `- [ ] todo` / `- [x] done` checklists, **bold**, *italic*, ~~strike~~, `code`, ``` code blocks, `> quote`, `---`, [links](https://…), @[Name](user:ID) to tag a member (id from list_members; they are notified), and ![alt](/api/attachments/ID) for an image uploaded to the task. Blank line between paragraphs. It is shown formatted in the app.";
+
+const commentBody = CreateTaskCommentSchema.shape.body.describe(`The comment. ${RICH_TEXT_DOC}`);
+
+/** A model's Markdown becomes the doc the app's editor stores, so the route receives exactly what the screen would send. */
+function withRichDescription<T extends { description?: string | null }>(data: T): T {
+  return data.description === undefined ? data : { ...data, description: markdownToDocJson(data.description) };
+}
+
+function withRichBody<T extends { body: string }>(data: T): T {
+  return { ...data, body: markdownToDocJson(data.body) ?? data.body };
+}
 
 /** Largest image a tool accepts, matching the upload route's own limit. */
 
@@ -66,13 +81,13 @@ function taskListView(t: Task, base: string) {
   };
 }
 
-/** A task as a model reads it: plain-text notes, hours, names instead of colours. */
+/** A task as a model reads it: notes as Markdown, hours, names instead of colours. */
 function taskView(t: Task, base: string) {
   return {
     id: t.id,
     name: t.name,
     url: taskUrl(base, t.id),
-    notes: richTextToPlain(t.description),
+    notes: docJsonToMarkdown(t.description),
     project: { id: t.projectId, name: t.projectName },
     status: { id: t.statusId, name: t.statusName, category: t.statusCategory },
     done: !t.active,
@@ -93,8 +108,8 @@ function commentView(c: TaskComment, base: string) {
     id: c.id,
     url: taskUrl(base, c.taskId, "comments"),
     author: { userId: c.userId, name: c.userName },
-    // A rich comment reads as text too, mentions in the same @[Name](user:ID) form the tools document.
-    body: commentText(c.body),
+    // Markdown, mentions in the same @[Name](user:ID) form a comment is written in.
+    body: docJsonToMarkdown(c.body) ?? "",
     mentionedUserIds: c.mentionedUserIds,
     attachmentId: c.attachmentId,
     createdAt: c.createdAt,
@@ -277,7 +292,7 @@ export function registerTaskWrites(d: ToolDeps): void {
     // A model retries or re-asks where a form can't: the same task twice in a few minutes is a duplicate, not a second task.
     const twin = await recentTwin(data);
     if (twin) return { ok: true, status: 200, data: { ...twin, alreadyExisted: true } };
-    return bridge<Task>("POST", "/api/tasks", data);
+    return bridge<Task>("POST", "/api/tasks", withRichDescription(data));
   };
   const createdView = (t: Task & { alreadyExisted?: true }) => ({
     ...view(t),
@@ -289,14 +304,15 @@ export function registerTaskWrites(d: ToolDeps): void {
       : {}),
   });
   const updateOne = ({ taskId, ...patch }: UpdateTask & { taskId: string }) =>
-    bridge<Task>("PUT", `/api/tasks/${segment(taskId)}`, patch);
+    bridge<Task>("PUT", `/api/tasks/${segment(taskId)}`, withRichDescription(patch));
   const moveOne = ({ taskId, statusId, completedOn }: { taskId: string; statusId: string; completedOn?: string }) =>
     bridge<Task>("PATCH", `/api/tasks/${segment(taskId)}/move`, { statusId, ...(completedOn ? { completedOn } : {}) });
   const deleteOne = ({ taskId }: { taskId: string }) => bridge("DELETE", `/api/tasks/${segment(taskId)}`);
 
   // No `id`: a model must never pick one; the retry guard is for forms, which mint their own.
-  const createInput = CreateTaskSchema.omit({ id: true }).shape;
-  const updateInput = { taskId: IdArg("task"), ...UpdateTaskSchema.shape };
+  const description = { description: CreateTaskSchema.shape.description.describe(`The task's notes. ${RICH_TEXT_DOC}`) };
+  const createInput = { ...CreateTaskSchema.omit({ id: true }).shape, ...description };
+  const updateInput = { taskId: IdArg("task"), ...UpdateTaskSchema.shape, ...description };
   const moveInput = { taskId: IdArg("task"), statusId: IdArg("status"), completedOn: MoveTaskSchema.shape.completedOn };
   const deleteInput = { taskId: IdArg("task") };
 
@@ -364,11 +380,14 @@ export function registerTaskWrites(d: ToolDeps): void {
       title: "Comment on a task",
       description:
         "Add a comment to a task as the key's owner. To tag a person write @[Name](user:ID) in the body, with the id from list_members: the app shows it as a clickable @Name and notifies them (`mentionedUserIds` still works and notifies without a tag in the text). A comment read back carries the same @[Name](user:ID) form. Pass an `attachmentId` from upload_task_attachment to show an image with it.",
-      inputSchema: { taskId: IdArg("task"), ...CreateTaskCommentSchema.shape },
+      inputSchema: { taskId: IdArg("task"), ...CreateTaskCommentSchema.shape, body: commentBody },
       annotations: MUTATES,
     },
     async ({ taskId, ...body }) =>
-      fromBridge(await bridge<TaskComment>("POST", `/api/tasks/${segment(taskId)}/comments`, body), (c) => commentView(c, appUrl(env)))
+      fromBridge(
+        await bridge<TaskComment>("POST", `/api/tasks/${segment(taskId)}/comments`, withRichBody(body)),
+        (c) => commentView(c, appUrl(env))
+      )
   );
 
   server.registerTool(
@@ -376,7 +395,7 @@ export function registerTaskWrites(d: ToolDeps): void {
     {
       title: "Edit a comment",
       description: "Rewrite a comment's text (and its mentions or image). Only the comment's author can; ids come from list_task_comments.",
-      inputSchema: { taskId: IdArg("task"), commentId: IdArg("comment"), ...UpdateTaskCommentSchema.shape },
+      inputSchema: { taskId: IdArg("task"), commentId: IdArg("comment"), ...UpdateTaskCommentSchema.shape, body: commentBody },
       annotations: { ...MUTATES, idempotentHint: true },
     },
     async ({ taskId, commentId, ...body }) =>
@@ -384,7 +403,7 @@ export function registerTaskWrites(d: ToolDeps): void {
         await bridge<TaskComment>(
           "PATCH",
           `/api/tasks/${segment(taskId)}/comments/${segment(commentId)}`,
-          body
+          withRichBody(body)
         ),
         (c) => commentView(c, appUrl(env))
       )

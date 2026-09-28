@@ -168,6 +168,9 @@ importers:
       lucide-react:
         specifier: ^1.24.0
         version: 1.24.0(react@19.2.7)
+      marked:
+        specifier: 15.0.12
+        version: 15.0.12
       mimetext:
         specifier: ^3.0.28
         version: 3.0.28
