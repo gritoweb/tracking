@@ -1,5 +1,7 @@
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import type { Notification } from "@shared/schemas";
+import { showFromPage } from "@/lib/browserNotifications";
 
 const PING_INTERVAL_MS = 30_000;
 
@@ -32,9 +34,10 @@ export function useNotificationSocket() {
 
       ws.onmessage = (event) => {
         try {
-          const msg = JSON.parse(event.data as string) as { event?: string };
+          const msg = JSON.parse(event.data as string) as { event?: string; data?: Notification };
           if (msg.event === "notification:new") {
             queryClient.invalidateQueries({ queryKey: ["notifications"] });
+            if (msg.data) void showFromPage(msg.data);
           }
         } catch {
           // Ignore malformed messages.

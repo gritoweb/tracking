@@ -14,6 +14,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { useNotificationSocket } from "@/hooks/useNotificationSocket";
+import { useBrowserNotifications } from "@/hooks/useBrowserNotifications";
 import { useOfflineSync } from "@/hooks/useOfflineSync";
 import { useHydrateSettings } from "@/hooks/useSettings";
 import { useUIStore } from "@/stores/uiStore";
@@ -37,6 +38,7 @@ const LogTaskTimeSheet = lazyWithReload(() =>
 export function AppShell() {
   useWebSocket();
   useNotificationSocket();
+  useBrowserNotifications();
   useHydrateSettings();
   const { isOnline } = useOfflineSync();
   const quickAddOpen = useUIStore((s) => s.quickAddOpen);

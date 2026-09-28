@@ -95,6 +95,9 @@ interface UIStore {
   /** The task rail beside the Timer grid. Persisted — it's a workspace layout choice. */
   taskRailOpen: boolean;
   setTaskRailOpen: (v: boolean) => void;
+  /** Bell notifications as desktop notifications, turned on in this browser (Settings). Persisted per browser. */
+  browserNotifications: boolean;
+  setBrowserNotifications: (v: boolean) => void;
   /** How a task opens: a centered two-column modal (default) or the side panel. Persisted per browser. */
   taskViewMode: TaskViewMode;
   setTaskViewMode: (v: TaskViewMode) => void;
@@ -253,6 +256,8 @@ export const useUIStore = create<UIStore>()(
       closeTaskLogTime: () => set({ logTimeTaskId: null }),
       taskRailOpen: false,
       setTaskRailOpen: (v) => set({ taskRailOpen: v }),
+      browserNotifications: false,
+      setBrowserNotifications: (v) => set({ browserNotifications: v }),
       taskViewMode: "modal",
       setTaskViewMode: (v) => set({ taskViewMode: v }),
       taskActivityOpen: true,
@@ -289,6 +294,7 @@ export const useUIStore = create<UIStore>()(
         sidebarCollapsed: s.sidebarCollapsed,
         taskRailOpen: s.taskRailOpen,
         taskViewMode: s.taskViewMode,
+        browserNotifications: s.browserNotifications,
         taskActivityOpen: s.taskActivityOpen,
         collapsedRailClients: s.collapsedRailClients,
         theme: s.theme,

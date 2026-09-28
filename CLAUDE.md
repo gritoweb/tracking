@@ -86,9 +86,13 @@ Configured in `wrangler.jsonc` under `triggers.crons`. Four independent jobs run
 
 - **Email digests** (`runDigests`): the opt-in morning briefing and Monday weekly summary. The cron has no request to read a timezone from, so it works off `user.digest_tz_offset` (reconciled client-side in `useHydrateSettings` when it drifts, so a DST change doesn't send an hour off for months). Exactly-once per day by comparing `digest_daily_sent`/`digest_weekly_sent` against the user's **local** date — the cron ticks twelve times inside the target hour.
 
-- **Slack notifications** (`runSlackNotifications`, `lib/slack.ts` + `routes/slack.ts`): a bell notification still unread after 15 min goes to its person as a Slack DM (matched by email, one DM per person, claimed via `notifications.slack_sent_at` so at most once). One OAuth installation per workspace (`slack_installations`, manager-only), per-person opt-out `user.slack_notify`. **`SLACK_DRY_RUN=1` in `.dev.vars` means local runs never call slack.com** — keep it there. See `docs/SLACK.md`.
+- **Slack notifications** (`runSlackNotifications`, `lib/slack.ts` + `routes/slack.ts`): a bell notification still unread after 5 min goes to its person as a Slack DM (matched by email, one DM per person, claimed via `notifications.slack_sent_at` so at most once). One OAuth installation per workspace (`slack_installations`, manager-only), per-person opt-out `user.slack_notify`. **`SLACK_DRY_RUN=1` in `.dev.vars` means local runs never call slack.com** — keep it there. See `docs/SLACK.md`.
 
 All jobs iterate their subjects independently and swallow per-subject errors, so one broken connection, template or address never blocks the rest of the sweep.
+
+### Desktop notifications (web push)
+
+`notifyUser` also calls `sendWebPush` (`lib/web-push.ts`): a **payload-less** push, VAPID-signed (ES256 via WebCrypto), to each browser in `push_subscriptions`; the service worker `public/sw.js` then reads `/api/notifications` itself and shows the unread ones it hasn't shown, and stays quiet while the app is focused. Clicking marks read (so Slack stays quiet) and opens the task. Turned on per browser in Settings → General (`BrowserNotificationsCard`, `lib/browserNotifications.ts`); without push the page shows them itself while open in another tab. The worker only POSTs to browser push services (`isPushEndpoint`) — never widen that list to arbitrary hosts. Env `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`; see `docs/PUSH_NOTIFICATIONS.md`.
 
 ### The app's own URL
 

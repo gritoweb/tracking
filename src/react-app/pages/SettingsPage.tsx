@@ -11,7 +11,7 @@ import { useRecolorProjects } from "@/hooks/useProjects";
 import { useWorkspaceRole } from "@/hooks/useWorkspaceRole";
 import { GeneralSettingsTab } from "@/components/settings/GeneralSettingsTab";
 import { IntegrationsCard } from "@/components/integrations/IntegrationsCard";
-import { CalendarSyncCard } from "@/components/settings/CalendarSyncCard";
+import { BrowserNotificationsCard } from "@/components/settings/BrowserNotificationsCard";
 import { ProductivityCard } from "@/components/settings/ProductivityCard";
 import { DigestCard } from "@/components/settings/DigestCard";
 import { McpConnectorCard } from "@/components/settings/McpConnectorCard";
@@ -85,7 +85,9 @@ export function SettingsPage() {
   // than rendering an empty page.
   const [searchParams, setSearchParams] = useSearchParams();
   const requested = searchParams.get("tab");
-  const tab = TABS.includes(requested as Tab) ? (requested as Tab) : "general";
+  // An OAuth round trip (Slack, calendar) lands on /settings?slack=… — its result belongs to the Integrations grid.
+  const oauthReturn = searchParams.has("slack") || searchParams.has("calendar");
+  const tab = TABS.includes(requested as Tab) ? (requested as Tab) : oauthReturn ? "workspace" : "general";
   const setTab = (next: string) => {
     const params = new URLSearchParams(searchParams);
     params.set("tab", next);
@@ -131,6 +133,7 @@ export function SettingsPage() {
             showWeekends={showWeekends}
             onShowWeekendsChange={handleShowWeekendsChange}
           />
+          <BrowserNotificationsCard />
         </TabsContent>
 
         <TabsContent value="tracking" className="mt-4 space-y-4">
@@ -142,7 +145,6 @@ export function SettingsPage() {
 
         <TabsContent value="workspace" className="mt-4 space-y-4">
           <TeamCard />
-          <CalendarSyncCard />
           <McpConnectorCard />
           <IntegrationsCard />
 

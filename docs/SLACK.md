@@ -1,7 +1,7 @@
 # Slack — notificações não lidas por DM
 
 Quando uma notificação **sobre você** — task atribuída a você, ou alguém te marcou (@) no título, na descrição
-ou num comentário — continua **não lida por 15 minutos**, o bot do TimeTracker manda uma DM no Slack para a pessoa, com um botão que abre a
+ou num comentário — continua **não lida por 5 minutos**, o bot do TimeTracker manda uma DM no Slack para a pessoa, com um botão que abre a
 tarefa no app. Quem está com o app aberto e lê a notificação a tempo não recebe nada no Slack.
 
 - Mudança de status **não** vai para o Slack (fica só no sininho): só vai o que tem a ver com você
@@ -53,7 +53,7 @@ requisição** ao slack.com: registra o método e os argumentos no log (`slack d
 uma resposta falsa. A única exceção é `oauth.v2.access` (a troca do código ao clicar em Add to Slack),
 que não envia mensagem para ninguém. Em produção a variável não existe.
 
-Testar a varredura local sem Slack real: rodar `pnpm dev`, ter uma notificação não lida com mais de 15 min
+Testar a varredura local sem Slack real: rodar `pnpm dev`, ter uma notificação não lida com mais de 5 min
 num workspace com uma linha em `slack_installations`, e disparar o cron:
 `curl "http://localhost:5173/cdn-cgi/handler/scheduled?cron=*/5+*+*+*+*"`. O payload aparece no log e
 `notifications.slack_sent_at` é preenchido.
@@ -63,7 +63,7 @@ num workspace com uma linha em `slack_installations`, e disparar o cron:
 - **Tabelas** (migração `0053`): `slack_installations` (token do bot cifrado com `AUTH_SECRET`),
   `slack_user_links` (cache do e-mail → id do Slack; "não achado" é re-checado após 24h),
   `notifications.slack_sent_at`, `user.slack_notify`.
-- **Cron** `runSlackNotifications`, a cada 5 min: pega o que está não lido entre 15 min e 24h, só de quem
+- **Cron** `runSlackNotifications`, a cada 5 min: pega o que está não lido entre 5 min e 24h, só de quem
   ainda é membro, não está banido e não desligou. **Reivindica antes de enviar** (`UPDATE … WHERE
   slack_sent_at IS NULL`), então uma notificação vai para o Slack no máximo uma vez, mesmo com duas
   varreduras sobrepostas. Falha de envio não reenvia.

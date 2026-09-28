@@ -1002,6 +1002,8 @@ export const SlackStatusSchema = z.object({
 
 export const UpdateSlackPrefsSchema = z.object({ notify: z.boolean() });
 
+export const PushSubscriptionSchema = z.object({ endpoint: z.string().url().max(2048) });
+
 // ─── Integrations ──────────────────────────────────────────────────────────────
 
 export const IntegrationTypeSchema = z.enum(["workfront", "dynamics"]);

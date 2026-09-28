@@ -20,6 +20,7 @@ import type { settingsRouter } from "../../worker/routes/settings";
 import type { integrationsRouter } from "../../worker/routes/integrations";
 import type { calendarRouter } from "../../worker/routes/calendar";
 import type { slackRouter } from "../../worker/routes/slack";
+import type { pushRouter } from "../../worker/routes/push";
 import type { aiRouter } from "../../worker/routes/ai";
 import type { assistantRouter } from "../../worker/routes/assistant";
 import type { adminRouter } from "../../worker/routes/admin";
@@ -89,6 +90,9 @@ export const calendarClient = hc<PickResponseByStatusCode<typeof calendarRouter,
   fetch: honoFetch,
 });
 export const slackClient = hc<PickResponseByStatusCode<typeof slackRouter, 200>>("/slack", {
+  fetch: honoFetch,
+});
+export const pushClient = hc<PickResponseByStatusCode<typeof pushRouter, 200>>("/push", {
   fetch: honoFetch,
 });
 export const aiClient = hc<PickResponseByStatusCode<typeof aiRouter, 200>>("/ai", {

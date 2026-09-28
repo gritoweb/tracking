@@ -19,6 +19,7 @@ import {
   integrationsClient,
   calendarClient,
   slackClient,
+  pushClient,
   aiClient,
   assistantClient,
   adminClient,
@@ -435,6 +436,14 @@ export const api = {
     setNotify: (notify: boolean) => json(slackClient.me.$patch({ json: { notify } })),
     sendTest: () => json(slackClient.test.$post()),
     disconnect: () => json(slackClient.index.$delete()),
+  },
+
+  // ─── Browser push ─────────────────────────────────────────────────────────
+  push: {
+    config: () => json(pushClient.config.$get()),
+    subscribe: (endpoint: string) => json(pushClient.subscriptions.$post({ json: { endpoint } })),
+    unsubscribe: (endpoint: string) => json(pushClient.subscriptions.$delete({ json: { endpoint } })),
+    sendTest: () => json(pushClient.test.$post()),
   },
 
   // ─── AI ───────────────────────────────────────────────────────────────────

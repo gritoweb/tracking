@@ -3,6 +3,7 @@ import type { NotificationRow } from "../db/rows";
 import { currentMemberIds } from "./permissions";
 import { taskPath } from "@shared/task-links";
 import { sqliteUtcToIso } from "./sqlite-time";
+import { sendWebPush } from "./web-push";
 
 export function formatNotification(row: NotificationRow): Notification {
   return {
@@ -75,6 +76,7 @@ export async function notifyUser(
 
   const row = await env.DB.prepare(`SELECT * FROM notifications WHERE id = ?`).bind(id).first<NotificationRow>();
   if (row) await pushLive(env, userId, formatNotification(row));
+  await sendWebPush(env, userId);
 }
 
 const NOTIFICATION_RETENTION_DAYS = 90;

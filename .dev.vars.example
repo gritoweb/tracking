@@ -53,3 +53,9 @@ SLACK_CLIENT_ID=
 SLACK_CLIENT_SECRET=
 # 1 = log every Slack Web API call instead of sending it (local dev never messages anyone).
 SLACK_DRY_RUN=1
+
+# Browser push notifications (lib/web-push.ts, docs/PUSH_NOTIFICATIONS.md). A P-256 key pair: the public key as
+# base64url uncompressed point, the private key as its base64url `d`. Generate one with the command in the doc.
+# Production: `wrangler secret put VAPID_PUBLIC_KEY` / `wrangler secret put VAPID_PRIVATE_KEY`. Blank = feature off.
+VAPID_PUBLIC_KEY=
+VAPID_PRIVATE_KEY=

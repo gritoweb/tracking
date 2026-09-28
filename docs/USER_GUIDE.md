@@ -294,9 +294,13 @@ Under **Settings → Integrations** you can connect **Adobe Workfront** or **Mic
 
 Both systems file time against a calendar day rather than a timestamp, and the day used is the one **you** were working in: the push sends your browser's timezone, so an entry tracked at 18:30 is filed on that date, not the next one. Pushing an older backlog is dated by the rule in force back then, so entries either side of a daylight-saving change still land on the right day.
 
+## Desktop notifications
+
+Turn them on once per browser in **Settings → General → Desktop notifications → Enable notifications** and allow the browser's prompt. From then on, everything that reaches the bell — a task assigned to you, a mention, your task moving — also shows as a notification in the corner of your screen, with your computer's sound, even when TimeTracker isn't open (the browser has to be). Clicking it opens the task and marks it read. On iPhone or iPad, add TimeTracker to your Home Screen first and turn it on from there. **Send a test** shows one; **Turn off** stops it for that browser.
+
 ## Slack notifications
 
-If a workspace owner or admin connects Slack (**Settings → Workspace → Integrations → Add to Slack**), notifications about **you** that you haven't opened in the app within **15 minutes** — a task assigned to you, or someone mentioning you in a task's title, description or a comment — arrive as a direct message from the TimeTracker bot, with a button that opens the task. If you read the notification in time, Slack stays quiet.
+If a workspace owner or admin connects Slack (**Settings → Workspace → Integrations → Slack → Add to Slack**), notifications about **you** that you haven't opened in the app within **5 minutes** — a task assigned to you, or someone mentioning you in a task's title, description or a comment — arrive as a direct message from the TimeTracker bot, with a button that opens the task. If you read the notification in time, Slack stays quiet.
 
 - You're matched in Slack by the **email address** of your account. If they differ, the card tells you nothing can reach you there.
 - **Send me a test message** checks that it works for you.

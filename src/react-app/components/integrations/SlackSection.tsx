@@ -1,11 +1,8 @@
-import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
-import { toast } from "sonner";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Spinner } from "@/components/ui/spinner";
-import { Separator } from "@/components/ui/separator";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { SettingsRow } from "@/components/settings/SettingsRow";
 import { SettingsHint } from "@/components/settings/SettingsHint";
@@ -16,30 +13,13 @@ import {
   useSlackStatus,
 } from "@/hooks/useSlack";
 
-const RESULT_TOASTS: Record<string, () => void> = {
-  connected: () => toast.success("Slack connected"),
-  not_configured: () => toast.error("Slack isn't configured on this server"),
-  forbidden: () => toast.error("Only workspace owners and admins can connect Slack"),
-  error: () => toast.error("Couldn't connect Slack"),
-};
-
 /** Slack as a delivery channel for unread notifications: the workspace's installation plus each person's opt-out. */
 export function SlackSection() {
-  const [params, setParams] = useSearchParams();
   const { data: status } = useSlackStatus();
   const setNotify = useSetSlackNotify();
   const sendTest = useSendSlackTest();
   const disconnect = useDisconnectSlack();
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
-
-  // Surface the OAuth round-trip result (redirected back to /settings?slack=…).
-  useEffect(() => {
-    const result = params.get("slack");
-    if (!result) return;
-    RESULT_TOASTS[result]?.();
-    params.delete("slack");
-    setParams(params, { replace: true });
-  }, [params, setParams]);
 
   // Same rule as calendar sync: a server without a Slack app has nothing to offer here.
   if (!status?.configured) return null;
@@ -88,7 +68,7 @@ export function SlackSection() {
           <SettingsRow
             htmlFor="slack-notify"
             label="Send my unread notifications to Slack"
-            description="When a task is assigned to you or someone mentions you, and you haven't seen it here within 15 minutes, the TimeTracker bot sends you a direct message."
+            description="When a task is assigned to you or someone mentions you, and you haven't opened it within 5 minutes, the TimeTracker bot sends you a direct message."
           >
             <Switch
               id="slack-notify"
@@ -120,8 +100,6 @@ export function SlackSection() {
           setConfirmDisconnect(false);
         }}
       />
-      {/* Divides Slack (notifications) from the time-push connections listed below it. */}
-      <Separator className="mt-4" />
     </div>
   );
 }

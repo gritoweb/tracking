@@ -24,6 +24,7 @@ import { plannerRouter } from "./routes/planner";
 import { settingsRouter } from "./routes/settings";
 import { integrationsRouter } from "./routes/integrations";
 import { calendarRouter } from "./routes/calendar";
+import { pushRouter } from "./routes/push";
 import { slackRouter } from "./routes/slack";
 import { aiRouter } from "./routes/ai";
 import { assistantRouter } from "./routes/assistant";
@@ -118,6 +119,7 @@ const app = new Hono<{ Bindings: Env }>()
   .use("/api/integrations/*", outboundRateLimit)
   .use("/api/calendar/convert", outboundRateLimit)
   .use("/api/slack/test", outboundRateLimit)
+  .use("/api/push/test", outboundRateLimit)
   .use("/api/client-errors", clientErrorsRateLimit)
   .route("/api/time_entries", timeEntriesRouter)
   .route("/api/projects", projectsRouter)
@@ -136,6 +138,7 @@ const app = new Hono<{ Bindings: Env }>()
   .route("/api/integrations", integrationsRouter)
   .route("/api/calendar", calendarRouter)
   .route("/api/slack", slackRouter)
+  .route("/api/push", pushRouter)
   .route("/api/ai", aiRouter)
   .route("/api/assistant", assistantRouter)
   .route("/api/admin", adminRouter)
