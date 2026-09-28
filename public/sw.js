@@ -22,8 +22,8 @@ async function writeShown(ids) {
 
 async function showUnread() {
   const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
-  // Someone looking at the app sees it arrive in the bell; a desktop popup on top would be noise.
-  if (windows.some((w) => w.focused)) return;
+  // Someone looking at the app sees it arrive in the bell, so only the test (asked for from the app itself) pops up then.
+  const appInFocus = windows.some((w) => w.focused);
 
   let notifications = [];
   try {
@@ -36,6 +36,7 @@ async function showUnread() {
   const shown = await readShown();
   const fresh = notifications
     .filter((n) => !n.isRead && !shown.includes(n.id) && Date.now() - Date.parse(n.createdAt) < MAX_AGE_MS)
+    .filter((n) => !appInFocus || n.type === "test")
     .slice(0, MAX_PER_PUSH);
   if (!fresh.length) return;
 

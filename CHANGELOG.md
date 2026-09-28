@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-09-28 (10) — on `refactor`, local only, not pushed or deployed
+### Fixed
+- **"Send a test" showed nothing.** The service worker skips the popup while the app is focused (the bell already shows it), and the test is always clicked from inside the app, so it was always skipped. Found locally: Luis's browser had a live FCM subscription, both tests reached the bell, FCM accepted the push (no refusal logged, subscription kept), and no popup appeared. The test notification (`type: "test"`) now pops up even with the app focused; every other one still stays quiet while you're looking at the app.
+
 ## 2026-09-28 (9) — on `refactor`, local only, not pushed or deployed
 ### Added
 - **Desktop notifications (web push).** Everything that reaches the bell also appears as a system notification with the computer's sound, even when TimeTracker isn't open (the browser must be); clicking it marks it read and opens the task. Turned on per browser from **Settings → General → Desktop notifications → Enable notifications**. The push carries no payload: `sendWebPush` (`lib/web-push.ts`, called from `notifyUser`) signs an ES256 VAPID JWT with WebCrypto and wakes each of the person's browsers; the service worker (`public/sw.js`) reads `/api/notifications` and shows the unread ones it hasn't shown, and stays quiet while the app is focused. Why no payload: nothing about a task passes through Google/Mozilla/Apple, and there is no payload encryption to get wrong. New: migration `0054_push_subscriptions.sql` (additive), `/api/push` (`config`, `subscriptions`, `test`), env `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`, `docs/PUSH_NOTIFICATIONS.md`. The worker only POSTs to the browsers' push services (`isPushEndpoint`), and a 404/410 from one drops that subscription.

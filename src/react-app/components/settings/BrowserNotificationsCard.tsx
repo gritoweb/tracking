@@ -88,7 +88,7 @@ export function BrowserNotificationsCard() {
               onClick={() =>
                 run(async () => {
                   await api.push.sendTest();
-                  toast.success("Test sent — switch to another tab or app to see it");
+                  toast.success("Test sent — it should appear in the corner of your screen");
                 })
               }
             >
