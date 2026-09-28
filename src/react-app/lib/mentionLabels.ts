@@ -2,6 +2,8 @@ import type { Editor } from "@tiptap/react";
 
 /** Rewrites each mention chip's saved label to the person's current name (matched by id); returns whether anything changed. */
 export function refreshMentionLabels(editor: Editor, members: { userId: string; name: string }[]): boolean {
+  // Same as the mention list: an editor replaced while opening another task can't take a transaction.
+  if (editor.isDestroyed) return false;
   const names = new Map(members.map((m) => [m.userId, m.name]));
   const tr = editor.state.tr;
   editor.state.doc.descendants((node, pos) => {

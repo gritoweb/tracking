@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-09-28 (14) — on `refactor`, local only, not pushed or deployed
+### Fixed
+- **Opening a task could crash the page** ("An unexpected error interrupted this page", fixed only by F5) with `TypeError: Cannot set properties of undefined (setting 'members')` in `setMentionMembers` — seen when a desktop notification opened a task (reported by the app to `/api/client-errors`, route `/tasks/4fee…`). Cause: the description editor is rebuilt when the task's collaborative document changes, Tiptap's `destroy()` empties `extensionStorage`, and an effect still ran once with the destroyed editor. `setMentionMembers` and `refreshMentionLabels` (which would dispatch on the destroyed view) now skip a destroyed editor; the replacement gets the team on its own effect run. Tests reproduce both crashes and fail without the guard.
+
 ## 2026-09-28 (13) — on `refactor`, local only, not pushed or deployed
 ### Fixed
 - **Desktop notifications have an "Open" button**, which the click handler treats like a click on the body. Root cause of "I click and nothing opens", proven on Luis's machine (XFCE, `xfce4-notifyd` 0.9.4) with `dbus-monitor`: Chrome registers the `default` action on every notification, but a click on the body made the daemon send `NotificationClosed` with reason 2 (dismissed by the user) and never `ActionInvoked "default"`, so Chrome was never told there was a click; the daemon does advertise `actions` and reports button clicks. On Windows/macOS the body click keeps working and the button is just a shortcut.

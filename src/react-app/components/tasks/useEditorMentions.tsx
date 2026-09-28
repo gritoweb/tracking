@@ -17,6 +17,8 @@ declare module "@tiptap/core" {
 
 /** Hands the editor the current team, which "@" lists; call it whenever the team changes. */
 export function setMentionMembers(editor: Editor, members: WorkspaceMember[]) {
+  // A destroyed editor has no storage; the one replacing it gets the team when its own effect runs.
+  if (editor.isDestroyed) return;
   editor.storage.mention.members = members;
 }
 
