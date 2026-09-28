@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { NodeViewWrapper, type NodeViewProps } from "@tiptap/react";
 import { X } from "lucide-react";
 import { fileExtension, formatFileSize } from "@shared/attachments";
@@ -9,12 +10,34 @@ export function FileCard({ node, editor, deleteNode }: NodeViewProps) {
   const openAttachment = useOpenAttachment();
   const { href, filename, size } = node.attrs as { href: string; filename: string; size: number | null };
   const attachmentId = attachmentIdFromHref(href);
+  const [gone, setGone] = useState(false);
+
+  // A file deleted from the task shows nothing, and an editable text drops it; only a 404 counts, never a network blip.
+  const drop = useRef(() => (editor.isEditable ? deleteNode() : undefined));
+  useEffect(() => {
+    drop.current = () => (editor.isEditable ? deleteNode() : undefined);
+  });
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch(href, { method: "HEAD", signal: controller.signal })
+      .then((res) => {
+        if (res.status !== 404) return;
+        setGone(true);
+        drop.current();
+      })
+      .catch((e: unknown) => {
+        if (!controller.signal.aborted) console.warn("file check failed", { href, error: String(e) });
+      });
+    return () => controller.abort();
+  }, [href]);
 
   const open = () => {
     if (attachmentId && openAttachment) openAttachment(attachmentId);
     // Outside a task (nothing to open it in), the file itself downloads.
     else window.open(href, "_blank", "noopener");
   };
+
+  if (gone) return <NodeViewWrapper className="hidden" />;
 
   return (
     <NodeViewWrapper className="my-1.5" data-drag-handle="">

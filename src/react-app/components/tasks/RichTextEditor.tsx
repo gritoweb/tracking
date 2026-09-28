@@ -16,6 +16,8 @@ import { pickedFile, insertUploadedFile, UploadPlaceholderExtension, type Inline
 import { attachmentIdFromHref, useOpenAttachment } from "./attachment-viewer/AttachmentViewerContext";
 import { refreshMentionLabels } from "@/lib/mentionLabels";
 import { cn } from "@/lib/utils";
+import { FILE_ATTACHMENT_NODE, attachmentIdsInDoc } from "@shared/rich-doc";
+import { onAttachmentDeleted } from "@/lib/attachmentEvents";
 import { getContrastColor } from "@/lib/colorUtils";
 import { NEUTRAL_SWATCH } from "@shared/colors";
 import type { WorkspaceMember } from "@/hooks/useWorkspaceRole";
@@ -108,6 +110,32 @@ export function RichTextEditor({
     onSubmitRef.current = onSubmit;
   });
   const mentions = useEditorMentions(members);
+  // Files uploaded while this text was being written: one taken out again before it was saved is deleted, not left in Attachments.
+  const sessionUploads = useRef(new Set<string>());
+  const trackedUpload = onUploadFile
+    ? async (file: File) => {
+        const uploaded = await onUploadFile(file);
+        sessionUploads.current.add(uploaded.id);
+        return uploaded;
+      }
+    : undefined;
+  const trackedUploadRef = useRef(trackedUpload);
+  useEffect(() => {
+    trackedUploadRef.current = trackedUpload;
+  });
+  const onDeleteRef = useRef(onDeleteImage);
+  useEffect(() => {
+    onDeleteRef.current = onDeleteImage;
+  }, [onDeleteImage]);
+  const sweepRemovedUploads = (doc: JSONContent) => {
+    if (!sessionUploads.current.size) return;
+    const shown = attachmentIdsInDoc(JSON.stringify(doc));
+    for (const id of sessionUploads.current) {
+      if (shown.has(id)) continue;
+      sessionUploads.current.delete(id);
+      onDeleteRef.current?.(id);
+    }
+  };
   // Read through a ref: the editor's handlers are built once, the viewer callback can change.
   const openAttachment = useOpenAttachment();
   const openAttachmentRef = useRef(openAttachment);
@@ -179,24 +207,27 @@ export function RichTextEditor({
       },
       handlePaste: (view, event) => {
         const file = pickedFile(event.clipboardData?.items);
-        if (!file || !onUploadFile) return false;
+        const upload = trackedUploadRef.current;
+        if (!file || !upload) return false;
         event.preventDefault();
-        insertUploadedFile(view, view.state.selection.from, file, onUploadFile, onDeleteImage);
+        insertUploadedFile(view, view.state.selection.from, file, upload, onDeleteImage);
         return true;
       },
       handleDrop: (view, event) => {
         const file = pickedFile(event.dataTransfer?.files);
-        if (!file || !onUploadFile) return false;
+        const upload = trackedUploadRef.current;
+        if (!file || !upload) return false;
         event.preventDefault();
         const pos =
           view.posAtCoords({ left: event.clientX, top: event.clientY })?.pos ?? view.state.selection.from;
-        insertUploadedFile(view, pos, file, onUploadFile, onDeleteImage);
+        insertUploadedFile(view, pos, file, upload, onDeleteImage);
         return true;
       },
     },
     onBlur: ({ editor: e }) => {
       // A "/" the "+" handle left behind must not be saved as text.
       dropHandleSlash(e);
+      sweepRemovedUploads(e.getJSON());
       onBlur?.(e.getJSON());
     },
   }, [collab?.doc]);
@@ -204,6 +235,37 @@ export function RichTextEditor({
   useEffect(() => {
     editorRef.current = editor;
   });
+
+  // Leaving without saving (a comment never posted, the task closed): what this session uploaded and the text no longer shows goes.
+  const sweepRef = useRef(sweepRemovedUploads);
+  useEffect(() => {
+    sweepRef.current = sweepRemovedUploads;
+  });
+  useEffect(
+    () => () => {
+      const doc = editorRef.current?.state.doc.toJSON() as JSONContent | undefined;
+      if (doc) sweepRef.current(doc);
+    },
+    []
+  );
+
+  // A file deleted from Attachments leaves this text at once; in a live room the change reaches everyone through it.
+  useEffect(() => {
+    if (!editor) return;
+    return onAttachmentDeleted((attachmentId) => {
+      sessionUploads.current.delete(attachmentId);
+      const url = `/api/attachments/${attachmentId}`;
+      const ranges: { from: number; to: number }[] = [];
+      editor.state.doc.descendants((node, pos) => {
+        const shown = node.type.name === "image" ? node.attrs.src : node.type.name === FILE_ATTACHMENT_NODE ? node.attrs.href : null;
+        if (shown === url) ranges.push({ from: pos, to: pos + node.nodeSize });
+      });
+      if (!ranges.length) return;
+      const tr = editor.state.tr;
+      for (const range of ranges.reverse()) tr.delete(range.from, range.to);
+      editor.view.dispatch(tr);
+    });
+  }, [editor]);
 
   // The sheet reopens on a different task without remounting this component — sync the content in.
   useEffect(() => {
@@ -251,7 +313,7 @@ export function RichTextEditor({
       <EditorContent editor={editor} className={className} />
       {toolbar && (
         <div className="flex items-center justify-between gap-2">
-          <EditorToolbar editor={editor} onUploadFile={onUploadFile} onDeleteImage={onDeleteImage} />
+          <EditorToolbar editor={editor} onUploadFile={trackedUpload} onDeleteImage={onDeleteImage} />
           {footer}
         </div>
       )}

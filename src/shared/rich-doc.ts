@@ -72,3 +72,18 @@ export function attachmentsRemoved(before: string | null | undefined, after: str
   const now = attachmentIdsInDoc(after);
   return [...attachmentIdsInDoc(before)].filter((id) => !now.has(id));
 }
+
+/** A stored doc with every image or file card of this attachment removed; null when it showed none (nothing to rewrite). */
+export function stripAttachment(raw: string | null | undefined, attachmentId: string): RichNode | null {
+  const doc = parseDoc(raw);
+  if (!doc || !attachmentIdsInDoc(raw).has(attachmentId)) return null;
+  const shows = (node: RichNode) => {
+    const url = node.type === "image" ? node.attrs?.src : node.type === FILE_ATTACHMENT_NODE ? node.attrs?.href : null;
+    return typeof url === "string" && url.match(ATTACHMENT_URL)?.[1] === attachmentId;
+  };
+  const strip = (node: RichNode, depth: number): RichNode =>
+    depth > MAX_DEPTH || !node.content
+      ? node
+      : { ...node, content: node.content.filter((child) => !shows(child)).map((child) => strip(child, depth + 1)) };
+  return strip(doc, 0);
+}

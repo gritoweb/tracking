@@ -139,21 +139,155 @@ test("an image deleted from the description leaves the task's Attachments as soo
   await expect(thumbnail).toHaveCount(0, { timeout: 10_000 });
 });
 
-test("deleting from Attachments an image the text still shows leaves a note instead of a broken image", async ({ page }) => {
+test("deleting a file from Attachments takes it out of the description and the comments too", async ({ page }) => {
   const panel = await openTask(page);
+  const png = makePng(400, 240).toString("base64");
   const description = panel.getByRole("textbox", { name: "Description" });
   await description.click();
-  await giveFile(description, "paste", "diagram.png", makePng(400, 240).toString("base64"), "image/png");
+  await giveFile(description, "paste", "diagram.png", png, "image/png");
   await expect(description.locator("img")).toHaveCount(1, { timeout: 10_000 });
   await panel.getByText("Subtasks").click();
 
-  const thumbnail = panel.getByRole("button", { name: "Open diagram.png" });
-  await thumbnail.hover();
-  await panel.getByRole("button", { name: "Delete diagram.png" }).click();
-  await page.getByRole("alertdialog").getByRole("button", { name: "Delete" }).click();
-  await expect(thumbnail).toHaveCount(0);
+  const composer = panel.getByRole("textbox", { name: "Write a comment" });
+  await composer.click();
+  await page.keyboard.type("Look at this ");
+  await giveFile(composer, "paste", "flow.pdf", PDF, "application/pdf");
+  await expect(composer.getByRole("button", { name: "Open flow.pdf" })).toBeVisible({ timeout: 10_000 });
+  await panel.getByRole("button", { name: "Comment", exact: true }).click();
+  const posted = panel.getByRole("region", { name: "Comments" }).getByRole("textbox", { name: "Comment", exact: true });
+  await expect(posted.getByRole("button", { name: "Open flow.pdf" })).toBeVisible();
 
-  // The description still holds the image node; reopening shows the note, not a broken picture.
+  for (const name of ["diagram.png", "flow.pdf"]) {
+    // The first "Open" is the Attachments thumbnail; the comment's card comes later in the page.
+    await panel.getByRole("button", { name: `Open ${name}` }).first().hover();
+    await panel.getByRole("button", { name: `Delete ${name}` }).click();
+    await page.getByRole("alertdialog").getByRole("button", { name: "Delete" }).click();
+  }
+
+  // Gone from the text itself — not merely broken and replaced by the "removed" note.
+  await expect(description.locator("img")).toHaveCount(0);
+  await expect(description.getByText("This image was removed from the task")).toHaveCount(0);
+  await expect(posted.getByRole("button", { name: "Open flow.pdf" })).toHaveCount(0);
+  await expect(posted.getByText("Look at this")).toBeVisible();
+});
+
+test("an image already in the description, deleted from Attachments after reopening, leaves the text for good", async ({ page }) => {
+  const panel = await openTask(page);
+  const description = panel.getByRole("textbox", { name: "Description" });
+  await description.click();
+  await giveFile(description, "paste", "kept.png", makePng(400, 240).toString("base64"), "image/png");
+  await expect(description.locator("img")).toHaveCount(1, { timeout: 10_000 });
+  await panel.getByText("Subtasks").click();
   await page.reload();
-  await expect(panel.getByText("This image was removed from the task")).toBeVisible({ timeout: 10_000 });
+  await page.waitForLoadState("networkidle");
+  await expect(description.locator("img")).toHaveCount(1);
+
+  await panel.getByRole("button", { name: "Open kept.png" }).first().hover();
+  await panel.getByRole("button", { name: "Delete kept.png" }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Delete" }).click();
+  await expect(description.locator("img")).toHaveCount(0);
+  await expect(description.getByText("This image was removed from the task")).toHaveCount(0);
+
+  // The shared (co-edited) copy dropped it too: reopening doesn't bring it back.
+  await page.reload();
+  await page.waitForLoadState("networkidle");
+  await expect(panel.getByText("Subtasks")).toBeVisible();
+  await expect(description.locator("img")).toHaveCount(0);
+  await expect(description.getByText("This image was removed from the task")).toHaveCount(0);
+});
+
+test("the empty comment field fits its whole placeholder, with no scrollbar", async ({ page }) => {
+  const panel = await openTask(page);
+  const composer = panel.getByRole("textbox", { name: "Write a comment" });
+  await expect(composer).toBeVisible();
+  const overflow = await composer.evaluate((el) => {
+    const box = el.parentElement!;
+    return { scroll: box.scrollHeight, client: box.clientHeight };
+  });
+  expect(overflow.scroll).toBeLessThanOrEqual(overflow.client);
+});
+
+test("an image pasted into a comment and taken out before posting leaves Attachments", async ({ page }) => {
+  const panel = await openTask(page);
+  const composer = panel.getByRole("textbox", { name: "Write a comment" });
+  await composer.click();
+  await giveFile(composer, "paste", "draft.png", makePng(400, 240).toString("base64"), "image/png");
+  await expect(composer.locator("img")).toHaveCount(1, { timeout: 10_000 });
+  await expect(panel.getByRole("button", { name: "Open draft.png" })).toBeVisible();
+
+  await composer.locator("img").hover();
+  await composer.getByRole("button", { name: "Remove image from the text" }).click();
+  await panel.getByText("Subtasks").click();
+  await expect(panel.getByRole("button", { name: "Open draft.png" })).toHaveCount(0, { timeout: 10_000 });
+});
+
+test("an image in a comment that was never posted leaves Attachments when the task is closed", async ({ page }) => {
+  const panel = await openTask(page);
+  const url = page.url();
+  const composer = panel.getByRole("textbox", { name: "Write a comment" });
+  await composer.click();
+  await giveFile(composer, "paste", "unsent.png", makePng(400, 240).toString("base64"), "image/png");
+  await expect(panel.getByRole("button", { name: "Open unsent.png" })).toBeVisible({ timeout: 10_000 });
+
+  await page.keyboard.press("Escape");
+  await expect(panel).not.toBeVisible();
+  await page.goto(url);
+  await page.waitForLoadState("networkidle");
+  await expect(page.getByRole("dialog", { name: "Brand review" }).getByText("Attachments")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Open unsent.png" })).toHaveCount(0);
+});
+
+test("an image added while editing a comment goes away when the edit is cancelled", async ({ page }) => {
+  const panel = await openTask(page);
+  const composer = panel.getByRole("textbox", { name: "Write a comment" });
+  await composer.click();
+  await page.keyboard.type("First version");
+  await panel.getByRole("button", { name: "Comment", exact: true }).click();
+  await expect(panel.getByRole("region", { name: "Comments" }).getByText("First version")).toBeVisible();
+
+  await panel.getByRole("region", { name: "Comments" }).getByText("First version").hover();
+  await panel.getByRole("button", { name: "Edit comment" }).click();
+  const editor = panel.getByRole("textbox", { name: "Edit comment" });
+  await editor.click();
+  await giveFile(editor, "paste", "edit.png", makePng(400, 240).toString("base64"), "image/png");
+  await expect(panel.getByRole("button", { name: "Open edit.png" })).toBeVisible({ timeout: 10_000 });
+
+  await panel.getByRole("button", { name: "Cancel" }).click();
+  await expect(panel.getByRole("button", { name: "Open edit.png" })).toHaveCount(0, { timeout: 10_000 });
+});
+
+test("a file already deleted leaves no trace: nothing shows, no note, and the description drops it", async ({ page }) => {
+  await signUp(page);
+  const project = await createProject(page, { name: "Site Relaunch", color: "#e11d48" });
+  const stale = (text: string) =>
+    JSON.stringify({
+      type: "doc",
+      content: [
+        { type: "paragraph", content: [{ type: "text", text }] },
+        { type: "image", attrs: { src: "/api/attachments/deleted-image" } },
+        { type: "fileAttachment", attrs: { href: "/api/attachments/deleted-file", filename: "old.pdf" } },
+      ],
+    });
+  const task = await (
+    await page.request.post("/api/tasks", { data: { name: "Brand review", projectId: project.id, description: stale("Keep me") } })
+  ).json();
+  const comment = await page.request.post(`/api/tasks/${task.id}/comments`, { data: { body: stale("Comment text") } });
+  expect(comment.status()).toBe(201);
+
+  await page.goto(`/tasks/${task.id}`);
+  await page.waitForLoadState("networkidle");
+  const panel = page.getByRole("dialog", { name: "Brand review" });
+  await expect(panel.getByText("Keep me")).toBeVisible();
+  await expect(panel.getByText("Comment text")).toBeVisible();
+  await expect(panel.locator(".tt-richtext img")).toHaveCount(0);
+  await expect(panel.getByRole("button", { name: "Open old.pdf" })).toHaveCount(0);
+  await expect(panel.getByText("This image was removed from the task")).toHaveCount(0);
+
+  // The description is editable, so the dead references leave it for good once it's saved.
+  const description = panel.getByRole("textbox", { name: "Description" });
+  await description.click();
+  await panel.getByText("Subtasks").click();
+  await expect
+    .poll(async () => ((await (await page.request.get(`/api/tasks/${task.id}`)).json()).description as string).includes("deleted-"))
+    .toBe(false);
 });

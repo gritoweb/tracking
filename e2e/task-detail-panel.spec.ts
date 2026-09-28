@@ -190,6 +190,8 @@ test("pasting an image into the description uploads it and shows it in the galle
   const task = await created.json();
 
   await page.goto(`/tasks/${task.id}`);
+  // Locally the description may be co-edited: its editor is rebuilt once the shared doc loads, so let that settle first.
+  await page.waitForLoadState("networkidle");
   const panel = page.getByRole("dialog", { name: "Cutover plan" });
   await panel.getByRole("textbox", { name: "Description" }).click();
 

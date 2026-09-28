@@ -3,6 +3,9 @@ import { canDeleteAttachment, getMemberRole } from "../lib/permissions";
 import type { TaskAttachment } from "@shared/schemas";
 import type { TaskAttachmentRow } from "../db/rows";
 import { isImageContentType } from "@shared/attachments";
+import { stripAttachment, type RichNode } from "@shared/rich-doc";
+import { commentIsEmpty } from "@shared/comment-body";
+import { broadcast, requestOrigin } from "../db/queries";
 
 function formatAttachment(row: TaskAttachmentRow): TaskAttachment {
   return {
@@ -67,8 +70,8 @@ export const attachmentsRouter = new Hono<{
     const userId = c.get("userId");
     const id = c.req.param("id");
     const row = await c.env.DB.prepare(
-      `SELECT r2_key, user_id FROM task_attachments WHERE id = ? AND workspace_id = ?`
-    ).bind(id, workspaceId).first<{ r2_key: string; user_id: string | null }>();
+      `SELECT r2_key, user_id, task_id FROM task_attachments WHERE id = ? AND workspace_id = ?`
+    ).bind(id, workspaceId).first<{ r2_key: string; user_id: string | null; task_id: string }>();
     if (!row) return c.json({ error: "Not found" }, 404);
 
     const role = await getMemberRole(c.env.DB, workspaceId, userId);
@@ -76,8 +79,45 @@ export const attachmentsRouter = new Hono<{
       return c.json({ error: "Only the uploader or a workspace manager can delete this attachment" }, 403);
     }
 
-    await c.env.DB.prepare(`DELETE FROM task_attachments WHERE id = ?`).bind(id).run();
+    // The file also leaves every text of the task that shows it, so no broken image or dead card stays behind.
+    const serialize = (doc: RichNode) => JSON.stringify(doc.content?.length ? doc : { ...doc, content: [{ type: "paragraph" }] });
+    const task = await c.env.DB.prepare(`SELECT description FROM tasks WHERE id = ? AND workspace_id = ?`)
+      .bind(row.task_id, workspaceId).first<{ description: string | null }>();
+    const { results: comments } = await c.env.DB.prepare(
+      `SELECT id, body, attachment_id FROM task_comments WHERE task_id = ? AND workspace_id = ?`
+    ).bind(row.task_id, workspaceId).all<{ id: string; body: string; attachment_id: string | null }>();
+
+    const writes: D1PreparedStatement[] = [];
+    const description = stripAttachment(task?.description, id);
+    if (description) {
+      writes.push(c.env.DB.prepare(`UPDATE tasks SET description = ? WHERE id = ? AND workspace_id = ?`)
+        .bind(serialize(description), row.task_id, workspaceId));
+    }
+    let commentsChanged = false;
+    for (const comment of comments) {
+      const stripped = stripAttachment(comment.body, id);
+      const keptAttachment = comment.attachment_id === id ? null : comment.attachment_id;
+      if (!stripped && keptAttachment === comment.attachment_id) continue;
+      commentsChanged = true;
+      const body = stripped ? serialize(stripped) : comment.body;
+      // A comment that only carried this file has nothing left to say.
+      if (commentIsEmpty(body) && !keptAttachment) {
+        writes.push(c.env.DB.prepare(`DELETE FROM task_comments WHERE id = ?`).bind(comment.id));
+      } else {
+        writes.push(c.env.DB.prepare(`UPDATE task_comments SET body = ?, attachment_id = ? WHERE id = ?`)
+          .bind(body, keptAttachment, comment.id));
+      }
+    }
+    writes.push(c.env.DB.prepare(`DELETE FROM task_attachments WHERE id = ?`).bind(id));
+    await c.env.DB.batch(writes);
     c.executionCtx.waitUntil(c.env.ATTACHMENTS.delete(row.r2_key));
+
+    if (description) c.executionCtx.waitUntil(broadcast(c.env, workspaceId, "tasks:changed", null, requestOrigin(c)));
+    if (commentsChanged) {
+      c.executionCtx.waitUntil(
+        broadcast(c.env, workspaceId, "task-comments:changed", { taskId: row.task_id }, requestOrigin(c))
+      );
+    }
     return c.json({ ok: true }, 200);
   });
 

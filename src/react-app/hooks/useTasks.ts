@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api } from "@/lib/api-client";
+import { announceAttachmentDeleted } from "@/lib/attachmentEvents";
 import { toastApiError } from "@/lib/toastApiError";
 import { useUIStore } from "@/stores/uiStore";
 import { formatDueDate } from "@/lib/taskUtils";
@@ -226,8 +227,12 @@ export function useDeleteTaskAttachment() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id }: { taskId: string; id: string }) => api.tasks.attachments.delete(id),
-    onSuccess: (_result, { taskId }) => {
+    onSuccess: (_result, { taskId, id }) => {
       queryClient.invalidateQueries({ queryKey: ["task-attachments", taskId] });
+      // The server also took the file out of the description and comments that showed it; open editors drop it too.
+      announceAttachmentDeleted(id);
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["task-comments", taskId] });
     },
     onError: (error) => toastApiError(error, "Failed to delete attachment"),
   });

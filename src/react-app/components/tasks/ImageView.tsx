@@ -1,22 +1,28 @@
 import { useState } from "react";
 import { NodeViewWrapper, type NodeViewProps } from "@tiptap/react";
-import { ImageOff, X } from "lucide-react";
+import { X } from "lucide-react";
 
 /** An image in rich text: a click opens it in the viewer (RichTextEditor), and an editable text offers an X to take it out. */
 export function ImageView({ node, editor, deleteNode }: NodeViewProps) {
   const { src, alt } = node.attrs as { src: string; alt: string | null };
-  const [broken, setBroken] = useState(false);
+  const [gone, setGone] = useState(false);
+
+  // A file deleted from the task shows nothing; an editable text also drops it, once the server confirms it's gone (not a blip).
+  const onError = () => {
+    setGone(true);
+    if (!editor.isEditable) return;
+    fetch(src, { method: "HEAD" })
+      .then((res) => {
+        if (res.status === 404) deleteNode();
+      })
+      .catch((e: unknown) => console.warn("image check failed", { src, error: String(e) }));
+  };
+
+  if (gone) return <NodeViewWrapper className="hidden" />;
 
   return (
     <NodeViewWrapper className="group relative w-fit min-w-12 max-w-full" data-drag-handle="">
-      {broken ? (
-        <span className="my-2 flex items-center gap-2 rounded-md border px-3 py-2 text-xs text-muted-foreground">
-          <ImageOff className="h-4 w-4" />
-          This image was removed from the task
-        </span>
-      ) : (
-        <img src={src} alt={alt ?? ""} draggable={false} onError={() => setBroken(true)} />
-      )}
+      <img src={src} alt={alt ?? ""} draggable={false} onError={onError} />
       {editor.isEditable && (
         <button
           type="button"

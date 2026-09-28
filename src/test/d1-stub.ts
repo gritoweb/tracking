@@ -45,6 +45,12 @@ export function createD1Stub(handlers: D1StubHandlers = {}): D1Stub {
       };
       return statement;
     },
+    // D1's batch runs each statement in order; the stub records them like single runs.
+    async batch(statements: { run(): Promise<unknown> }[]) {
+      const results = [];
+      for (const statement of statements) results.push(await statement.run());
+      return results;
+    },
   };
 
   return { db: db as unknown as D1Database, calls };
