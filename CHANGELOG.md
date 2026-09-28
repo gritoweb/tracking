@@ -1,6 +1,6 @@
 # Changelog
 
-## 2026-09-28 — on `master`, not pushed or deployed
+## 2026-09-28 — deployed to production (version 86907576)
 ### Added
 - **Documents on a task, not only images.** The Attachments section takes PDF, Word (.docx), Excel (.xlsx), PowerPoint (.pptx), TXT and CSV besides PNG/JPEG/WebP/GIF, up to **25 MB** each (was 10 MB, images only); the formats and the limit are written under **Attach file**. One contract, `src/shared/attachments.ts`, holds formats and limit for both sides, so the hint can't disagree with the server (an env var would reach only the worker).
 - **Security**: the type comes from the bytes, never the name or mimetype. `lib/document.ts` refuses PDFs with scripts, launch/submit actions or embedded files (names read after undoing `#xx` escapes, scanned in place so a 25 MB file costs no copies), and docx/xlsx/pptx with macros, embedded OLE objects, ActiveX or executables inside, a mismatched Office type or a zip-bomb size; TXT/CSV must be UTF-8 without NUL bytes. Old `.doc`/`.xls`, ZIP, SVG and HTML stay out. The stored name gets the detected extension (`invoice.exe` holding a PDF is saved as `invoice.pdf`). Non-images always download (`attachment`), and every attachment is served with `nosniff` and a `default-src 'none'; sandbox` CSP. There is no antivirus scan: nothing on Workers provides one (see docs/ARCHITECTURE.md).
