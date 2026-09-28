@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-09-28 (13) — on `refactor`, local only, not pushed or deployed
+### Fixed
+- **Desktop notifications have an "Open" button**, which the click handler treats like a click on the body. Root cause of "I click and nothing opens", proven on Luis's machine (XFCE, `xfce4-notifyd` 0.9.4) with `dbus-monitor`: Chrome registers the `default` action on every notification, but a click on the body made the daemon send `NotificationClosed` with reason 2 (dismissed by the user) and never `ActionInvoked "default"`, so Chrome was never told there was a click; the daemon does advertise `actions` and reports button clicks. On Windows/macOS the body click keeps working and the button is just a shortcut.
+
 ## 2026-09-28 (12) — on `refactor`, local only, not pushed or deployed
 ### Fixed
 - **Clicking a desktop notification opens the task first.** The click handler waited for "mark as read" before opening a window, and Chrome only lets a service worker open one right after the click; now opening and marking read run together, and the click logs `[sw] notificationclick` so a click that never reaches the page can be told apart. Found locally: Luis clicked a notification and nothing opened, and the notification stayed unread — while `PATCH /api/notifications/:id/read` from the service worker itself returned 200 and marked it read in a controlled Chromium, so on his machine the click never reached the service worker at all (still being narrowed down: popup vs. the system's notification list).

@@ -27,6 +27,8 @@ function display(n) {
     icon: "/logo192.png",
     badge: "/maskable-192.png",
     tag: n.id,
+    // Some desktops (XFCE) treat a click on the body as "dismiss" and only report buttons, so opening needs one too.
+    actions: [{ action: "open", title: "Open" }],
     data: { id: n.id, link: n.link },
   });
 }
