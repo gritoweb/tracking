@@ -14,7 +14,7 @@ const TINY_PNG = Buffer.from(
   "base64"
 );
 
-const REJECTED_MESSAGE = "Only PNG, JPEG, WebP and GIF images are accepted";
+const REJECTED_MESSAGE = "Only images (PNG, JPEG, WebP, GIF), PDF, Word, Excel, PowerPoint, TXT and CSV files are accepted";
 
 test("visiting /tasks/:id opens that task's detail panel directly (D5)", async ({ page }) => {
   await signUp(page);
@@ -163,7 +163,7 @@ test("attaching, viewing and deleting an image on a task (D7)", async ({ page })
   await expect(thumbnail).toHaveCount(0);
 });
 
-test("a non-image file is rejected before it reaches R2 (D7)", async ({ page }) => {
+test("a program is rejected before it reaches R2 (D7)", async ({ page }) => {
   await signUp(page);
   const project = await createProject(page, { name: "ERP Migration", color: "#e11d48" });
   const created = await page.request.post("/api/tasks", {
@@ -172,7 +172,7 @@ test("a non-image file is rejected before it reaches R2 (D7)", async ({ page }) 
   const task = await created.json();
 
   const res = await page.request.post(`/api/tasks/${task.id}/attachments`, {
-    multipart: { file: { name: "notes.txt", mimeType: "text/plain", buffer: Buffer.from("not an image") } },
+    multipart: { file: { name: "setup.exe", mimeType: "application/x-msdownload", buffer: Buffer.from([0x4d, 0x5a, 0x90, 0x00]) } },
   });
   expect(res.status()).toBe(400);
   expect((await res.json()).error).toBe(REJECTED_MESSAGE);

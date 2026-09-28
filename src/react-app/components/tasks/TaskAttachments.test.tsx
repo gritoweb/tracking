@@ -11,13 +11,13 @@ const image = (name = "a.png", type = "image/png", size = 100) => new File([new 
 
 function setup(onUpload: (file: File) => Promise<unknown> = vi.fn(async () => undefined)) {
   const utils = render(
-    <TaskAttachments attachments={[]} loading={false} onOpenLightbox={() => {}} onDelete={() => {}} onUpload={onUpload} />
+    <TaskAttachments attachments={[]} loading={false} onOpen={() => {}} onDelete={() => {}} onUpload={onUpload} />
   );
   return { onUpload: onUpload as ReturnType<typeof vi.fn>, ...utils };
 }
 
 const choose = (files: File[]) =>
-  fireEvent.change(screen.getByLabelText("Choose images to attach"), { target: { files } });
+  fireEvent.change(screen.getByLabelText("Choose files to attach"), { target: { files } });
 
 describe("TaskAttachments — attaching", () => {
   beforeEach(() => toastError.mockClear());
@@ -35,20 +35,34 @@ describe("TaskAttachments — attaching", () => {
     await waitFor(() => expect(onUpload).toHaveBeenCalledTimes(2));
   });
 
-  it("refuses a file that is not an image, saying why, and uploads nothing", async () => {
+  it("uploads a PDF and a spreadsheet the same way as an image", async () => {
     const { onUpload } = setup();
-    choose([image("notes.txt", "text/plain")]);
-    await waitFor(() => expect(toastError).toHaveBeenCalledWith("Only PNG, JPEG, WebP and GIF images are accepted"));
+    const pdf = image("brief.pdf", "application/pdf");
+    const sheet = image("hours.xlsx", "");
+    choose([pdf, sheet]);
+    await waitFor(() => expect(onUpload).toHaveBeenCalledTimes(2));
+    expect(onUpload).toHaveBeenCalledWith(pdf);
+  });
+
+  it("refuses a program, saying which formats are accepted, and uploads nothing", async () => {
+    const { onUpload } = setup();
+    choose([image("setup.exe", "application/x-msdownload")]);
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith(expect.stringMatching(/^Only images .* PDF, Word, Excel/)));
     expect(onUpload).not.toHaveBeenCalled();
   });
 
-  it("refuses an image over 10 MB but still sends the valid one beside it", async () => {
+  it("refuses a file over 25 MB but still sends the valid one beside it", async () => {
     const { onUpload } = setup();
     const ok = image("ok.png");
-    choose([image("huge.png", "image/png", 10 * 1024 * 1024 + 1), ok]);
+    choose([image("huge.pdf", "application/pdf", 25 * 1024 * 1024 + 1), ok]);
     await waitFor(() => expect(onUpload).toHaveBeenCalledWith(ok));
-    expect(toastError).toHaveBeenCalledWith("Image is larger than 10 MB");
+    expect(toastError).toHaveBeenCalledWith("File is larger than 25 MB");
     expect(onUpload).toHaveBeenCalledTimes(1);
+  });
+
+  it("tells people the formats and the size limit before they pick a file", () => {
+    setup();
+    expect(screen.getByText(/PDF, Word, Excel, PowerPoint, TXT or CSV — up to 25 MB each/)).toBeInTheDocument();
   });
 
   it("uploads images dropped on the area", async () => {
@@ -62,7 +76,7 @@ describe("TaskAttachments — attaching", () => {
     let finish: () => void = () => {};
     const { onUpload } = setup(vi.fn(() => new Promise<void>((resolve) => (finish = resolve))));
     choose([image()]);
-    const button = screen.getByRole("button", { name: /Attach image/ });
+    const button = screen.getByRole("button", { name: /Attach file/ });
     await waitFor(() => expect((button as HTMLButtonElement).disabled).toBe(true));
     finish();
     await waitFor(() => expect((button as HTMLButtonElement).disabled).toBe(false));

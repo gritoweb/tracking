@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
 import { createMigratedD1 } from "../../test/sqlite-d1";
+import { DOCX, makeZip } from "../../test/zip";
 
 // tasks.ts imports lib/image.ts, which loads a real WASM module outside vitest — stub it out (same as tasks.test.ts).
 vi.mock("@cf-wasm/photon/workerd", () => ({
@@ -83,8 +84,8 @@ function streamedUpload(fileBytes: number, firstBytes: Uint8Array, opts: { decla
   return { init: { method: "POST", headers, body, duplex: "half" } as RequestInit, state, total };
 }
 
-function smallUpload(file: Uint8Array, declareLength: boolean): RequestInit {
-  const body = new Blob([partHead("dot.gif"), file, partTail]);
+function smallUpload(file: Uint8Array, declareLength: boolean, filename = "dot.gif"): RequestInit {
+  const body = new Blob([partHead(filename), file, partTail]);
   const headers: Record<string, string> = { "Content-Type": `multipart/form-data; boundary=${BOUNDARY}` };
   if (declareLength) headers["Content-Length"] = String(body.size);
   return { method: "POST", headers, body };
@@ -93,23 +94,23 @@ function smallUpload(file: Uint8Array, declareLength: boolean): RequestInit {
 const PNG_SIG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
 describe("S-11 — the size limit is enforced before the body is read", () => {
-  it("answers 413 for an 18 MB upload that declares Content-Length, without pulling the body", async () => {
+  it("answers 413 for a 30 MB upload that declares Content-Length, without pulling the body", async () => {
     const w = world();
-    const upload = streamedUpload(18 * MB, PNG_SIG, { declareLength: true });
+    const upload = streamedUpload(30 * MB, PNG_SIG, { declareLength: true });
     const res = await w.app.request("/t1/attachments", upload.init, w.env, w.ctx);
     expect(upload.state.pulled).toBeLessThan(MB);
     expect(res.status).toBe(413);
-    expect(((await res.json()) as { error: string }).error).toMatch(/10 MB/);
+    expect(((await res.json()) as { error: string }).error).toMatch(/25 MB/);
     expect(w.put).not.toHaveBeenCalled();
     expect(w.count()).toBe(0);
   });
 
   it("still refuses an oversized body that arrives without Content-Length (post-read check kept)", async () => {
     const w = world();
-    const upload = streamedUpload(11 * MB, PNG_SIG, { declareLength: false });
+    const upload = streamedUpload(26 * MB, PNG_SIG, { declareLength: false });
     const res = await w.app.request("/t1/attachments", upload.init, w.env, w.ctx);
     expect([400, 413]).toContain(res.status);
-    expect(((await res.json()) as { error: string }).error).toMatch(/10 MB/);
+    expect(((await res.json()) as { error: string }).error).toMatch(/25 MB/);
     expect(w.put).not.toHaveBeenCalled();
     expect(w.count()).toBe(0);
   });
@@ -183,5 +184,47 @@ describe("S-22 — an uploaded GIF is stored without non-frame bytes", () => {
     const res = await w.app.request("/t1/attachments", smallUpload(GIF_1X1.subarray(0, GIF_1X1.length - 1), true), w.env, w.ctx);
     expect(res.status).toBe(400);
     expect(w.put).not.toHaveBeenCalled();
+  });
+});
+
+describe("documents — the type comes from the bytes and active content is refused", () => {
+  const stored = (w: ReturnType<typeof world>) =>
+    w.raw.prepare(`SELECT filename, content_type, width, height FROM task_attachments WHERE task_id = 't1'`).get();
+
+  it("stores a PDF as it is, typed from its bytes, with no dimensions", async () => {
+    const w = world();
+    const bytes = encoder.encode("%PDF-1.7\n1 0 obj << /Type /Catalog >> endobj\n%%EOF");
+    const res = await w.app.request("/t1/attachments", smallUpload(bytes, true, "brief.pdf"), w.env, w.ctx);
+    expect(res.status).toBe(201);
+    expect(stored(w)).toEqual({ filename: "brief.pdf", content_type: "application/pdf", width: null, height: null });
+    expect([...(w.put.mock.calls[0] as unknown as [string, Uint8Array])[1]]).toEqual([...bytes]);
+  });
+
+  it("names a PDF sent as .exe by what it really is", async () => {
+    const w = world();
+    const bytes = encoder.encode("%PDF-1.7\n%%EOF");
+    await w.app.request("/t1/attachments", smallUpload(bytes, true, "invoice.exe"), w.env, w.ctx);
+    expect(stored(w)).toMatchObject({ filename: "invoice.pdf", content_type: "application/pdf" });
+  });
+
+  it("accepts a real Word document", async () => {
+    const w = world();
+    const res = await w.app.request("/t1/attachments", smallUpload(makeZip(DOCX), true, "notes.docx"), w.env, w.ctx);
+    expect(res.status).toBe(201);
+    expect(stored(w)).toMatchObject({ content_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+  });
+
+  it.each([
+    ["a program", new Uint8Array([0x4d, 0x5a, 0x90, 0x00]), "setup.exe", /^Only images/],
+    ["HTML", encoder.encode("<html><script>alert(1)</script></html>"), "page.html", /^Only images/],
+    ["a PDF with a script", encoder.encode("%PDF-1.7\n<< /S /JavaScript /JS (x) >>"), "a.pdf", /scripts/],
+    ["a Word file with macros", makeZip({ ...DOCX, "word/vbaProject.bin": "x" }), "a.docx", /macros/],
+  ])("refuses %s with a 400 and stores nothing", async (_label, bytes, name, message) => {
+    const w = world();
+    const res = await w.app.request("/t1/attachments", smallUpload(bytes, true, name), w.env, w.ctx);
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error: string }).error).toMatch(message);
+    expect(w.put).not.toHaveBeenCalled();
+    expect(w.count()).toBe(0);
   });
 });

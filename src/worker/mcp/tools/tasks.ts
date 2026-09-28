@@ -1,6 +1,7 @@
 // Tasks: the plan side — list, edit, statuses, comments and image attachments.
 import { z } from "zod";
 import { commentText } from "@shared/comment-body";
+import { ACCEPTED_FORMATS_LABEL, MAX_ATTACHMENT_BYTES, MAX_ATTACHMENT_LABEL } from "@shared/attachments";
 import type { CreateTask, Task, TaskActivity, TaskAttachment, TaskComment, TaskStatus, UpdateTask } from "@shared/schemas";
 import {
   ArchiveTaskStatusSchema, CreateTaskCommentSchema, CreateTaskSchema, CreateTaskStatusSchema,
@@ -14,7 +15,6 @@ import { listableInput, rejected, runListable } from "../batch";
 import { DESTRUCTIVE, IdArg, MUTATES, READ_ONLY, ROW_LIMIT, compact, fromBridge, hours, json, refuse, richTextToPlain, type ToolDeps } from "../shared";
 
 /** Largest image a tool accepts, matching the upload route's own limit. */
-const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 
 /** How far back create_task looks for the same task before making another: long enough for a retry or a re-ask. */
 const DUPLICATE_WINDOW_MS = 10 * 60 * 1000;
@@ -236,7 +236,7 @@ export function registerTaskReads(d: ToolDeps): void {
     "list_task_attachments",
     {
       title: "List a task's attachments",
-      description: "The images attached to a task, with a download URL that needs a signed-in session in the app.",
+      description: "The files (images and documents) attached to a task, with a download URL that needs a signed-in session in the app.",
       inputSchema: { taskId: IdArg("task") },
       annotations: READ_ONLY,
     },
@@ -405,9 +405,8 @@ export function registerTaskWrites(d: ToolDeps): void {
   server.registerTool(
     "upload_task_attachment",
     {
-      title: "Attach an image to a task",
-      description:
-        "Upload a PNG, JPEG, WebP or GIF (up to 10 MB) to a task, base64-encoded. The same checks as the app apply: the image is decoded, resized when huge, and refused if it isn't really an image.",
+      title: "Attach a file to a task",
+      description: `Upload ${ACCEPTED_FORMATS_LABEL} (up to ${MAX_ATTACHMENT_LABEL}) to a task, base64-encoded. The same checks as the app apply: the type is read from the bytes, images are decoded and resized when huge, and PDFs or Office files with scripts, macros or embedded programs are refused.`,
       inputSchema: {
         taskId: IdArg("task"),
         filename: z.string().min(1).max(255),
@@ -422,7 +421,7 @@ export function registerTaskWrites(d: ToolDeps): void {
       } catch {
         return refuse("contentBase64 is not valid base64.");
       }
-      if (bytes.byteLength > MAX_ATTACHMENT_BYTES) return refuse("Image is larger than 10 MB.");
+      if (bytes.byteLength > MAX_ATTACHMENT_BYTES) return refuse(`File is larger than ${MAX_ATTACHMENT_LABEL}.`);
       const form = new FormData();
       form.set("file", new File([bytes], filename));
       return fromBridge(
@@ -436,7 +435,7 @@ export function registerTaskWrites(d: ToolDeps): void {
     "delete_task_attachment",
     {
       title: "Delete an attachment",
-      description: "Remove an image from a task. Its uploader or a workspace owner/admin can.",
+      description: "Remove a file from a task. Its uploader or a workspace owner/admin can.",
       inputSchema: { attachmentId: IdArg("attachment (from list_task_attachments)") },
       annotations: DESTRUCTIVE,
     },

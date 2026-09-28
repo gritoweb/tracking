@@ -216,7 +216,7 @@ export function useUploadTaskAttachment() {
     onSuccess: (_result, { taskId }) => {
       queryClient.invalidateQueries({ queryKey: ["task-attachments", taskId] });
     },
-    onError: (error) => toastApiError(error, "Failed to upload image"),
+    onError: (error) => toastApiError(error, "Failed to upload file"),
   });
 }
 

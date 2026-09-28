@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { canDeleteAttachment, getMemberRole } from "../lib/permissions";
 import type { TaskAttachment } from "@shared/schemas";
 import type { TaskAttachmentRow } from "../db/rows";
+import { isImageContentType } from "@shared/attachments";
 
 function formatAttachment(row: TaskAttachmentRow): TaskAttachment {
   return {
@@ -16,8 +17,8 @@ function formatAttachment(row: TaskAttachmentRow): TaskAttachment {
   };
 }
 
-/** `inline` keeps the image showing in the page; the name is only what "save as" suggests, and can never carry a path or break the header. */
-export function attachmentDisposition(filename: string): string {
+/** `inline` keeps an image showing in the page, anything else downloads; the name can never carry a path or break the header. */
+export function attachmentDisposition(filename: string, inline = true): string {
   const clean = [...filename]
     .filter((ch) => {
       const code = ch.codePointAt(0) ?? 0;
@@ -28,7 +29,7 @@ export function attachmentDisposition(filename: string): string {
     .slice(0, 120) || "attachment";
   const ascii = clean.replace(/[^\x20-\x7e]|%/g, "_");
   const encoded = encodeURIComponent(clean).replace(/['()*]/g, (ch) => `%${ch.charCodeAt(0).toString(16).toUpperCase()}`);
-  return `inline; filename="${ascii}"; filename*=UTF-8''${encoded}`;
+  return `${inline ? "inline" : "attachment"}; filename="${ascii}"; filename*=UTF-8''${encoded}`;
 }
 
 // Mounted at /api/attachments — download/delete a single attachment by its own id, workspace-scoped.
@@ -50,7 +51,11 @@ export const attachmentsRouter = new Hono<{
     return new Response(object.body, {
       headers: {
         "Content-Type": row.content_type,
-        "Content-Disposition": attachmentDisposition(row.filename),
+        // Only images render in the page; a document is always a download, never opened as our origin.
+        "Content-Disposition": attachmentDisposition(row.filename, isImageContentType(row.content_type)),
+        "X-Content-Type-Options": "nosniff",
+        // Even if a file is ever opened directly, it runs no script and loads nothing.
+        "Content-Security-Policy": "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox",
         // Private and per-workspace: never cached by a shared/CDN cache.
         "Cache-Control": "private, max-age=31536000, immutable",
       },

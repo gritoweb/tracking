@@ -31,16 +31,18 @@ import {
 } from "../lib/task-statuses";
 import { nearestColumn } from "@shared/task-columns";
 import { ImageDecodeError, processImage, sniffImage } from "../lib/image";
+import { DocumentRejectedError, inspectDocument, safeFilename } from "../lib/document";
+import { ACCEPTED_FORMATS_LABEL, MAX_ATTACHMENT_BYTES, MAX_ATTACHMENT_LABEL } from "@shared/attachments";
 import { formatAttachment } from "./attachments";
 import { actorDisplayName, notifyAssigneesOfStatusChange, notifyMentions, notifyNewAssignees } from "../lib/notifications";
 import type { CreateTask, Task, TaskComment, TaskStatus } from "@shared/schemas";
 
-const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 // Multipart framing (boundary + part headers) rides on top of the file itself.
 const MULTIPART_SLACK_BYTES = 64 * 1024;
-// Generous for screenshots on one task; bounds R2 growth per task to a known ceiling.
+// Generous for screenshots and documents on one task; bounds R2 growth per task to a known ceiling.
 const MAX_ATTACHMENTS_PER_TASK = 50;
-const TOO_MANY_ATTACHMENTS = `A task can hold at most ${MAX_ATTACHMENTS_PER_TASK} images`;
+const TOO_MANY_ATTACHMENTS = `A task can hold at most ${MAX_ATTACHMENTS_PER_TASK} files`;
+const TOO_LARGE = `File is larger than ${MAX_ATTACHMENT_LABEL}`;
 
 const taskAssigneeArray = z.array(TaskAssigneeSchema);
 
@@ -845,7 +847,7 @@ export const tasksRouter = new Hono<{
     // Refuse on the declared size first: parseBody() would buffer the whole upload before any check could run.
     const declaredBytes = Number(c.req.header("content-length"));
     if (Number.isFinite(declaredBytes) && declaredBytes > MAX_ATTACHMENT_BYTES + MULTIPART_SLACK_BYTES) {
-      return c.json({ error: "Image is larger than 10 MB" }, 413);
+      return c.json({ error: TOO_LARGE }, 413);
     }
 
     const existingCount = await c.env.DB.prepare(`SELECT COUNT(*) AS n FROM task_attachments WHERE task_id = ? AND workspace_id = ?`)
@@ -856,18 +858,23 @@ export const tasksRouter = new Hono<{
     const file = body.file;
     if (!(file instanceof File)) return c.json({ error: "Missing file" }, 400);
     if (file.size > MAX_ATTACHMENT_BYTES) {
-      return c.json({ error: "Image is larger than 10 MB" }, 400);
+      return c.json({ error: TOO_LARGE }, 400);
     }
 
     const bytes = new Uint8Array(await file.arrayBuffer());
-    const kind = sniffImage(bytes);
-    if (!kind) return c.json({ error: "Only PNG, JPEG, WebP and GIF images are accepted" }, 400);
-
-    let processed;
+    // The type comes from the bytes, never from the client's filename or mimetype.
+    let processed: { bytes: Uint8Array; contentType: string; width: number | null; height: number | null; filename: string };
     try {
-      processed = processImage(bytes, kind);
+      const imageKind = sniffImage(bytes);
+      if (imageKind) {
+        processed = { ...processImage(bytes, imageKind), filename: file.name || "image" };
+      } else {
+        const format = inspectDocument(bytes, file.name);
+        if (!format) return c.json({ error: `Only ${ACCEPTED_FORMATS_LABEL} files are accepted` }, 400);
+        processed = { bytes, contentType: format.contentType, width: null, height: null, filename: safeFilename(file.name, format) };
+      }
     } catch (e) {
-      if (e instanceof ImageDecodeError) return c.json({ error: e.message }, 400);
+      if (e instanceof ImageDecodeError || e instanceof DocumentRejectedError) return c.json({ error: e.message }, 400);
       throw e;
     }
     const now = new Date();
@@ -884,7 +891,7 @@ export const tasksRouter = new Hono<{
        WHERE (SELECT COUNT(*) FROM task_attachments WHERE task_id = ? AND workspace_id = ?) < ?`
     ).bind(
       id, workspaceId, taskId, userId, key,
-      file.name || "attachment", processed.contentType, processed.bytes.byteLength,
+      processed.filename, processed.contentType, processed.bytes.byteLength,
       processed.width, processed.height,
       taskId, workspaceId, MAX_ATTACHMENTS_PER_TASK
     ).run();

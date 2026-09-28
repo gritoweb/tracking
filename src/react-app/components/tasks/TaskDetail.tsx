@@ -3,7 +3,7 @@ import { useTaskImageUpload } from "@/hooks/useTaskImageUpload";
 import { useSyncedField } from "@/hooks/useSyncedField";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { AttachmentViewer } from "./attachment-viewer/AttachmentViewer";
 import { TaskDetailToolbar } from "./TaskDetailToolbar";
 import { TaskModalShell } from "./TaskModalShell";
 import { TaskSidebarShell } from "./TaskSidebarShell";
@@ -29,7 +29,7 @@ import { useTimerStore } from "@/stores/timerStore";
 import { useUIStore } from "@/stores/uiStore";
 import { parseTimeInput, formatTimeInput } from "@/lib/dateUtils";
 import { serializeDescription } from "@/lib/richText";
-import type { Task, TaskAttachment } from "@shared/schemas";
+import type { Task } from "@shared/schemas";
 import type { JSONContent } from "@tiptap/react";
 
 interface TaskDetailProps {
@@ -60,7 +60,7 @@ export function TaskDetail({ open, onClose, task, tab, onTabChange, onRequestDel
   const { data: attachments = [], isLoading: attachmentsLoading } = useTaskAttachments(task?.id ?? null);
   const { data: comments = [] } = useTaskComments(task?.id ?? null);
   const deleteAttachment = useDeleteTaskAttachment();
-  const { uploadImage, deleteOrphanedImage } = useTaskImageUpload(task?.id ?? null);
+  const { uploadImage, uploadFile, deleteOrphanedImage } = useTaskImageUpload(task?.id ?? null);
   const { startTimer, stopTimer } = useTimer();
   const runningEntry = useTimerStore((s) => s.runningEntry);
 
@@ -68,7 +68,7 @@ export function TaskDetail({ open, onClose, task, tab, onTabChange, onRequestDel
   const [name, setName] = useSyncedField(task?.name ?? "", task?.id ?? null);
   const [estimate, setEstimate] = useSyncedField(formatTimeInput(task?.estimatedSeconds ?? null), task?.id ?? null);
   const [dueOpen, setDueOpen] = useState(false);
-  const [lightbox, setLightbox] = useState<TaskAttachment | null>(null);
+  const [viewingId, setViewingId] = useState<string | null>(null);
 
   if (!task) return null;
 
@@ -178,9 +178,9 @@ export function TaskDetail({ open, onClose, task, tab, onTabChange, onRequestDel
       <TaskAttachments
         attachments={attachments}
         loading={attachmentsLoading}
-        onOpenLightbox={setLightbox}
+        onOpen={(a) => setViewingId(a.id)}
         onDelete={(id) => deleteAttachment.mutate({ taskId: task.id, id })}
-        onUpload={uploadImage}
+        onUpload={uploadFile}
       />
     </>
   );
@@ -217,18 +217,7 @@ export function TaskDetail({ open, onClose, task, tab, onTabChange, onRequestDel
     <>
       {shell}
 
-      <Dialog open={!!lightbox} onOpenChange={(o) => !o && setLightbox(null)}>
-        <DialogContent className="max-w-3xl p-2">
-          <DialogTitle className="sr-only">{lightbox?.filename}</DialogTitle>
-          {lightbox && (
-            <img
-              src={lightbox.url}
-              alt={lightbox.filename}
-              className="max-h-(--size-cap-80vh) w-full rounded object-contain"
-            />
-          )}
-        </DialogContent>
-      </Dialog>
+      <AttachmentViewer attachments={attachments} openId={viewingId} onOpenChange={setViewingId} />
     </>
   );
 }
