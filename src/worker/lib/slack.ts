@@ -2,7 +2,7 @@ import { appUrl } from "./app-url";
 import { decryptJSON } from "./crypto";
 
 /** A notification waits this long unread in the bell before it goes to Slack. */
-export const SLACK_DELAY_MINUTES = 15;
+export const SLACK_DELAY_MINUTES = 5;
 /** Older than this is backlog: installing Slack must not replay a day of stale notifications. */
 const SLACK_MAX_AGE_HOURS = 24;
 /** A person whose email matched no Slack user is looked up again after this long. */

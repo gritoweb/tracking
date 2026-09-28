@@ -98,7 +98,7 @@ describe("runSlackNotifications", () => {
   it("skips read, too-recent and day-old notifications", async () => {
     const { env, notify, sentIds } = await world();
     notify("read", "u-ana", "-20 minutes", 1);
-    notify("fresh", "u-ana", "-5 minutes");
+    notify("fresh", "u-ana", "-2 minutes");
     notify("stale", "u-ana", "-2 days");
     const slack = mockSlack();
     await runSlackNotifications(env);
