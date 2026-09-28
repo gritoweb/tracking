@@ -1,22 +1,13 @@
 import { toast } from "sonner";
-import { attachmentProblem, imageProblem } from "@/lib/taskCommentAttachments";
+import type { InlineUpload } from "@/components/tasks/editorUpload";
+import { attachmentProblem } from "@/lib/taskCommentAttachments";
+import { isImageContentType } from "@shared/attachments";
 import { useDeleteTaskAttachment, useUploadTaskAttachment } from "@/hooks/useTasks";
 
-/** An image into a task's rich text (description or comment): checked, uploaded, and the orphan cleanup the editor needs. */
+/** Files into a task: its Attachments section, its rich text (description or comment), and the orphan cleanup the editor needs. */
 export function useTaskImageUpload(taskId: string | null) {
   const upload = useUploadTaskAttachment();
   const remove = useDeleteTaskAttachment();
-
-  const uploadImage = async (file: File): Promise<{ url: string; id: string }> => {
-    const problem = imageProblem(file);
-    if (problem) {
-      toast.error(problem);
-      throw new Error(problem);
-    }
-    if (!taskId) throw new Error("No task to attach the image to");
-    const attachment = await upload.mutateAsync({ taskId, file });
-    return { url: attachment.url, id: attachment.id };
-  };
 
   /** Any accepted file into the task's Attachments section (images and documents). */
   const uploadFile = async (file: File) => {
@@ -29,10 +20,16 @@ export function useTaskImageUpload(taskId: string | null) {
     return upload.mutateAsync({ taskId, file });
   };
 
+  /** A file into a task's rich text: an image shows inline, any other accepted file becomes a link to it. */
+  const uploadInline = async (file: File): Promise<InlineUpload> => {
+    const attachment = await uploadFile(file);
+    return { url: attachment.url, id: attachment.id, filename: attachment.filename, image: isImageContentType(attachment.contentType) };
+  };
+
   // Only when an upload's insertion spot vanished mid-flight, leaving an orphan in R2.
   const deleteOrphanedImage = (id: string) => {
     if (taskId) remove.mutate({ taskId, id });
   };
 
-  return { uploadImage, uploadFile, deleteOrphanedImage };
+  return { uploadInline, uploadFile, deleteOrphanedImage };
 }

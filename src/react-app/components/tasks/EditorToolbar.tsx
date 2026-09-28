@@ -2,18 +2,19 @@ import { useRef } from "react";
 import type { Editor } from "@tiptap/react";
 import { AtSign, Paperclip, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { insertUploadedImage } from "./editorUpload";
+import { insertUploadedFile, type InlineUpload } from "./editorUpload";
 import { markHandleSlash } from "./useEditorSlashCommands";
+import { ATTACHMENT_ACCEPT } from "@shared/attachments";
 
 interface EditorToolbarProps {
   editor: Editor;
   /** Without it there is nothing to upload to, so the clip isn't offered. */
-  onUploadImage?: (file: File) => Promise<{ url: string; id: string }>;
+  onUploadFile?: (file: File) => Promise<InlineUpload>;
   onDeleteImage?: (id: string) => void;
 }
 
 /** The row under a compact editor (a comment): "+" for the block menu, a clip for an image, "@" to tag someone. */
-export function EditorToolbar({ editor, onUploadImage, onDeleteImage }: EditorToolbarProps) {
+export function EditorToolbar({ editor, onUploadFile, onDeleteImage }: EditorToolbarProps) {
   const fileRef = useRef<HTMLInputElement>(null);
 
   // What typing it would do: the same "/" and "@" menus open at the caret, so there is one menu of each, not two.
@@ -40,15 +41,15 @@ export function EditorToolbar({ editor, onUploadImage, onDeleteImage }: EditorTo
       >
         <Plus />
       </Button>
-      {onUploadImage && (
+      {onUploadFile && (
         <>
           <Button
             type="button"
             variant="ghost"
             size="icon-sm"
             className="text-muted-foreground"
-            aria-label="Attach an image"
-            title="Attach an image"
+            aria-label="Attach a file"
+            title="Attach an image or a file"
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => fileRef.current?.click()}
           >
@@ -57,12 +58,12 @@ export function EditorToolbar({ editor, onUploadImage, onDeleteImage }: EditorTo
           <input
             ref={fileRef}
             type="file"
-            accept="image/*"
+            accept={ATTACHMENT_ACCEPT}
             hidden
             onChange={(e) => {
               const file = e.target.files?.[0];
               e.target.value = "";
-              if (file) insertUploadedImage(editor.view, editor.state.selection.from, file, onUploadImage, onDeleteImage);
+              if (file) insertUploadedFile(editor.view, editor.state.selection.from, file, onUploadFile, onDeleteImage);
             }}
           />
         </>

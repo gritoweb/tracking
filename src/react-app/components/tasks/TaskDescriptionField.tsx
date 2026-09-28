@@ -7,6 +7,7 @@ import { parseDescription } from "@/lib/richText";
 import type { WorkspaceMember } from "@/hooks/useWorkspaceRole";
 import type { Task } from "@shared/schemas";
 import type { JSONContent } from "@tiptap/react";
+import type { InlineUpload } from "./editorUpload";
 
 /** Past this, the description collapses behind "Expand". */
 const DESCRIPTION_COLLAPSED_HEIGHT = 180;
@@ -17,12 +18,12 @@ interface TaskDescriptionFieldProps {
   task: Task;
   members: WorkspaceMember[];
   onSave: (doc: JSONContent) => void;
-  onUploadImage: (file: File) => Promise<{ url: string; id: string }>;
+  onUploadFile: (file: File) => Promise<InlineUpload>;
   onDeleteImage: (id: string) => void;
 }
 
 /** Keyed by task id from the caller, so switching tasks remounts it and starts collapsed again. */
-export function TaskDescriptionField({ task, members, onSave, onUploadImage, onDeleteImage }: TaskDescriptionFieldProps) {
+export function TaskDescriptionField({ task, members, onSave, onUploadFile, onDeleteImage }: TaskDescriptionFieldProps) {
   const { user } = useAuth();
   const { collabDescriptions } = useWorkspaceRole();
   const collab = useDescriptionCollab(task.id, collabDescriptions, user);
@@ -36,7 +37,7 @@ export function TaskDescriptionField({ task, members, onSave, onUploadImage, onD
         aria-label="Description"
         content={parseDescription(task.description)}
         onBlur={onSave}
-        onUploadImage={onUploadImage}
+        onUploadFile={onUploadFile}
         onDeleteImage={onDeleteImage}
         members={members}
         collab={collab}

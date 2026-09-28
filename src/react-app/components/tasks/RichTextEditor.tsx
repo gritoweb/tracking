@@ -11,7 +11,8 @@ import { dropHandleSlash, useEditorSlashCommands } from "./useEditorSlashCommand
 import { RichTextBubbleMenu } from "./RichTextBubbleMenu";
 import { BlockHandle } from "./BlockHandle";
 import { EditorToolbar } from "./EditorToolbar";
-import { imageFile, insertUploadedImage, UploadPlaceholderExtension } from "./editorUpload";
+import { pickedFile, insertUploadedFile, UploadPlaceholderExtension, type InlineUpload } from "./editorUpload";
+import { attachmentIdFromHref, useOpenAttachment } from "./attachment-viewer/AttachmentViewerContext";
 import { refreshMentionLabels } from "@/lib/mentionLabels";
 import { cn } from "@/lib/utils";
 import { getContrastColor } from "@/lib/colorUtils";
@@ -45,7 +46,7 @@ interface RichTextEditorProps {
   className?: string;
   "aria-label"?: string;
   /** A dropped/pasted image uploads through here and lands inline — the only way to attach a file to a task. */
-  onUploadImage?: (file: File) => Promise<{ url: string; id: string }>;
+  onUploadFile?: (file: File) => Promise<InlineUpload>;
   /** Cleans up an attachment that finished uploading but whose insertion spot vanished mid-upload (e.g. that text got deleted). */
   onDeleteImage?: (id: string) => void;
   /** Who "@" can tag; without it the editor has no mentions. */
@@ -85,7 +86,7 @@ export function RichTextEditor({
   placeholder,
   className,
   "aria-label": ariaLabel,
-  onUploadImage,
+  onUploadFile,
   onDeleteImage,
   members = [],
   collab = null,
@@ -106,6 +107,12 @@ export function RichTextEditor({
     onSubmitRef.current = onSubmit;
   });
   const mentions = useEditorMentions(members);
+  // Read through a ref: the editor's handlers are built once, the viewer callback can change.
+  const openAttachment = useOpenAttachment();
+  const openAttachmentRef = useRef(openAttachment);
+  useEffect(() => {
+    openAttachmentRef.current = openAttachment;
+  }, [openAttachment]);
   const slash = useEditorSlashCommands();
   const editor = useEditor({
     extensions: [
@@ -156,23 +163,31 @@ export function RichTextEditor({
       handleDOMEvents: {
         click: (_view, event) => {
           mentions.onChipClick(event);
+          // A link to one of the task's files opens the viewer instead of downloading it.
+          const link = (event.target as HTMLElement | null)?.closest?.("a");
+          const attachmentId = attachmentIdFromHref(link?.getAttribute("href") ?? null);
+          if (attachmentId && openAttachmentRef.current) {
+            event.preventDefault();
+            openAttachmentRef.current(attachmentId);
+            return true;
+          }
           return false;
         },
       },
       handlePaste: (view, event) => {
-        const file = imageFile(event.clipboardData?.items);
-        if (!file || !onUploadImage) return false;
+        const file = pickedFile(event.clipboardData?.items);
+        if (!file || !onUploadFile) return false;
         event.preventDefault();
-        insertUploadedImage(view, view.state.selection.from, file, onUploadImage, onDeleteImage);
+        insertUploadedFile(view, view.state.selection.from, file, onUploadFile, onDeleteImage);
         return true;
       },
       handleDrop: (view, event) => {
-        const file = imageFile(event.dataTransfer?.files);
-        if (!file || !onUploadImage) return false;
+        const file = pickedFile(event.dataTransfer?.files);
+        if (!file || !onUploadFile) return false;
         event.preventDefault();
         const pos =
           view.posAtCoords({ left: event.clientX, top: event.clientY })?.pos ?? view.state.selection.from;
-        insertUploadedImage(view, pos, file, onUploadImage, onDeleteImage);
+        insertUploadedFile(view, pos, file, onUploadFile, onDeleteImage);
         return true;
       },
     },
@@ -233,7 +248,7 @@ export function RichTextEditor({
       <EditorContent editor={editor} className={className} />
       {toolbar && (
         <div className="flex items-center justify-between gap-2">
-          <EditorToolbar editor={editor} onUploadImage={onUploadImage} onDeleteImage={onDeleteImage} />
+          <EditorToolbar editor={editor} onUploadFile={onUploadFile} onDeleteImage={onDeleteImage} />
           {footer}
         </div>
       )}

@@ -5,12 +5,13 @@ import { Button } from "@/components/ui/button";
 import { commentIsEmpty } from "@shared/comment-body";
 import type { WorkspaceMember } from "@/hooks/useWorkspaceRole";
 import { RichTextEditor } from "./RichTextEditor";
+import type { InlineUpload } from "./editorUpload";
 
 interface CommentComposerProps {
   /** The doc to start from: empty for a new comment, the comment's own for an edit. */
   initial: JSONContent;
   members: WorkspaceMember[];
-  onUploadImage: (file: File) => Promise<{ url: string; id: string }>;
+  onUploadFile: (file: File) => Promise<InlineUpload>;
   onDeleteImage?: (id: string) => void;
   /** Receives the stored body (the doc as JSON); the caller decides what happens next. */
   onSubmit: (body: string) => void;
@@ -25,7 +26,7 @@ interface CommentComposerProps {
 export function CommentComposer({
   initial,
   members,
-  onUploadImage,
+  onUploadFile,
   onDeleteImage,
   onSubmit,
   onCancel,
@@ -47,7 +48,7 @@ export function CommentComposer({
       onChange={setDoc}
       onSubmit={submit}
       members={members}
-      onUploadImage={onUploadImage}
+      onUploadFile={onUploadFile}
       onDeleteImage={onDeleteImage}
       placeholder={placeholder}
       autoFocus={autoFocus}

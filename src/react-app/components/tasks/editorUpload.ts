@@ -3,13 +3,23 @@ import { Plugin, PluginKey, type EditorState } from "@tiptap/pm/state";
 import { Decoration, DecorationSet, type EditorView } from "@tiptap/pm/view";
 import { toastApiError } from "@/lib/toastApiError";
 
-// Image upload inside a rich-text editor (description, comments): paste, drop or the toolbar's clip all land here.
+// File upload inside a rich-text editor (description, comments): paste, drop or the toolbar's clip all land here.
 
-export function imageFile(items: DataTransferItemList | FileList | null | undefined): File | null {
+/** What an upload into the text resolves to: an image is shown inline, anything else is linked by name. */
+export interface InlineUpload {
+  url: string;
+  id: string;
+  filename: string;
+  image: boolean;
+}
+
+/** The first file among pasted or dropped items; plain text or HTML (no file) leaves the editor's own handling alone. */
+export function pickedFile(items: DataTransferItemList | FileList | null | undefined): File | null {
   if (!items) return null;
   for (const item of items) {
+    if ("kind" in item && item.kind !== "file") continue;
     const file = "getAsFile" in item ? item.getAsFile() : (item as File);
-    if (file?.type.startsWith("image/")) return file;
+    if (file) return file;
   }
   return null;
 }
@@ -24,7 +34,7 @@ const uploadPlaceholderKey = new PluginKey<DecorationSet>("upload-placeholder");
 
 function placeholderDOM(): HTMLElement {
   const span = document.createElement("span");
-  span.textContent = "Uploading image…";
+  span.textContent = "Uploading…";
   span.style.opacity = "0.6";
   span.style.fontStyle = "italic";
   return span;
@@ -71,18 +81,18 @@ function findPlaceholderPos(state: EditorState, id: string): number | null {
 }
 
 /** Reserves `pos` with a placeholder immediately, then resolves the upload against wherever that spot mapped to — never the position captured at drop/paste time. */
-export function insertUploadedImage(
+export function insertUploadedFile(
   view: EditorView,
   pos: number,
   file: File,
-  onUploadImage: (file: File) => Promise<{ url: string; id: string }>,
+  onUploadFile: (file: File) => Promise<InlineUpload>,
   onDeleteImage: ((id: string) => void) | undefined
 ) {
   const id = crypto.randomUUID();
   view.dispatch(view.state.tr.setMeta(uploadPlaceholderKey, { add: { id, pos } } satisfies PlaceholderAction));
 
-  onUploadImage(file)
-    .then(({ url, id: attachmentId }) => {
+  onUploadFile(file)
+    .then(({ url, id: attachmentId, filename, image }) => {
       const mappedPos = findPlaceholderPos(view.state, id);
       const tr = view.state.tr.setMeta(uploadPlaceholderKey, { remove: { id } } satisfies PlaceholderAction);
       if (mappedPos === null) {
@@ -91,11 +101,15 @@ export function insertUploadedImage(
         onDeleteImage?.(attachmentId);
         toastApiError(
           new Error("Upload target position was removed before it finished"),
-          "Image uploaded but its spot in the text was deleted — removed"
+          "File uploaded but its spot in the text was deleted — removed"
         );
         return;
       }
-      view.dispatch(tr.insert(mappedPos, view.state.schema.nodes.image.create({ src: url })));
+      const { schema } = view.state;
+      const content = image
+        ? schema.nodes.image.create({ src: url })
+        : [schema.text(filename, [schema.marks.link.create({ href: url })]), schema.text(" ")];
+      view.dispatch(tr.insert(mappedPos, content));
     })
     .catch(() => {
       // The upload itself already reported its own error (type/size checks or the mutation's own toast).

@@ -4,6 +4,7 @@ import { useSyncedField } from "@/hooks/useSyncedField";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AttachmentViewer } from "./attachment-viewer/AttachmentViewer";
+import { AttachmentViewerContext } from "./attachment-viewer/AttachmentViewerContext";
 import { TaskDetailToolbar } from "./TaskDetailToolbar";
 import { TaskModalShell } from "./TaskModalShell";
 import { TaskSidebarShell } from "./TaskSidebarShell";
@@ -60,7 +61,7 @@ export function TaskDetail({ open, onClose, task, tab, onTabChange, onRequestDel
   const { data: attachments = [], isLoading: attachmentsLoading } = useTaskAttachments(task?.id ?? null);
   const { data: comments = [] } = useTaskComments(task?.id ?? null);
   const deleteAttachment = useDeleteTaskAttachment();
-  const { uploadImage, uploadFile, deleteOrphanedImage } = useTaskImageUpload(task?.id ?? null);
+  const { uploadInline, uploadFile, deleteOrphanedImage } = useTaskImageUpload(task?.id ?? null);
   const { startTimer, stopTimer } = useTimer();
   const runningEntry = useTimerStore((s) => s.runningEntry);
 
@@ -159,7 +160,7 @@ export function TaskDetail({ open, onClose, task, tab, onTabChange, onRequestDel
           key={task.id}
           task={task}
           onSave={saveDescription}
-          onUploadImage={uploadImage}
+          onUploadFile={uploadInline}
           onDeleteImage={deleteOrphanedImage}
           members={members}
         />
@@ -214,10 +215,11 @@ export function TaskDetail({ open, onClose, task, tab, onTabChange, onRequestDel
     );
 
   return (
-    <>
+    // Links to the task's files, in the description or a comment, open in the viewer below.
+    <AttachmentViewerContext.Provider value={setViewingId}>
       {shell}
 
       <AttachmentViewer attachments={attachments} openId={viewingId} onOpenChange={setViewingId} />
-    </>
+    </AttachmentViewerContext.Provider>
   );
 }
