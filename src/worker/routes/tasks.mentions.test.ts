@@ -51,7 +51,12 @@ function world() {
     return res;
   };
   const notified = () =>
-    raw.prepare(`SELECT user_id, type, body FROM notifications ORDER BY user_id`).all() as { user_id: string; type: string; body: string }[];
+    raw.prepare(`SELECT user_id, type, title, body FROM notifications ORDER BY user_id`).all() as {
+      user_id: string;
+      type: string;
+      title: string;
+      body: string;
+    }[];
   return { send, notified };
 }
 
@@ -63,7 +68,9 @@ describe("PUT /:id — people tagged in the title", () => {
     const w = world();
     const res = await w.send("PUT", "/t-A", { name: "Review @Bo copy with @Ana Maria" });
     expect(res.status).toBe(200);
-    expect(w.notified()).toEqual([{ user_id: "u-ana", type: "task_mention", body: "Review @Bo copy with @Ana Maria: in the title" }]);
+    expect(w.notified()).toEqual([
+      { user_id: "u-ana", type: "task_mention", title: 'Author mentioned you in "Review @Bo copy with @Ana Maria"', body: "In the title" },
+    ]);
   });
 
   it("never notifies the editor tagging themselves, or a name that isn't a member here", async () => {
@@ -84,9 +91,9 @@ describe("POST / — people tagged when the task is created", () => {
     const w = world();
     const res = await w.send("POST", "/", { name: "Ping @Bo", projectId: "p-A", description: doc("u-ana", "u-bo") });
     expect(res.status).toBe(201);
-    expect(w.notified().map((n) => [n.user_id, n.body])).toEqual([
-      ["u-ana", "Ping @Bo: in the description"],
-      ["u-bo", "Ping @Bo: in the title"],
+    expect(w.notified().map((n) => [n.user_id, n.title, n.body])).toEqual([
+      ["u-ana", 'Author mentioned you in "Ping @Bo"', "In the description"],
+      ["u-bo", 'Author mentioned you in "Ping @Bo"', "In the title"],
     ]);
   });
 });
@@ -108,6 +115,8 @@ describe("POST /:id/comments — people tagged in a comment", () => {
     });
     const res = await w.send("POST", "/t-A/comments", { body });
     expect(res.status).toBe(201);
-    expect(w.notified()).toEqual([{ user_id: "u-ana", type: "task_mention", body: "Review @Bo copy: please check, @Ana Maria" }]);
+    expect(w.notified()).toEqual([
+      { user_id: "u-ana", type: "task_mention", title: 'Author mentioned you in "Review @Bo copy"', body: "please check, @Ana Maria" },
+    ]);
   });
 });

@@ -456,13 +456,13 @@ export const tasksRouter = new Hono<{
     const inDescription = docMentions(data.description ?? null)
       .map((m) => m.userId)
       .filter((id) => id !== userId && !inTitle.includes(id));
-    for (const [targets, where] of [[inTitle, "in the title"], [inDescription, "in the description"]] as const) {
+    for (const [targets, where] of [[inTitle, "In the title"], [inDescription, "In the description"]] as const) {
       if (!targets.length) continue;
       c.executionCtx.waitUntil(
         notifyMentions(c.env, workspaceId, targets, {
           type: "task_mention",
-          title: `${await actorDisplayName(c.env.DB, userId)} mentioned you`,
-          body: `${result.task.name}: ${where}`,
+          title: `${await actorDisplayName(c.env.DB, userId)} mentioned you in "${result.task.name}"`,
+          body: where,
           link: taskPath(result.task.id),
         })
       );
@@ -575,8 +575,8 @@ export const tasksRouter = new Hono<{
         c.executionCtx.waitUntil(
           notifyMentions(c.env, workspaceId, fresh, {
             type: "task_mention",
-            title: `${await actorDisplayName(c.env.DB, userId)} mentioned you`,
-            body: `${data.name}: in the title`,
+            title: `${await actorDisplayName(c.env.DB, userId)} mentioned you in "${data.name}"`,
+            body: "In the title",
             link: taskPath(id),
           })
         );
@@ -597,8 +597,8 @@ export const tasksRouter = new Hono<{
         c.executionCtx.waitUntil(
           notifyMentions(c.env, workspaceId, fresh, {
             type: "task_mention",
-            title: `${await actorDisplayName(c.env.DB, userId)} mentioned you`,
-            body: `${existing.name}: in the description`,
+            title: `${await actorDisplayName(c.env.DB, userId)} mentioned you in "${existing.name}"`,
+            body: "In the description",
             link: taskPath(id),
           })
         );
@@ -1053,8 +1053,8 @@ export const tasksRouter = new Hono<{
       c.executionCtx.waitUntil(
         notifyMentions(c.env, workspaceId, notifyTargets, {
           type: "task_mention",
-          title: `${author} mentioned you`,
-          body: `${task.name}: ${mentionsToPlain(commentText(body))}`,
+          title: `${author} mentioned you in "${task.name}"`,
+          body: mentionsToPlain(commentText(body)),
           link: taskPath(taskId, "comments"),
         })
       );

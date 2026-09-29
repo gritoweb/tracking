@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-09-29 (5) — on `refactor`, local only, not pushed or deployed
+### Changed
+- **A mention names the task in its title**: "Richard Souto mentioned you in \"Launch\"", with the body left for what happened — the comment excerpt, or "In the title" / "In the description". Before, the title said only who, and the task name was a prefix of the body. The bell, the desktop notification and the Slack DM all read this one text, so all three improve.
+- **The Slack DM shows the task's link on its own line** instead of an "Open in TimeTracker" button: title, what happened, then the URL to click (Luis's call). The alert preview is `title: body`, escaped.
+- Why it scales: the task name is written into the notification when it is created, inside its own workspace, so the Slack sweep does no extra query and never reads across workspaces.
+### Verified
+- `tsc -b` (0), `lint` (0), `vitest run` 1178/1178 (mention tests now assert title and body; the Slack message test asserts one section with title, body and URL and no button), e2e `task-comments` + `task-notification-scoping` 5/5 locally.
+
 ## 2026-09-29 (4) — deployed to production (`refactor` → `master`)
 ### Changed
 - **The Slack DM links the task from its text.** Luis got "Richard Souto mentioned you" with nothing to click where he read it: the preview line (`text`, what Slack shows in alerts and the conversation list) carried only the title, and the link lived in the "Open in TimeTracker" button below. The title is now itself the link to the task (`<url|title>`), the preview line says what happened (`title: body`), and the button stays. The preview line is now escaped like the blocks, so a task named `<!here>` can't ping anyone. At Luis's word ("pode subir quando terminar pro git master"); no migration.

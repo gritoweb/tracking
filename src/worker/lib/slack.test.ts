@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createMigratedD1 } from "../../test/sqlite-d1";
 import { encryptJSON } from "./crypto";
-import { buildNotificationMessage, escapeSlackLinkLabel, escapeSlackText, runSlackNotifications } from "./slack";
+import { buildNotificationMessage, escapeSlackText, runSlackNotifications } from "./slack";
 
 const SECRET = "test-secret-for-slack-credentials";
 
@@ -190,14 +190,17 @@ describe("buildNotificationMessage", () => {
     expect(looked).toEqual(["ana@home.test", "bo@x.test"]);
   });
 
-  it("makes the title the link to the task and says what happened in the preview line", () => {
+  it("shows the title, what happened and the task's link on its own line, with no button", () => {
     const message = buildNotificationMessage(
-      [{ title: "Richard mentioned you", body: "Launch: please check <!here>", link: "/tasks/t1?tab=comments" }],
+      [{ title: 'Richard mentioned you in "Launch"', body: "please check <!here>", link: "/tasks/t1/comments" }],
       "https://app.test"
     );
-    expect(message.text).toBe("Richard mentioned you: Launch: please check &lt;!here&gt;");
-    const section = message.blocks[0] as { text: { text: string } };
-    expect(section.text.text).toBe("*<https://app.test/tasks/t1?tab=comments|Richard mentioned you>*\nLaunch: please check &lt;!here&gt;");
-    expect(escapeSlackLinkLabel("a|b")).toBe("a\u2223b");
+    expect(message.text).toBe('Richard mentioned you in "Launch": please check &lt;!here&gt;');
+    expect(message.blocks).toEqual([
+      {
+        type: "section",
+        text: { type: "mrkdwn", text: '*Richard mentioned you in "Launch"*\nplease check &lt;!here&gt;\nhttps://app.test/tasks/t1/comments' },
+      },
+    ]);
   });
 });

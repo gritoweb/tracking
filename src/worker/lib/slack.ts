@@ -126,44 +126,31 @@ export function escapeSlackText(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-/** Inside `<url|label>`, a `|` would end the label early. */
-export function escapeSlackLinkLabel(text: string): string {
-  return escapeSlackText(text).replace(/\|/g, "\u2223");
-}
-
-function openButton(url: string, label: string) {
-  return { type: "button", text: { type: "plain_text", text: label }, url };
-}
-
-/** One DM for every pending notification of a person: plain `text` for the push preview, blocks for the body. */
+/** One DM for every pending notification of a person: plain `text` for the alert preview, blocks for the body. */
 export function buildNotificationMessage(items: SlackNotificationItem[], baseUrl: string) {
   const shown = items.slice(0, MAX_ITEMS_PER_DM);
   const urlOf = (item: SlackNotificationItem) => `${baseUrl}${item.link ?? "/"}`;
-  // The title is the link, so the task opens from the text itself as well as from the button.
+  // Title, what happened, and the task's address on its own line to click.
   const itemText = (item: SlackNotificationItem) => ({
     type: "mrkdwn",
-    text: `*<${urlOf(item)}|${escapeSlackLinkLabel(item.title)}>*\n${escapeSlackText(item.body)}`,
+    text: `*${escapeSlackText(item.title)}*\n${escapeSlackText(item.body)}\n${urlOf(item)}`,
   });
 
   if (items.length === 1) {
     return {
-      // The preview line (desktop/phone alert, channel list) carries what happened, not only who.
       text: escapeSlackText(`${items[0].title}: ${items[0].body}`),
-      blocks: [
-        { type: "section", text: itemText(items[0]) },
-        { type: "actions", elements: [openButton(urlOf(items[0]), "Open in TimeTracker")] },
-      ],
+      blocks: [{ type: "section", text: itemText(items[0]) }],
     };
   }
 
   const blocks: object[] = [
     { type: "section", text: { type: "mrkdwn", text: `You have *${items.length} unread notifications* in TimeTracker` } },
-    ...shown.map((item) => ({ type: "section", text: itemText(item), accessory: openButton(urlOf(item), "Open") })),
+    ...shown.map((item) => ({ type: "section", text: itemText(item) })),
   ];
   if (items.length > shown.length) {
     blocks.push({
       type: "context",
-      elements: [{ type: "mrkdwn", text: `…and ${items.length - shown.length} more — <${baseUrl}/|open TimeTracker>` }],
+      elements: [{ type: "mrkdwn", text: `…and ${items.length - shown.length} more — ${baseUrl}/` }],
     });
   }
   return { text: `You have ${items.length} unread notifications in TimeTracker`, blocks };
