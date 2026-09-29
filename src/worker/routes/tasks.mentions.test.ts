@@ -90,3 +90,24 @@ describe("POST / — people tagged when the task is created", () => {
     ]);
   });
 });
+
+describe("POST /:id/comments — people tagged in a comment", () => {
+  it("names them in the notification as @Name, never as the stored tag", async () => {
+    const w = world();
+    const body = JSON.stringify({
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            { type: "text", text: "please check, " },
+            { type: "mention", attrs: { id: "u-ana", label: "Ana Maria" } },
+          ],
+        },
+      ],
+    });
+    const res = await w.send("POST", "/t-A/comments", { body });
+    expect(res.status).toBe(201);
+    expect(w.notified()).toEqual([{ user_id: "u-ana", type: "task_mention", body: "Review @Bo copy: please check, @Ana Maria" }]);
+  });
+});

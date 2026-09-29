@@ -13,7 +13,7 @@ import {
 } from "@shared/schemas";
 import { nextOccurrence, normalizeRecurRule } from "@shared/task-recurrence";
 import { taskPath } from "@shared/task-links";
-import { docMentions, mentionedIds, splitPlainMentions, type MentionPerson } from "@shared/mentions";
+import { docMentions, mentionedIds, mentionsToPlain, splitPlainMentions, type MentionPerson } from "@shared/mentions";
 import { commentIsEmpty, commentText } from "@shared/comment-body";
 import { sqliteUtcToIso, sqliteUtcToIsoOrNull } from "../lib/sqlite-time";
 import { listActivity, memberNames, recordActivity, statusName, type ActivityInput } from "../lib/task-activity";
@@ -1054,7 +1054,7 @@ export const tasksRouter = new Hono<{
         notifyMentions(c.env, workspaceId, notifyTargets, {
           type: "task_mention",
           title: `${author} mentioned you`,
-          body: `${task.name}: ${commentText(body)}`,
+          body: `${task.name}: ${mentionsToPlain(commentText(body))}`,
           link: taskPath(taskId, "comments"),
         })
       );

@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-29 (3) — on `refactor`, local only, not pushed or deployed
+### Fixed
+- **A comment mention showed the stored tag in the notification** — the bell (and so the desktop notification and the Slack DM, which read the same text) said `test notificação: @[Luis](user:kMac…)` instead of `@Luis`. Seen in production by Luis. Cause: the comment route built the notification body from `commentText`, which keeps mentions in their stored `@[Name](user:ID)` form for mention lookup and MCP; the body now goes through the existing `mentionsToPlain`. Only comment creation built a body this way (editing a comment notifies nobody; title and description bodies were already plain). Notifications already stored keep their old text.
+### Verified
+- `tsc -b` (0), `lint` (0), `vitest run` (new route test posts a comment tagging "Ana Maria" and expects `…: please check, @Ana Maria`; it failed before the fix with `@[Ana Maria](user:u-ana)`).
+
 ## 2026-09-29 (2) — deployed to production (`refactor` → `master`)
 ### Added
 - **Slack email per person.** Slack finds a person by the email of their TimeTracker account, as before; someone whose Slack uses another address enters it in the Slack panel (Settings → Workspace → Integrations → Slack → "Slack email"), and leaving it empty goes back to the account email. Why: Luis's account is `luis@…` and his Slack is a personal address, so `users.lookupByEmail` found nobody and no DM could reach him. New: migration `0055_user_slack_email.sql` (additive: nullable `user.slack_email`), `SLACK_LOOKUP_EMAIL` in `lib/slack.ts` (one rule for the cron and the test), `slackEmail` on `PATCH /api/slack/me`, `accountEmail`/`slackEmail` in the status. Saving normalises to lower case, stores the account email itself or a blank as NULL (so a later account email change is still followed), and drops the person's cached Slack match so the next lookup uses the new address.
