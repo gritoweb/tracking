@@ -998,9 +998,18 @@ export const SlackStatusSchema = z.object({
   notify: z.boolean(),
   // null = this person's email hasn't been looked up in Slack yet.
   linked: z.boolean().nullable(),
+  // The account email is the default match; slackEmail overrides it when their Slack uses another address.
+  accountEmail: z.string(),
+  slackEmail: z.string().nullable(),
 });
 
-export const UpdateSlackPrefsSchema = z.object({ notify: z.boolean() });
+export const UpdateSlackPrefsSchema = z
+  .object({
+    notify: z.boolean().optional(),
+    // null (or blank) goes back to matching by the account email.
+    slackEmail: z.union([z.string().trim().toLowerCase().email().max(254), z.literal(""), z.null()]).optional(),
+  })
+  .refine((v) => v.notify !== undefined || v.slackEmail !== undefined, "Nothing to update");
 
 export const PushSubscriptionSchema = z.object({ endpoint: z.string().url().max(2048) });
 

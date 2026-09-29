@@ -117,6 +117,38 @@ describe("slack routes", () => {
     });
     expect(patch.status).toBe(200);
     const status = await (await member("/status")).json();
-    expect(status).toEqual({ configured: true, connected: false, teamName: null, canManage: false, notify: false, linked: null });
+    expect(status).toEqual({
+      configured: true,
+      connected: false,
+      teamName: null,
+      canManage: false,
+      notify: false,
+      linked: null,
+      accountEmail: "member@x.test",
+      slackEmail: null,
+    });
+  });
+
+  it("a person can enter the email their Slack uses, which drops the old match and can be cleared", async () => {
+    const { as, raw } = world();
+    const member = as("u-member");
+    const patch = (body: unknown) =>
+      member("/me", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const saved = () => (raw.prepare(`SELECT slack_email FROM "user" WHERE id = 'u-member'`).get() as { slack_email: string | null }).slack_email;
+    raw.exec(`INSERT INTO slack_user_links (workspace_id, user_id, slack_user_id) VALUES ('ws-A', 'u-member', 'U-OLD')`);
+
+    expect((await patch({ slackEmail: "  Member@Home.TEST " })).status).toBe(200);
+    expect(saved()).toBe("member@home.test");
+    expect(raw.prepare(`SELECT count(*) AS n FROM slack_user_links WHERE user_id = 'u-member'`).get()).toEqual({ n: 0 });
+    expect(((await (await member("/status")).json()) as { slackEmail: string | null }).slackEmail).toBe("member@home.test");
+
+    await patch({ slackEmail: "member@x.test" });
+    expect(saved()).toBeNull();
+    await patch({ slackEmail: "member@home.test" });
+    await patch({ slackEmail: "" });
+    expect(saved()).toBeNull();
+
+    expect((await patch({ slackEmail: "not an email" })).status).toBe(400);
+    expect((await patch({})).status).toBe(400);
   });
 });

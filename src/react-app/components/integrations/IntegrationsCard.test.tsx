@@ -7,9 +7,10 @@ let canManage = true;
 const idle = { mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false };
 vi.mock("@/hooks/useSlack", () => ({
   useSlackStatus: () => ({
-    data: { configured: true, connected: true, teamName: "Acme", canManage, notify: true, linked: true },
+    data: { configured: true, connected: true, teamName: "Acme", canManage, notify: true, linked: true, accountEmail: "a@x.test", slackEmail: null },
   }),
   useSetSlackNotify: () => idle,
+  useSetSlackEmail: () => idle,
   useSendSlackTest: () => idle,
   useDisconnectSlack: () => idle,
 }));

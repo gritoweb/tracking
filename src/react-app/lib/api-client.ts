@@ -434,6 +434,7 @@ export const api = {
   slack: {
     status: () => json(slackClient.status.$get()),
     setNotify: (notify: boolean) => json(slackClient.me.$patch({ json: { notify } })),
+    setSlackEmail: (slackEmail: string | null) => json(slackClient.me.$patch({ json: { slackEmail } })),
     sendTest: () => json(slackClient.test.$post()),
     disconnect: () => json(slackClient.index.$delete()),
   },

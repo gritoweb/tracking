@@ -78,6 +78,9 @@ export async function deleteSlackInstallation(env: Env, workspaceId: string): Pr
   ]);
 }
 
+/** The address a person is looked up by in Slack: their own override, else the account email (`u` = the "user" row). */
+export const SLACK_LOOKUP_EMAIL = `COALESCE(u.slack_email, u.email)`;
+
 /** The person's Slack user id, matched by email and cached; null when their email has no Slack user. */
 export async function resolveSlackUser(
   env: Env,
@@ -172,7 +175,9 @@ async function postDm(env: Env, installation: SlackInstallation, slackUserId: st
 export async function sendSlackTest(env: Env, workspaceId: string, userId: string): Promise<"sent" | "not_connected" | "no_slack_user"> {
   const installation = await loadSlackInstallation(env, workspaceId);
   if (!installation) return "not_connected";
-  const user = await env.DB.prepare(`SELECT email FROM "user" WHERE id = ?`).bind(userId).first<{ email: string }>();
+  const user = await env.DB.prepare(`SELECT ${SLACK_LOOKUP_EMAIL} AS email FROM "user" u WHERE u.id = ?`)
+    .bind(userId)
+    .first<{ email: string }>();
   const slackUserId = user ? await resolveSlackUser(env, installation, userId, user.email) : null;
   if (!slackUserId) return "no_slack_user";
   await postDm(
@@ -199,7 +204,7 @@ export async function runSlackNotifications(env: Env): Promise<void> {
   let pending: PendingRow[];
   try {
     const { results } = await env.DB.prepare(
-      `SELECT n.id, n.workspace_id, n.user_id, u.email, n.title, n.body, n.link
+      `SELECT n.id, n.workspace_id, n.user_id, ${SLACK_LOOKUP_EMAIL} AS email, n.title, n.body, n.link
          FROM notifications n
          JOIN slack_installations si ON si.workspace_id = n.workspace_id
          JOIN "member" m ON m.organizationId = n.workspace_id AND m.userId = n.user_id

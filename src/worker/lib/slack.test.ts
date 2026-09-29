@@ -178,4 +178,15 @@ describe("buildNotificationMessage", () => {
     expect(message.blocks.filter((b) => (b as { type: string }).type === "section")).toHaveLength(11);
     expect(JSON.stringify(message.blocks)).toContain("and 3 more");
   });
+
+  it("looks a person up by the Slack email they entered, and by the account email otherwise", async () => {
+    const { env, raw, notify } = await world();
+    raw.exec(`UPDATE "user" SET slack_email = 'ana@home.test' WHERE id = 'u-ana'`);
+    notify("n-ana", "u-ana", "-20 minutes");
+    notify("n-bo", "u-bo", "-20 minutes");
+    const slack = mockSlack();
+    await runSlackNotifications(env);
+    const looked = slack.calls.filter((c) => c.method === "users.lookupByEmail").map((c) => c.args.email).sort();
+    expect(looked).toEqual(["ana@home.test", "bo@x.test"]);
+  });
 });

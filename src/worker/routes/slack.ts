@@ -62,7 +62,9 @@ export const slackRouter = new Hono<{
       c.env.DB.prepare(`SELECT slack_user_id FROM slack_user_links WHERE workspace_id = ? AND user_id = ?`)
         .bind(workspaceId, userId)
         .first<{ slack_user_id: string | null }>(),
-      c.env.DB.prepare(`SELECT slack_notify FROM "user" WHERE id = ?`).bind(userId).first<{ slack_notify: number }>(),
+      c.env.DB.prepare(`SELECT slack_notify, email, slack_email FROM "user" WHERE id = ?`)
+        .bind(userId)
+        .first<{ slack_notify: number; email: string; slack_email: string | null }>(),
       isManager(c.env, workspaceId, userId),
     ]);
     const status: SlackStatus = {
@@ -73,15 +75,29 @@ export const slackRouter = new Hono<{
       notify: user ? Boolean(user.slack_notify) : true,
       // null until the first lookup, so "not checked yet" never reads as "not found".
       linked: link ? Boolean(link.slack_user_id) : null,
+      accountEmail: user?.email ?? "",
+      slackEmail: user?.slack_email ?? null,
     };
     return c.json(status, 200);
   })
   .patch("/me", zValidator("json", UpdateSlackPrefsSchema), async (c) => {
-    const { notify } = c.req.valid("json");
-    await c.env.DB.prepare(`UPDATE "user" SET slack_notify = ? WHERE id = ?`)
-      .bind(notify ? 1 : 0, c.get("userId"))
-      .run();
-    return c.json({ ok: true, notify }, 200);
+    const { notify, slackEmail } = c.req.valid("json");
+    const userId = c.get("userId");
+    if (notify !== undefined) {
+      await c.env.DB.prepare(`UPDATE "user" SET slack_notify = ? WHERE id = ?`).bind(notify ? 1 : 0, userId).run();
+    }
+    if (slackEmail !== undefined) {
+      // Blank or the account email itself means "match by the account email" — stored as NULL, so a later account
+      // email change is followed rather than pinned to the old address.
+      await c.env.DB.prepare(
+        `UPDATE "user" SET slack_email = CASE WHEN ? IS NULL OR ? = '' OR ? = lower(email) THEN NULL ELSE ? END WHERE id = ?`
+      )
+        .bind(slackEmail, slackEmail, slackEmail, slackEmail, userId)
+        .run();
+      // The cached match was made with the old address; the next lookup uses the new one.
+      await c.env.DB.prepare(`DELETE FROM slack_user_links WHERE user_id = ?`).bind(userId).run();
+    }
+    return c.json({ ok: true }, 200);
   })
   .get("/connect", async (c) => {
     if (!isConfigured(c.env)) return c.redirect("/settings?slack=not_configured");

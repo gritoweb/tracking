@@ -82,3 +82,10 @@ num workspace com uma linha em `slack_installations`, e disparar o cron:
 | `?slack=error` depois de autorizar | redirect URL não cadastrado no app, ou o state expirou (10 min) |
 | "No Slack user … has your email" | e-mail do app ≠ e-mail do Slack; corrige e espera 24h ou reinstala |
 | Ninguém recebe mais nada | token revogado no Slack → instalação apagada; reconectar |
+
+## E-mail do Slack diferente do e-mail da conta
+
+A pessoa é encontrada no Slack pelo e-mail da conta do TimeTracker. Se o Slack dela usa outro endereço,
+ela informa em **Settings → Workspace → Integrations → Slack → Slack email** (vazio = volta ao e-mail da
+conta). Salvar apaga o vínculo guardado dessa pessoa, e a próxima busca já usa o endereço novo; o
+**Send me a test message** confirma na hora. Coluna `user.slack_email` (migration `0055`).

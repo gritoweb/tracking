@@ -24,6 +24,18 @@ export function useSetSlackNotify() {
   });
 }
 
+export function useSetSlackEmail() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (slackEmail: string | null) => api.slack.setSlackEmail(slackEmail),
+    onSuccess: (_data, slackEmail) => {
+      queryClient.invalidateQueries({ queryKey: ["slack", "status"] });
+      toast.success(slackEmail ? "Slack email saved — send a test to check it" : "Back to your account email");
+    },
+    onError: (error) => toastApiError(error, "Couldn't save your Slack email"),
+  });
+}
+
 export function useSendSlackTest() {
   const queryClient = useQueryClient();
   return useMutation({

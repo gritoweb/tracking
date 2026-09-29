@@ -302,7 +302,7 @@ Turn them on once per browser in **Settings → General → Desktop notification
 
 If a workspace owner or admin connects Slack (**Settings → Workspace → Integrations → Slack → Add to Slack**), notifications about **you** that you haven't opened in the app within **5 minutes** — a task assigned to you, or someone mentioning you in a task's title, description or a comment — arrive as a direct message from the TimeTracker bot, with a button that opens the task. If you read the notification in time, Slack stays quiet.
 
-- You're matched in Slack by the **email address** of your account. If they differ, the card tells you nothing can reach you there.
+- You're matched in Slack by the **email address** of your account. If your Slack uses another address, enter it under **Slack email** in the Slack panel; leave it empty to go back to your account email. **Send me a test message** tells you right away whether Slack found you.
 - **Send me a test message** checks that it works for you.
 - To stop them, turn off **Send my unread notifications to Slack** in the same card.
 

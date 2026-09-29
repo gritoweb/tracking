@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-29 (2) — on `refactor`, local only, not pushed or deployed
+### Added
+- **Slack email per person.** Slack finds a person by the email of their TimeTracker account, as before; someone whose Slack uses another address enters it in the Slack panel (Settings → Workspace → Integrations → Slack → "Slack email"), and leaving it empty goes back to the account email. Why: Luis's account is `luis@…` and his Slack is a personal address, so `users.lookupByEmail` found nobody and no DM could reach him. New: migration `0055_user_slack_email.sql` (additive: nullable `user.slack_email`), `SLACK_LOOKUP_EMAIL` in `lib/slack.ts` (one rule for the cron and the test), `slackEmail` on `PATCH /api/slack/me`, `accountEmail`/`slackEmail` in the status. Saving normalises to lower case, stores the account email itself or a blank as NULL (so a later account email change is still followed), and drops the person's cached Slack match so the next lookup uses the new address.
+### Verified
+- `tsc -b` (0), `lint` (0), `vitest run` 1176/1176 (new: the sweep looks one person up by their Slack email and another by the account email; the route normalises, clears the cached match, turns the account email and a blank into NULL, refuses a non-email and an empty body; the panel shows the account email as the default and names the saved address when Slack can't find it). Mutation check: reverting the lookup to the account email failed exactly the new sweep test. Locally (dry run, migration `--local` only, a local dry-run installation): status → save `lluispaulop@gmail.com` → test message; the dry-run log shows `users.lookupByEmail` with that address and the status turns `linked: true`. Nothing reached slack.com; production untouched.
+
 ## 2026-09-29 (1) — deploying to production (`refactor` → `master`)
 ### Released
 - Everything on `refactor` since the last production deploy reaches production: Slack DMs for unread assignments and mentions (after 5 minutes), title mentions notifying, the subtask row menu, desktop notifications through web push (with the "Open" button), the partner grid for integrations, and the description-editor crash fix. At Luis's explicit request ("vai subir tanto na refactor como na master").
