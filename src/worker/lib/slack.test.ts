@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createMigratedD1 } from "../../test/sqlite-d1";
 import { encryptJSON } from "./crypto";
-import { buildNotificationMessage, escapeSlackText, runSlackNotifications } from "./slack";
+import { buildNotificationMessage, escapeSlackLinkLabel, escapeSlackText, runSlackNotifications } from "./slack";
 
 const SECRET = "test-secret-for-slack-credentials";
 
@@ -188,5 +188,16 @@ describe("buildNotificationMessage", () => {
     await runSlackNotifications(env);
     const looked = slack.calls.filter((c) => c.method === "users.lookupByEmail").map((c) => c.args.email).sort();
     expect(looked).toEqual(["ana@home.test", "bo@x.test"]);
+  });
+
+  it("makes the title the link to the task and says what happened in the preview line", () => {
+    const message = buildNotificationMessage(
+      [{ title: "Richard mentioned you", body: "Launch: please check <!here>", link: "/tasks/t1?tab=comments" }],
+      "https://app.test"
+    );
+    expect(message.text).toBe("Richard mentioned you: Launch: please check &lt;!here&gt;");
+    const section = message.blocks[0] as { text: { text: string } };
+    expect(section.text.text).toBe("*<https://app.test/tasks/t1?tab=comments|Richard mentioned you>*\nLaunch: please check &lt;!here&gt;");
+    expect(escapeSlackLinkLabel("a|b")).toBe("a\u2223b");
   });
 });

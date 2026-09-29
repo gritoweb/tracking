@@ -126,6 +126,11 @@ export function escapeSlackText(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+/** Inside `<url|label>`, a `|` would end the label early. */
+export function escapeSlackLinkLabel(text: string): string {
+  return escapeSlackText(text).replace(/\|/g, "\u2223");
+}
+
 function openButton(url: string, label: string) {
   return { type: "button", text: { type: "plain_text", text: label }, url };
 }
@@ -134,14 +139,16 @@ function openButton(url: string, label: string) {
 export function buildNotificationMessage(items: SlackNotificationItem[], baseUrl: string) {
   const shown = items.slice(0, MAX_ITEMS_PER_DM);
   const urlOf = (item: SlackNotificationItem) => `${baseUrl}${item.link ?? "/"}`;
+  // The title is the link, so the task opens from the text itself as well as from the button.
   const itemText = (item: SlackNotificationItem) => ({
     type: "mrkdwn",
-    text: `*${escapeSlackText(item.title)}*\n${escapeSlackText(item.body)}`,
+    text: `*<${urlOf(item)}|${escapeSlackLinkLabel(item.title)}>*\n${escapeSlackText(item.body)}`,
   });
 
   if (items.length === 1) {
     return {
-      text: items[0].title,
+      // The preview line (desktop/phone alert, channel list) carries what happened, not only who.
+      text: escapeSlackText(`${items[0].title}: ${items[0].body}`),
       blocks: [
         { type: "section", text: itemText(items[0]) },
         { type: "actions", elements: [openButton(urlOf(items[0]), "Open in TimeTracker")] },

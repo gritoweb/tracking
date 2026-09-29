@@ -1,6 +1,12 @@
 # Changelog
 
-## 2026-09-29 (3) — on `refactor`, local only, not pushed or deployed
+## 2026-09-29 (4) — deployed to production (`refactor` → `master`)
+### Changed
+- **The Slack DM links the task from its text.** Luis got "Richard Souto mentioned you" with nothing to click where he read it: the preview line (`text`, what Slack shows in alerts and the conversation list) carried only the title, and the link lived in the "Open in TimeTracker" button below. The title is now itself the link to the task (`<url|title>`), the preview line says what happened (`title: body`), and the button stays. The preview line is now escaped like the blocks, so a task named `<!here>` can't ping anyone. At Luis's word ("pode subir quando terminar pro git master"); no migration.
+### Verified
+- `lint` (0), `vitest run` (new: link in the title, preview line with the body, escaping of `<!here>` and of `|` inside a link label), `pnpm check` (0).
+
+## 2026-09-29 (3) — deployed with (4)
 ### Fixed
 - **A comment mention showed the stored tag in the notification** — the bell (and so the desktop notification and the Slack DM, which read the same text) said `test notificação: @[Luis](user:kMac…)` instead of `@Luis`. Seen in production by Luis. Cause: the comment route built the notification body from `commentText`, which keeps mentions in their stored `@[Name](user:ID)` form for mention lookup and MCP; the body now goes through the existing `mentionsToPlain`. Only comment creation built a body this way (editing a comment notifies nobody; title and description bodies were already plain). Notifications already stored keep their old text.
 ### Verified
