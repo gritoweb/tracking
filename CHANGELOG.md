@@ -1,8 +1,10 @@
 # Changelog
 
-## 2026-09-29 (2) — on `refactor`, local only, not pushed or deployed
+## 2026-09-29 (2) — deployed to production (`refactor` → `master`)
 ### Added
 - **Slack email per person.** Slack finds a person by the email of their TimeTracker account, as before; someone whose Slack uses another address enters it in the Slack panel (Settings → Workspace → Integrations → Slack → "Slack email"), and leaving it empty goes back to the account email. Why: Luis's account is `luis@…` and his Slack is a personal address, so `users.lookupByEmail` found nobody and no DM could reach him. New: migration `0055_user_slack_email.sql` (additive: nullable `user.slack_email`), `SLACK_LOOKUP_EMAIL` in `lib/slack.ts` (one rule for the cron and the test), `slackEmail` on `PATCH /api/slack/me`, `accountEmail`/`slackEmail` in the status. Saving normalises to lower case, stores the account email itself or a blank as NULL (so a later account email change is still followed), and drops the person's cached Slack match so the next lookup uses the new address.
+### Released
+- At Luis's word ("vamos mandar pra master"). Remote migration `0055_user_slack_email.sql` applied before the code, after a time-travel bookmark: `000012c7-00000000-000050f5-67aed3d277b11effad227c06c5ee6528` (2026-09-29T11:23Z). No Slack email was pre-filled for anyone; each person enters their own.
 ### Verified
 - `tsc -b` (0), `lint` (0), `vitest run` 1176/1176 (new: the sweep looks one person up by their Slack email and another by the account email; the route normalises, clears the cached match, turns the account email and a blank into NULL, refuses a non-email and an empty body; the panel shows the account email as the default and names the saved address when Slack can't find it). Mutation check: reverting the lookup to the account email failed exactly the new sweep test. Locally (dry run, migration `--local` only, a local dry-run installation): status → save `lluispaulop@gmail.com` → test message; the dry-run log shows `users.lookupByEmail` with that address and the status turns `linked: true`. Nothing reached slack.com; production untouched.
 
