@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-09-29 (1) — deploying to production (`refactor` → `master`)
+### Released
+- Everything on `refactor` since the last production deploy reaches production: Slack DMs for unread assignments and mentions (after 5 minutes), title mentions notifying, the subtask row menu, desktop notifications through web push (with the "Open" button), the partner grid for integrations, and the description-editor crash fix. At Luis's explicit request ("vai subir tanto na refactor como na master").
+- Remote D1: migrations `0053_slack_notifications.sql` and `0054_push_subscriptions.sql` applied **before** the code (both additive: new tables, one new nullable column, indexes). Time-travel bookmark taken right before: `000012c2-00000000-000050f5-7a9ea64174341d18cc84bed19b16699a` (2026-09-29T10:50Z).
+- Production secrets: a new VAPID pair (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`), separate from the local one. Slack stays hidden in production until `SLACK_CLIENT_ID`/`SLACK_CLIENT_SECRET` are set (docs/SLACK.md).
+### Verified before release
+- `pnpm check` (0: typecheck, build, wrangler dry-run); `vitest run` 1172/1172; e2e locally 16/16 (`integration-push-date`, `integration-ssrf`, `subtask-delete`, `task-delete-permissions`, `task-detail-panel`, `task-notification-scoping`). Desktop notifications tested end to end on Luis's machine: popup arrives with the site closed, "Open" opens the task.
+
 ## 2026-09-28 (14) — on `refactor`, local only, not pushed or deployed
 ### Fixed
 - **Opening a task could crash the page** ("An unexpected error interrupted this page", fixed only by F5) with `TypeError: Cannot set properties of undefined (setting 'members')` in `setMentionMembers` — seen when a desktop notification opened a task (reported by the app to `/api/client-errors`, route `/tasks/4fee…`). Cause: the description editor is rebuilt when the task's collaborative document changes, Tiptap's `destroy()` empties `extensionStorage`, and an effect still ran once with the destroyed editor. `setMentionMembers` and `refreshMentionLabels` (which would dispatch on the destroyed view) now skip a destroyed editor; the replacement gets the team on its own effect run. Tests reproduce both crashes and fail without the guard.
