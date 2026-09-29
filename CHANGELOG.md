@@ -1,6 +1,6 @@
 # Changelog
 
-## 2026-09-29 (5) — on `refactor`, local only, not pushed or deployed
+## 2026-09-29 (5) — deployed to production (`refactor` → `master`, at Luis's word "pode fazer o deploy"; no migration)
 ### Changed
 - **A mention names the task in its title**: "Richard Souto mentioned you in \"Launch\"", with the body left for what happened — the comment excerpt, or "In the title" / "In the description". Before, the title said only who, and the task name was a prefix of the body. The bell, the desktop notification and the Slack DM all read this one text, so all three improve.
 - **The Slack DM shows the task's link on its own line** instead of an "Open in TimeTracker" button: title, what happened, then the URL to click (Luis's call). The alert preview is `title: body`, escaped.
