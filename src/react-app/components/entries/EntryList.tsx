@@ -1,11 +1,12 @@
 import { useState, useCallback } from "react";
 import { toast } from "sonner";
-import { Trash2, X, DollarSign, Upload, Clock, AlertTriangle } from "lucide-react";
+import { Trash2, DollarSign, Upload, Clock, AlertTriangle } from "lucide-react";
 import { EntryGroup } from "./EntryGroup";
 import { EntryForm } from "@/components/forms/EntryForm";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
+import { SelectionBar } from "@/components/ui/selection-bar";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
@@ -145,65 +146,36 @@ export function EntryList({ since, until, onAddEntry }: EntryListProps) {
 
   return (
     <div className="flex h-full flex-col">
-      {/* Bulk action bar */}
       {selectionCount > 0 && (
-        <div className="flex items-center gap-2 border-b bg-accent/60 px-4 py-2">
-          <span className="text-sm font-medium">
-            {selectionCount} {selectionCount === 1 ? "entry" : "entries"} selected
-          </span>
-          <div className="ml-auto flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 gap-1.5 text-xs"
-              onClick={() => handleBulkBillable(true)}
-              disabled={bulkUpdate.isPending}
-            >
-              <DollarSign className="h-3 w-3" />
-              Mark billable
+        <SelectionBar
+          label={`${selectionCount} ${selectionCount === 1 ? "entry" : "entries"} selected`}
+          onClear={clearSelection}
+        >
+          <Button variant="ghost" size="sm" className="gap-1.5" onClick={() => handleBulkBillable(true)} disabled={bulkUpdate.isPending}>
+            <DollarSign className="h-3.5 w-3.5" />
+            Mark billable
+          </Button>
+          <Button variant="ghost" size="sm" className="gap-1.5" onClick={() => handleBulkBillable(false)} disabled={bulkUpdate.isPending}>
+            <DollarSign className="h-3.5 w-3.5 line-through opacity-50" />
+            Non-billable
+          </Button>
+          {integrations.length > 0 && (
+            <Button variant="ghost" size="sm" className="gap-1.5" onClick={handleBulkPush} disabled={pushEntries.isPending}>
+              <Upload className="h-3.5 w-3.5" />
+              Push to integration
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 gap-1.5 text-xs"
-              onClick={() => handleBulkBillable(false)}
-              disabled={bulkUpdate.isPending}
-            >
-              <DollarSign className="h-3 w-3 line-through opacity-50" />
-              Non-billable
-            </Button>
-            {integrations.length > 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 gap-1.5 text-xs"
-                onClick={handleBulkPush}
-                disabled={pushEntries.isPending}
-              >
-                <Upload className="h-3 w-3" />
-                Push to integration
-              </Button>
-            )}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 gap-1.5 text-xs text-destructive hover:text-destructive"
-              onClick={() => setConfirmingBulkDelete(true)}
-              disabled={bulkDelete.isPending}
-            >
-              <Trash2 className="h-3 w-3" />
-              Delete
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Clear selection"
-              onClick={clearSelection}
-            >
-              <X className="h-3.5 w-3.5" />
-            </Button>
-          </div>
-        </div>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1.5 text-destructive hover:text-destructive"
+            onClick={() => setConfirmingBulkDelete(true)}
+            disabled={bulkDelete.isPending}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Delete
+          </Button>
+        </SelectionBar>
       )}
 
       <ScrollArea className="min-h-0 flex-1">

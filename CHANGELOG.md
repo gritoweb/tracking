@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-30 (28) — `refactor` only (not deployed)
+### Changed
+- **The time-entry list and the detailed report use the shared `SelectionBar`.** Both had their own hand-built selection strip (a tinted band on top of the list, and a bordered row that replaced the report's "Columns" menu); they now show the same floating bar as the task board, with the count and its × on the left and their actions on the right (Mark billable / Non-billable / Push to integration / Delete, and Billable / Non-billable / Delete). The report's "Columns" menu now stays available while rows are selected. Actions, confirmations and permissions are unchanged; the ad-hoc `h-7 text-xs` button overrides are replaced by `size="sm"`.
+### Verified
+- `tsc -b` (0), `lint` (0), `vitest run` green; `e2e/entry-inline-edit.spec.ts` + `e2e/reports.spec.ts` 9/9 (incl. "row selection reveals the bulk action bar" and "Mark billable"). In the browser (local): selecting an entry → "1 entry selected" bar with its four actions, × clears it; selecting a report row → "1 selected" bar, "Columns" still shown.
+
 ## 2026-09-30 (27) — `refactor` only (not deployed)
 ### Changed
 - **The archive pages per column, with page numbers.** With "Show archived" on, each Board column loads its own archive 50 at a time and ends with numbered pages (`‹ 1 2 [3] 4 … 11 ›`, new primitive `ui/pagination.tsx`, page list in `lib/pagination.ts`) to jump straight to any page; its header shows how many archived tasks the column holds. The List, which has no columns, pages its archive once under the list. The single "Load 50 more" footer is gone. Server: `GET /api/tasks?archivedOnly=true` takes `archivePage` (and `statusId` / `projectId`, applied to the parents so a subtask in another column still comes with its parent) — `archiveLimit` and `ARCHIVE_MAX_LIMIT` are removed — and `GET /api/tasks/archive-counts[?projectId]` returns archived parents per column. Pages are remembered per project for the session.

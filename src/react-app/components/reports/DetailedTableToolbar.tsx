@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { SelectionBar } from "@/components/ui/selection-bar";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -7,7 +8,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Columns3, Trash2, X } from "lucide-react";
+import { Columns3, Trash2 } from "lucide-react";
 import type { ColumnDef, ColumnKey } from "./DetailedTableColumns";
 
 interface DetailedTableToolbarProps {
@@ -20,7 +21,7 @@ interface DetailedTableToolbarProps {
   onToggleColumn: (key: ColumnKey) => void;
 }
 
-/** Bulk action bar when rows are selected, else the column-visibility menu. */
+/** The column-visibility menu, plus the floating bulk bar while rows are selected. */
 export function DetailedTableToolbar({
   selectedCount,
   onClearSelection,
@@ -30,31 +31,22 @@ export function DetailedTableToolbar({
   visible,
   onToggleColumn,
 }: DetailedTableToolbarProps) {
-  if (selectedCount > 0) {
-    return (
-      <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 print:hidden">
-        <span className="text-sm font-medium">{selectedCount} selected</span>
-        <div className="ml-auto flex items-center gap-1.5">
-          <Button variant="outline" size="sm" className="h-8" onClick={() => onBulkBillable(true)}>
+  return (
+    <div className="flex justify-end print:hidden">
+      {selectedCount > 0 && (
+        <SelectionBar label={`${selectedCount} selected`} onClear={onClearSelection}>
+          <Button variant="ghost" size="sm" onClick={() => onBulkBillable(true)}>
             Billable
           </Button>
-          <Button variant="outline" size="sm" className="h-8" onClick={() => onBulkBillable(false)}>
+          <Button variant="ghost" size="sm" onClick={() => onBulkBillable(false)}>
             Non-billable
           </Button>
-          <Button variant="outline" size="sm" className="h-8 gap-1.5 text-destructive" onClick={onBulkRemove}>
+          <Button variant="ghost" size="sm" className="gap-1.5 text-destructive hover:text-destructive" onClick={onBulkRemove}>
             <Trash2 className="h-3.5 w-3.5" />
             Delete
           </Button>
-          <Button variant="ghost" size="icon-sm" onClick={onClearSelection} aria-label="Clear selection">
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex justify-end print:hidden">
+        </SelectionBar>
+      )}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="outline" size="sm" className="h-8 gap-1.5 text-sm">
