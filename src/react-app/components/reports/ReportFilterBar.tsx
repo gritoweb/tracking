@@ -35,7 +35,8 @@ interface ReportFilterBarProps {
 export function ReportFilterBar({ filters, onChange, canFilterPeople = false }: ReportFilterBarProps) {
   const { data: clients = [] } = useAllClients();
   const { data: projects = [] } = useAllProjects();
-  const { data: tasks = [] } = useAllTasks();
+  // Archived tasks keep their hours, so they stay filterable here.
+  const { data: tasks = [] } = useAllTasks(true);
   const { data: tags = [] } = useTags();
   const { data: members = [] } = useWorkspaceMembers(canFilterPeople);
 

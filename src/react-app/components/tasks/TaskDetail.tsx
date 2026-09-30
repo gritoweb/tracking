@@ -62,7 +62,8 @@ export function TaskDetail({ open, onClose, task, tab, onTabChange, onRequestDel
   const updateTask = useUpdateTask();
   const completeTask = useCompleteTask();
   const { data: members = [], isPending: membersLoading } = useWorkspaceMembers(open);
-  const { data: allTasks = [] } = useAllTasks();
+  // An archived task's subtasks are archived with it, so its own list is read from the archive too.
+  const { data: allTasks = [] } = useAllTasks(Boolean(task?.archivedAt));
   const { data: attachments = [], isLoading: attachmentsLoading } = useTaskAttachments(task?.id ?? null);
   const { data: comments = [] } = useTaskComments(task?.id ?? null);
   const deleteAttachment = useDeleteTaskAttachment();

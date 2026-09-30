@@ -221,6 +221,7 @@ export function TaskRow({
         "group flex items-center gap-2 rounded-md px-2 py-2 transition-colors duration-fast ease-out-quart hover:bg-muted/50",
         nested && "pl-8",
         running && "bg-primary/5",
+        task.archivedAt && "opacity-60",
         dragging && "opacity-50"
       )}
       {...dragHandlers}

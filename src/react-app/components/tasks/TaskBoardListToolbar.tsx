@@ -1,4 +1,4 @@
-import { Plus, User } from "lucide-react";
+import { Archive, Plus, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -33,6 +33,8 @@ interface TaskBoardListToolbarProps {
   onToggleAssignedToMe: () => void;
   status: StatusFilter;
   onStatusChange: (status: StatusFilter) => void;
+  showArchived: boolean;
+  onToggleShowArchived: () => void;
   groupBy: GroupBy;
   onGroupByChange: (groupBy: GroupBy) => void;
   sortBy: SortBy;
@@ -51,6 +53,8 @@ export function TaskBoardListToolbar({
   onToggleAssignedToMe,
   status,
   onStatusChange,
+  showArchived,
+  onToggleShowArchived,
   groupBy,
   onGroupByChange,
   sortBy,
@@ -98,6 +102,18 @@ export function TaskBoardListToolbar({
           <SelectItem value="done">Done</SelectItem>
         </SelectContent>
       </Select>
+
+      {/* A separate toggle, not a fourth status: an archived task can also be done, so it adds to any filter. */}
+      <Button
+        variant={showArchived ? "secondary" : "outline"}
+        size="sm"
+        className="gap-1.5"
+        aria-pressed={showArchived}
+        onClick={onToggleShowArchived}
+      >
+        <Archive className="h-3.5 w-3.5" />
+        Show archived
+      </Button>
 
       <Select value={groupBy} onValueChange={(v) => onGroupByChange(v as GroupBy)}>
         <SelectTrigger size="sm" className="w-36" aria-label="Group by">

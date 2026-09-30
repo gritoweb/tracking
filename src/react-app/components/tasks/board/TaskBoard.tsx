@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -19,6 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { TaskBoardColumn } from "./TaskBoardColumn";
 import { TaskCard } from "./TaskCard";
 import { AddStatusColumn } from "./AddStatusColumn";
+import { TaskSelectionBar } from "./TaskSelectionBar";
 import { useMoveTask } from "@/hooks/useTasks";
 import { useTaskStatuses } from "@/hooks/useTaskStatuses";
 import { useWorkspaceRole } from "@/hooks/useWorkspaceRole";
@@ -28,6 +29,8 @@ import {
   matchesDueFilter,
   midpointOrder,
   SORTERS,
+  toggleCardSelection,
+  toggleColumnSelection,
   type DueFilter,
   type GroupBy,
   type SortBy,
@@ -110,6 +113,36 @@ export function TaskBoard({
     for (const list of map.values()) list.sort(compare);
     return map;
   }, [tasks, statuses, projectId, dueFilter, status, sortBy, today]);
+
+  // Only what is on screen counts as selected: a filter or project switch drops the rest from the bar.
+  const [pickedIds, setPickedIds] = useState<ReadonlySet<string>>(new Set());
+  const lastPicked = useRef<string | null>(null);
+  const visibleIds = useMemo(() => new Set([...serverColumns.values()].flat().map((t) => t.id)), [serverColumns]);
+  const visibleOnly = (ids: ReadonlySet<string>) => new Set([...ids].filter((id) => visibleIds.has(id)));
+  const selectedIds = useMemo(() => new Set([...pickedIds].filter((id) => visibleIds.has(id))), [pickedIds, visibleIds]);
+  const selectedTasks = tasks.filter((t) => selectedIds.has(t.id));
+  const clearSelection = () => setPickedIds(new Set());
+
+  const toggleSelect = (task: Task, range: boolean) => {
+    const column = [...serverColumns.values()].find((list) => list.some((t) => t.id === task.id)) ?? [];
+    const anchor = lastPicked.current;
+    lastPicked.current = task.id;
+    setPickedIds((prev) => toggleCardSelection(visibleOnly(prev), column.map((t) => t.id), task.id, anchor, range));
+  };
+  const toggleColumn = (columnTasks: Task[]) =>
+    setPickedIds((prev) => toggleColumnSelection(visibleOnly(prev), columnTasks.map((t) => t.id)));
+
+  // Esc clears the selection, unless it is closing one of the bar's own menus or a dialog.
+  const selecting = selectedIds.size > 0;
+  useEffect(() => {
+    if (!selecting) return;
+    const onKey = (e: KeyboardEvent) => {
+      const inLayer = (e.target as HTMLElement | null)?.closest?.('[role="dialog"], [role="menu"], [data-radix-popper-content-wrapper]');
+      if (e.key === "Escape" && !inLayer) setPickedIds(new Set());
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [selecting]);
 
   // Live-reshuffled while dragging (two separate SortableContexts can't do this alone); server truth otherwise.
   const [liveColumns, setLiveColumns] = useState<Map<string, Task[]> | null>(null);
@@ -251,6 +284,9 @@ export function TaskBoard({
             groupBy={groupBy}
             onOpenTask={onOpenTask}
             onRequestDelete={onRequestDelete}
+            selectedIds={selectedIds}
+            onToggleSelect={toggleSelect}
+            onToggleColumn={toggleColumn}
           />
         ))}
         {canManage && <AddStatusColumn statuses={statuses} projectId={projectId} />}
@@ -262,6 +298,10 @@ export function TaskBoard({
       <DragOverlay dropAnimation={reducedMotion ? null : undefined}>
         {dragging ? <TaskCard task={dragging} onOpen={onOpenTask} overlay /> : null}
       </DragOverlay>
+
+      {selecting && (
+        <TaskSelectionBar selected={selectedTasks} statuses={statuses} tasks={tasks} onClear={clearSelection} />
+      )}
     </DndContext>
   );
 }

@@ -40,7 +40,9 @@ interface TaskBoardListProps {
 }
 
 export function TaskBoardList({ openTaskId = null, openTab = "task" }: TaskBoardListProps) {
-  const { data: tasks = [], isLoading } = useAllTasks();
+  const showArchived = useUIStore((s) => s.showArchivedTasks);
+  const setShowArchived = useUIStore((s) => s.setShowArchivedTasks);
+  const { data: tasks = [], isLoading } = useAllTasks(showArchived);
   const deleteTask = useDeleteTask();
   const updateTask = useUpdateTask();
   const openTaskLogTime = useUIStore((s) => s.openTaskLogTime);
@@ -84,8 +86,12 @@ export function TaskBoardList({ openTaskId = null, openTab = "task" }: TaskBoard
   // A client has no status fork of its own — falls back to the workspace's global set.
   const { data: statuses = [] } = useTaskStatuses(railClientId ? null : railProjectId);
 
-  const openTask = openTaskId ? tasks.find((t) => t.id === openTaskId) ?? null : null;
-  const openTaskNotFound = !!openTaskId && !isLoading && !openTask;
+  const listedTask = openTaskId ? tasks.find((t) => t.id === openTaskId) ?? null : null;
+  // A link to an archived task still opens it, with "Show archived" off.
+  const lookInArchive = !!openTaskId && !isLoading && !listedTask && !showArchived;
+  const { data: archivedTasks = [], isLoading: archiveLoading } = useAllTasks(true, lookInArchive);
+  const openTask = listedTask ?? (openTaskId ? archivedTasks.find((t) => t.id === openTaskId) ?? null : null);
+  const openTaskNotFound = !!openTaskId && !isLoading && !(lookInArchive && archiveLoading) && !openTask;
   // A shared link to a task this person can't see (or that is gone) lands on the plain list, with the reason.
   // Ids deleted from this screen: a stale route id for one is our own deletion, not a bad link (the list refetch can land before the navigation).
   const deletedIds = useRef(new Set<string>());
@@ -198,6 +204,8 @@ export function TaskBoardList({ openTaskId = null, openTab = "task" }: TaskBoard
           onToggleAssignedToMe={() => setAssignedToMe((v) => !v)}
           status={status}
           onStatusChange={setStatus}
+          showArchived={showArchived}
+          onToggleShowArchived={() => setShowArchived(!showArchived)}
           groupBy={layout === "board" ? boardGroupBy : groupBy}
           onGroupByChange={layout === "board" ? setBoardGroupBy : setGroupBy}
           sortBy={sortBy}

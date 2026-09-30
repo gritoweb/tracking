@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { MessageCircle, MoreHorizontal, Pencil, Play, Repeat, Square, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, MessageCircle, MoreHorizontal, Pencil, Play, Repeat, Square, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -28,7 +30,7 @@ import { TaskStatusChip } from "../TaskStatusChip";
 import { useTimer } from "@/hooks/useTimer";
 import { TASK_TIMER_ENABLED } from "@/lib/features";
 import { useTimerStore } from "@/stores/timerStore";
-import { useUpdateTask } from "@/hooks/useTasks";
+import { useBulkTaskAction, useUpdateTask } from "@/hooks/useTasks";
 import { useCanDeleteTask } from "@/hooks/useTaskPermissions";
 import { useWorkspaceMembers } from "@/hooks/useWorkspaceRole";
 import { formatDurationShort } from "@/lib/dateUtils";
@@ -60,14 +62,19 @@ interface TaskCardProps {
   onRequestDelete?: (task: Task) => void;
   /** Rendered inside the DragOverlay — no sortable wiring, no transform. */
   overlay?: boolean;
+  /** Bulk selection: the checkbox shows on hover, and on every card while anything is selected. */
+  selected?: boolean;
+  selecting?: boolean;
+  onToggleSelect?: (task: Task, range: boolean) => void;
 }
 
 /** One task on the board — a dense cell (`rounded-lg`), never a pill; grab anywhere on it to drag. */
-export function TaskCard({ task, onOpen, onRequestDelete, overlay = false }: TaskCardProps) {
+export function TaskCard({ task, onOpen, onRequestDelete, overlay = false, selected = false, selecting = false, onToggleSelect }: TaskCardProps) {
   const { startTimer, stopTimer } = useTimer();
   const runningEntry = useTimerStore((s) => s.runningEntry);
   const running = runningEntry?.taskId === task.id;
   const updateTask = useUpdateTask();
+  const bulk = useBulkTaskAction();
   const { data: members = [], isPending: membersLoading } = useWorkspaceMembers(!overlay);
   const [dueOpen, setDueOpen] = useState(false);
   const canDelete = useCanDeleteTask()(task);
@@ -75,6 +82,14 @@ export function TaskCard({ task, onOpen, onRequestDelete, overlay = false }: Tas
   // One list for both menus (right-click and the "…" on hover), so they can't drift apart.
   const actions = [
     { key: "edit", label: "Edit task…", icon: Pencil, destructive: false, onSelect: () => onOpen(task) },
+    // Same rule as Delete (author or owner/admin); subtasks follow the card.
+    ...(canDelete
+      ? [
+          task.archivedAt
+            ? { key: "unarchive", label: "Unarchive", icon: ArchiveRestore, destructive: false, onSelect: () => bulk.mutate({ ids: [task.id], action: "unarchive" }) }
+            : { key: "archive", label: "Archive", icon: Archive, destructive: false, onSelect: () => bulk.mutate({ ids: [task.id], action: "archive" }) },
+        ]
+      : []),
     ...(canDelete && onRequestDelete
       ? [{ key: "delete", label: "Delete", icon: Trash2, destructive: true, onSelect: () => onRequestDelete(task) }]
       : []),
@@ -117,6 +132,8 @@ export function TaskCard({ task, onOpen, onRequestDelete, overlay = false }: Tas
         !overlay && "cursor-pointer touch-none active:cursor-grabbing",
         !overlay && "focus-ring",
         running && "bg-primary/5",
+        task.archivedAt && "opacity-60",
+        selected && "ring-2 ring-primary",
         // Stays in place as a hole while the overlay follows the pointer.
         !overlay && sortable.isDragging && "opacity-40",
         // The overlay renders in a portal, outside the column's own width — without this it
@@ -133,6 +150,19 @@ export function TaskCard({ task, onOpen, onRequestDelete, overlay = false }: Tas
       }}
     >
       <div className="flex items-start gap-1.5">
+        {!overlay && onToggleSelect && (
+          <Checkbox
+            size="sm"
+            checked={selected}
+            aria-label={`Select ${task.name}`}
+            title="Select (Shift-click for a range)"
+            onClick={(e) => {
+              e.preventDefault();
+              onToggleSelect(task, e.shiftKey);
+            }}
+            className={cn("mt-0.5", !selecting && "tt-reveal")}
+          />
+        )}
         {/* Same vocabulary as the list: tinted ring, only P1/P2 carry colour. Clickable here — the
             board had no way to change priority except opening the sheet. */}
         {task.priority < 4 && (
@@ -239,6 +269,7 @@ export function TaskCard({ task, onOpen, onRequestDelete, overlay = false }: Tas
 
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         {!overlay && <TaskStatusChip task={task} className="px-1.5 py-0" />}
+        {task.archivedAt && <Badge variant="outline">Archived</Badge>}
         {task.projectName && (
           <ProjectBadge name={task.projectName} color={task.projectColor} className="max-w-36" />
         )}

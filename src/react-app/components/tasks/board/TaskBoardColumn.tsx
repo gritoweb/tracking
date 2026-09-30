@@ -3,11 +3,13 @@ import { Plus } from "lucide-react";
 import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ColorDot } from "@/components/ColorDot";
 import { QuickAddTask } from "../QuickAddTask";
 import { TaskCard } from "./TaskCard";
 import { StatusColumnMenu } from "./StatusColumnMenu";
 import { useOutsideClick } from "@/hooks/useOutsideClick";
+import { cn } from "@/lib/utils";
 import { clusterTasks, type GroupBy } from "@/lib/taskUtils";
 import { todayLocalDate } from "@shared/task-recurrence";
 import type { Task, TaskStatus } from "@shared/schemas";
@@ -22,6 +24,10 @@ interface TaskBoardColumnProps {
   groupBy: GroupBy;
   onOpenTask: (task: Task) => void;
   onRequestDelete: (task: Task) => void;
+  selectedIds: ReadonlySet<string>;
+  onToggleSelect: (task: Task, range: boolean) => void;
+  /** Empty column selection → select all of its cards; partial or full → clear them. */
+  onToggleColumn: (tasks: Task[]) => void;
 }
 
 /** One column of the board — `useDroppable` here (not just the sortable list) is what lets an empty column receive a card. */
@@ -34,11 +40,17 @@ export function TaskBoardColumn({
   groupBy,
   onOpenTask,
   onRequestDelete,
+  selectedIds,
+  onToggleSelect,
+  onToggleColumn,
 }: TaskBoardColumnProps) {
   const { setNodeRef } = useDroppable({ id: `column:${status.id}` });
   const [adding, setAdding] = useState(false);
   const outsideRef = useOutsideClick<HTMLDivElement>(() => setAdding(false));
   const clusters = clusterTasks(tasks, groupBy, todayLocalDate());
+  const selecting = selectedIds.size > 0;
+  const picked = tasks.filter((t) => selectedIds.has(t.id)).length;
+  const columnState = picked === 0 ? false : picked === tasks.length ? true : "indeterminate";
 
   return (
     <section aria-label={status.name} className="flex w-(--size-board-column) shrink-0 flex-col rounded-container">
@@ -51,7 +63,20 @@ export function TaskBoardColumn({
           style={{ "--swatch": status.color } as CSSProperties}
           className="flex flex-col tt-swatch-column rounded-container"
         >
-          <header className="flex items-center gap-2 px-3 pb-2 pt-3">
+          <header className="group flex items-center gap-2 px-3 pb-2 pt-3">
+            {tasks.length > 0 && (
+              <Checkbox
+                size="sm"
+                checked={columnState}
+                aria-label={picked ? `Clear the selection in ${status.name}` : `Select every task in ${status.name}`}
+                title={picked ? "Clear selection in this column" : "Select all in this column"}
+                onClick={(e) => {
+                  e.preventDefault();
+                  onToggleColumn(tasks);
+                }}
+                className={cn(!selecting && "tt-reveal")}
+              />
+            )}
             <ColorDot color={status.color} />
             <h2 className="min-w-0 flex-1 truncate text-sm font-medium">{status.name}</h2>
             <span className="text-xs tabular-nums text-muted-foreground">{tasks.length}</span>
@@ -77,7 +102,15 @@ export function TaskBoardColumn({
                     </h3>
                   )}
                   {cluster.tasks.map((task) => (
-                    <TaskCard key={task.id} task={task} onOpen={onOpenTask} onRequestDelete={onRequestDelete} />
+                    <TaskCard
+                      key={task.id}
+                      task={task}
+                      onOpen={onOpenTask}
+                      onRequestDelete={onRequestDelete}
+                      selected={selectedIds.has(task.id)}
+                      selecting={selecting}
+                      onToggleSelect={onToggleSelect}
+                    />
                   ))}
                 </div>
               ))}

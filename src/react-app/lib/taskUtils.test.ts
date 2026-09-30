@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  toggleCardSelection,
+  toggleColumnSelection,
   buildTaskSections,
   clusterTasks,
   comparePlanned,
@@ -421,5 +423,29 @@ describe("nest", () => {
     const child = makeTask({ id: "c", parentId: "p" });
     const nodes = nest([parent, child], (x, y) => x.id.localeCompare(y.id));
     expect(nodes.map((n) => n.task.id)).toEqual(["p"]);
+  });
+});
+
+describe("board selection", () => {
+  const column = ["a", "b", "c", "d"];
+
+  it("toggles one card", () => {
+    expect([...toggleCardSelection(new Set(), column, "b", null, false)]).toEqual(["b"]);
+    expect([...toggleCardSelection(new Set(["b"]), column, "b", "b", false)]).toEqual([]);
+  });
+
+  it("adds every card between the last picked and this one with Shift, either direction", () => {
+    expect([...toggleCardSelection(new Set(["a"]), column, "c", "a", true)].sort()).toEqual(["a", "b", "c"]);
+    expect([...toggleCardSelection(new Set(["d"]), column, "b", "d", true)].sort()).toEqual(["b", "c", "d"]);
+  });
+
+  it("falls back to a plain toggle when the last picked card is in another column", () => {
+    expect([...toggleCardSelection(new Set(["x"]), column, "c", "x", true)].sort()).toEqual(["c", "x"]);
+  });
+
+  it("selects a whole column when none of it is picked, and clears it when some or all is", () => {
+    expect([...toggleColumnSelection(new Set(["x"]), column)].sort()).toEqual(["a", "b", "c", "d", "x"]);
+    expect([...toggleColumnSelection(new Set(["b", "x"]), column)]).toEqual(["x"]);
+    expect([...toggleColumnSelection(new Set(column), column)]).toEqual([]);
   });
 });

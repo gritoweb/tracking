@@ -39,6 +39,8 @@ import type {
   UpdateProject,
   CreateTask,
   UpdateTask,
+  BulkTaskAction,
+  BulkUpdateTasks,
   MoveTask,
   TaskAttachment,
   CreateTaskComment,
@@ -292,8 +294,13 @@ export const api = {
 
   // ─── Tasks ────────────────────────────────────────────────────────────────
   tasks: {
-    list: (params?: { projectId?: string; includeInactive?: string }) =>
+    list: (params?: { projectId?: string; includeInactive?: string; includeArchived?: string }) =>
       request<TasksListResponse>(`/tasks${queryString(params)}`),
+    get: (id: string) => json(tasksClient[":id"].$get({ param: { id } })),
+    /** The selection bar: one action over several tasks, all or nothing. */
+    bulk: (body: BulkTaskAction) => json(tasksClient.bulk.$post({ json: body })),
+    /** The selection bar's edits: each item is the task's own PUT, reported one by one. */
+    bulkUpdate: (body: BulkUpdateTasks) => json(tasksClient["bulk-update"].$post({ json: body })),
     create: (body: CreateTask) => json(tasksClient.index.$post({ json: body })),
     update: (id: string, body: UpdateTask) => json(tasksClient[":id"].$put({ param: { id }, json: body })),
     /** A board drop: the column and the position inside it, in one write. */

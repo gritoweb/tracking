@@ -98,6 +98,9 @@ interface UIStore {
   /** Bell notifications as desktop notifications, turned on in this browser (Settings). Persisted per browser. */
   browserNotifications: boolean;
   setBrowserNotifications: (v: boolean) => void;
+  /** The Tasks page's "Show archived": adds archived tasks to whatever filter is on. Persisted per browser. */
+  showArchivedTasks: boolean;
+  setShowArchivedTasks: (v: boolean) => void;
   /** How a task opens: a centered two-column modal (default) or the side panel. Persisted per browser. */
   taskViewMode: TaskViewMode;
   setTaskViewMode: (v: TaskViewMode) => void;
@@ -258,6 +261,8 @@ export const useUIStore = create<UIStore>()(
       setTaskRailOpen: (v) => set({ taskRailOpen: v }),
       browserNotifications: false,
       setBrowserNotifications: (v) => set({ browserNotifications: v }),
+      showArchivedTasks: false,
+      setShowArchivedTasks: (v) => set({ showArchivedTasks: v }),
       taskViewMode: "modal",
       setTaskViewMode: (v) => set({ taskViewMode: v }),
       taskActivityOpen: true,
@@ -294,6 +299,7 @@ export const useUIStore = create<UIStore>()(
         sidebarCollapsed: s.sidebarCollapsed,
         taskRailOpen: s.taskRailOpen,
         taskViewMode: s.taskViewMode,
+        showArchivedTasks: s.showArchivedTasks,
         browserNotifications: s.browserNotifications,
         taskActivityOpen: s.taskActivityOpen,
         collapsedRailClients: s.collapsedRailClients,

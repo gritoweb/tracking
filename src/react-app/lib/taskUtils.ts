@@ -462,3 +462,34 @@ export function buildTaskSections(params: {
   }
   return entries.sort((a, b) => a.label.localeCompare(b.label));
 }
+
+// ─── Board selection ─────────────────────────────────────────────────────────
+
+/** A card's checkbox: toggles it, or with `range` adds every card between the last one picked and this one. */
+export function toggleCardSelection(
+  selected: ReadonlySet<string>,
+  columnIds: string[],
+  id: string,
+  anchorId: string | null,
+  range: boolean
+): Set<string> {
+  const next = new Set(selected);
+  const from = anchorId ? columnIds.indexOf(anchorId) : -1;
+  const to = columnIds.indexOf(id);
+  if (range && from !== -1 && to !== -1) {
+    for (const cardId of columnIds.slice(Math.min(from, to), Math.max(from, to) + 1)) next.add(cardId);
+  } else if (next.has(id)) next.delete(id);
+  else next.add(id);
+  return next;
+}
+
+/** A column's checkbox: nothing of it picked → pick all of it; some or all picked → clear it. */
+export function toggleColumnSelection(selected: ReadonlySet<string>, columnIds: string[]): Set<string> {
+  const next = new Set(selected);
+  const any = columnIds.some((id) => next.has(id));
+  for (const id of columnIds) {
+    if (any) next.delete(id);
+    else next.add(id);
+  }
+  return next;
+}

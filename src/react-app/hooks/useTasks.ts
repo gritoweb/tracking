@@ -10,7 +10,7 @@ import {
   nextOccurrence,
   todayLocalDate,
 } from "@shared/task-recurrence";
-import type { Task, CreateTask, TaskStatus, UpdateTask } from "@shared/schemas";
+import type { Task, CreateTask, TaskStatus, UpdateTask, BulkTaskAction, BulkUpdateTasks } from "@shared/schemas";
 
 // The API hides inactive (done) tasks unless asked, so every list here opts in:
 // the Tasks page offers an All/Active/Done filter and a "Done" group, and without
@@ -29,11 +29,13 @@ export function useTasks(projectId?: string | null) {
   });
 }
 
-export function useAllTasks() {
+/** `includeArchived`: the Tasks page's "Show archived", Reports' task filter (archived hours still count) and an opened archived task. */
+export function useAllTasks(includeArchived = false, enabled = true) {
   return useQuery({
-    queryKey: ["tasks", "all", "withDone"],
-    queryFn: () => api.tasks.list({ includeInactive: "true" }),
+    queryKey: includeArchived ? ["tasks", "all", "withDone", "archived"] : ["tasks", "all", "withDone"],
+    queryFn: () => api.tasks.list({ includeInactive: "true", ...(includeArchived ? { includeArchived: "true" } : {}) }),
     staleTime: 30_000,
+    enabled,
   });
 }
 
@@ -247,5 +249,39 @@ export function useDeleteTask() {
       toast.success("Task deleted");
     },
     onError: (error) => toastApiError(error, "Failed to delete task"),
+  });
+}
+
+const BULK_DONE: Record<BulkTaskAction["action"], string> = { archive: "archived", unarchive: "unarchived", delete: "deleted" };
+const plural = (n: number) => `${n} task${n === 1 ? "" : "s"}`;
+
+/** Archive, unarchive or delete a selection — the server refuses the whole batch if one task isn't the person's to change. */
+export function useBulkTaskAction() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: BulkTaskAction) => api.tasks.bulk(body),
+    onSuccess: (_data, { action, ids }) => {
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["task-activity"] });
+      toast.success(`${plural(ids.length)} ${BULK_DONE[action]}`);
+    },
+    onError: (error) => toastApiError(error, "Couldn't change those tasks"),
+  });
+}
+
+/** Status, assignees, dates… over a selection; each item succeeds or fails on its own. */
+export function useBulkUpdateTasks() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: BulkUpdateTasks) => api.tasks.bulkUpdate(body),
+    onSuccess: ({ results, updated }) => {
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      queryClient.invalidateQueries({ queryKey: ["task-activity"] });
+      const failed = results.filter((r) => !r.ok);
+      if (!failed.length) toast.success(`${plural(updated)} updated`);
+      else toast.error(`${plural(updated)} updated, ${failed.length} not changed: ${failed[0].error}`);
+    },
+    onError: (error) => toastApiError(error, "Couldn't update those tasks"),
   });
 }
