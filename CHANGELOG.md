@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-09-30 (18) — `refactor` only (not deployed)
+### Changed
+- **The AI looks at archived tasks only when asked.** The code already left them out by default — `list_tasks` hides them unless `includeArchived`, the in-app Assistant uses the same tools, and the AI's own grounding list skips them — so nothing archived reaches the model unasked. What was missing was the model knowing how to ask: the Assistant's prompt and `tracking_guide` now say to pass `includeArchived: true` only when the person asks for archived or old tasks, and to show only the ones marked archived.
+### Verified
+- `tsc -b` (0), `lint` (0), `vitest run` 1203/1203.
+- MCP against the local server only (`localhost:5173/mcp`, a local test key): `list_tasks` without the flag returns no archived task; with `includeArchived` the archived one comes back with `archived: true`; `get_task` opens it; `tracking_guide` carries the rule.
+- In-app Assistant in the browser (local, Playwright): "list my tasks" → the tool call sends `includeArchived: false` and the answer has no archived task; "list my archived tasks" → `includeArchived: true` and the answer lists only the archived one.
+
 ## 2026-09-30 (17) — `refactor` only (not deployed)
 ### Removed
 - **Archiving is manual only, for now.** The hourly job that archived tasks completed for three days (`lib/task-auto-archive.ts`, `runTaskAutoArchive` in `scheduled()`) is gone, with its tests and its "archived automatically" history wording. Tasks are archived only by a person: the card's or List row's "…", the task's own "…", the selection bar, or a column's "Archive all tasks". Migration 0056 is unchanged (not yet in production, already applied locally): `unarchived_at` and the partial index stay unused, ready if an automatic archive is ever turned back on.
