@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { Hono, type ExecutionContext as HonoExecutionContext } from "hono";
 import { z } from "zod";
 import { canDeleteAttachment, canDeleteComment, canDeleteTask, currentMemberIds, entryScopeUserId, getMemberRole } from "../lib/permissions";
 import { zValidator } from "@hono/zod-validator";
@@ -949,7 +949,11 @@ export const tasksRouter = new Hono<{
       })
       .route("/", tasksRouter);
     const pending: Promise<unknown>[] = [];
-    const ctx = { waitUntil: (p: Promise<unknown>) => void pending.push(p), passThroughOnException: () => {}, props: {} } as unknown as ExecutionContext;
+    const ctx: HonoExecutionContext = {
+      waitUntil: (p) => void pending.push(p),
+      passThroughOnException: () => c.executionCtx.passThroughOnException(),
+      props: c.executionCtx.props,
+    };
     const batch = new NotificationBatch();
 
     const results: Array<{ id: string; ok: boolean; error?: string }> = [];

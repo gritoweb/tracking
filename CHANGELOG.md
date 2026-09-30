@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-30 (19) — `refactor` only (not deployed)
+### Changed
+- The bulk-edit route builds its inner execution context as Hono's own `ExecutionContext` type (waitUntil collected, `passThroughOnException` and `props` from the real one) instead of an `as unknown as ExecutionContext` cast. No behaviour change.
+### Verified
+- `tsc -b` (0), `lint` (0), `vitest run` 1203/1203.
+
 ## 2026-09-30 (18) — `refactor` only (not deployed)
 ### Changed
 - **The AI looks at archived tasks only when asked.** The code already left them out by default — `list_tasks` hides them unless `includeArchived`, the in-app Assistant uses the same tools, and the AI's own grounding list skips them — so nothing archived reaches the model unasked. What was missing was the model knowing how to ask: the Assistant's prompt and `tracking_guide` now say to pass `includeArchived: true` only when the person asks for archived or old tasks, and to show only the ones marked archived.
