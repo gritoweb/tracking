@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-30 (20) — `refactor` only (not deployed)
+### Changed
+- The board's column selection is named for what it does now that the header checkbox is gone: `selectColumn` (was `toggleColumnSelection`) only adds the column's cards, and `onSelectColumn` (was `onToggleColumn`) is what the column menu's "Select all" calls. The never-used "clear the column" branch is removed. No behaviour change.
+### Verified
+- `tsc -b` (0), `lint` (0), `vitest run` 1203/1203 (the column test now checks that Select all adds the column and keeps what was already picked).
+
 ## 2026-09-30 (19) — `refactor` only (not deployed)
 ### Changed
 - The bulk-edit route builds its inner execution context as Hono's own `ExecutionContext` type (waitUntil collected, `passThroughOnException` and `props` from the real one) instead of an `as unknown as ExecutionContext` cast. No behaviour change.

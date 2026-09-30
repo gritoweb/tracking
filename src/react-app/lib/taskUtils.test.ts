@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   toggleCardSelection,
-  toggleColumnSelection,
+  selectColumn,
   buildTaskSections,
   clusterTasks,
   comparePlanned,
@@ -443,9 +443,7 @@ describe("board selection", () => {
     expect([...toggleCardSelection(new Set(["x"]), column, "c", "x", true)].sort()).toEqual(["c", "x"]);
   });
 
-  it("selects a whole column when none of it is picked, and clears it when some or all is", () => {
-    expect([...toggleColumnSelection(new Set(["x"]), column)].sort()).toEqual(["a", "b", "c", "d", "x"]);
-    expect([...toggleColumnSelection(new Set(["b", "x"]), column)]).toEqual(["x"]);
-    expect([...toggleColumnSelection(new Set(column), column)]).toEqual([]);
+  it("adds a whole column to the selection, keeping what was already picked", () => {
+    expect([...selectColumn(new Set(["x", "b"]), column)].sort()).toEqual(["a", "b", "c", "d", "x"]);
   });
 });

@@ -483,13 +483,7 @@ export function toggleCardSelection(
   return next;
 }
 
-/** A column's checkbox: nothing of it picked → pick all of it; some or all picked → clear it. */
-export function toggleColumnSelection(selected: ReadonlySet<string>, columnIds: string[]): Set<string> {
-  const next = new Set(selected);
-  const any = columnIds.some((id) => next.has(id));
-  for (const id of columnIds) {
-    if (any) next.delete(id);
-    else next.add(id);
-  }
-  return next;
+/** The column menu's "Select all": adds every card of the column to what is already selected. */
+export function selectColumn(selected: ReadonlySet<string>, columnIds: string[]): Set<string> {
+  return new Set([...selected, ...columnIds]);
 }

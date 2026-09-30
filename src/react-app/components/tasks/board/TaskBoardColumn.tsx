@@ -27,8 +27,8 @@ interface TaskBoardColumnProps {
   onRequestDelete: (task: Task) => void;
   selectedIds: ReadonlySet<string>;
   onToggleSelect: (task: Task, range: boolean) => void;
-  /** The column menu's "Select all": adds the given cards to the selection. */
-  onToggleColumn: (tasks: Task[]) => void;
+  /** The column menu's "Select all": adds the column's cards to the selection. */
+  onSelectColumn: (tasks: Task[]) => void;
 }
 
 /** One column of the board — `useDroppable` here (not just the sortable list) is what lets an empty column receive a card. */
@@ -43,20 +43,16 @@ export function TaskBoardColumn({
   onRequestDelete,
   selectedIds,
   onToggleSelect,
-  onToggleColumn,
+  onSelectColumn,
 }: TaskBoardColumnProps) {
   const { setNodeRef } = useDroppable({ id: `column:${status.id}` });
   const [adding, setAdding] = useState(false);
   const outsideRef = useOutsideClick<HTMLDivElement>(() => setAdding(false));
   const clusters = clusterTasks(tasks, groupBy, todayLocalDate());
   const selecting = selectedIds.size > 0;
-  const picked = tasks.filter((t) => selectedIds.has(t.id)).length;
   const bulk = useBulkTaskAction();
   const canDelete = useCanDeleteTask();
   const [archiveAllOpen, setArchiveAllOpen] = useState(false);
-  const selectAll = () => {
-    if (picked !== tasks.length) onToggleColumn(tasks.filter((t) => !selectedIds.has(t.id)));
-  };
 
   return (
     <section aria-label={status.name} className="flex w-(--size-board-column) shrink-0 flex-col rounded-container">
@@ -79,7 +75,7 @@ export function TaskBoardColumn({
               taskCount={tasks.length}
               projectId={defaultProjectId}
               canManage={canManage}
-              onSelectAll={selectAll}
+              onSelectAll={() => onSelectColumn(tasks)}
               onArchiveAll={() => setArchiveAllOpen(true)}
               canArchiveAll={tasks.every(canDelete)}
             />

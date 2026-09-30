@@ -30,7 +30,7 @@ import {
   midpointOrder,
   SORTERS,
   toggleCardSelection,
-  toggleColumnSelection,
+  selectColumn,
   type DueFilter,
   type GroupBy,
   type SortBy,
@@ -129,8 +129,8 @@ export function TaskBoard({
     lastPicked.current = task.id;
     setPickedIds((prev) => toggleCardSelection(visibleOnly(prev), column.map((t) => t.id), task.id, anchor, range));
   };
-  const toggleColumn = (columnTasks: Task[]) =>
-    setPickedIds((prev) => toggleColumnSelection(visibleOnly(prev), columnTasks.map((t) => t.id)));
+  const selectWholeColumn = (columnTasks: Task[]) =>
+    setPickedIds((prev) => selectColumn(visibleOnly(prev), columnTasks.map((t) => t.id)));
 
   // Esc clears the selection unless a menu, popover or dialog is open: that Esc is for closing it (still in the DOM here).
   const selecting = selectedIds.size > 0;
@@ -287,7 +287,7 @@ export function TaskBoard({
             onRequestDelete={onRequestDelete}
             selectedIds={selectedIds}
             onToggleSelect={toggleSelect}
-            onToggleColumn={toggleColumn}
+            onSelectColumn={selectWholeColumn}
           />
         ))}
         {canManage && <AddStatusColumn statuses={statuses} projectId={projectId} />}
