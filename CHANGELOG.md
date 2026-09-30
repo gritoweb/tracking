@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-09-30 (34) — deployed to production (`refactor` → `master`)
+### Released
+- Everything since 2026-09-29 (5): manual task archiving with "Show archived" (per-column pages of 50), board bulk selection with the floating action bar, bulk archive/unarchive/delete/edit with one notification per person, the AI looking at archived tasks only when asked, Reports' light task list, notifications read when their task is viewed (so Slack doesn't repeat them), the description's formatting bar after Ctrl/Cmd+A, and sandboxed HTML attachment previews.
+- Remote migration `0056_task_archiving.sql` (one additive `ALTER TABLE tasks ADD COLUMN archived_at TEXT`) applied before the code, after a time-travel bookmark: `00001428-00000000-000050f6-d626e33abbe36132274f6bb55defad69` (2026-09-30). Afterwards the remote `tasks` table has `archived_at`, all 29 tasks are still there and none is archived.
+### Verified
+- CI green on `refactor` (`83ebdd2`), `pnpm check` (0), `vitest run` 1213/1213, task/reports/entries e2e 61 passed / 1 skipped before release.
+
 ## 2026-09-30 (33) — `refactor` only (not deployed)
 ### Added
 - **HTML attachments open as a page, with zoom.** An `.html`/`.htm` attachment used to open as its source code in the viewer; it now renders as the page (reports keep their own layout, tables and fonts), with the same − / + / fit zoom as PDFs and a "Preview | Code" switch to read the source. Safety: the file is still stored and served as `text/plain` (never as HTML), and the viewer draws it in an `iframe` with an empty `sandbox` (no scripts, forms, popups or same-origin) and a CSP prepended to the document that allows only inline/HTTPS styles, images, fonts and media — no `script-src`, no `connect-src`. Zoom scales the frame instead of reloading it. The shared text fetch moved to `useAttachmentText`, used by the text and HTML stages.
