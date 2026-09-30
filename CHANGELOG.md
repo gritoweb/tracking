@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-30 (29) — `refactor` only (not deployed)
+### Docs
+- `docs/USER_GUIDE.md`: the archive's 50-per-page numbered pages (per column on the Board, under the List), "Unarchive all tasks", and selecting a column through its "…" menu ("Select all" / "Deselect all") instead of the removed header checkbox.
+### Verified
+- The task e2e suite against the final code: 52 passed, 1 skipped, 0 failed (`task-board`, `task-delete-permissions`, `task-detail-panel`, `task-planning`, `task-statuses-fork`, `task-view-mode`, `subtask-delete`, `task-create-once`, `task-log-time`, `task-notification-scoping`, `task-comments`).
+
 ## 2026-09-30 (28) — `refactor` only (not deployed)
 ### Changed
 - **The time-entry list and the detailed report use the shared `SelectionBar`.** Both had their own hand-built selection strip (a tinted band on top of the list, and a bordered row that replaced the report's "Columns" menu); they now show the same floating bar as the task board, with the count and its × on the left and their actions on the right (Mark billable / Non-billable / Push to integration / Delete, and Billable / Non-billable / Delete). The report's "Columns" menu now stays available while rows are selected. Actions, confirmations and permissions are unchanged; the ad-hoc `h-7 text-xs` button overrides are replaced by `size="sm"`.
