@@ -294,7 +294,7 @@ export const api = {
 
   // ─── Tasks ────────────────────────────────────────────────────────────────
   tasks: {
-    list: (params?: { projectId?: string; includeInactive?: string; includeArchived?: string }) =>
+    list: (params?: { projectId?: string; parentId?: string; includeInactive?: string; includeArchived?: string; archivedOnly?: string }) =>
       request<TasksListResponse>(`/tasks${queryString(params)}`),
     get: (id: string) => json(tasksClient[":id"].$get({ param: { id } })),
     /** The selection bar: one action over several tasks, all or nothing. */

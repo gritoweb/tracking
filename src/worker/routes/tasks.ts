@@ -6,6 +6,7 @@ import {
   CreateTaskCommentSchema,
   TaskCommentsQuerySchema,
   CreateTaskSchema,
+  ARCHIVE_PAGE_LIMIT,
   BulkTaskActionSchema,
   BulkUpdateTasksSchema,
   MoveTaskSchema,
@@ -441,7 +442,7 @@ export const tasksRouter = new Hono<{
   // ─── List tasks ───────────────────────────────────────────────────────────
   .get("/", async (c) => {
     const workspaceId = c.get("workspaceId");
-    const { projectId, statusId, includeInactive, includeArchived, assignee, parentId } = c.req.query();
+    const { projectId, statusId, includeInactive, includeArchived, archivedOnly, assignee, parentId } = c.req.query();
 
     let where = `WHERE tk.workspace_id = ?`;
     const bindings: unknown[] = [workspaceId];
@@ -450,7 +451,13 @@ export const tasksRouter = new Hono<{
     if (statusId) { where += ` AND tk.status_id = ?`; bindings.push(statusId); }
     if (parentId) { where += ` AND tk.parent_id = ?`; bindings.push(parentId); }
     if (!includeInactive) { where += ` AND tk.active = 1`; }
-    if (!includeArchived) { where += ` AND tk.archived_at IS NULL`; }
+    if (archivedOnly) {
+      // The archive only grows (the auto-archive feeds it): the most recently archived parents, with their subtasks.
+      where += ` AND tk.archived_at IS NOT NULL AND COALESCE(tk.parent_id, tk.id) IN (
+        SELECT a.id FROM tasks a WHERE a.workspace_id = ? AND a.parent_id IS NULL AND a.archived_at IS NOT NULL
+        ORDER BY a.archived_at DESC LIMIT ?)`;
+      bindings.push(workspaceId, ARCHIVE_PAGE_LIMIT);
+    } else if (!includeArchived) { where += ` AND tk.archived_at IS NULL`; }
     if (assignee) {
       const assigneeId = assignee === "me" ? c.get("userId") : assignee;
       where += ` AND EXISTS (SELECT 1 FROM task_assignees ta

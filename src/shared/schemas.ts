@@ -354,6 +354,8 @@ export const UpdateTaskSchema = z.object({
 
 /** What a drag on the board sends: the column it landed in and where in it. */
 export const BULK_TASK_IDS_MAX = 100;
+/** "Show archived" loads this many of the most recently archived parent tasks (with their subtasks). */
+export const ARCHIVE_PAGE_LIMIT = 500;
 
 /** What the board's selection bar sends: one action over several tasks, all or nothing. */
 export const BulkTaskActionSchema = z.object({

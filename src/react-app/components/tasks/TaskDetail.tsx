@@ -18,6 +18,8 @@ import { TaskComments } from "./TaskComments";
 import { useTaskComments } from "@/hooks/useTaskComments";
 import {
   useAllTasks,
+  useSubtasks,
+  useTask,
   useBulkTaskAction,
   useCompleteTask,
   useUpdateTask,
@@ -64,8 +66,11 @@ export function TaskDetail({ open, onClose, task, tab, onTabChange, onRequestDel
   const updateTask = useUpdateTask();
   const completeTask = useCompleteTask();
   const { data: members = [], isPending: membersLoading } = useWorkspaceMembers(open);
-  // An archived task's subtasks are archived with it, so its own list is read from the archive too.
-  const { data: allTasks = [] } = useAllTasks(Boolean(task?.archivedAt));
+  const { data: allTasks = [] } = useAllTasks();
+  // An archived task's subtasks (archived with it) and an archived subtask's parent aren't in the live list.
+  const archived = Boolean(task?.archivedAt);
+  const { data: archivedSubtasks = [] } = useSubtasks(task?.id ?? null, archived && !task?.parentId);
+  const { data: archivedParent = null } = useTask(task?.parentId ?? null, archived);
   const { data: attachments = [], isLoading: attachmentsLoading } = useTaskAttachments(task?.id ?? null);
   const { data: comments = [] } = useTaskComments(task?.id ?? null);
   const deleteAttachment = useDeleteTaskAttachment();
@@ -82,7 +87,7 @@ export function TaskDetail({ open, onClose, task, tab, onTabChange, onRequestDel
   if (!task) return null;
 
   const isSubtask = Boolean(task.parentId);
-  const subtasks = allTasks.filter((t) => t.parentId === task.id);
+  const subtasks = archived ? archivedSubtasks : allTasks.filter((t) => t.parentId === task.id);
   const running = runningEntry?.taskId === task.id;
   const commentsCount = Math.max(task.commentCount, comments.length);
 
@@ -137,7 +142,7 @@ export function TaskDetail({ open, onClose, task, tab, onTabChange, onRequestDel
     />
   );
 
-  const parent = task.parentId ? allTasks.find((t) => t.id === task.parentId) : undefined;
+  const parent = task.parentId ? allTasks.find((t) => t.id === task.parentId) ?? archivedParent ?? undefined : undefined;
   const title = (
     <div className="space-y-1">
       {parent && <TaskParentLink parent={parent} onOpen={(id) => navigate(taskPath(id))} />}

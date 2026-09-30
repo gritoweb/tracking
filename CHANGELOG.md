@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-30 (13) — `refactor`, local only (not pushed, not deployed)
+### Fixed
+- **"Show archived" fetches only the archive, and a bounded slice of it.** It used to load every live task plus every archived one (with their hour and count rollups) and filter on the client — a list the auto-archive makes grow forever. `GET /api/tasks?archivedOnly=true` returns only archived tasks: the `ARCHIVE_PAGE_LIMIT` (500) most recently archived parents with their subtasks; the page says so when the cap is reached. Opening a link to a task that isn't in the list on screen now fetches that one task (`useTask`, `GET /api/tasks/:id`) instead of the whole archive, and an archived task's detail reads its own subtasks (`useSubtasks`) and, for an archived subtask, its parent by id.
+### Verified
+- `tsc -b` (0), `lint` (0), `vitest run` (new: `archivedOnly` returns just the archived parent and its subtask; with 501 archived parents it returns the 500 most recent, dropping the oldest).
+
 ## 2026-09-30 (12) — `refactor`, local only (not pushed, not deployed)
 ### Fixed
 - **A bulk edit sends one realtime event, not two per task.** Each inner `PUT` of `POST /api/tasks/bulk-update` used to broadcast `tasks:changed` and `task-comments:changed`, so a 50-task edit sent up to 100 events and every open screen refetched the task list dozens of times. The inner requests (marked in the `bulkRequests` WeakMap, which also carries the grouped-notification sink) now stay quiet, and the batch broadcasts one `tasks:changed` at the end; the client also refreshes open task histories (`["task-activity"]`) on that event. Items still run one after another on purpose: a status change reads `MAX(board_order)+1`, which two parallel writes would read alike.

@@ -29,13 +29,43 @@ export function useTasks(projectId?: string | null) {
   });
 }
 
-/** `includeArchived`: the Tasks page's "Show archived", Reports' task filter (archived hours still count) and an opened archived task. */
-export function useAllTasks(includeArchived = false, enabled = true) {
+/** `includeArchived`: Reports' task filter only (archived hours still count). */
+export function useAllTasks(includeArchived = false) {
   return useQuery({
-    queryKey: includeArchived ? ["tasks", "all", "withDone", "archived"] : ["tasks", "all", "withDone"],
+    queryKey: includeArchived ? ["tasks", "all", "withDone", "withArchived"] : ["tasks", "all", "withDone"],
     queryFn: () => api.tasks.list({ includeInactive: "true", ...(includeArchived ? { includeArchived: "true" } : {}) }),
     staleTime: 30_000,
+  });
+}
+
+/** "Show archived": the archive alone, capped server-side at the most recent ARCHIVE_PAGE_LIMIT parents. */
+export function useArchivedTasks(enabled: boolean) {
+  return useQuery({
+    queryKey: ["tasks", "archived"],
+    queryFn: () => api.tasks.list({ includeInactive: "true", archivedOnly: "true" }),
+    staleTime: 30_000,
     enabled,
+  });
+}
+
+/** One task by id — an archived one opened from a link, or an entry's archived task. */
+export function useTask(id: string | null, enabled = true) {
+  return useQuery({
+    queryKey: ["tasks", "one", id],
+    queryFn: () => api.tasks.get(id!),
+    staleTime: 30_000,
+    enabled: enabled && !!id,
+    retry: false,
+  });
+}
+
+/** A task's subtasks, archived ones included — an archived parent's list isn't in the live one. */
+export function useSubtasks(parentId: string | null, enabled = true) {
+  return useQuery({
+    queryKey: ["tasks", "subtasks", parentId],
+    queryFn: () => api.tasks.list({ parentId: parentId!, includeInactive: "true", includeArchived: "true" }),
+    staleTime: 30_000,
+    enabled: enabled && !!parentId,
   });
 }
 
