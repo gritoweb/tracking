@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-09-30 (9) — `refactor` only (not deployed)
+### Changed
+- **Archive follows Delete's pattern: without permission it isn't shown at all**, rather than shown disabled. The selection bar shows Archive/Unarchive and Delete only when every selected task is the person's (author) or they are owner/admin; the column's "…" shows "Archive all tasks" only when every task in the column is. Card and List-row menus already worked this way.
+### Added
+- **Archive task / Unarchive task in the task's own "…"** (the modal and the sidebar share `TaskDetailToolbar`), above "Delete task" and under the same rule; top-level tasks only (a subtask follows its parent). The task stays open after archiving. With neither action allowed, the "…" is not rendered, as before.
+### Verified
+- `tsc -b` (0), `lint` (0), `vitest run` 1204/1204. In the browser (local): as the owner, the task's "…" lists Archive task + Delete task, archiving keeps the modal open and the menu then offers Unarchive task; as a local test member who didn't create the tasks, the card menu shows only "Edit task…", the column menu only "Select all", the selection bar has no Archive/Delete, and the task's "…" is absent in both the modal and the sidebar.
+
 ## 2026-09-30 (8) — `refactor` only (not deployed)
 ### Added
 - **The column's "…" menu has "Select all" and "Archive all tasks"**, for everyone (before, the menu held only column configuration and only owners/admins saw it). "Archive all tasks" asks for confirmation, archives the column's cards with their subtasks, and is disabled — with the reason in its tooltip — when the column holds a task that isn't the person's to archive. Renaming, colour, type, default, moving and archiving the column itself stay owner/admin only; the column's own archive item now reads "Archive column" so it can't be mistaken for archiving its tasks. A member's trigger is labelled "<column> options" (an owner/admin's stays "Configure <column>"). A bulk action over more than 100 tasks is sent in consecutive requests of 100.

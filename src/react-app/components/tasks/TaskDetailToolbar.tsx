@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { AppWindow, Check, MoreHorizontal, PanelRight, Trash2 } from "lucide-react";
+import { AppWindow, Archive, ArchiveRestore, Check, MoreHorizontal, PanelRight, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -15,8 +15,11 @@ import type { TaskViewMode } from "@/stores/uiStore";
 interface TaskDetailToolbarProps {
   mode: TaskViewMode;
   onModeChange: (mode: TaskViewMode) => void;
-  /** Absent when this person may not delete the task, and then there is no actions menu. */
+  /** Absent when this person may not delete the task; with no archive either, there is no actions menu. */
   onDeleteTask?: () => void;
+  /** Same rule as delete, top-level tasks only; absent means the item isn't shown. */
+  onToggleArchive?: () => void;
+  archived?: boolean;
   isSubtask?: boolean;
 }
 
@@ -73,10 +76,10 @@ function ViewModeMenu({ mode, onModeChange }: Pick<TaskDetailToolbarProps, "mode
 }
 
 /** The task detail's top strip, shared by the modal and the sidebar — both close buttons sit to its right. */
-export function TaskDetailToolbar({ mode, onModeChange, onDeleteTask, isSubtask = false }: TaskDetailToolbarProps) {
+export function TaskDetailToolbar({ mode, onModeChange, onDeleteTask, onToggleArchive, archived = false, isSubtask = false }: TaskDetailToolbarProps) {
   return (
     <div className="flex h-12 shrink-0 items-center gap-1 border-b px-4 pr-12">
-      {onDeleteTask && (
+      {(onDeleteTask || onToggleArchive) && (
         <>
       {/* "..." rather than a bare trash icon, so delete isn't a stray misclick. */}
       <DropdownMenu>
@@ -93,10 +96,18 @@ export function TaskDetailToolbar({ mode, onModeChange, onDeleteTask, isSubtask 
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start">
-          <DropdownMenuItem variant="destructive" onClick={onDeleteTask}>
-            <Trash2 className="h-3.5 w-3.5" />
-            {isSubtask ? "Delete subtask" : "Delete task"}
-          </DropdownMenuItem>
+          {onToggleArchive && (
+            <DropdownMenuItem onClick={onToggleArchive}>
+              {archived ? <ArchiveRestore className="h-3.5 w-3.5" /> : <Archive className="h-3.5 w-3.5" />}
+              {archived ? "Unarchive task" : "Archive task"}
+            </DropdownMenuItem>
+          )}
+          {onDeleteTask && (
+            <DropdownMenuItem variant="destructive" onClick={onDeleteTask}>
+              <Trash2 className="h-3.5 w-3.5" />
+              {isSubtask ? "Delete subtask" : "Delete task"}
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
         </>

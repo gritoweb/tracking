@@ -46,12 +46,12 @@ interface StatusColumnMenuProps {
   canManage: boolean;
   onSelectAll: () => void;
   onArchiveAll: () => void;
-  /** Why "Archive all tasks" is off (someone else's task in the column), or null when it is allowed. */
-  archiveAllBlocked: string | null;
+  /** Like Delete: shown only when every task in the column is the person's to archive. */
+  canArchiveAll: boolean;
 }
 
 /** Configuring a column. Every rule enforced here is refused server-side too — this just says why sooner. */
-export function StatusColumnMenu({ status, statuses, taskCount, projectId, canManage, onSelectAll, onArchiveAll, archiveAllBlocked }: StatusColumnMenuProps) {
+export function StatusColumnMenu({ status, statuses, taskCount, projectId, canManage, onSelectAll, onArchiveAll, canArchiveAll }: StatusColumnMenuProps) {
   const update = useUpdateTaskStatus(projectId);
   const archive = useArchiveTaskStatus(projectId);
   const [renaming, setRenaming] = useState(false);
@@ -130,10 +130,12 @@ export function StatusColumnMenu({ status, statuses, taskCount, projectId, canMa
             <CheckSquare className="mr-2 h-3.5 w-3.5" />
             Select all
           </DropdownMenuItem>
-          <DropdownMenuItem disabled={taskCount === 0 || archiveAllBlocked !== null} title={archiveAllBlocked ?? undefined} onClick={onArchiveAll}>
-            <Archive className="mr-2 h-3.5 w-3.5" />
-            Archive all tasks
-          </DropdownMenuItem>
+          {canArchiveAll && (
+            <DropdownMenuItem disabled={taskCount === 0} onClick={onArchiveAll}>
+              <Archive className="mr-2 h-3.5 w-3.5" />
+              Archive all tasks
+            </DropdownMenuItem>
+          )}
 
           {canManage && (
             <>

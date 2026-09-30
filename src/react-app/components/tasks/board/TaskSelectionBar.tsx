@@ -46,8 +46,6 @@ interface TaskSelectionBarProps {
   onClear: () => void;
 }
 
-const NOT_YOURS = "Only the task's author or a workspace owner/admin can do this to every selected task";
-
 /** The board's bulk actions; every edit is each task's own PUT on the server, so rules and history match a single edit. */
 export function TaskSelectionBar({ selected, statuses, tasks, onClear }: TaskSelectionBarProps) {
   const bulk = useBulkTaskAction();
@@ -219,41 +217,32 @@ export function TaskSelectionBar({ selected, statuses, tasks, onClear }: TaskSel
           <Copy className="h-4 w-4" />
         </Button>
 
-        {allArchived ? (
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label="Unarchive"
-            title={allYours ? "Unarchive" : NOT_YOURS}
-            disabled={busy || !allYours}
-            onClick={() => bulk.mutate({ ids, action: "unarchive" }, { onSuccess: onClear })}
-          >
-            <ArchiveRestore className="h-4 w-4" />
-          </Button>
-        ) : (
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label="Archive"
-            title={allYours ? "Archive" : NOT_YOURS}
-            disabled={busy || !allYours}
-            onClick={() => bulk.mutate({ ids, action: "archive" }, { onSuccess: onClear })}
-          >
-            <Archive className="h-4 w-4" />
-          </Button>
+        {/* Like Delete everywhere else: shown only when every selected task is the person's to change. */}
+        {allYours && (
+          <>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={allArchived ? "Unarchive" : "Archive"}
+              title={allArchived ? "Unarchive" : "Archive"}
+              disabled={busy}
+              onClick={() => bulk.mutate({ ids, action: allArchived ? "unarchive" : "archive" }, { onSuccess: onClear })}
+            >
+              {allArchived ? <ArchiveRestore className="h-4 w-4" /> : <Archive className="h-4 w-4" />}
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Delete"
+              title="Delete"
+              disabled={busy}
+              onClick={() => setConfirmDelete(true)}
+              className="text-destructive hover:text-destructive"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </>
         )}
-
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label="Delete"
-          title={allYours ? "Delete" : NOT_YOURS}
-          disabled={busy || !allYours}
-          onClick={() => setConfirmDelete(true)}
-          className="text-destructive hover:text-destructive"
-        >
-          <Trash2 className="h-4 w-4" />
-        </Button>
       </SelectionBar>
 
       <ConfirmDialog

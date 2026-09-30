@@ -97,9 +97,7 @@ export function TaskBoardColumn({
               canManage={canManage}
               onSelectAll={selectAll}
               onArchiveAll={() => setArchiveAllOpen(true)}
-              archiveAllBlocked={
-                tasks.every(canDelete) ? null : "Some of these tasks can only be archived by their author or a workspace owner/admin"
-              }
+              canArchiveAll={tasks.every(canDelete)}
             />
           </header>
 
