@@ -66,3 +66,110 @@ describe("task archiving — listing", () => {
     expect((await as("u-owner").get("/t-owner")).status).toBe(200);
   });
 });
+
+describe("POST /bulk — archive, unarchive, delete", () => {
+  it("archives a task with its subtasks and records it in the history", async () => {
+    const { raw, as, archivedAt } = archivingWorld();
+    const res = await as("u-owner").post("/bulk", { ids: ["t-owner"], action: "archive" });
+    expect(res.status).toBe(200);
+    expect(archivedAt("t-owner")).toBeTruthy();
+    expect(archivedAt("t-owner-sub")).toBeTruthy();
+    expect(archivedAt("t-mine")).toBeNull();
+    const kinds = raw.prepare(`SELECT kind, user_id FROM task_activity WHERE task_id = 't-owner'`).all();
+    expect(kinds).toEqual([{ kind: "archived", user_id: "u-owner" }]);
+  });
+
+  it("unarchives the task and its subtasks and marks when it was unarchived", async () => {
+    const { raw, as, archivedAt } = archivingWorld();
+    raw.exec(`UPDATE tasks SET archived_at = '2026-02-01T00:00:00.000Z' WHERE id IN ('t-owner', 't-owner-sub')`);
+    const res = await as("u-owner").post("/bulk", { ids: ["t-owner"], action: "unarchive" });
+    expect(res.status).toBe(200);
+    expect(archivedAt("t-owner")).toBeNull();
+    expect(archivedAt("t-owner-sub")).toBeNull();
+    const row = raw.prepare(`SELECT unarchived_at FROM tasks WHERE id = 't-owner'`).get() as { unarchived_at: string | null };
+    expect(row.unarchived_at).toBeTruthy();
+  });
+
+  it("lets a member archive their own task", async () => {
+    const { as, archivedAt } = archivingWorld();
+    expect((await as("u-member").post("/bulk", { ids: ["t-mine"], action: "archive" })).status).toBe(200);
+    expect(archivedAt("t-mine")).toBeTruthy();
+  });
+
+  it("refuses a member the whole batch when one task isn't theirs, changing nothing", async () => {
+    const { as, archivedAt } = archivingWorld();
+    const res = await as("u-member").post("/bulk", { ids: ["t-mine", "t-owner"], action: "archive" });
+    expect(res.status).toBe(403);
+    expect(archivedAt("t-mine")).toBeNull();
+    expect(archivedAt("t-owner")).toBeNull();
+  });
+
+  it("lets owner and admin archive anyone's task", async () => {
+    const { as, archivedAt } = archivingWorld();
+    expect((await as("u-admin").post("/bulk", { ids: ["t-mine"], action: "archive" })).status).toBe(200);
+    expect(archivedAt("t-mine")).toBeTruthy();
+    expect((await as("u-owner").post("/bulk", { ids: ["t-mine"], action: "unarchive" })).status).toBe(200);
+    expect(archivedAt("t-mine")).toBeNull();
+  });
+
+  it("refuses to archive a subtask on its own", async () => {
+    const { as, archivedAt } = archivingWorld();
+    expect((await as("u-owner").post("/bulk", { ids: ["t-owner-sub"], action: "archive" })).status).toBe(400);
+    expect(archivedAt("t-owner-sub")).toBeNull();
+  });
+
+  it("treats another workspace's task as not found and touches nothing", async () => {
+    const { as, archivedAt } = archivingWorld();
+    for (const action of ["archive", "delete"] as const) {
+      const res = await as("u-owner").post("/bulk", { ids: ["t-owner", "t-foreign"], action });
+      expect(res.status).toBe(404);
+    }
+    expect(archivedAt("t-owner")).toBeNull();
+    expect(archivedAt("t-foreign")).toBeNull();
+  });
+
+  it("deletes tasks with every subtask and leaves their time entries' hours and project alone", async () => {
+    const { raw, as } = archivingWorld();
+    raw.exec(`
+      INSERT INTO tasks (id, workspace_id, project_id, name, status_id, created_by, parent_id) VALUES
+        ('t-owner-sub2', 'ws-A', 'p-A', 'Second', 's-todo', 'u-owner', 't-owner'),
+        ('t-owner-sub3', 'ws-A', 'p-A', 'Third', 's-todo', 'u-owner', 't-owner');
+      INSERT INTO time_entries (id, workspace_id, project_id, user_id, description, start, stop, duration, task_id) VALUES
+        ('e-1', 'ws-A', 'p-A', 'u-owner', 'Work', '2026-01-02T09:00:00Z', '2026-01-02T11:00:00Z', 7200, 't-owner-sub3');
+    `);
+    const res = await as("u-owner").post("/bulk", { ids: ["t-owner", "t-mine"], action: "delete" });
+    expect(res.status).toBe(200);
+    const left = raw.prepare(`SELECT id FROM tasks WHERE workspace_id = 'ws-A'`).all();
+    expect(left).toEqual([]);
+    expect(raw.prepare(`SELECT project_id, duration, description, task_id FROM time_entries WHERE id = 'e-1'`).get()).toEqual({
+      project_id: "p-A", duration: 7200, description: "Work", task_id: null,
+    });
+  });
+
+  it("archives more tasks than one statement's bind limit allows", async () => {
+    const { raw, as } = archivingWorld();
+    const many = Array.from({ length: 95 }, (_, i) => `t-bulk-${i}`);
+    raw.exec(
+      `INSERT INTO tasks (id, workspace_id, project_id, name, status_id, created_by) VALUES ` +
+        many.map((id) => `('${id}', 'ws-A', 'p-A', '${id}', 's-todo', 'u-owner')`).join(", ")
+    );
+    expect((await as("u-owner").post("/bulk", { ids: many, action: "archive" })).status).toBe(200);
+    const archived = raw.prepare(`SELECT COUNT(*) AS n FROM tasks WHERE archived_at IS NOT NULL`).get() as { n: number };
+    expect(archived.n).toBe(95);
+  });
+});
+
+describe("DELETE /:id — shares the bulk deletion", () => {
+  it("removes the task and every one of its subtasks, not just the first", async () => {
+    const { raw, as } = archivingWorld();
+    raw.exec(`INSERT INTO tasks (id, workspace_id, project_id, name, status_id, created_by, parent_id) VALUES
+      ('t-owner-sub2', 'ws-A', 'p-A', 'Second', 's-todo', 'u-owner', 't-owner')`);
+    expect((await as("u-owner").del("/t-owner")).status).toBe(200);
+    expect(raw.prepare(`SELECT id FROM tasks WHERE workspace_id = 'ws-A' ORDER BY id`).all()).toEqual([{ id: "t-mine" }]);
+  });
+
+  it("still refuses a member deleting someone else's task", async () => {
+    const { as } = archivingWorld();
+    expect((await as("u-member").del("/t-owner")).status).toBe(403);
+  });
+});

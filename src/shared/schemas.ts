@@ -353,6 +353,15 @@ export const UpdateTaskSchema = z.object({
 });
 
 /** What a drag on the board sends: the column it landed in and where in it. */
+export const BULK_TASK_IDS_MAX = 100;
+
+/** What the board's selection bar sends: one action over several tasks, all or nothing. */
+export const BulkTaskActionSchema = z.object({
+  ids: z.array(z.string().min(1)).min(1).max(BULK_TASK_IDS_MAX),
+  action: z.enum(["archive", "unarchive", "delete"]),
+});
+export type BulkTaskAction = z.infer<typeof BulkTaskActionSchema>;
+
 export const MoveTaskSchema = z.object({
   statusId: z.string(),
   /** Omitted (the MCP's move_task), the card goes to the end of its new column. */
@@ -920,7 +929,7 @@ export const UpdateTaskCommentSchema = z.object({
   attachmentId: z.string().nullable().optional(),
 });
 
-export const TaskActivityKindSchema = z.enum(["status", "due_date", "priority", "assignees"]);
+export const TaskActivityKindSchema = z.enum(["status", "due_date", "priority", "assignees", "archived", "unarchived"]);
 
 /** One change to a task, shown in the comments feed. For `assignees`, `from` is who was removed and `to` who was added. */
 export const TaskActivitySchema = z.object({

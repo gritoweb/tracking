@@ -432,3 +432,30 @@ describe("MCP writes and reads a task's notes and comments as Markdown", () => {
     expect(stored.content.map((n: { type: string }) => n.type)).toEqual(["paragraph", "taskList"]);
   });
 });
+
+describe("update_task archives through the same route as the board", () => {
+  it("archives a task out of list_tasks, shows it with includeArchived, and brings it back", async () => {
+    const w = world();
+    const admin = w.toolsFor("u-admin");
+    const t = (await w.call(admin, "create_task", { name: "Old plan", projectId: "p1" })).data!;
+
+    const archived = await w.call(admin, "update_task", { taskId: t.id, archived: true });
+    expect(archived.error).toBeNull();
+    expect((archived.data as { archivedAt: string | null }).archivedAt).toBeTruthy();
+
+    const names = async (args: Record<string, unknown>) =>
+      ((await w.call(admin, "list_tasks", args)).data as unknown as { name: string; archived?: boolean }[]);
+    expect((await names({})).map((x) => x.name)).not.toContain("Old plan");
+    expect(await names({ includeArchived: true })).toEqual(expect.arrayContaining([expect.objectContaining({ name: "Old plan", archived: true })]));
+
+    await w.call(admin, "update_task", { taskId: t.id, archived: false });
+    expect((await names({})).map((x) => x.name)).toContain("Old plan");
+  });
+
+  it("refuses a member archiving a task someone else created", async () => {
+    const w = world();
+    const t = (await w.call(w.toolsFor("u-admin"), "create_task", { name: "Admin's", projectId: "p1" })).data!;
+    const res = await w.call(w.toolsFor("u-member"), "update_task", { taskId: t.id, archived: true });
+    expect(res.error).toContain("author or a workspace manager");
+  });
+});

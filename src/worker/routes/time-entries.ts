@@ -50,13 +50,13 @@ const BULK_CHUNK_SIZE = 90;
 
 export const TASK_NOT_FOUND_ERROR = "Task not found in this workspace";
 
-function chunked<T>(items: T[]): T[][] {
+export function chunked<T>(items: T[]): T[][] {
   const chunks: T[][] = [];
   for (let i = 0; i < items.length; i += BULK_CHUNK_SIZE) chunks.push(items.slice(i, i + BULK_CHUNK_SIZE));
   return chunks;
 }
 
-const placeholdersFor = (ids: string[]) => ids.map(() => "?").join(",");
+export const placeholdersFor = (ids: string[]) => ids.map(() => "?").join(",");
 
 export async function taskInWorkspace(db: D1Database, workspaceId: string, taskId: string): Promise<boolean> {
   const row = await db

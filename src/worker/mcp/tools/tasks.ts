@@ -306,8 +306,15 @@ export function registerTaskWrites(d: ToolDeps): void {
         }
       : {}),
   });
-  const updateOne = ({ taskId, ...patch }: UpdateTask & { taskId: string }) =>
-    bridge<Task>("PUT", `/api/tasks/${segment(taskId)}`, withRichDescription(patch));
+  const updateOne = async ({ taskId, archived, ...patch }: UpdateTask & { taskId: string; archived?: boolean }) => {
+    // Archiving has its own route (author or owner/admin, subtasks follow the parent); the rest is the usual PUT.
+    if (archived !== undefined) {
+      const done = await bridge("POST", "/api/tasks/bulk", { ids: [taskId], action: archived ? "archive" : "unarchive" });
+      if (!done.ok) return done;
+      if (!Object.keys(patch).length) return bridge<Task>("GET", `/api/tasks/${segment(taskId)}`);
+    }
+    return bridge<Task>("PUT", `/api/tasks/${segment(taskId)}`, withRichDescription(patch));
+  };
   const moveOne = ({ taskId, statusId, completedOn }: { taskId: string; statusId: string; completedOn?: string }) =>
     bridge<Task>("PATCH", `/api/tasks/${segment(taskId)}/move`, { statusId, ...(completedOn ? { completedOn } : {}) });
   const deleteOne = ({ taskId }: { taskId: string }) => bridge("DELETE", `/api/tasks/${segment(taskId)}`);
@@ -315,7 +322,10 @@ export function registerTaskWrites(d: ToolDeps): void {
   // No `id`: a model must never pick one; the retry guard is for forms, which mint their own.
   const description = { description: CreateTaskSchema.shape.description.describe(`The task's notes. ${RICH_TEXT_DOC}`) };
   const createInput = { ...CreateTaskSchema.omit({ id: true }).shape, ...description };
-  const updateInput = { taskId: IdArg("task"), ...UpdateTaskSchema.shape, ...description };
+  const archived = {
+    archived: z.boolean().optional().describe("true archives the task (off the board and out of lists, nothing deleted; its subtasks follow), false brings it back. Only its author or an owner/admin; a subtask can't be archived on its own."),
+  };
+  const updateInput = { taskId: IdArg("task"), ...UpdateTaskSchema.shape, ...description, ...archived };
   const moveInput = { taskId: IdArg("task"), statusId: IdArg("status"), completedOn: MoveTaskSchema.shape.completedOn };
   const deleteInput = { taskId: IdArg("task") };
 
@@ -323,7 +333,7 @@ export function registerTaskWrites(d: ToolDeps): void {
     "Never re-create a task to change it — use update_task/move_task. An open task with the same name in the same project (or under the same parent) created in the last 10 minutes is returned with `alreadyExisted: true` instead of a duplicate. " +
     "Only when the person asked for this task. Use list_projects for the projectId; never guess it. `assigneeIds` must already be workspace members — ask the person who, rather than guessing; one task for several people is ONE task with several assigneeIds.";
   const UPDATE_DOC =
-    "Change a task's name, notes, due date (a local YYYY-MM-DD day), priority (1 highest … 4 none), estimate, parent, project, repeat rule, status or assignees — only the fields passed change. To mark it done, set `active: false` and pass `completedOn` (the person's local date) so a repeating task schedules its next occurrence. `assigneeIds` replaces the whole list.";
+    "Change a task's name, notes, due date (a local YYYY-MM-DD day), priority (1 highest … 4 none), estimate, parent, project, repeat rule, status or assignees — only the fields passed change. To mark it done, set `active: false` and pass `completedOn` (the person's local date) so a repeating task schedules its next occurrence. `assigneeIds` replaces the whole list. `archived` archives or unarchives it — confirm with the person first.";
   const MOVE_DOC =
     "Exactly what dragging a card on the board does: moving into a completed status closes the subtasks too (reopening brings them back), the card goes to the end of the new column, the change is recorded in the task's history, and the assignees are notified (except whoever's key makes this call). " +
     "Get taskId from list_tasks, then statusId from list_task_statuses called with that task's projectId — only a column of the task's own board is accepted. " +

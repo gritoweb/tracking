@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-09-30 (2) — `refactor` only (not deployed)
+### Added
+- **Archive, unarchive and delete tasks in bulk** — `POST /api/tasks/bulk` `{ ids (1–100), action: "archive" | "unarchive" | "delete" }`. Same rule as deleting one task: its author or an owner/admin (`canDeleteTask`), all or nothing — one refused id returns 403 with the list and nothing changes; an id outside the workspace is 404. Archiving or unarchiving takes the subtasks along and refuses a subtask on its own (400); unarchiving stamps `unarchived_at`. Both are written to the task's history (new activity kinds `archived`/`unarchived`). Work runs in chunks of 90 ids for D1's bind limit, with one `tasks:changed` broadcast.
+- MCP `update_task` takes `archived: true|false`, through the same route; `tracking_guide` says archiving follows the delete rule.
+### Changed
+- `DELETE /api/tasks/:id` now goes through the same deletion as the bulk route (`deleteTaskTrees`): the task, all its subtasks, comments and attachments (R2 too). Time entries keep their hours, project and description; only `task_id` becomes NULL, as before. `taskAndSubtaskIds` and its stub test were replaced by real-SQLite tests of the same regression (every subtask goes, not just the first).
+### Verified
+- `tsc -b` (0), `lint` (0), `vitest run` 1191/1191 — new: archive/unarchive with subtasks and history, member own task 200 / someone else's 403 with nothing changed, admin and owner on anyone's, subtask alone 400, another workspace's id 404 for archive and delete, bulk delete keeps the time entry's hours/project/description, 95 ids across chunks, MCP archive → hidden from `list_tasks` → shown with `includeArchived` → unarchived.
+
 ## 2026-09-30 (1) — `refactor` only (not deployed)
 ### Added
 - **Tasks can be archived (schema and reads).** Migration `0056_task_archiving.sql` adds `tasks.archived_at` and `tasks.unarchived_at` (nullable, additive: no existing row changes) and a partial index for the auto-archive sweep. `GET /api/tasks` leaves archived tasks out unless `includeArchived=true`; a task opened by id still loads. The AI grounding (`loadGroundingProjects`) skips archived tasks. MCP: `list_tasks` takes `includeArchived`, and a task says `archived`/`archivedAt`. Why: archiving takes a task off the board and out of lists without deleting its comments, history or hours — time entries are untouched.

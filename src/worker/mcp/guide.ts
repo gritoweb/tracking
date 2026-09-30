@@ -32,7 +32,7 @@ function permissions(role: WorkspaceRole, scope: ApiKeyScope): string {
     "- **Projects:** you can create one (its rate and budget are left for an owner/admin — the result lists what wasn't saved) and link a client to a project that has none; renaming, re-rating, budgets or archiving are for an owner/admin.",
     "- **Clients:** you can create one; editing or archiving is for an owner/admin.",
     "- **Board columns (statuses):** you move tasks between them, but creating, renaming or archiving columns is for an owner/admin.",
-    "- **Deleting:** a task, comment or file you didn't create is deleted by its author or an owner/admin.",
+    "- **Deleting:** a task, comment or file you didn't create is deleted by its author or an owner/admin. Archiving a task (`update_task` with `archived`) follows the same rule.",
   ].join("\n");
 }
 

@@ -6,6 +6,7 @@ import {
   CreateTaskCommentSchema,
   TaskCommentsQuerySchema,
   CreateTaskSchema,
+  BulkTaskActionSchema,
   MoveTaskSchema,
   TaskAssigneeSchema,
   UpdateTaskCommentSchema,
@@ -35,6 +36,7 @@ import { classifyDocument, safeFilename } from "../lib/document";
 import { attachmentIdsInDoc, attachmentsRemoved } from "@shared/rich-doc";
 import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENT_LABEL } from "@shared/attachments";
 import { formatAttachment } from "./attachments";
+import { chunked, placeholdersFor } from "./time-entries";
 import { actorDisplayName, notifyAssigneesOfStatusChange, notifyMentions, notifyNewAssignees } from "../lib/notifications";
 import type { CreateTask, Task, TaskComment, TaskStatus } from "@shared/schemas";
 
@@ -317,13 +319,47 @@ async function pruneRemovedAttachments(
   }
 }
 
-/** A task plus its direct subtasks, resolved to a real id list — SQLite's `IN (a, (SELECT …))` is scalar and only matches the subquery's first row. */
-export async function taskAndSubtaskIds(db: D1Database, workspaceId: string, taskId: string): Promise<string[]> {
-  const { results } = await db
-    .prepare(`SELECT id FROM tasks WHERE workspace_id = ? AND (id = ? OR parent_id = ?)`)
-    .bind(workspaceId, taskId, taskId)
-    .all<{ id: string }>();
-  return results.map((r) => r.id);
+/** Each id plus its subtasks, in chunks that keep `id IN (…) OR parent_id IN (…)` under D1's bind limit. */
+async function treeIds(db: D1Database, workspaceId: string, ids: string[]): Promise<string[]> {
+  const found: string[] = [];
+  for (const part of chunked(ids)) {
+    const half = [part.slice(0, 45), part.slice(45)].filter((p) => p.length);
+    for (const p of half) {
+      const { results } = await db
+        .prepare(`SELECT id FROM tasks WHERE workspace_id = ? AND (id IN (${placeholdersFor(p)}) OR parent_id IN (${placeholdersFor(p)}))`)
+        .bind(workspaceId, ...p, ...p)
+        .all<{ id: string }>();
+      found.push(...results.map((r) => r.id));
+    }
+  }
+  return [...new Set(found)];
+}
+
+/** Deletes tasks with their subtasks, comments and attachments (R2 too); time entries keep their hours, only `task_id` goes NULL. */
+async function deleteTaskTrees(
+  c: { env: Env; executionCtx: { waitUntil(promise: Promise<unknown>): void } },
+  workspaceId: string,
+  ids: string[]
+): Promise<void> {
+  const db = c.env.DB;
+  const all = await treeIds(db, workspaceId, ids);
+  const keys: string[] = [];
+  for (const part of chunked(all)) {
+    const { results } = await db
+      .prepare(`SELECT r2_key FROM task_attachments WHERE workspace_id = ? AND task_id IN (${placeholdersFor(part)})`)
+      .bind(workspaceId, ...part)
+      .all<{ r2_key: string }>();
+    keys.push(...results.map((r) => r.r2_key));
+  }
+  // FK cascade already covers these (PRAGMA foreign_keys = 1 in D1); explicit deletes so the R2 keys above are read first.
+  await db.batch(
+    chunked(all).flatMap((part) => [
+      db.prepare(`DELETE FROM task_attachments WHERE workspace_id = ? AND task_id IN (${placeholdersFor(part)})`).bind(workspaceId, ...part),
+      db.prepare(`DELETE FROM task_comments WHERE workspace_id = ? AND task_id IN (${placeholdersFor(part)})`).bind(workspaceId, ...part),
+      db.prepare(`DELETE FROM tasks WHERE workspace_id = ? AND id IN (${placeholdersFor(part)})`).bind(workspaceId, ...part),
+    ])
+  );
+  for (const key of keys) c.executionCtx.waitUntil(c.env.ATTACHMENTS.delete(key));
 }
 
 /** Replaces a task's whole assignee set; ids that aren't workspace members are dropped, never trusted (D6). */
@@ -873,6 +909,65 @@ export const tasksRouter = new Hono<{
     );
     return c.json(formatTask(row), 200);
   })
+  // ─── Bulk archive / unarchive / delete (the board's selection bar) ────────
+  .post("/bulk", zValidator("json", BulkTaskActionSchema), async (c) => {
+    const workspaceId = c.get("workspaceId");
+    const userId = c.get("userId");
+    const { action } = c.req.valid("json");
+    const ids = [...new Set(c.req.valid("json").ids)];
+
+    const rows: Array<{ id: string; created_by: string | null; parent_id: string | null; archived_at: string | null }> = [];
+    for (const part of chunked(ids)) {
+      const { results } = await c.env.DB.prepare(
+        `SELECT id, created_by, parent_id, archived_at FROM tasks WHERE workspace_id = ? AND id IN (${placeholdersFor(part)})`
+      ).bind(workspaceId, ...part).all<(typeof rows)[number]>();
+      rows.push(...results);
+    }
+    if (rows.length !== ids.length) {
+      const known = new Set(rows.map((r) => r.id));
+      return c.json({ error: "Not found", detail: ids.filter((id) => !known.has(id)).join(", ") }, 404);
+    }
+
+    const role = await getMemberRole(c.env.DB, workspaceId, userId);
+    const forbidden = rows.filter((r) => !canDeleteTask(role, r.created_by ?? null, userId));
+    if (forbidden.length) {
+      return c.json(
+        { error: "Only the task's author or a workspace manager can do this", detail: forbidden.map((r) => r.id).join(", ") },
+        403
+      );
+    }
+
+    if (action === "delete") {
+      await deleteTaskTrees(c, workspaceId, ids);
+    } else {
+      if (rows.some((r) => r.parent_id)) {
+        return c.json({ error: "Archive the parent task — its subtasks follow it" }, 400);
+      }
+      const archiving = action === "archive";
+      const now = new Date().toISOString();
+      const all = await treeIds(c.env.DB, workspaceId, ids);
+      await c.env.DB.batch(
+        chunked(all).map((part) =>
+          archiving
+            ? c.env.DB.prepare(
+                `UPDATE tasks SET archived_at = ? WHERE workspace_id = ? AND archived_at IS NULL AND id IN (${placeholdersFor(part)})`
+              ).bind(now, workspaceId, ...part)
+            : c.env.DB.prepare(
+                `UPDATE tasks SET archived_at = NULL, unarchived_at = ? WHERE workspace_id = ? AND archived_at IS NOT NULL AND id IN (${placeholdersFor(part)})`
+              ).bind(now, workspaceId, ...part)
+        )
+      );
+      const changed = rows.filter((r) => (archiving ? !r.archived_at : Boolean(r.archived_at)));
+      await Promise.all(
+        changed.map((r) =>
+          recordActivity(c.env.DB, workspaceId, r.id, userId, [{ kind: archiving ? "archived" : "unarchived", from: null, to: null }])
+        )
+      );
+    }
+
+    c.executionCtx.waitUntil(broadcast(c.env, workspaceId, "tasks:changed", null, requestOrigin(c)));
+    return c.json({ ok: true, count: ids.length }, 200);
+  })
   // ─── Delete ───────────────────────────────────────────────────────────────
   .delete("/:id", async (c) => {
     const workspaceId = c.get("workspaceId");
@@ -889,22 +984,7 @@ export const tasksRouter = new Hono<{
       return c.json({ error: "Only the task's author or a workspace manager can delete it" }, 403);
     }
 
-    const ids = await taskAndSubtaskIds(c.env.DB, workspaceId, id);
-    const placeholders = ids.map(() => "?").join(",");
-    const { results: attachments } = await c.env.DB.prepare(
-      `SELECT r2_key FROM task_attachments WHERE workspace_id = ? AND task_id IN (${placeholders})`
-    ).bind(workspaceId, ...ids).all<{ r2_key: string }>();
-
-    // FK cascade already covers this (PRAGMA foreign_keys = 1 in D1); explicit deletes here only so the R2 keys below can be read before the rows disappear.
-    await c.env.DB.batch([
-      c.env.DB.prepare(`DELETE FROM task_attachments WHERE workspace_id = ? AND task_id IN (${placeholders})`).bind(workspaceId, ...ids),
-      c.env.DB.prepare(`DELETE FROM task_comments WHERE workspace_id = ? AND task_id IN (${placeholders})`).bind(workspaceId, ...ids),
-      c.env.DB.prepare(`DELETE FROM tasks WHERE parent_id = ? AND workspace_id = ?`).bind(id, workspaceId),
-      c.env.DB.prepare(`DELETE FROM tasks WHERE id = ? AND workspace_id = ?`).bind(id, workspaceId),
-    ]);
-    for (const a of attachments) {
-      c.executionCtx.waitUntil(c.env.ATTACHMENTS.delete(a.r2_key));
-    }
+    await deleteTaskTrees(c, workspaceId, [id]);
     c.executionCtx.waitUntil(
       broadcast(c.env, workspaceId, "tasks:changed", null, requestOrigin(c))
     );

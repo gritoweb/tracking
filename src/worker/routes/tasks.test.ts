@@ -9,7 +9,7 @@ vi.mock("@cf-wasm/photon/workerd", () => ({
   resize: vi.fn(),
 }));
 
-const { taskAndSubtaskIds, tasksRouter } = await import("./tasks");
+const { tasksRouter } = await import("./tasks");
 
 function mountedApp(handlers: D1StubHandlers) {
   const { db, calls } = createD1Stub(handlers);
@@ -22,23 +22,6 @@ function mountedApp(handlers: D1StubHandlers) {
     .route("/", tasksRouter);
   return { app, env: { DB: db } as unknown as Env, calls };
 }
-
-describe("taskAndSubtaskIds (P0-2)", () => {
-  it("returns the task and every one of its subtasks, not just the first", async () => {
-    // SQLite's `IN (a, (SELECT …))` is scalar — it only matched "P,S1" for subtasks S1/S2/S3.
-    const { db, calls } = createD1Stub({
-      all: () => ({ results: [{ id: "P" }, { id: "S1" }, { id: "S2" }, { id: "S3" }] }),
-    });
-    const ids = await taskAndSubtaskIds(db, "workspace-1", "P");
-    expect(ids).toEqual(["P", "S1", "S2", "S3"]);
-    expect(calls[0]?.params).toEqual(["workspace-1", "P", "P"]);
-  });
-
-  it("returns just the task itself when it has no subtasks", async () => {
-    const { db } = createD1Stub({ all: () => ({ results: [{ id: "P" }] }) });
-    expect(await taskAndSubtaskIds(db, "workspace-1", "P")).toEqual(["P"]);
-  });
-});
 
 describe("GET / — formatTask's assignees_json (TYPE-2: typed rows, parsed via parseJsonColumn)", () => {
   const baseRow = {
