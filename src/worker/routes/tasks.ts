@@ -324,18 +324,16 @@ async function pruneRemovedAttachments(
 /** A bulk edit's inner PUT requests, keyed by the Request itself: notifications grouped, and one broadcast at the end instead of one per task. */
 const bulkRequests = new WeakMap<Request, { deliver: Deliver }>();
 
-/** Each id plus its subtasks, in chunks that keep `id IN (…) OR parent_id IN (…)` under D1's bind limit. */
+/** Each id plus its subtasks; 45 ids per query, since each is bound twice (`id IN … OR parent_id IN …`) under D1's 100-bind limit. */
 async function treeIds(db: D1Database, workspaceId: string, ids: string[]): Promise<string[]> {
   const found: string[] = [];
-  for (const part of chunked(ids)) {
-    const half = [part.slice(0, 45), part.slice(45)].filter((p) => p.length);
-    for (const p of half) {
-      const { results } = await db
-        .prepare(`SELECT id FROM tasks WHERE workspace_id = ? AND (id IN (${placeholdersFor(p)}) OR parent_id IN (${placeholdersFor(p)}))`)
-        .bind(workspaceId, ...p, ...p)
-        .all<{ id: string }>();
-      found.push(...results.map((r) => r.id));
-    }
+  for (let i = 0; i < ids.length; i += 45) {
+    const p = ids.slice(i, i + 45);
+    const { results } = await db
+      .prepare(`SELECT id FROM tasks WHERE workspace_id = ? AND (id IN (${placeholdersFor(p)}) OR parent_id IN (${placeholdersFor(p)}))`)
+      .bind(workspaceId, ...p, ...p)
+      .all<{ id: string }>();
+    found.push(...results.map((r) => r.id));
   }
   return [...new Set(found)];
 }

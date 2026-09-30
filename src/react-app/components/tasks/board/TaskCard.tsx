@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Archive, ArchiveRestore, MessageCircle, MoreHorizontal, Pencil, Play, Repeat, Square, Trash2 } from "lucide-react";
+import { MessageCircle, MoreHorizontal, Pencil, Play, Repeat, Square, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -30,7 +30,7 @@ import { TaskStatusChip } from "../TaskStatusChip";
 import { useTimer } from "@/hooks/useTimer";
 import { TASK_TIMER_ENABLED } from "@/lib/features";
 import { useTimerStore } from "@/stores/timerStore";
-import { useBulkTaskAction, useUpdateTask } from "@/hooks/useTasks";
+import { useArchiveToggle, useUpdateTask } from "@/hooks/useTasks";
 import { useCanDeleteTask } from "@/hooks/useTaskPermissions";
 import { useWorkspaceMembers } from "@/hooks/useWorkspaceRole";
 import { formatDurationShort } from "@/lib/dateUtils";
@@ -74,7 +74,7 @@ export function TaskCard({ task, onOpen, onRequestDelete, overlay = false, selec
   const runningEntry = useTimerStore((s) => s.runningEntry);
   const running = runningEntry?.taskId === task.id;
   const updateTask = useUpdateTask();
-  const bulk = useBulkTaskAction();
+  const archive = useArchiveToggle()(task);
   const { data: members = [], isPending: membersLoading } = useWorkspaceMembers(!overlay);
   const [dueOpen, setDueOpen] = useState(false);
   const canDelete = useCanDeleteTask()(task);
@@ -83,13 +83,7 @@ export function TaskCard({ task, onOpen, onRequestDelete, overlay = false, selec
   const actions = [
     { key: "edit", label: "Edit task…", icon: Pencil, destructive: false, onSelect: () => onOpen(task) },
     // Same rule as Delete (author or owner/admin); subtasks follow the card.
-    ...(canDelete
-      ? [
-          task.archivedAt
-            ? { key: "unarchive", label: "Unarchive", icon: ArchiveRestore, destructive: false, onSelect: () => bulk.mutate({ ids: [task.id], action: "unarchive" }) }
-            : { key: "archive", label: "Archive", icon: Archive, destructive: false, onSelect: () => bulk.mutate({ ids: [task.id], action: "archive" }) },
-        ]
-      : []),
+    ...(canDelete ? [{ key: "archive", label: archive.label, icon: archive.icon, destructive: false, onSelect: archive.run }] : []),
     ...(canDelete && onRequestDelete
       ? [{ key: "delete", label: "Delete", icon: Trash2, destructive: true, onSelect: () => onRequestDelete(task) }]
       : []),

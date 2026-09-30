@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { Archive, ArchiveRestore } from "lucide-react";
 import { api } from "@/lib/api-client";
 import { announceAttachmentDeleted } from "@/lib/attachmentEvents";
 import { toastApiError } from "@/lib/toastApiError";
@@ -331,5 +332,15 @@ export function useBulkUpdateTasks() {
       else toast.error(`${plural(updated)} updated, ${failed.length} not changed: ${failed[0].error}`);
     },
     onError: (error) => toastApiError(error, "Couldn't update those tasks"),
+  });
+}
+
+/** One task's Archive/Unarchive as every menu shows it: label, icon and action, from its archived state. */
+export function useArchiveToggle() {
+  const bulk = useBulkTaskAction();
+  return (task: Pick<Task, "id" | "archivedAt">) => ({
+    label: task.archivedAt ? "Unarchive" : "Archive",
+    icon: task.archivedAt ? ArchiveRestore : Archive,
+    run: () => bulk.mutate({ ids: [task.id], action: task.archivedAt ? "unarchive" : "archive" }),
   });
 }

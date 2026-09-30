@@ -20,7 +20,7 @@ import {
   useAllTasks,
   useSubtasks,
   useTask,
-  useBulkTaskAction,
+  useArchiveToggle,
   useCompleteTask,
   useUpdateTask,
   useTaskAttachments,
@@ -59,7 +59,7 @@ export function TaskDetail({ open, onClose, task, tab, onTabChange, onRequestDel
   const { user } = useAuth();
   const { canManage } = useWorkspaceRole();
   const canDeleteTask = useCanDeleteTask();
-  const bulkAction = useBulkTaskAction();
+  const archiveToggle = useArchiveToggle();
   const mode = useUIStore((s) => s.taskViewMode);
   const setMode = useUIStore((s) => s.setTaskViewMode);
   const narrow = useMediaQuery(BELOW_LG);
@@ -131,9 +131,7 @@ export function TaskDetail({ open, onClose, task, tab, onTabChange, onRequestDel
       onModeChange={setMode}
       isSubtask={isSubtask}
       archived={Boolean(task.archivedAt)}
-      onToggleArchive={canDeleteTask(task) && !isSubtask ? () => {
-        bulkAction.mutate({ ids: [task.id], action: task.archivedAt ? "unarchive" : "archive" });
-      } : undefined}
+      onToggleArchive={canDeleteTask(task) && !isSubtask ? archiveToggle(task).run : undefined}
       onDeleteTask={canDeleteTask(task) ? () => {
         onRequestDelete(task);
         // A subtask stays open behind the confirmation; confirming returns to its parent (TaskBoardList).

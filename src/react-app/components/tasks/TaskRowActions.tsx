@@ -1,4 +1,4 @@
-import { Archive, ArchiveRestore, Clock, Flag, MoreHorizontal, Pencil, Plus, Repeat, Trash2 } from "lucide-react";
+import { Clock, Flag, MoreHorizontal, Pencil, Plus, Repeat, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { dateToLocalDate, localDateToDate, PRIORITIES, PRIORITY_LABEL } from "@/lib/taskUtils";
 import { useCanDeleteTask } from "@/hooks/useTaskPermissions";
-import { useBulkTaskAction } from "@/hooks/useTasks";
+import { useArchiveToggle } from "@/hooks/useTasks";
 import type { Task } from "@shared/schemas";
 
 const RECUR_OPTIONS = [
@@ -50,7 +50,7 @@ export function TaskRowActions({
   onChangeRecurRule,
 }: TaskRowActionsProps) {
   const canDelete = useCanDeleteTask()(task);
-  const bulk = useBulkTaskAction();
+  const archive = useArchiveToggle()(task);
   return (
     <div className="tt-reveal flex items-center gap-0.5">
       <Button
@@ -149,11 +149,9 @@ export function TaskRowActions({
               <DropdownMenuSeparator />
               {/* Archiving follows the delete rule; a subtask goes with its parent, never alone. */}
               {!task.parentId && (
-                <DropdownMenuItem
-                  onSelect={() => bulk.mutate({ ids: [task.id], action: task.archivedAt ? "unarchive" : "archive" })}
-                >
-                  {task.archivedAt ? <ArchiveRestore className="h-3.5 w-3.5" /> : <Archive className="h-3.5 w-3.5" />}
-                  {task.archivedAt ? "Unarchive" : "Archive"}
+                <DropdownMenuItem onSelect={archive.run}>
+                  <archive.icon className="h-3.5 w-3.5" />
+                  {archive.label}
                 </DropdownMenuItem>
               )}
               <DropdownMenuItem variant="destructive" onSelect={() => onRequestDelete(task)}>

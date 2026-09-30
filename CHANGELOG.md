@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-30 (23) — `refactor` only (not deployed)
+### Changed
+- **One Archive/Unarchive for every task menu.** The card's "…", the List row's "…" and the task's own "…" each rebuilt the same label, icon and action from `archivedAt`; they now read it from one hook, `useArchiveToggle` (`hooks/useTasks.ts`), so the three can't drift apart. `treeIds` (bulk archive/delete) walks the ids 45 at a time in one loop instead of chunks of 90 split in halves — same bind limit, fewer lines. No behaviour change.
+### Verified
+- `tsc -b` (0), `lint` (0), `vitest run` 1204/1204 (the 95-id bulk archive still crosses the chunk boundary). In the browser (local): card menu Edit / Archive / Delete → archived; the task's "…" then offers Unarchive task / Delete task → unarchived; List row menu shows Archive.
+
 ## 2026-09-30 (22) — `refactor` only (not deployed)
 ### Fixed
 - **The column menu reads the state it acts on.** With "Show archived" on, every card in a column is archived, yet the "…" still offered "Archive all tasks"; it now offers **"Unarchive all tasks"** (with its own confirmation) whenever every card in the column is archived — the same rule the selection bar already follows — and otherwise "Archive all tasks" archives only the live cards. Likewise **"Select all" becomes "Deselect all"** once every card of the column is selected, and clears just that column (`deselectColumn`).
