@@ -37,7 +37,7 @@ import { classifyDocument, safeFilename } from "../lib/document";
 import { attachmentIdsInDoc, attachmentsRemoved } from "@shared/rich-doc";
 import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENT_LABEL } from "@shared/attachments";
 import { formatAttachment } from "./attachments";
-import { chunked, placeholdersFor } from "./time-entries";
+import { chunked, placeholdersFor } from "../lib/sql-chunks";
 import { actorDisplayName, NotificationBatch, notifyAssigneesOfStatusChange, notifyMentions, notifyNewAssignees, type Deliver } from "../lib/notifications";
 import type { CreateTask, Task, TaskComment, TaskStatus } from "@shared/schemas";
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-09-30 (4) — `refactor` only (not deployed)
+### Added
+- **Tasks completed for three days archive themselves** (`lib/task-auto-archive.ts`, `runTaskAutoArchive` in the `*/5` cron). It works only on the first tick of each hour (72h does not need 5-minute precision), with one `UPDATE … RETURNING` over the partial index from migration 0056, at most 500 tasks per sweep, then their subtasks, a history line with no user ("TimeTracker archived this task automatically…") and one `tasks:changed` per affected workspace. It never moves a task to a completed column and never touches time entries. A task someone unarchived after it was completed is left alone until it is completed again (`unarchived_at < completed_at`). A completed subtask under an open parent is never archived on its own. Errors are logged and swallowed, like the other cron jobs.
+### Changed
+- `chunked`/`placeholdersFor`/`BULK_CHUNK_SIZE` moved from `routes/time-entries.ts` to `lib/sql-chunks.ts`, so the cron job and the task routes don't import a route module. No behaviour change.
+### Verified
+- `tsc -b` (0), `lint` (0), `vitest run` 1199/1199 — new: 73h archived with its subtask and one history line, 71h and open kept, completed subtask under an open parent kept, unarchived-after-completion kept while a re-completed one is archived, nothing at minute 5, exactly 500 of 503 in one sweep.
+
 ## 2026-09-30 (3) — `refactor` only (not deployed)
 ### Added
 - **Edit tasks in bulk** — `POST /api/tasks/bulk-update` `{ items: [{ id, patch }] }` (up to 100; patch limited to status, `completedOn`, assignees, due date, priority, project, parent). Each item runs through the task's own `PUT /api/tasks/:id` on an inner Hono app, so validation, the status mirror (`resolveStatusChange`), the recurrence spawn, the history and the broadcast are exactly those of a single edit — no second write path. The answer reports each item (`ok`/`error`); one failure doesn't stop the others.

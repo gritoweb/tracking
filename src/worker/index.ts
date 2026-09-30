@@ -37,6 +37,7 @@ import { createAuth } from "./auth";
 import { runAutoTrack } from "./lib/calendar-autotrack";
 import { runRecurring } from "./lib/recurring";
 import { runDigests } from "./lib/digest";
+import { runTaskAutoArchive } from "./lib/task-auto-archive";
 import { pruneNotifications } from "./lib/notifications";
 import { runSlackNotifications } from "./lib/slack";
 import { routeAgentRequest } from "agents";
@@ -255,12 +256,13 @@ export default {
   },
   // Cron (*/5): materialize finished calendar events for auto-track workspaces,
   // any due recurring-entry occurrences, any digest whose local send hour has
-  // arrived, and bell notifications left unread long enough to go to Slack.
+  // arrived, bell notifications left unread long enough to go to Slack, and
+  // (hourly) tasks completed more than three days ago leave the board.
   // Each sweep swallows its own per-workspace/per-user errors, so one broken
   // connection can't stop the others.
   scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext) {
     ctx.waitUntil(
-      Promise.all([runAutoTrack(env), runRecurring(env), runDigests(env), pruneNotifications(env), runSlackNotifications(env)])
+      Promise.all([runAutoTrack(env), runRecurring(env), runDigests(env), pruneNotifications(env), runSlackNotifications(env), runTaskAutoArchive(env)])
     );
   },
 } satisfies ExportedHandler<Env>;
