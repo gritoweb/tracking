@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-30 (15) — `refactor`, local only (not pushed, not deployed)
+### Fixed
+- **A time entry on an archived task no longer shows "No task".** The entry kept its task (and saving kept it), but the picker only knew live tasks, so it read as if the task were gone. `TaskPicker` now fetches that one task by id and shows "<name> (archived)".
+### Verified
+- `tsc -b` (0), `lint` (0), `vitest run` green. In the browser (local, Playwright): archived the task of the 2h entry, opened the entry → the picker reads "Task: Write landing copy (archived)".
+
 ## 2026-09-30 (14) — `refactor`, local only (not pushed, not deployed)
 ### Changed
 - **Reports' task filter reads a light list.** It loaded every task with the full task rollups (tracked hours, subtask and comment counts, assignees) — and, to keep archived tasks filterable, the whole archive too, which the auto-archive grows forever. `GET /api/tasks/options` returns just `{ id, name, projectId, parentId, archived }` for every task in the workspace, archived included, with no subqueries; archived tasks read "(archived)" in the filter. Hours of archived tasks keep counting in reports as before.

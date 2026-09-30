@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/command";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
-import { useTasks, useCreateTask } from "@/hooks/useTasks";
+import { useTasks, useCreateTask, useTask } from "@/hooks/useTasks";
 
 interface TaskPickerProps {
   projectId: string | null;
@@ -46,7 +46,10 @@ export function TaskPicker({
   const { data: tasks = [] } = useTasks(projectId ?? undefined);
   const createTask = useCreateTask();
 
-  const selected = tasks.find((t) => t.id === value);
+  const listed = tasks.find((t) => t.id === value);
+  // An entry can point at an archived task, which the live list leaves out: show its name rather than "No task".
+  const { data: archivedTask } = useTask(value, !!value && !listed && tasks.length > 0);
+  const selected = listed ?? (archivedTask ? { ...archivedTask, name: `${archivedTask.name} (archived)` } : undefined);
 
   const select = (taskId: string | null) => {
     onChange(taskId);
