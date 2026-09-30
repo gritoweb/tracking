@@ -1,27 +1,12 @@
-import { useEffect, useState } from "react";
 import { Spinner } from "@/components/ui/spinner";
+import { useAttachmentText } from "./useAttachmentText";
 
 // Enough to read a note or skim a CSV; the full file is one Download away.
 const PREVIEW_CHARS = 200_000;
 
-/** A TXT or CSV shown as plain text — React escapes it, so nothing in the file can run. */
+/** A TXT, CSV or any other text (an HTML file's source too) shown as plain text — React escapes it, so nothing in the file can run. */
 export function TextStage({ url, zoom }: { url: string; zoom: number }) {
-  const [text, setText] = useState<string | null>(null);
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    fetch(url, { signal: controller.signal })
-      .then((res) => (res.ok ? res.text() : Promise.reject(new Error(String(res.status)))))
-      .then(setText)
-      .catch((e: unknown) => {
-        if (!controller.signal.aborted) {
-          console.warn("attachment text preview failed", { url, error: String(e) });
-          setFailed(true);
-        }
-      });
-    return () => controller.abort();
-  }, [url]);
+  const { text, failed } = useAttachmentText(url);
 
   if (failed) return <p className="p-8 text-center text-sm text-muted-foreground">Couldn't load this file. Download it instead.</p>;
   if (text === null) {

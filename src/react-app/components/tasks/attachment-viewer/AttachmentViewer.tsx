@@ -3,31 +3,37 @@ import { ChevronLeft, ChevronRight, Download, FileText, Maximize2, Minus, Plus, 
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-import { formatFileSize, isImageContentType } from "@shared/attachments";
+import { fileExtension, formatFileSize, isImageContentType } from "@shared/attachments";
 import type { TaskAttachment } from "@shared/schemas";
 import { ImageStage } from "./ImageStage";
 import { TextStage } from "./TextStage";
+import { HtmlStage } from "./HtmlStage";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import { useZoomPan, ZOOM_STEP } from "./useZoomPan";
 
 // pdf.js (~450 KB + a 1.3 MB worker) loads only when someone opens a PDF.
 const PdfStage = lazy(() => import("./PdfStage"));
 
-type Kind = "image" | "pdf" | "text" | "other";
+type Kind = "image" | "pdf" | "html" | "text" | "other";
 
 function kindOf(attachment: TaskAttachment): Kind {
   if (isImageContentType(attachment.contentType)) return "image";
   if (attachment.contentType === "application/pdf") return "pdf";
+  // Stored as plain text (never served as HTML); the viewer renders it in a sandbox.
+  if (attachment.contentType.startsWith("text/") && ["html", "htm"].includes(fileExtension(attachment.filename))) return "html";
   if (attachment.contentType.startsWith("text/")) return "text";
   return "other";
 }
 
-const ZOOM_RANGE: Record<Kind, [number, number]> = { image: [1, 8], pdf: [0.5, 4], text: [0.75, 2], other: [1, 1] };
+const ZOOM_RANGE: Record<Kind, [number, number]> = { image: [1, 8], pdf: [0.5, 4], html: [0.5, 2], text: [0.75, 2], other: [1, 1] };
 
-function ViewerBody({ attachment, kind, view, onPdfError }: {
+function ViewerBody({ attachment, kind, view, onPdfError, showSource }: {
   attachment: TaskAttachment;
   kind: Kind;
   view: ReturnType<typeof useZoomPan>;
   onPdfError: () => void;
+  /** HTML only: its source as text instead of the rendered page. */
+  showSource: boolean;
 }) {
   if (kind === "image") return <ImageStage src={attachment.url} alt={attachment.filename} view={view} />;
   if (kind === "pdf") {
@@ -37,6 +43,7 @@ function ViewerBody({ attachment, kind, view, onPdfError }: {
       </Suspense>
     );
   }
+  if (kind === "html") return showSource ? <TextStage url={attachment.url} zoom={view.zoom} /> : <HtmlStage url={attachment.url} zoom={view.zoom} />;
   if (kind === "text") return <TextStage url={attachment.url} zoom={view.zoom} />;
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
@@ -67,6 +74,7 @@ function ViewerPane({ attachment, position, onPrevious, onNext, onClose }: Viewe
   const [min, max] = ZOOM_RANGE[kind];
   const view = useZoomPan(min, max);
   const [pdfFailed, setPdfFailed] = useState(false);
+  const [htmlView, setHtmlView] = useState<"preview" | "code">("preview");
   const onPdfError = useCallback(() => setPdfFailed(true), []);
   const zoomable = kind !== "other" && !(kind === "pdf" && pdfFailed);
 
@@ -100,6 +108,18 @@ function ViewerPane({ attachment, position, onPrevious, onNext, onClose }: Viewe
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
+        )}
+
+        {kind === "html" && (
+          <SegmentedControl
+            value={htmlView}
+            options={[
+              { value: "preview", label: "Preview" },
+              { value: "code", label: "Code" },
+            ]}
+            onChange={setHtmlView}
+            label="Show the page or its code"
+          />
         )}
 
         {zoomable && (
@@ -147,7 +167,7 @@ function ViewerPane({ attachment, position, onPrevious, onNext, onClose }: Viewe
         {kind === "pdf" && pdfFailed ? (
           <p className="p-8 text-center text-sm text-muted-foreground">Couldn't open this PDF. Download it instead.</p>
         ) : (
-          <ViewerBody attachment={attachment} kind={kind} view={view} onPdfError={onPdfError} />
+          <ViewerBody attachment={attachment} kind={kind} view={view} onPdfError={onPdfError} showSource={htmlView === "code"} />
         )}
       </div>
     </div>
