@@ -59,28 +59,23 @@ const archivePageQuery = (statusId: string | null, projectId: string | null, pag
     }),
   staleTime: 30_000,
   enabled,
-  // Keeps the current page on screen while the next one loads, instead of flashing the skeleton.
-  placeholderData: <T,>(previous: T | undefined) => previous,
 });
 
-/** "Show archived" in the List: one page of the whole archive (of one project when given). */
-export function useArchivedPage(projectId: string | null, page: number, enabled: boolean) {
-  return useQuery(archivePageQuery(null, projectId, page, enabled));
-}
-
-/** "Show archived" on the Board: each column's own page, merged into one list the board splits back by column. */
-export function useArchivedColumns(pages: { statusId: string; page: number }[], projectId: string | null, enabled: boolean) {
+/** "Show archived": each list (a column, or the List's `null`) holds pages 1…n as separate queries, so loading more appends one page. */
+export function useArchivedLists(lists: { statusId: string | null; pages: number }[], projectId: string | null, enabled: boolean) {
+  const pages = lists.flatMap(({ statusId, pages: n }) => Array.from({ length: n }, (_, i) => ({ statusId, page: i + 1 })));
   return useQueries({
     queries: pages.map(({ statusId, page }) => archivePageQuery(statusId, projectId, page, enabled)),
     combine: (results) => ({
       data: results.flatMap((r) => r.data ?? []),
-      isLoading: results.some((r) => r.isLoading),
-      isFetching: results.some((r) => r.isFetching),
+      // Only the first page of a list counts as loading the view; later pages load inside their own list.
+      isLoading: results.some((r, i) => pages[i].page === 1 && r.isLoading),
+      loadingMore: new Set(results.flatMap((r, i) => (pages[i].page > 1 && r.isFetching ? [pages[i].statusId] : []))),
     }),
   });
 }
 
-/** Archived parent tasks per column, for the archive's page numbers. */
+/** Archived parent tasks per column (and in all), for the archive's column totals and what is left to load. */
 export function useArchiveCounts(projectId: string | null, enabled: boolean) {
   return useQuery({
     queryKey: ["tasks", "archive-counts", projectId ?? "all"],

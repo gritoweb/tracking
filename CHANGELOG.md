@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-30 (30) — `refactor` only (not deployed)
+### Changed
+- **The archive loads more below, like a comment thread, instead of numbered pages.** Changing a column's page swapped its query key, the whole Tasks view fell back to its loading skeleton, and the board unmounted and remounted every column (measured: another column's card was a new DOM node, the skeleton showed, the scroll jumped to the top). Now each list — a Board column, or the List as a whole — holds pages 1…n as separate TanStack Query entries (`useArchivedLists`): reaching the end of a column (or its "Load more · N left" button, new `ui/load-more.tsx`, which loads by itself when scrolled into view) adds only the next page's query and appends its 50 cards under the last one. Only the first page of a list counts as loading the view; later pages show a spinner inside their own list. The numbered `Pagination` primitive and `lib/pagination.ts`, now unused, are removed. Column headers still show each column's archived total.
+### Verified
+- `tsc -b` (0), `lint` (0), `vitest run` 1208/1208 (new: `LoadMore` loads when it scrolls into view and on click, and stops watching while a step loads). In the browser (local, Playwright, 121 archived): scrolling Backlog to its end sent exactly one request (Backlog page 2), grew it from 50 to 100 cards under the existing ones with the scroll position kept, left another column's card and Backlog's first card as the same DOM nodes, showed no skeleton, and read "Load more · 20 left"; the List went from "71 left" to "21 left" the same way.
+
 ## 2026-09-30 (29) — `refactor` only (not deployed)
 ### Docs
 - `docs/USER_GUIDE.md`: the archive's 50-per-page numbered pages (per column on the Board, under the List), "Unarchive all tasks", and selecting a column through its "…" menu ("Select all" / "Deselect all") instead of the removed header checkbox.

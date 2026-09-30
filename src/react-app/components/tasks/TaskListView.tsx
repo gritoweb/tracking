@@ -1,6 +1,8 @@
 import { Plus, ListChecks, SearchX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { LoadMore } from "@/components/ui/load-more";
+import type { ArchiveLoading } from "./board/TaskBoardColumn";
 import { ColorDot } from "@/components/ColorDot";
 import { TaskRow } from "./TaskRow";
 import { QuickAddTask } from "./QuickAddTask";
@@ -18,8 +20,8 @@ import type { Task } from "@shared/schemas";
 export type { TaskSection } from "@/lib/taskUtils";
 
 interface TaskListViewProps {
-  /** "Show archived" is on: a task added here would be live and vanish from this view, so there is no quick-add. */
-  archiveView?: boolean;
+  /** Present while "Show archived" is on: the list loads more at its end, and offers no quick-add (a new task would be live). */
+  archiveLoading?: ArchiveLoading;
   sections: TaskSection[];
   groupBy: GroupBy;
   isLoading: boolean;
@@ -45,7 +47,7 @@ interface TaskListViewProps {
 
 /** The List layout's grouped rows, empty states and inline quick-add — pure view. */
 export function TaskListView({
-  archiveView = false,
+  archiveLoading,
   sections,
   groupBy,
   isLoading,
@@ -169,7 +171,7 @@ export function TaskListView({
 
   return (
     <>
-      {hasAnyTask && !archiveView && <QuickAddTask className="mb-4" defaultDueDate={defaultDueDate} />}
+      {hasAnyTask && !archiveLoading && <QuickAddTask className="mb-4" defaultDueDate={defaultDueDate} />}
 
       <div className="space-y-6">
         {sections.map((section) => {
@@ -196,6 +198,14 @@ export function TaskListView({
           );
         })}
       </div>
+      {archiveLoading && archiveLoading.remaining(null) > 0 && (
+        <LoadMore
+          onLoadMore={() => archiveLoading.loadMore(null)}
+          loading={archiveLoading.loadingMore(null)}
+          remaining={`${archiveLoading.remaining(null)} left`}
+          className="mt-3"
+        />
+      )}
     </>
   );
 }

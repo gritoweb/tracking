@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { CollectionHeader } from "@/components/layout/CollectionHeader";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Pagination } from "@/components/ui/pagination";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { Archive } from "lucide-react";
@@ -13,8 +12,9 @@ import { TaskListView } from "./TaskListView";
 import { TaskDialog } from "./TaskDialog";
 import { TaskDetail } from "./TaskDetail";
 import { TaskBoard } from "./board/TaskBoard";
+import type { ArchiveLoading } from "./board/TaskBoardColumn";
 import { TaskProjectRail } from "./TaskProjectRail";
-import { useAllTasks, useArchiveCounts, useArchivedColumns, useArchivedPage, useDeleteTask, useTask, useUpdateTask } from "@/hooks/useTasks";
+import { useAllTasks, useArchiveCounts, useArchivedLists, useDeleteTask, useTask, useUpdateTask } from "@/hooks/useTasks";
 import { useProjects } from "@/hooks/useProjects";
 import { useTaskStatuses } from "@/hooks/useTaskStatuses";
 import { useAuth } from "@/hooks/useAuth";
@@ -90,28 +90,25 @@ export function TaskBoardList({ openTaskId = null, openTab = "task" }: TaskBoard
   // A client has no status fork of its own — falls back to the workspace's global set.
   const { data: statuses = [] } = useTaskStatuses(railClientId ? null : railProjectId);
 
-  // "Show archived" is a view of the archive alone, fetched a page at a time: per column on the Board, as one list in List.
-  // Pages are keyed by project, so switching the rail's project starts that project's archive at page 1.
-  const [archivePages, setArchivePages] = useState<Record<string, number>>({});
+  // "Show archived" is a view of the archive alone, loaded 50 at a time per column (Board) or for the whole list (List).
+  // Loaded pages are keyed by project, so switching the rail's project starts that project's archive over.
+  const [loadedPages, setLoadedPages] = useState<Record<string, number>>({});
   const pageKey = (statusId: string | null) => `${railProjectId ?? "all"}:${statusId ?? "list"}`;
-  const pageOf = (statusId: string | null) => archivePages[pageKey(statusId)] ?? 1;
-  const setPageOf = (statusId: string | null, page: number) => setArchivePages((p) => ({ ...p, [pageKey(statusId)]: page }));
-  const archiveBoard = useArchivedColumns(
-    statuses.map((s) => ({ statusId: s.id, page: pageOf(s.id) })),
+  const pagesOf = (statusId: string | null) => loadedPages[pageKey(statusId)] ?? 1;
+  const archiveLists = layout === "board" ? statuses.map((s) => s.id) : [null];
+  const archive = useArchivedLists(
+    archiveLists.map((statusId) => ({ statusId, pages: pagesOf(statusId) })),
     railProjectId,
-    showArchived && layout === "board"
+    showArchived
   );
-  const archiveList = useArchivedPage(railProjectId, pageOf(null), showArchived && layout === "list");
   const { data: archiveCounts } = useArchiveCounts(railProjectId, showArchived);
-  const archiveSource = layout === "board" ? archiveBoard : archiveList;
-  const { data: tasks = [], isLoading } = showArchived ? archiveSource : live;
-  const archivePaging = {
-    page: pageOf,
-    pageCount: (statusId: string | null) =>
-      Math.ceil((statusId ? archiveCounts?.byStatus[statusId] ?? 0 : archiveCounts?.total ?? 0) / ARCHIVE_PAGE_LIMIT),
-    total: (statusId: string) => archiveCounts?.byStatus[statusId] ?? 0,
-    onPage: setPageOf,
-    busy: archiveSource.isFetching,
+  const { data: tasks = [], isLoading } = showArchived ? archive : live;
+  const totalOf = (statusId: string | null) => (statusId ? archiveCounts?.byStatus[statusId] ?? 0 : archiveCounts?.total ?? 0);
+  const archiveLoading: ArchiveLoading = {
+    total: totalOf,
+    remaining: (statusId) => Math.max(totalOf(statusId) - pagesOf(statusId) * ARCHIVE_PAGE_LIMIT, 0),
+    loadingMore: (statusId) => archive.loadingMore.has(statusId),
+    loadMore: (statusId) => setLoadedPages((p) => ({ ...p, [pageKey(statusId)]: pagesOf(statusId) + 1 })),
   };
 
   const listedTask = openTaskId ? tasks.find((t) => t.id === openTaskId) ?? null : null;
@@ -281,7 +278,7 @@ export function TaskBoardList({ openTaskId = null, openTab = "task" }: TaskBoard
               groupBy={boardGroupBy}
               onOpenTask={openSheet}
               onRequestDelete={setDeleteTarget}
-              archivePaging={showArchived ? archivePaging : undefined}
+              archiveLoading={showArchived ? archiveLoading : undefined}
             />
           ) : (
             <TaskListView
@@ -305,23 +302,11 @@ export function TaskBoardList({ openTaskId = null, openTab = "task" }: TaskBoard
               onEdit={openSheet}
               onLogTime={(t) => openTaskLogTime(t.id)}
               onCreateTask={() => setAddOpen(true)}
-              archiveView={showArchived}
+              archiveLoading={showArchived ? archiveLoading : undefined}
               onClearFilters={clearFilters}
             />
           )}
         </div>
-      )}
-
-      {/* The List has no columns to page, so its archive pages once, under the list. */}
-      {showArchived && layout === "list" && (
-        <Pagination
-          page={archivePaging.page(null)}
-          pageCount={archivePaging.pageCount(null)}
-          onPageChange={(page) => archivePaging.onPage(null, page)}
-          label="Archive pages"
-          disabled={archivePaging.busy}
-          className="shrink-0 border-t py-2"
-        />
       )}
 
       <TaskDialog
