@@ -372,8 +372,10 @@ export const BulkUpdateTaskPatchSchema = UpdateTaskSchema.pick({
   projectId: true,
   parentId: true,
 });
+// Each item is a full PUT (queries, history, broadcast), so a request carries as many as the MCP's `items` does.
+export const BULK_UPDATE_ITEMS_MAX = 50;
 export const BulkUpdateTasksSchema = z.object({
-  items: z.array(z.object({ id: z.string().min(1), patch: BulkUpdateTaskPatchSchema })).min(1).max(BULK_TASK_IDS_MAX),
+  items: z.array(z.object({ id: z.string().min(1), patch: BulkUpdateTaskPatchSchema })).min(1).max(BULK_UPDATE_ITEMS_MAX),
 });
 export type BulkUpdateTasks = z.infer<typeof BulkUpdateTasksSchema>;
 

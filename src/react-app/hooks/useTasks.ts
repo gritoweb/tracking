@@ -10,7 +10,7 @@ import {
   nextOccurrence,
   todayLocalDate,
 } from "@shared/task-recurrence";
-import type { Task, CreateTask, TaskStatus, UpdateTask, BulkTaskAction, BulkUpdateTasks } from "@shared/schemas";
+import { BULK_UPDATE_ITEMS_MAX, type Task, type CreateTask, type TaskStatus, type UpdateTask, type BulkTaskAction, type BulkUpdateTasks } from "@shared/schemas";
 
 // The API hides inactive (done) tasks unless asked, so every list here opts in:
 // the Tasks page offers an All/Active/Done filter and a "Done" group, and without
@@ -273,7 +273,14 @@ export function useBulkTaskAction() {
 export function useBulkUpdateTasks() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: BulkUpdateTasks) => api.tasks.bulkUpdate(body),
+    // A bigger selection goes in consecutive requests of the server's cap, reported as one.
+    mutationFn: async (body: BulkUpdateTasks) => {
+      const results: Awaited<ReturnType<typeof api.tasks.bulkUpdate>>["results"] = [];
+      for (let i = 0; i < body.items.length; i += BULK_UPDATE_ITEMS_MAX) {
+        results.push(...(await api.tasks.bulkUpdate({ items: body.items.slice(i, i + BULK_UPDATE_ITEMS_MAX) })).results);
+      }
+      return { results, updated: results.filter((r) => r.ok).length };
+    },
     onSuccess: ({ results, updated }) => {
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
       queryClient.invalidateQueries({ queryKey: ["projects"] });

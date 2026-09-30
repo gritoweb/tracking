@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-30 (7) — `refactor` only (not deployed)
+### Fixed
+- **Bulk task edits carry at most 50 items per request** (`BULK_UPDATE_ITEMS_MAX`, was 100). Each item is a full `PUT` — several queries, the history and a broadcast — so a request now carries as many as the MCP's `items` already does in production; the board sends a larger selection as consecutive requests and reports them as one. Archive/unarchive/delete (one statement per 90 ids) keeps 100.
+### Verified
+- `tsc -b` (0), `lint` (0), `vitest run` 1204/1204.
+
 ## 2026-09-30 (6) — `refactor` only (not deployed)
 ### Docs
 - Task archiving, "Show archived", the auto-archive and bulk actions documented in `docs/USER_GUIDE.md` ("Archiving a task", "Working on several tasks at once"), `docs/ARCHITECTURE.md` (cron job + "Task archiving and bulk actions"), `docs/MCP.md` (`includeArchived`, `update_task` `archived`) and `CLAUDE.md` (cron list). Not deployed: migration 0056 must be applied to the remote D1 before this code reaches `master`.
