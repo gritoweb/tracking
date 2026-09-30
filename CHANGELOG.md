@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-09-30 (3) — `refactor` only (not deployed)
+### Added
+- **Edit tasks in bulk** — `POST /api/tasks/bulk-update` `{ items: [{ id, patch }] }` (up to 100; patch limited to status, `completedOn`, assignees, due date, priority, project, parent). Each item runs through the task's own `PUT /api/tasks/:id` on an inner Hono app, so validation, the status mirror (`resolveStatusChange`), the recurrence spawn, the history and the broadcast are exactly those of a single edit — no second write path. The answer reports each item (`ok`/`error`); one failure doesn't stop the others.
+- **One notification per person for a bulk edit.** The inner requests hand their "assigned you"/"moved" notifications to a `NotificationBatch` (keyed by the Request in a WeakMap, so nothing else changes behaviour), which then sends one per person and kind: "Luis assigned you 12 tasks" with the first three names, or the usual single text when only one task changed. Why: twelve bells, twelve Slack DMs and twelve pushes for one click was noise.
+### Verified
+- `tsc -b` (0), `lint` (0), `vitest run` 1194/1194 — new: two tasks assigned → one notification with both names; one task → the usual title; status via bulk sets `active`/`completed_at` and the history; another workspace's id fails alone while the other item succeeds.
+
 ## 2026-09-30 (2) — `refactor` only (not deployed)
 ### Added
 - **Archive, unarchive and delete tasks in bulk** — `POST /api/tasks/bulk` `{ ids (1–100), action: "archive" | "unarchive" | "delete" }`. Same rule as deleting one task: its author or an owner/admin (`canDeleteTask`), all or nothing — one refused id returns 403 with the list and nothing changes; an id outside the workspace is 404. Archiving or unarchiving takes the subtasks along and refuses a subtask on its own (400); unarchiving stamps `unarchived_at`. Both are written to the task's history (new activity kinds `archived`/`unarchived`). Work runs in chunks of 90 ids for D1's bind limit, with one `tasks:changed` broadcast.

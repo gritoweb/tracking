@@ -106,6 +106,38 @@ export async function notifyMentions(
   await Promise.all(targets.map((userId) => notifyUser(env, workspaceId, userId, template)));
 }
 
+/** Who gets a task notification and what it says; a bulk edit swaps in `NotificationBatch.deliver` to group them. */
+export type Deliver = (userId: string, template: NotificationTemplate, taskName: string) => Promise<void>;
+
+/** Collects a bulk edit's task notifications, then sends one per person and kind ("assigned you 12 tasks"). */
+export class NotificationBatch {
+  private readonly items = new Map<string, { userId: string; template: NotificationTemplate; names: string[] }>();
+
+  readonly deliver: Deliver = async (userId, template, taskName) => {
+    const key = `${userId}\u0000${template.type}`;
+    const found = this.items.get(key);
+    if (found) found.names.push(taskName);
+    else this.items.set(key, { userId, template, names: [taskName] });
+  };
+
+  async flush(env: Env, workspaceId: string, actorName: string): Promise<void> {
+    await Promise.all(
+      [...this.items.values()].map(({ userId, template, names }) => {
+        if (names.length === 1) return notifyUser(env, workspaceId, userId, template);
+        const verb = template.type === "task_assigned" ? "assigned you" : "moved";
+        const shown = names.slice(0, 3).map((n) => `"${n}"`).join(", ");
+        return notifyUser(env, workspaceId, userId, {
+          type: template.type,
+          title: `${actorName} ${verb} ${names.length} tasks`,
+          body: names.length > 3 ? `${shown} and ${names.length - 3} more` : shown,
+          link: "/tasks",
+        });
+      })
+    );
+    this.items.clear();
+  }
+}
+
 /** Being added as an assignee notifies you — on creation or later — except when you added yourself. */
 export async function notifyNewAssignees(
   env: Env,
@@ -114,18 +146,19 @@ export async function notifyNewAssignees(
   taskName: string,
   actorId: string,
   actorName: string,
-  newAssigneeIds: string[]
+  newAssigneeIds: string[],
+  deliver: Deliver = (userId, template) => notifyUser(env, workspaceId, userId, template)
 ): Promise<void> {
   const candidates = newAssigneeIds.filter((id) => id !== actorId);
   const targets = await currentMemberIds(env.DB, workspaceId, candidates);
   await Promise.all(
     targets.map((userId) =>
-      notifyUser(env, workspaceId, userId, {
+      deliver(userId, {
         type: "task_assigned",
         title: `${actorName} assigned you "${taskName}"`,
         body: "You're now responsible for this task",
         link: taskPath(taskId),
-      })
+      }, taskName)
     )
   );
 }
@@ -138,7 +171,8 @@ export async function notifyAssigneesOfStatusChange(
   taskName: string,
   actorId: string,
   actorName: string,
-  statusName: string
+  statusName: string,
+  deliver: Deliver = (userId, template) => notifyUser(env, workspaceId, userId, template)
 ): Promise<void> {
   const { results } = await env.DB.prepare(
     `SELECT ta.user_id AS userId FROM task_assignees ta
@@ -151,12 +185,12 @@ export async function notifyAssigneesOfStatusChange(
   const targets = results.filter((r) => r.userId !== actorId);
   await Promise.all(
     targets.map((r) =>
-      notifyUser(env, workspaceId, r.userId, {
+      deliver(r.userId, {
         type: "task_status_changed",
         title: `${actorName} moved "${taskName}"`,
         body: `Now in ${statusName}`,
         link: taskPath(taskId),
-      })
+      }, taskName)
     )
   );
 }

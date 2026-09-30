@@ -7,6 +7,7 @@ import {
   TaskCommentsQuerySchema,
   CreateTaskSchema,
   BulkTaskActionSchema,
+  BulkUpdateTasksSchema,
   MoveTaskSchema,
   TaskAssigneeSchema,
   UpdateTaskCommentSchema,
@@ -37,7 +38,7 @@ import { attachmentIdsInDoc, attachmentsRemoved } from "@shared/rich-doc";
 import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENT_LABEL } from "@shared/attachments";
 import { formatAttachment } from "./attachments";
 import { chunked, placeholdersFor } from "./time-entries";
-import { actorDisplayName, notifyAssigneesOfStatusChange, notifyMentions, notifyNewAssignees } from "../lib/notifications";
+import { actorDisplayName, NotificationBatch, notifyAssigneesOfStatusChange, notifyMentions, notifyNewAssignees, type Deliver } from "../lib/notifications";
 import type { CreateTask, Task, TaskComment, TaskStatus } from "@shared/schemas";
 
 // Multipart framing (boundary + part headers) rides on top of the file itself.
@@ -318,6 +319,9 @@ async function pruneRemovedAttachments(
     c.executionCtx.waitUntil(c.env.ATTACHMENTS.delete(row.r2_key));
   }
 }
+
+/** A bulk edit's inner PUT requests, keyed by the Request itself, so their notifications are grouped instead of sent one by one. */
+const bulkDelivery = new WeakMap<Request, Deliver>();
 
 /** Each id plus its subtasks, in chunks that keep `id IN (…) OR parent_id IN (…)` under D1's bind limit. */
 async function treeIds(db: D1Database, workspaceId: string, ids: string[]): Promise<string[]> {
@@ -649,7 +653,7 @@ export const tasksRouter = new Hono<{
       c.executionCtx.waitUntil(
         notifyAssigneesOfStatusChange(
           c.env, workspaceId, id, existing.name, userId,
-          await actorDisplayName(c.env.DB, userId), change.status.name
+          await actorDisplayName(c.env.DB, userId), change.status.name, bulkDelivery.get(c.req.raw)
         )
       );
     }
@@ -677,7 +681,7 @@ export const tasksRouter = new Hono<{
         c.executionCtx.waitUntil(
           notifyNewAssignees(
             c.env, workspaceId, id, existing.name, userId,
-            await actorDisplayName(c.env.DB, userId), newAssigneeIds
+            await actorDisplayName(c.env.DB, userId), newAssigneeIds, bulkDelivery.get(c.req.raw)
           )
         );
       }
@@ -908,6 +912,40 @@ export const tasksRouter = new Hono<{
       broadcast(c.env, workspaceId, "tasks:changed", null, requestOrigin(c))
     );
     return c.json(formatTask(row), 200);
+  })
+  // ─── Bulk edit (the board's selection bar): each item is the same PUT as one task ──
+  .post("/bulk-update", zValidator("json", BulkUpdateTasksSchema), async (c) => {
+    const workspaceId = c.get("workspaceId");
+    const userId = c.get("userId");
+    const inner = new Hono<{ Bindings: Env; Variables: { workspaceId: string; userId: string } }>()
+      .use("*", async (ic, next) => {
+        ic.set("workspaceId", workspaceId);
+        ic.set("userId", userId);
+        await next();
+      })
+      .route("/", tasksRouter);
+    const pending: Promise<unknown>[] = [];
+    const ctx = { waitUntil: (p: Promise<unknown>) => void pending.push(p), passThroughOnException: () => {}, props: {} } as unknown as ExecutionContext;
+    const batch = new NotificationBatch();
+
+    const results: Array<{ id: string; ok: boolean; error?: string }> = [];
+    for (const { id, patch } of c.req.valid("json").items) {
+      const req = new Request(`http://internal/${encodeURIComponent(id)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      bulkDelivery.set(req, batch.deliver);
+      const res = await inner.fetch(req, c.env, ctx);
+      if (res.ok) results.push({ id, ok: true });
+      else {
+        const body = (await res.json().catch(() => ({}))) as { error?: unknown };
+        results.push({ id, ok: false, error: typeof body.error === "string" ? body.error : `Failed with status ${res.status}` });
+      }
+    }
+    await Promise.allSettled(pending);
+    c.executionCtx.waitUntil(batch.flush(c.env, workspaceId, await actorDisplayName(c.env.DB, userId)));
+    return c.json({ results, updated: results.filter((r) => r.ok).length }, 200);
   })
   // ─── Bulk archive / unarchive / delete (the board's selection bar) ────────
   .post("/bulk", zValidator("json", BulkTaskActionSchema), async (c) => {

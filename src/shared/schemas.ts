@@ -362,6 +362,21 @@ export const BulkTaskActionSchema = z.object({
 });
 export type BulkTaskAction = z.infer<typeof BulkTaskActionSchema>;
 
+/** Only what the selection bar changes; each item runs through the task's own PUT. */
+export const BulkUpdateTaskPatchSchema = UpdateTaskSchema.pick({
+  statusId: true,
+  completedOn: true,
+  assigneeIds: true,
+  dueDate: true,
+  priority: true,
+  projectId: true,
+  parentId: true,
+});
+export const BulkUpdateTasksSchema = z.object({
+  items: z.array(z.object({ id: z.string().min(1), patch: BulkUpdateTaskPatchSchema })).min(1).max(BULK_TASK_IDS_MAX),
+});
+export type BulkUpdateTasks = z.infer<typeof BulkUpdateTasksSchema>;
+
 export const MoveTaskSchema = z.object({
   statusId: z.string(),
   /** Omitted (the MCP's move_task), the card goes to the end of its new column. */

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createMigratedD1 } from "../../test/sqlite-d1";
 import { routeClient } from "../../test/route-harness";
+import { Hono } from "hono";
 
 // tasks.ts imports lib/image.ts, which loads a real WASM module outside vitest — stub it out (same as tasks.test.ts).
 vi.mock("@cf-wasm/photon/workerd", () => ({
@@ -171,5 +172,72 @@ describe("DELETE /:id — shares the bulk deletion", () => {
   it("still refuses a member deleting someone else's task", async () => {
     const { as } = archivingWorld();
     expect((await as("u-member").del("/t-owner")).status).toBe(403);
+  });
+});
+
+describe("POST /bulk-update — each item is the task's own PUT, notifications grouped per person", () => {
+  function bulkWorld() {
+    const w = archivingWorld();
+    const pending: Promise<unknown>[] = [];
+    const ctx = { waitUntil: (p: Promise<unknown>) => void pending.push(p), passThroughOnException: () => {} } as unknown as ExecutionContext;
+    const room = { idFromName: () => "room", get: () => ({ fetch: async () => new Response("ok") }) };
+    const env = { DB: w.db, TIMER_ROOM: room, NOTIFICATION_ROOM: room } as unknown as Env;
+    const app = new Hono<{ Bindings: Env; Variables: { workspaceId: string; userId: string } }>()
+      .use("*", async (c, next) => {
+        c.set("workspaceId", "ws-A");
+        c.set("userId", "u-owner");
+        await next();
+      })
+      .route("/", tasksRouter);
+    const post = async (body: unknown) => {
+      const res = await app.request("/bulk-update", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }, env, ctx);
+      while (pending.length) await Promise.all(pending.splice(0));
+      return res;
+    };
+    return { ...w, post };
+  }
+
+  it("assigns several tasks and sends the assignee ONE notification naming them", async () => {
+    const { raw, post } = bulkWorld();
+    const res = await post({
+      items: [
+        { id: "t-owner", patch: { assigneeIds: ["u-member"] } },
+        { id: "t-mine", patch: { assigneeIds: ["u-member"] } },
+      ],
+    });
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { updated: number }).updated).toBe(2);
+    expect(raw.prepare(`SELECT task_id FROM task_assignees WHERE user_id = 'u-member' ORDER BY task_id`).all()).toEqual([
+      { task_id: "t-mine" }, { task_id: "t-owner" },
+    ]);
+    const notes = raw.prepare(`SELECT title, body, link FROM notifications WHERE user_id = 'u-member'`).all();
+    expect(notes).toEqual([{ title: "Owner assigned you 2 tasks", body: '"Owner task", "Member task"', link: "/tasks" }]);
+  });
+
+  it("keeps the usual single notification when only one task changes", async () => {
+    const { raw, post } = bulkWorld();
+    await post({ items: [{ id: "t-owner", patch: { assigneeIds: ["u-member"] } }] });
+    const notes = raw.prepare(`SELECT title FROM notifications WHERE user_id = 'u-member'`).all();
+    expect(notes).toEqual([{ title: 'Owner assigned you "Owner task"' }]);
+  });
+
+  it("moves status through the same rules (mirror + history) and reports a failed item without stopping", async () => {
+    const { raw, post } = bulkWorld();
+    const res = await post({
+      items: [
+        { id: "t-owner", patch: { statusId: "s-done" } },
+        { id: "t-foreign", patch: { statusId: "s-done" } },
+      ],
+    });
+    const body = (await res.json()) as { results: Array<{ id: string; ok: boolean }> };
+    expect(body.results).toEqual([
+      { id: "t-owner", ok: true },
+      expect.objectContaining({ id: "t-foreign", ok: false }),
+    ]);
+    const row = raw.prepare(`SELECT active, completed_at FROM tasks WHERE id = 't-owner'`).get() as { active: number; completed_at: string | null };
+    expect(row.active).toBe(0);
+    expect(row.completed_at).toBeTruthy();
+    expect(raw.prepare(`SELECT kind FROM task_activity WHERE task_id = 't-owner'`).all()).toEqual([{ kind: "status" }]);
+    expect(raw.prepare(`SELECT status_id FROM tasks WHERE id = 't-foreign'`).get()).toEqual({ status_id: "s-todo-B" });
   });
 });
