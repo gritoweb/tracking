@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-30 (17) — `refactor` only (not deployed)
+### Removed
+- **Archiving is manual only, for now.** The hourly job that archived tasks completed for three days (`lib/task-auto-archive.ts`, `runTaskAutoArchive` in `scheduled()`) is gone, with its tests and its "archived automatically" history wording. Tasks are archived only by a person: the card's or List row's "…", the task's own "…", the selection bar, or a column's "Archive all tasks". Migration 0056 is unchanged (not yet in production, already applied locally): `unarchived_at` and the partial index stay unused, ready if an automatic archive is ever turned back on.
+### Verified
+- `tsc -b` (0), `lint` (0), `vitest run` 1203/1203 (the five auto-archive tests removed with the job).
+
 ## 2026-09-30 (16) — `refactor`, local only (not pushed, not deployed)
 ### Fixed
 - **Esc never clears the board's selection while it is closing a menu, popover or dialog.** It checked whether the key came from inside one, which missed a menu that opened without taking focus; it now checks whether any such layer is open (still in the DOM when the key arrives).

@@ -38,7 +38,7 @@ export function describeActivity(a: TaskActivity): ActivitySegment[] {
       return parts;
     }
     case "archived":
-      return [plain(a.userId ? "archived this task" : "archived this task automatically after 3 days completed")];
+      return [plain("archived this task")];
     case "unarchived":
       return [plain("unarchived this task")];
   }

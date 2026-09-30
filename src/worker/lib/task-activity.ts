@@ -19,8 +19,7 @@ export function formatActivity(row: ActivityRow): TaskActivity {
     id: row.id,
     taskId: row.task_id,
     userId: row.user_id,
-    // No user id is the auto-archive sweep, not a person who left.
-    userName: row.user_id === null ? "TimeTracker" : row.user_name || row.user_email || "Someone",
+    userName: row.user_name || row.user_email || "Someone",
     userImage: row.user_image ?? null,
     kind: row.kind,
     from: row.from_value,

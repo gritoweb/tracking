@@ -452,7 +452,7 @@ export const tasksRouter = new Hono<{
     if (parentId) { where += ` AND tk.parent_id = ?`; bindings.push(parentId); }
     if (!includeInactive) { where += ` AND tk.active = 1`; }
     if (archivedOnly) {
-      // The archive only grows (the auto-archive feeds it): the most recently archived parents, with their subtasks.
+      // The archive only grows: the most recently archived parents, with their subtasks.
       where += ` AND tk.archived_at IS NOT NULL AND COALESCE(tk.parent_id, tk.id) IN (
         SELECT a.id FROM tasks a WHERE a.workspace_id = ? AND a.parent_id IS NULL AND a.archived_at IS NOT NULL
         ORDER BY a.archived_at DESC LIMIT ?)`;
