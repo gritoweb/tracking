@@ -77,6 +77,7 @@ function taskListView(t: Task, base: string) {
     ...(t.subtaskTotal ? { subtasks: `${t.subtaskDone}/${t.subtaskTotal}` } : {}),
     ...(t.recurRule ? { repeats: t.recurRule } : {}),
     ...(t.active ? {} : { done: true }),
+    ...(t.archivedAt ? { archived: true } : {}),
   };
 }
 
@@ -99,6 +100,7 @@ function taskView(t: Task, base: string) {
     trackedHours: hours(t.trackedSeconds),
     repeats: t.recurRule,
     completedAt: t.completedAt,
+    archivedAt: t.archivedAt,
   };
 }
 
@@ -125,7 +127,7 @@ export function registerTaskReads(d: ToolDeps): void {
     {
       title: "List tasks",
       description:
-        "Tasks in the workspace — the plan, not tracked time — in the board's column order (whatever the workspace named its columns; list_task_statuses has them), each with its status and url (notes and full details: get_task). Open tasks only unless `includeDone`, so completed ones are left out. " +
+        "Tasks in the workspace — the plan, not tracked time — in the board's column order (whatever the workspace named its columns; list_task_statuses has them), each with its status and url (notes and full details: get_task). Open tasks only unless `includeDone`, so completed ones are left out; archived ones only with `includeArchived`. " +
         "\"My tasks\" with no date means ALL of the person's open tasks: assignee `me` and NO dueBy — whatever their due date, or none. Pass dueBy only when the person names a day or period (\"today\", \"this week\"). " +
         "Filter by project, status, assignee (`me` for the key's owner) or due day. Use this to find a taskId before editing, moving, commenting or attaching.",
       inputSchema: {
@@ -134,6 +136,7 @@ export function registerTaskReads(d: ToolDeps): void {
         assignee: z.string().optional().describe("A member's userId from list_members, or `me`"),
         search: z.string().trim().min(1).max(200).optional().describe("Words from the task's name, as the person said them (typos are fine): tasks matching any word, best matches first — the one call to find a task the person named"),
         includeDone: z.boolean().default(false).describe("Also return completed tasks"),
+        includeArchived: z.boolean().default(false).describe("Also return archived tasks (off the board, nothing deleted)"),
         dueBy: z
           .string()
           .regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD")
@@ -142,12 +145,13 @@ export function registerTaskReads(d: ToolDeps): void {
       },
       annotations: READ_ONLY,
     },
-    async ({ projectId, statusId, assignee, includeDone, dueBy, search }) => {
+    async ({ projectId, statusId, assignee, includeDone, includeArchived, dueBy, search }) => {
       const query = new URLSearchParams();
       if (projectId) query.set("projectId", projectId);
       if (statusId) query.set("statusId", statusId);
       if (assignee) query.set("assignee", assignee);
       if (includeDone) query.set("includeInactive", "true");
+      if (includeArchived) query.set("includeArchived", "true");
       const [tasks, statuses] = await Promise.all([
         bridge<Task[]>("GET", `/api/tasks?${query}`),
         bridge<TaskStatus[]>("GET", "/api/task-statuses"),
@@ -175,7 +179,7 @@ export function registerTaskReads(d: ToolDeps): void {
     async ({ taskId }) => {
       const [task, subtasks] = await Promise.all([
         bridge<Task>("GET", `/api/tasks/${segment(taskId)}`),
-        bridge<Task[]>("GET", `/api/tasks?${new URLSearchParams({ parentId: taskId, includeInactive: "true" })}`),
+        bridge<Task[]>("GET", `/api/tasks?${new URLSearchParams({ parentId: taskId, includeInactive: "true", includeArchived: "true" })}`),
       ]);
       if (!task.ok) {
         return task.status === 404 ? refuse(`No task with id ${taskId} in this workspace. Call list_tasks to find it.`) : fromBridge(task);

@@ -295,6 +295,8 @@ export const TaskSchema = z.object({
   /** Non-null on a subtask. One level only: a subtask can never be a parent. */
   parentId: z.string().nullable(),
   completedAt: z.string().nullable(),
+  /** Non-null once archived: off the board and out of lists, nothing deleted. */
+  archivedAt: z.string().nullable(),
   recurRule: z.string().nullable(),
   subtaskTotal: z.number(),
   subtaskDone: z.number(),

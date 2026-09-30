@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-30 (1) — `refactor` only (not deployed)
+### Added
+- **Tasks can be archived (schema and reads).** Migration `0056_task_archiving.sql` adds `tasks.archived_at` and `tasks.unarchived_at` (nullable, additive: no existing row changes) and a partial index for the auto-archive sweep. `GET /api/tasks` leaves archived tasks out unless `includeArchived=true`; a task opened by id still loads. The AI grounding (`loadGroundingProjects`) skips archived tasks. MCP: `list_tasks` takes `includeArchived`, and a task says `archived`/`archivedAt`. Why: archiving takes a task off the board and out of lists without deleting its comments, history or hours — time entries are untouched.
+### Verified
+- `tsc -b` (0), `lint` (0), new `tasks.archiving.test.ts` (list hides archived, `includeArchived` returns them with `archivedAt`, by-id still opens), migration applied to the local D1 only.
+
 ## 2026-09-29 (5) — deployed to production (`refactor` → `master`; no migration)
 ### Changed
 - **A mention names the task in its title**: "Richard Souto mentioned you in \"Launch\"", with the body left for what happened — the comment excerpt, or "In the title" / "In the description". Before, the title said only who, and the task name was a prefix of the body. The bell, the desktop notification and the Slack DM all read this one text, so all three improve.

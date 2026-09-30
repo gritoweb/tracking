@@ -70,6 +70,7 @@ function formatTask(row: TaskJoinRow): Task {
     sortOrder: row.sort_order ?? 0,
     parentId: row.parent_id ?? null,
     completedAt: row.completed_at ?? null,
+    archivedAt: row.archived_at ?? null,
     recurRule: row.recur_rule ?? null,
     boardOrder: row.board_order ?? 0,
     subtaskTotal: row.subtask_total ?? 0,
@@ -400,7 +401,7 @@ export const tasksRouter = new Hono<{
   // ─── List tasks ───────────────────────────────────────────────────────────
   .get("/", async (c) => {
     const workspaceId = c.get("workspaceId");
-    const { projectId, statusId, includeInactive, assignee, parentId } = c.req.query();
+    const { projectId, statusId, includeInactive, includeArchived, assignee, parentId } = c.req.query();
 
     let where = `WHERE tk.workspace_id = ?`;
     const bindings: unknown[] = [workspaceId];
@@ -409,6 +410,7 @@ export const tasksRouter = new Hono<{
     if (statusId) { where += ` AND tk.status_id = ?`; bindings.push(statusId); }
     if (parentId) { where += ` AND tk.parent_id = ?`; bindings.push(parentId); }
     if (!includeInactive) { where += ` AND tk.active = 1`; }
+    if (!includeArchived) { where += ` AND tk.archived_at IS NULL`; }
     if (assignee) {
       const assigneeId = assignee === "me" ? c.get("userId") : assignee;
       where += ` AND EXISTS (SELECT 1 FROM task_assignees ta

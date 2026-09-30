@@ -69,6 +69,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     boardOrder: 0,
     parentId: null,
     completedAt: null,
+    archivedAt: null,
     recurRule: null,
     subtaskTotal: 0,
     subtaskDone: 0,

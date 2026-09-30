@@ -233,7 +233,7 @@ export async function loadGroundingProjects(
       `SELECT p.id AS project_id, p.name AS project_name, p.billable AS project_billable,
               tk.id AS task_id, tk.name AS task_name
        FROM projects p
-       LEFT JOIN tasks tk ON tk.project_id = p.id AND tk.active = 1
+       LEFT JOIN tasks tk ON tk.project_id = p.id AND tk.active = 1 AND tk.archived_at IS NULL
        WHERE p.workspace_id = ? AND p.active = 1 AND p.client_id IS NOT NULL
        ORDER BY p.name ASC`
     )
