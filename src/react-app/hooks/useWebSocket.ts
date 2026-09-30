@@ -232,6 +232,8 @@ export function useWebSocket() {
           if (!isOwnEcho) {
             queryClient.invalidateQueries({ queryKey: ["tasks"] });
             queryClient.invalidateQueries({ queryKey: ["task-statuses"] });
+            // A bulk edit sends this one event for every task it touched, histories included.
+            queryClient.invalidateQueries({ queryKey: ["task-activity"] });
           }
           break;
         }

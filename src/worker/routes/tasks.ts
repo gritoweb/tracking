@@ -320,8 +320,8 @@ async function pruneRemovedAttachments(
   }
 }
 
-/** A bulk edit's inner PUT requests, keyed by the Request itself, so their notifications are grouped instead of sent one by one. */
-const bulkDelivery = new WeakMap<Request, Deliver>();
+/** A bulk edit's inner PUT requests, keyed by the Request itself: notifications grouped, and one broadcast at the end instead of one per task. */
+const bulkRequests = new WeakMap<Request, { deliver: Deliver }>();
 
 /** Each id plus its subtasks, in chunks that keep `id IN (…) OR parent_id IN (…)` under D1's bind limit. */
 async function treeIds(db: D1Database, workspaceId: string, ids: string[]): Promise<string[]> {
@@ -653,7 +653,7 @@ export const tasksRouter = new Hono<{
       c.executionCtx.waitUntil(
         notifyAssigneesOfStatusChange(
           c.env, workspaceId, id, existing.name, userId,
-          await actorDisplayName(c.env.DB, userId), change.status.name, bulkDelivery.get(c.req.raw)
+          await actorDisplayName(c.env.DB, userId), change.status.name, bulkRequests.get(c.req.raw)?.deliver
         )
       );
     }
@@ -681,7 +681,7 @@ export const tasksRouter = new Hono<{
         c.executionCtx.waitUntil(
           notifyNewAssignees(
             c.env, workspaceId, id, existing.name, userId,
-            await actorDisplayName(c.env.DB, userId), newAssigneeIds, bulkDelivery.get(c.req.raw)
+            await actorDisplayName(c.env.DB, userId), newAssigneeIds, bulkRequests.get(c.req.raw)?.deliver
           )
         );
       }
@@ -805,7 +805,8 @@ export const tasksRouter = new Hono<{
     }
 
     await recordActivity(c.env.DB, workspaceId, id, userId, activity);
-    if (activity.length) {
+    const inBulk = bulkRequests.has(c.req.raw);
+    if (activity.length && !inBulk) {
       c.executionCtx.waitUntil(
         broadcast(c.env, workspaceId, "task-comments:changed", { taskId: id }, requestOrigin(c))
       );
@@ -813,9 +814,11 @@ export const tasksRouter = new Hono<{
 
     const row = await readTask(c.env.DB, id, workspaceId, await taskScope(c));
     if (!row) return c.json({ error: "Not found" }, 404);
-    c.executionCtx.waitUntil(
-      broadcast(c.env, workspaceId, "tasks:changed", null, requestOrigin(c))
-    );
+    if (!inBulk) {
+      c.executionCtx.waitUntil(
+        broadcast(c.env, workspaceId, "tasks:changed", null, requestOrigin(c))
+      );
+    }
     return c.json(formatTask(row), 200);
   })
   // ─── Move on the board — status and order in one write, never two ───────────
@@ -929,13 +932,14 @@ export const tasksRouter = new Hono<{
     const batch = new NotificationBatch();
 
     const results: Array<{ id: string; ok: boolean; error?: string }> = [];
+    // Sequential on purpose: a status change takes MAX(board_order)+1, which two parallel writes would both read.
     for (const { id, patch } of c.req.valid("json").items) {
       const req = new Request(`http://internal/${encodeURIComponent(id)}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(patch),
       });
-      bulkDelivery.set(req, batch.deliver);
+      bulkRequests.set(req, { deliver: batch.deliver });
       const res = await inner.fetch(req, c.env, ctx);
       if (res.ok) results.push({ id, ok: true });
       else {
@@ -945,6 +949,9 @@ export const tasksRouter = new Hono<{
     }
     await Promise.allSettled(pending);
     c.executionCtx.waitUntil(batch.flush(c.env, workspaceId, await actorDisplayName(c.env.DB, userId)));
+    if (results.some((r) => r.ok)) {
+      c.executionCtx.waitUntil(broadcast(c.env, workspaceId, "tasks:changed", null, requestOrigin(c)));
+    }
     return c.json({ results, updated: results.filter((r) => r.ok).length }, 200);
   })
   // ─── Bulk archive / unarchive / delete (the board's selection bar) ────────

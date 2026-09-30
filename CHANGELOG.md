@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-30 (12) — `refactor`, local only (not pushed, not deployed)
+### Fixed
+- **A bulk edit sends one realtime event, not two per task.** Each inner `PUT` of `POST /api/tasks/bulk-update` used to broadcast `tasks:changed` and `task-comments:changed`, so a 50-task edit sent up to 100 events and every open screen refetched the task list dozens of times. The inner requests (marked in the `bulkRequests` WeakMap, which also carries the grouped-notification sink) now stay quiet, and the batch broadcasts one `tasks:changed` at the end; the client also refreshes open task histories (`["task-activity"]`) on that event. Items still run one after another on purpose: a status change reads `MAX(board_order)+1`, which two parallel writes would read alike.
+### Verified
+- `tsc -b` (0), `lint` (0), `vitest run` (new: three items → exactly one `tasks:changed`). Timing on the local dev server: 50 tasks per bulk edit ≈ 510–550 ms (priority and due date).
+
 ## 2026-09-30 (11) — `refactor` only (not deployed)
 ### Changed
 - **"Show archived" now shows only the archived tasks**, instead of adding them to the live ones — turning it on is a view of the archive, turning it off goes back. The other filters (due date, status, assigned to me, project rail) still narrow it; archived subtasks come with their archived parent.

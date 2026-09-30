@@ -180,8 +180,13 @@ describe("POST /bulk-update — each item is the task's own PUT, notifications g
     const w = archivingWorld();
     const pending: Promise<unknown>[] = [];
     const ctx = { waitUntil: (p: Promise<unknown>) => void pending.push(p), passThroughOnException: () => {} } as unknown as ExecutionContext;
+    const events: string[] = [];
     const room = { idFromName: () => "room", get: () => ({ fetch: async () => new Response("ok") }) };
-    const env = { DB: w.db, TIMER_ROOM: room, NOTIFICATION_ROOM: room } as unknown as Env;
+    const timerRoom = {
+      idFromName: () => "room",
+      get: () => ({ fetch: async (req: Request) => (events.push(((await req.json()) as { event: string }).event), new Response("ok")) }),
+    };
+    const env = { DB: w.db, TIMER_ROOM: timerRoom, NOTIFICATION_ROOM: room } as unknown as Env;
     const app = new Hono<{ Bindings: Env; Variables: { workspaceId: string; userId: string } }>()
       .use("*", async (c, next) => {
         c.set("workspaceId", "ws-A");
@@ -194,8 +199,20 @@ describe("POST /bulk-update — each item is the task's own PUT, notifications g
       while (pending.length) await Promise.all(pending.splice(0));
       return res;
     };
-    return { ...w, post };
+    return { ...w, post, events };
   }
+
+  it("broadcasts once for the whole batch, not once (or twice) per task", async () => {
+    const { post, events } = bulkWorld();
+    await post({
+      items: [
+        { id: "t-owner", patch: { priority: 1 } },
+        { id: "t-mine", patch: { priority: 1 } },
+        { id: "t-owner-sub", patch: { dueDate: "2026-10-01" } },
+      ],
+    });
+    expect(events).toEqual(["tasks:changed"]);
+  });
 
   it("assigns several tasks and sends the assignee ONE notification naming them", async () => {
     const { raw, post } = bulkWorld();
