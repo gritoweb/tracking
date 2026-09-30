@@ -132,13 +132,14 @@ export function TaskBoard({
   const toggleColumn = (columnTasks: Task[]) =>
     setPickedIds((prev) => toggleColumnSelection(visibleOnly(prev), columnTasks.map((t) => t.id)));
 
-  // Esc clears the selection, unless it is closing one of the bar's own menus or a dialog.
+  // Esc clears the selection unless a menu, popover or dialog is open: that Esc is for closing it (still in the DOM here).
   const selecting = selectedIds.size > 0;
   useEffect(() => {
     if (!selecting) return;
     const onKey = (e: KeyboardEvent) => {
-      const inLayer = (e.target as HTMLElement | null)?.closest?.('[role="dialog"], [role="menu"], [data-radix-popper-content-wrapper]');
-      if (e.key === "Escape" && !inLayer) setPickedIds(new Set());
+      if (e.key !== "Escape") return;
+      if (document.querySelector('[role="menu"], [role="dialog"], [role="alertdialog"], [data-radix-popper-content-wrapper]')) return;
+      setPickedIds(new Set());
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);

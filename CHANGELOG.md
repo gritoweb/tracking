@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-30 (16) — `refactor`, local only (not pushed, not deployed)
+### Fixed
+- **Esc never clears the board's selection while it is closing a menu, popover or dialog.** It checked whether the key came from inside one, which missed a menu that opened without taking focus; it now checks whether any such layer is open (still in the DOM when the key arrives).
+### Verified
+- In the browser (local, Playwright): no layer in the DOM at rest; select a card → open the bar's Priority menu → Esc closes only the menu ("1 task selected" kept) → a second Esc clears the selection.
+
 ## 2026-09-30 (15) — `refactor`, local only (not pushed, not deployed)
 ### Fixed
 - **A time entry on an archived task no longer shows "No task".** The entry kept its task (and saving kept it), but the picker only knew live tasks, so it read as if the task were gone. `TaskPicker` now fetches that one task by id and shows "<name> (archived)".
