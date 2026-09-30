@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { isTextSelection, useEditorState, type Editor } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
+import { AllSelection } from "@tiptap/pm/state";
 import {
   Bold,
   Code,
@@ -84,12 +85,12 @@ export function RichTextBubbleMenu({ editor }: { editor: Editor }) {
     <BubbleMenu
       editor={editor}
       options={{ strategy: "fixed", placement: "top-start", onHide: () => setPanel(null) }}
-      // Text selections only: a dropped block stays node-selected, and the bar popping up after every drag reads as a glitch.
+      // Text selections and Ctrl/Cmd+A (an AllSelection) only: a dropped block stays node-selected, and a bar after every drag reads as a glitch.
       shouldShow={({ view, state, element }) => {
         const { selection } = state;
         const focused = view.hasFocus() || element.contains(document.activeElement);
         const hasText = state.doc.textBetween(selection.from, selection.to).length > 0;
-        return focused && editor.isEditable && isTextSelection(selection) && !selection.empty && hasText;
+        return focused && editor.isEditable && (isTextSelection(selection) || selection instanceof AllSelection) && !selection.empty && hasText;
       }}
       // Keeps the editor's selection: a click in the bar must not move focus out of the text it formats (the link field excepted).
       onMouseDown={(e) => {

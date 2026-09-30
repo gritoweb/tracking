@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-30 (24) — `refactor` only (not deployed)
+### Fixed
+- **Ctrl/Cmd+A in a task's description now shows the formatting bar.** Selecting everything makes ProseMirror an `AllSelection`, not a `TextSelection`, and the bar's `shouldShow` accepted only the latter — so select-all-then-format never worked (a double-clicked word did). It now accepts both; a node selection (a dropped block) still shows no bar. This had also failed `e2e/task-view-mode.spec.ts` on `master`.
+### Verified
+- Reproduced first (local, Playwright): after Ctrl+A the selection was "Scope", focus in the editor, and no toolbar in the DOM; a double-click showed it. After the fix: `e2e/task-view-mode.spec.ts` 6/6 (the heading + colour test that failed before passes), `tsc -b` (0), `lint` (0), `vitest run` green.
+
 ## 2026-09-30 (23) — `refactor` only (not deployed)
 ### Changed
 - **One Archive/Unarchive for every task menu.** The card's "…", the List row's "…" and the task's own "…" each rebuilt the same label, icon and action from `archivedAt`; they now read it from one hook, `useArchiveToggle` (`hooks/useTasks.ts`), so the three can't drift apart. `treeIds` (bulk archive/delete) walks the ids 45 at a time in one loop instead of chunks of 90 split in halves — same bind limit, fewer lines. No behaviour change.
