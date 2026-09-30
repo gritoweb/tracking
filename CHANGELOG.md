@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-30 (25) — `refactor` only (not deployed)
+### Added
+- **"Load more" in the archive.** "Show archived" loads the 500 most recently archived parent tasks; when there are more, the note above the board now has a "Load more" button that asks for 500 more each time (`archiveLimit` on `GET /api/tasks?archivedOnly=true`, clamped server-side to 1…`ARCHIVE_MAX_LIMIT` = 5000, anything unparsable falls back to 500). The previous step stays on screen while the next one loads. Older than that is still reachable by link and through the AI's `includeArchived`.
+### Verified
+- `tsc -b` (0), `lint` (0), `vitest run` green (new: `archiveLimit=2` returns the two most recent, `abc` falls back to the default, a huge value is clamped). In the browser (local, Playwright): with 502 archived tasks, 500 cards and "Showing the 500 most recently archived tasks." with "Load more" → 502 cards and the note gone; the 501 sample rows were deleted afterwards.
+
 ## 2026-09-30 (24) — `refactor` only (not deployed)
 ### Fixed
 - **Ctrl/Cmd+A in a task's description now shows the formatting bar.** Selecting everything makes ProseMirror an `AllSelection`, not a `TextSelection`, and the bar's `shouldShow` accepted only the latter — so select-all-then-format never worked (a double-clicked word did). It now accepts both; a node selection (a dropped block) still shows no bar. This had also failed `e2e/task-view-mode.spec.ts` on `master`.

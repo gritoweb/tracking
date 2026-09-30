@@ -11,7 +11,7 @@ vi.mock("@cf-wasm/photon/workerd", () => ({
 }));
 
 const { tasksRouter } = await import("./tasks");
-const { ARCHIVE_PAGE_LIMIT } = await import("@shared/schemas");
+const { ARCHIVE_MAX_LIMIT, ARCHIVE_PAGE_LIMIT } = await import("@shared/schemas");
 
 /** ws-A: owner u-owner, member u-member (author of t-mine), admin u-admin. ws-B holds t-foreign. */
 function archivingWorld() {
@@ -79,6 +79,16 @@ describe("task archiving — listing", () => {
     expect(listed).toHaveLength(ARCHIVE_PAGE_LIMIT);
     expect(listed).not.toContain("t-a0");
     expect(listed).toContain(`t-a${ARCHIVE_PAGE_LIMIT}`);
+  });
+
+  it("archiveLimit raises or lowers how many archived parents come back, within the ceiling", async () => {
+    const { raw, as } = archivingWorld();
+    const rows = Array.from({ length: 3 }, (_, i) => `('t-l${i}', 'ws-A', 'p-A', 'L${i}', 's-todo', 'u-owner', '2026-01-0${i + 1}T00:00:00.000Z')`);
+    raw.exec(`INSERT INTO tasks (id, workspace_id, project_id, name, status_id, created_by, archived_at) VALUES ${rows.join(", ")}`);
+    const owner = as("u-owner");
+    expect(await ids(await owner.get("/?includeInactive=true&archivedOnly=true&archiveLimit=2"))).toEqual(["t-l1", "t-l2"]);
+    expect(await ids(await owner.get("/?includeInactive=true&archivedOnly=true&archiveLimit=abc"))).toHaveLength(3);
+    expect(await ids(await owner.get(`/?includeInactive=true&archivedOnly=true&archiveLimit=${ARCHIVE_MAX_LIMIT * 10}`))).toHaveLength(3);
   });
 
   it("still opens an archived task by id", async () => {

@@ -6,6 +6,7 @@ import {
   CreateTaskCommentSchema,
   TaskCommentsQuerySchema,
   CreateTaskSchema,
+  ARCHIVE_MAX_LIMIT,
   ARCHIVE_PAGE_LIMIT,
   BulkTaskActionSchema,
   BulkUpdateTasksSchema,
@@ -440,7 +441,7 @@ export const tasksRouter = new Hono<{
   // ─── List tasks ───────────────────────────────────────────────────────────
   .get("/", async (c) => {
     const workspaceId = c.get("workspaceId");
-    const { projectId, statusId, includeInactive, includeArchived, archivedOnly, assignee, parentId } = c.req.query();
+    const { projectId, statusId, includeInactive, includeArchived, archivedOnly, archiveLimit, assignee, parentId } = c.req.query();
 
     let where = `WHERE tk.workspace_id = ?`;
     const bindings: unknown[] = [workspaceId];
@@ -454,7 +455,8 @@ export const tasksRouter = new Hono<{
       where += ` AND tk.archived_at IS NOT NULL AND COALESCE(tk.parent_id, tk.id) IN (
         SELECT a.id FROM tasks a WHERE a.workspace_id = ? AND a.parent_id IS NULL AND a.archived_at IS NOT NULL
         ORDER BY a.archived_at DESC LIMIT ?)`;
-      bindings.push(workspaceId, ARCHIVE_PAGE_LIMIT);
+      const limit = Math.min(Math.max(Number.parseInt(archiveLimit ?? "", 10) || ARCHIVE_PAGE_LIMIT, 1), ARCHIVE_MAX_LIMIT);
+      bindings.push(workspaceId, limit);
     } else if (!includeArchived) { where += ` AND tk.archived_at IS NULL`; }
     if (assignee) {
       const assigneeId = assignee === "me" ? c.get("userId") : assignee;

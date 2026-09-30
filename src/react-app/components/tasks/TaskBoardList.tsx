@@ -32,7 +32,7 @@ import {
 } from "@/lib/taskUtils";
 import { todayLocalDate } from "@shared/task-recurrence";
 import { taskPath, type TaskTab } from "@shared/task-links";
-import { ARCHIVE_PAGE_LIMIT, type Task } from "@shared/schemas";
+import { ARCHIVE_MAX_LIMIT, ARCHIVE_PAGE_LIMIT, type Task } from "@shared/schemas";
 
 type Layout = "board" | "list";
 
@@ -47,9 +47,11 @@ export function TaskBoardList({ openTaskId = null, openTab = "task" }: TaskBoard
   const setShowArchived = useUIStore((s) => s.setShowArchivedTasks);
   const live = useAllTasks();
   // "Show archived" is a view of the archive alone, fetched as such (never the live list plus everything archived).
-  const archive = useArchivedTasks(showArchived);
+  const [archiveLimit, setArchiveLimit] = useState(ARCHIVE_PAGE_LIMIT);
+  const archive = useArchivedTasks(showArchived, archiveLimit);
   const { data: tasks = [], isLoading } = showArchived ? archive : live;
-  const archiveCapped = showArchived && tasks.filter((t) => !t.parentId).length >= ARCHIVE_PAGE_LIMIT;
+  const archivedParents = showArchived ? tasks.filter((t) => !t.parentId).length : 0;
+  const archiveCapped = archivedParents >= archiveLimit && archiveLimit < ARCHIVE_MAX_LIMIT;
   const deleteTask = useDeleteTask();
   const updateTask = useUpdateTask();
   const openTaskLogTime = useUIStore((s) => s.openTaskLogTime);
@@ -225,9 +227,17 @@ export function TaskBoardList({ openTaskId = null, openTab = "task" }: TaskBoard
       </CollectionHeader>
 
       {archiveCapped && (
-        <p className="shrink-0 pb-2 text-xs text-muted-foreground">
-          Showing the {ARCHIVE_PAGE_LIMIT} most recently archived tasks.
-        </p>
+        <div className="flex shrink-0 items-center gap-2 pb-2 text-xs text-muted-foreground">
+          <span>Showing the {archiveLimit} most recently archived tasks.</span>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={archive.isFetching}
+            onClick={() => setArchiveLimit((n) => Math.min(n + ARCHIVE_PAGE_LIMIT, ARCHIVE_MAX_LIMIT))}
+          >
+            Load more
+          </Button>
+        </div>
       )}
 
       {archiveEmpty ? (

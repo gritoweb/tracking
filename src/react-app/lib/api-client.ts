@@ -294,7 +294,7 @@ export const api = {
 
   // ─── Tasks ────────────────────────────────────────────────────────────────
   tasks: {
-    list: (params?: { projectId?: string; parentId?: string; includeInactive?: string; includeArchived?: string; archivedOnly?: string }) =>
+    list: (params?: { projectId?: string; parentId?: string; includeInactive?: string; includeArchived?: string; archivedOnly?: string; archiveLimit?: string }) =>
       request<TasksListResponse>(`/tasks${queryString(params)}`),
     get: (id: string) => json(tasksClient[":id"].$get({ param: { id } })),
     /** Id, name, project and archived flag of every task — Reports' filter, archive included. */

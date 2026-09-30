@@ -47,13 +47,15 @@ export function useTaskOptions() {
   });
 }
 
-/** "Show archived": the archive alone, capped server-side at the most recent ARCHIVE_PAGE_LIMIT parents. */
-export function useArchivedTasks(enabled: boolean) {
+/** "Show archived": the archive alone, the `limit` most recently archived parents ("Load more" raises it). */
+export function useArchivedTasks(enabled: boolean, limit: number) {
   return useQuery({
-    queryKey: ["tasks", "archived"],
-    queryFn: () => api.tasks.list({ includeInactive: "true", archivedOnly: "true" }),
+    queryKey: ["tasks", "archived", limit],
+    queryFn: () => api.tasks.list({ includeInactive: "true", archivedOnly: "true", archiveLimit: String(limit) }),
     staleTime: 30_000,
     enabled,
+    // Keeps the board on screen while the next step loads, instead of flashing the skeleton.
+    placeholderData: (previous) => previous,
   });
 }
 
