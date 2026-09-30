@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-30 (10) — `refactor` only (not deployed)
+### Removed
+- **The checkbox on the column header.** Selecting a whole column is the "…" menu's "Select all"; each card keeps its own checkbox (and Shift-click for a range). Clearing is the bar's × or Esc.
+### Verified
+- `tsc -b` (0), `lint` (0), `vitest run` 1204/1204. In the browser (local): no checkbox in any column header, the three cards still have theirs, and "Select all" from the "…" gives "3 tasks selected".
+
 ## 2026-09-30 (9) — `refactor` only (not deployed)
 ### Changed
 - **Archive follows Delete's pattern: without permission it isn't shown at all**, rather than shown disabled. The selection bar shows Archive/Unarchive and Delete only when every selected task is the person's (author) or they are owner/admin; the column's "…" shows "Archive all tasks" only when every task in the column is. Card and List-row menus already worked this way.

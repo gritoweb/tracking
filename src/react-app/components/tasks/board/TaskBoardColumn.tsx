@@ -6,13 +6,11 @@ import { Plus } from "lucide-react";
 import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { ColorDot } from "@/components/ColorDot";
 import { QuickAddTask } from "../QuickAddTask";
 import { TaskCard } from "./TaskCard";
 import { StatusColumnMenu } from "./StatusColumnMenu";
 import { useOutsideClick } from "@/hooks/useOutsideClick";
-import { cn } from "@/lib/utils";
 import { clusterTasks, type GroupBy } from "@/lib/taskUtils";
 import { todayLocalDate } from "@shared/task-recurrence";
 import type { Task, TaskStatus } from "@shared/schemas";
@@ -29,7 +27,7 @@ interface TaskBoardColumnProps {
   onRequestDelete: (task: Task) => void;
   selectedIds: ReadonlySet<string>;
   onToggleSelect: (task: Task, range: boolean) => void;
-  /** Empty column selection → select all of its cards; partial or full → clear them. */
+  /** The column menu's "Select all": adds the given cards to the selection. */
   onToggleColumn: (tasks: Task[]) => void;
 }
 
@@ -53,7 +51,6 @@ export function TaskBoardColumn({
   const clusters = clusterTasks(tasks, groupBy, todayLocalDate());
   const selecting = selectedIds.size > 0;
   const picked = tasks.filter((t) => selectedIds.has(t.id)).length;
-  const columnState = picked === 0 ? false : picked === tasks.length ? true : "indeterminate";
   const bulk = useBulkTaskAction();
   const canDelete = useCanDeleteTask();
   const [archiveAllOpen, setArchiveAllOpen] = useState(false);
@@ -72,20 +69,7 @@ export function TaskBoardColumn({
           style={{ "--swatch": status.color } as CSSProperties}
           className="flex flex-col tt-swatch-column rounded-container"
         >
-          <header className="group flex items-center gap-2 px-3 pb-2 pt-3">
-            {tasks.length > 0 && (
-              <Checkbox
-                size="sm"
-                checked={columnState}
-                aria-label={picked ? `Clear the selection in ${status.name}` : `Select every task in ${status.name}`}
-                title={picked ? "Clear selection in this column" : "Select all in this column"}
-                onClick={(e) => {
-                  e.preventDefault();
-                  onToggleColumn(tasks);
-                }}
-                className={cn(!selecting && "tt-reveal")}
-              />
-            )}
+          <header className="flex items-center gap-2 px-3 pb-2 pt-3">
             <ColorDot color={status.color} />
             <h2 className="min-w-0 flex-1 truncate text-sm font-medium">{status.name}</h2>
             <span className="text-xs tabular-nums text-muted-foreground">{tasks.length}</span>
