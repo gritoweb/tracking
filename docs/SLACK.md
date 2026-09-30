@@ -10,6 +10,7 @@ tarefa no app. Quem está com o app aberto e lê a notificação a tempo não re
 - A pessoa é encontrada no Slack **pelo e-mail** da conta (`users.lookupByEmail`). E-mail diferente = sem DM
   (o card avisa "No Slack user … has your email address").
 - Cada pessoa pode desligar no mesmo card ("Send my unread notifications to Slack").
+- Abrir a tarefa (modal ou lateral, com a aba visível) marca como lidas todas as notificações dela, inclusive as que chegam com a tarefa aberta (`PATCH /api/notifications/read-task/:taskId`), então nada disso vai para o Slack.
 - Várias pendentes viram **uma** DM agrupada (até 10 itens + "…and N more").
 - Só notificações das últimas 24h: instalar o Slack não despeja o histórico antigo.
 

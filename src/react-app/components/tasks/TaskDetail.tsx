@@ -37,6 +37,7 @@ import { parseTimeInput, formatTimeInput } from "@/lib/dateUtils";
 import { serializeDescription } from "@/lib/richText";
 import type { Task } from "@shared/schemas";
 import type { JSONContent } from "@tiptap/react";
+import { useReadTaskNotifications } from "@/hooks/useNotifications";
 
 interface TaskDetailProps {
   open: boolean;
@@ -60,6 +61,7 @@ export function TaskDetail({ open, onClose, task, tab, onTabChange, onRequestDel
   const { canManage } = useWorkspaceRole();
   const canDeleteTask = useCanDeleteTask();
   const archiveToggle = useArchiveToggle();
+  useReadTaskNotifications(task?.id ?? null, open);
   const mode = useUIStore((s) => s.taskViewMode);
   const setMode = useUIStore((s) => s.setTaskViewMode);
   const narrow = useMediaQuery(BELOW_LG);

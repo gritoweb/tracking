@@ -348,6 +348,8 @@ export const api = {
     list: () => json(notificationsClient.index.$get()),
     markRead: (id: string) => json(notificationsClient[":id"].read.$patch({ param: { id } })),
     markAllRead: () => json(notificationsClient["read-all"].$patch()),
+    /** Viewing a task reads its notifications (the task and its comments tab). */
+    markTaskRead: (taskId: string) => json(notificationsClient["read-task"][":taskId"].$patch({ param: { taskId } })),
     delete: (id: string) => json(notificationsClient[":id"].$delete({ param: { id } })),
     clearAll: () => json(notificationsClient.index.$delete()),
   },

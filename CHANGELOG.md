@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-30 (32) — `refactor` only (not deployed)
+### Fixed
+- **Viewing a task reads its notifications, so Slack no longer repeats one you have already seen.** Only clicking a bell item marked a notification read; opening the task another way, or a second notification about the same task, stayed unread and went to Slack five minutes later. Root cause seen in real data: a teammate assigned a task (18:37:03) and mentioned the person on it 45 s later (18:37:48); the person clicked the assignment in the bell and read the task, but the mention was still unread and was sent as a Slack DM. Now, while a task is open (modal or sidebar) in a visible tab, every unread notification linking to it — the task or its comments tab — is marked read, including one that arrives while it is open (`useReadTaskNotifications`, `PATCH /api/notifications/read-task/:taskId`, scoped to the viewer and workspace; the path match is exact or `path/…`, so task `T1` never reads `T10`'s). The Slack sweep is unchanged: it still sends only what is unread after 5 minutes.
+### Verified
+- `tsc -b` (0), `lint` (0), `vitest run` green (new route test: the viewer's two notifications for T1 — task and comments — read, T10's and another person's untouched). In the browser (local, Playwright, two accounts): with the member viewing task A, the owner mentioned them on A and on B → A's assignment and mention read within seconds, B's both still unread.
+
 ## 2026-09-30 (31) — `refactor` only (not deployed)
 ### Changed
 - **Numbered pages again, without reloading the board.** The automatic "load below" of (30) is removed — it also had a runaway loop: after a page landed, its "Load more" row was still in view and fetched the next one, then the next, so the column kept scrolling down on its own. Each Board column (and the List) is back to numbered pages, and a page change now touches only that column: `useArchivedLists` keeps one query per list, and a new page borrows the page it replaces from the cache as placeholder, so nothing falls back to the loading skeleton; the column scrolls to its top so the new page is in view, and its page numbers are disabled while it loads. `Pagination` / `lib/pagination.ts` are restored; `LoadMore` is removed.

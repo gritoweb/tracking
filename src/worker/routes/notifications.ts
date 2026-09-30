@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { formatNotification } from "../lib/notifications";
+import { taskPath } from "@shared/task-links";
 import type { NotificationRow } from "../db/rows";
 
 // Mounted at /api/notifications — the bell's own list/read endpoints, plus its live socket.
@@ -25,6 +26,15 @@ export const notificationsRouter = new Hono<{
       `UPDATE notifications SET is_read = 1 WHERE id = ? AND user_id = ? AND workspace_id = ?`
     ).bind(c.req.param("id"), userId, workspaceId).run();
     return c.json({ ok: true }, 200);
+  })
+  // Viewing a task reads its notifications: any of the person's unread ones that link to it (task or comments tab).
+  .patch("/read-task/:taskId", async (c) => {
+    const path = taskPath(c.req.param("taskId"));
+    const { meta } = await c.env.DB.prepare(
+      `UPDATE notifications SET is_read = 1
+        WHERE user_id = ? AND workspace_id = ? AND is_read = 0 AND (link = ? OR substr(link, 1, ?) = ?)`
+    ).bind(c.get("userId"), c.get("workspaceId"), path, path.length + 1, `${path}/`).run();
+    return c.json({ ok: true, read: meta.changes ?? 0 }, 200);
   })
   .patch("/read-all", async (c) => {
     const workspaceId = c.get("workspaceId");
