@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { CollectionHeader } from "@/components/layout/CollectionHeader";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { Archive } from "lucide-react";
@@ -226,20 +227,6 @@ export function TaskBoardList({ openTaskId = null, openTab = "task" }: TaskBoard
         />
       </CollectionHeader>
 
-      {archiveCapped && (
-        <div className="flex shrink-0 items-center gap-2 pb-2 text-xs text-muted-foreground">
-          <span>Showing the {archiveLimit} most recently archived tasks.</span>
-          <Button
-            size="sm"
-            variant="ghost"
-            disabled={archive.isFetching}
-            onClick={() => setArchiveLimit((n) => Math.min(n + ARCHIVE_PAGE_LIMIT, ARCHIVE_MAX_LIMIT))}
-          >
-            Load more
-          </Button>
-        </div>
-      )}
-
       {archiveEmpty ? (
         <EmptyState
           icon={Archive}
@@ -304,6 +291,23 @@ export function TaskBoardList({ openTaskId = null, openTab = "task" }: TaskBoard
               onClearFilters={clearFilters}
             />
           )}
+        </div>
+      )}
+
+      {/* Below the board, where a longer list would continue — at the top it read as a note, not as more to load. */}
+      {archiveCapped && (
+        <div className="flex shrink-0 items-center justify-center gap-3 border-t py-3 text-sm text-muted-foreground">
+          <span>Showing the {archiveLimit} most recently archived tasks.</span>
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1.5"
+            disabled={archive.isFetching}
+            onClick={() => setArchiveLimit((n) => Math.min(n + ARCHIVE_PAGE_LIMIT, ARCHIVE_MAX_LIMIT))}
+          >
+            {archive.isFetching && <Spinner size="sm" label="Loading more archived tasks" />}
+            Load {ARCHIVE_PAGE_LIMIT} more
+          </Button>
         </div>
       )}
 

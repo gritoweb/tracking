@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-30 (26) — `refactor` only (not deployed)
+### Changed
+- **The archive loads 50 at a time, and "Load more" sits below the board.** `ARCHIVE_PAGE_LIMIT` is 50 (was 500): the archive is opened rarely, to find or restore something, so a small first step is enough. The note and button moved from above the board to a footer under it (and under the List), where more of a list would continue — above the board it read as a note rather than something to load — and the button says what it does ("Load 50 more") and shows a spinner while the next step loads.
+### Verified
+- `tsc -b` (0), `lint` (0), `vitest run` green (the cap test builds `ARCHIVE_PAGE_LIMIT + 1` archived parents). In the browser (local, Playwright, 61 archived in the test workspace, removed afterwards): 50 cards with the footer "Showing the 50 most recently archived tasks." + "Load 50 more" at the bottom → 61 cards, footer gone.
+
 ## 2026-09-30 (25) — `refactor` only (not deployed)
 ### Added
 - **"Load more" in the archive.** "Show archived" loads the 500 most recently archived parent tasks; when there are more, the note above the board now has a "Load more" button that asks for 500 more each time (`archiveLimit` on `GET /api/tasks?archivedOnly=true`, clamped server-side to 1…`ARCHIVE_MAX_LIMIT` = 5000, anything unparsable falls back to 500). The previous step stays on screen while the next one loads. Older than that is still reachable by link and through the AI's `includeArchived`.
