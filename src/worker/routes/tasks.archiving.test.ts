@@ -11,7 +11,7 @@ vi.mock("@cf-wasm/photon/workerd", () => ({
 }));
 
 const { tasksRouter } = await import("./tasks");
-const { ARCHIVE_MAX_LIMIT, ARCHIVE_PAGE_LIMIT } = await import("@shared/schemas");
+const { ARCHIVE_PAGE_LIMIT } = await import("@shared/schemas");
 
 /** ws-A: owner u-owner, member u-member (author of t-mine), admin u-admin. ws-B holds t-foreign. */
 function archivingWorld() {
@@ -68,7 +68,7 @@ describe("task archiving — listing", () => {
     expect(await ids(await as("u-owner").get("/?includeInactive=true&archivedOnly=true"))).toEqual(["t-owner", "t-owner-sub"]);
   });
 
-  it("archivedOnly keeps the most recently archived parents up to the cap", async () => {
+  it("archivedOnly returns the first page: the most recently archived parents", async () => {
     const { raw, as } = archivingWorld();
     const rows = Array.from({ length: ARCHIVE_PAGE_LIMIT + 1 }, (_, i) => {
       const at = new Date(Date.UTC(2026, 0, 1) + i * 60_000).toISOString();
@@ -81,14 +81,32 @@ describe("task archiving — listing", () => {
     expect(listed).toContain(`t-a${ARCHIVE_PAGE_LIMIT}`);
   });
 
-  it("archiveLimit raises or lowers how many archived parents come back, within the ceiling", async () => {
+  it("archivePage walks a column's archive one page at a time, with the parents' subtasks", async () => {
     const { raw, as } = archivingWorld();
-    const rows = Array.from({ length: 3 }, (_, i) => `('t-l${i}', 'ws-A', 'p-A', 'L${i}', 's-todo', 'u-owner', '2026-01-0${i + 1}T00:00:00.000Z')`);
+    const rows = Array.from({ length: ARCHIVE_PAGE_LIMIT + 1 }, (_, i) => {
+      const at = new Date(Date.UTC(2026, 0, 1) + i * 60_000).toISOString();
+      return `('t-p${i}', 'ws-A', 'p-A', 'P${i}', 's-done', 'u-owner', '${at}')`;
+    });
     raw.exec(`INSERT INTO tasks (id, workspace_id, project_id, name, status_id, created_by, archived_at) VALUES ${rows.join(", ")}`);
+    // A parent in another column, and a subtask of the oldest one sitting in yet another column.
+    raw.exec(`UPDATE tasks SET archived_at = '2026-03-01T00:00:00.000Z' WHERE id IN ('t-owner', 't-owner-sub')`);
+    raw.exec(`INSERT INTO tasks (id, workspace_id, project_id, name, status_id, created_by, parent_id, archived_at) VALUES ('t-p0-sub', 'ws-A', 'p-A', 'Sub', 's-todo', 'u-owner', 't-p0', '2026-01-01T00:00:00.000Z')`);
     const owner = as("u-owner");
-    expect(await ids(await owner.get("/?includeInactive=true&archivedOnly=true&archiveLimit=2"))).toEqual(["t-l1", "t-l2"]);
-    expect(await ids(await owner.get("/?includeInactive=true&archivedOnly=true&archiveLimit=abc"))).toHaveLength(3);
-    expect(await ids(await owner.get(`/?includeInactive=true&archivedOnly=true&archiveLimit=${ARCHIVE_MAX_LIMIT * 10}`))).toHaveLength(3);
+    const page1 = await ids(await owner.get("/?includeInactive=true&archivedOnly=true&statusId=s-done&archivePage=1"));
+    expect(page1).toHaveLength(ARCHIVE_PAGE_LIMIT);
+    expect(page1).not.toContain("t-p0");
+    expect(page1).not.toContain("t-owner");
+    expect(await ids(await owner.get("/?includeInactive=true&archivedOnly=true&statusId=s-done&archivePage=2"))).toEqual(["t-p0", "t-p0-sub"]);
+  });
+
+  it("archive-counts gives the archived parents per column, optionally for one project", async () => {
+    const { raw, as } = archivingWorld();
+    raw.exec(`UPDATE tasks SET archived_at = '2026-03-01T00:00:00.000Z' WHERE id IN ('t-owner', 't-owner-sub', 't-mine', 't-foreign')`);
+    raw.exec(`UPDATE tasks SET status_id = 's-done' WHERE id = 't-mine'`);
+    const body = (await (await as("u-owner").get("/archive-counts")).json()) as { byStatus: Record<string, number>; total: number };
+    expect(body).toEqual({ byStatus: { "s-todo": 1, "s-done": 1 }, total: 2 });
+    const none = (await (await as("u-owner").get("/archive-counts?projectId=p-B")).json()) as { total: number };
+    expect(none.total).toBe(0);
   });
 
   it("still opens an archived task by id", async () => {

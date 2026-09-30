@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { CollectionHeader } from "@/components/layout/CollectionHeader";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Spinner } from "@/components/ui/spinner";
+import { Pagination } from "@/components/ui/pagination";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { Archive } from "lucide-react";
@@ -14,7 +14,7 @@ import { TaskDialog } from "./TaskDialog";
 import { TaskDetail } from "./TaskDetail";
 import { TaskBoard } from "./board/TaskBoard";
 import { TaskProjectRail } from "./TaskProjectRail";
-import { useAllTasks, useArchivedTasks, useDeleteTask, useTask, useUpdateTask } from "@/hooks/useTasks";
+import { useAllTasks, useArchiveCounts, useArchivedColumns, useArchivedPage, useDeleteTask, useTask, useUpdateTask } from "@/hooks/useTasks";
 import { useProjects } from "@/hooks/useProjects";
 import { useTaskStatuses } from "@/hooks/useTaskStatuses";
 import { useAuth } from "@/hooks/useAuth";
@@ -33,7 +33,7 @@ import {
 } from "@/lib/taskUtils";
 import { todayLocalDate } from "@shared/task-recurrence";
 import { taskPath, type TaskTab } from "@shared/task-links";
-import { ARCHIVE_MAX_LIMIT, ARCHIVE_PAGE_LIMIT, type Task } from "@shared/schemas";
+import { ARCHIVE_PAGE_LIMIT, type Task } from "@shared/schemas";
 
 type Layout = "board" | "list";
 
@@ -47,12 +47,6 @@ export function TaskBoardList({ openTaskId = null, openTab = "task" }: TaskBoard
   const showArchived = useUIStore((s) => s.showArchivedTasks);
   const setShowArchived = useUIStore((s) => s.setShowArchivedTasks);
   const live = useAllTasks();
-  // "Show archived" is a view of the archive alone, fetched as such (never the live list plus everything archived).
-  const [archiveLimit, setArchiveLimit] = useState(ARCHIVE_PAGE_LIMIT);
-  const archive = useArchivedTasks(showArchived, archiveLimit);
-  const { data: tasks = [], isLoading } = showArchived ? archive : live;
-  const archivedParents = showArchived ? tasks.filter((t) => !t.parentId).length : 0;
-  const archiveCapped = archivedParents >= archiveLimit && archiveLimit < ARCHIVE_MAX_LIMIT;
   const deleteTask = useDeleteTask();
   const updateTask = useUpdateTask();
   const openTaskLogTime = useUIStore((s) => s.openTaskLogTime);
@@ -95,6 +89,30 @@ export function TaskBoardList({ openTaskId = null, openTab = "task" }: TaskBoard
   );
   // A client has no status fork of its own — falls back to the workspace's global set.
   const { data: statuses = [] } = useTaskStatuses(railClientId ? null : railProjectId);
+
+  // "Show archived" is a view of the archive alone, fetched a page at a time: per column on the Board, as one list in List.
+  // Pages are keyed by project, so switching the rail's project starts that project's archive at page 1.
+  const [archivePages, setArchivePages] = useState<Record<string, number>>({});
+  const pageKey = (statusId: string | null) => `${railProjectId ?? "all"}:${statusId ?? "list"}`;
+  const pageOf = (statusId: string | null) => archivePages[pageKey(statusId)] ?? 1;
+  const setPageOf = (statusId: string | null, page: number) => setArchivePages((p) => ({ ...p, [pageKey(statusId)]: page }));
+  const archiveBoard = useArchivedColumns(
+    statuses.map((s) => ({ statusId: s.id, page: pageOf(s.id) })),
+    railProjectId,
+    showArchived && layout === "board"
+  );
+  const archiveList = useArchivedPage(railProjectId, pageOf(null), showArchived && layout === "list");
+  const { data: archiveCounts } = useArchiveCounts(railProjectId, showArchived);
+  const archiveSource = layout === "board" ? archiveBoard : archiveList;
+  const { data: tasks = [], isLoading } = showArchived ? archiveSource : live;
+  const archivePaging = {
+    page: pageOf,
+    pageCount: (statusId: string | null) =>
+      Math.ceil((statusId ? archiveCounts?.byStatus[statusId] ?? 0 : archiveCounts?.total ?? 0) / ARCHIVE_PAGE_LIMIT),
+    total: (statusId: string) => archiveCounts?.byStatus[statusId] ?? 0,
+    onPage: setPageOf,
+    busy: archiveSource.isFetching,
+  };
 
   const listedTask = openTaskId ? tasks.find((t) => t.id === openTaskId) ?? null : null;
   // A link to a task that isn't in the list on screen (archived, or live while "Show archived" is on) is fetched by id.
@@ -263,7 +281,7 @@ export function TaskBoardList({ openTaskId = null, openTab = "task" }: TaskBoard
               groupBy={boardGroupBy}
               onOpenTask={openSheet}
               onRequestDelete={setDeleteTarget}
-              archiveView={showArchived}
+              archivePaging={showArchived ? archivePaging : undefined}
             />
           ) : (
             <TaskListView
@@ -294,21 +312,16 @@ export function TaskBoardList({ openTaskId = null, openTab = "task" }: TaskBoard
         </div>
       )}
 
-      {/* Below the board, where a longer list would continue — at the top it read as a note, not as more to load. */}
-      {archiveCapped && (
-        <div className="flex shrink-0 items-center justify-center gap-3 border-t py-3 text-sm text-muted-foreground">
-          <span>Showing the {archiveLimit} most recently archived tasks.</span>
-          <Button
-            size="sm"
-            variant="outline"
-            className="gap-1.5"
-            disabled={archive.isFetching}
-            onClick={() => setArchiveLimit((n) => Math.min(n + ARCHIVE_PAGE_LIMIT, ARCHIVE_MAX_LIMIT))}
-          >
-            {archive.isFetching && <Spinner size="sm" label="Loading more archived tasks" />}
-            Load {ARCHIVE_PAGE_LIMIT} more
-          </Button>
-        </div>
+      {/* The List has no columns to page, so its archive pages once, under the list. */}
+      {showArchived && layout === "list" && (
+        <Pagination
+          page={archivePaging.page(null)}
+          pageCount={archivePaging.pageCount(null)}
+          onPageChange={(page) => archivePaging.onPage(null, page)}
+          label="Archive pages"
+          disabled={archivePaging.busy}
+          className="shrink-0 border-t py-2"
+        />
       )}
 
       <TaskDialog

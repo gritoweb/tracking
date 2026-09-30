@@ -6,6 +6,7 @@ import { Plus } from "lucide-react";
 import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { Button } from "@/components/ui/button";
+import { Pagination } from "@/components/ui/pagination";
 import { ColorDot } from "@/components/ColorDot";
 import { QuickAddTask } from "../QuickAddTask";
 import { TaskCard } from "./TaskCard";
@@ -31,8 +32,17 @@ interface TaskBoardColumnProps {
   onSelectColumn: (tasks: Task[]) => void;
   /** "Deselect all", shown instead once every card of the column is selected. */
   onDeselectColumn: (tasks: Task[]) => void;
-  /** "Show archived" is on: a task added here would be live and vanish from this view, so there is no quick-add. */
-  archiveView: boolean;
+  /** Present while "Show archived" is on: the column pages through its archive, and offers no quick-add (a new task would be live). */
+  archivePaging?: ArchivePaging;
+}
+
+/** How the archive view pages each column; `null` status means the List's single archive list. */
+export interface ArchivePaging {
+  page: (statusId: string | null) => number;
+  pageCount: (statusId: string | null) => number;
+  total: (statusId: string) => number;
+  onPage: (statusId: string | null, page: number) => void;
+  busy: boolean;
 }
 
 /** One column of the board — `useDroppable` here (not just the sortable list) is what lets an empty column receive a card. */
@@ -49,7 +59,7 @@ export function TaskBoardColumn({
   onToggleSelect,
   onSelectColumn,
   onDeselectColumn,
-  archiveView,
+  archivePaging,
 }: TaskBoardColumnProps) {
   const { setNodeRef } = useDroppable({ id: `column:${status.id}` });
   const [adding, setAdding] = useState(false);
@@ -79,7 +89,7 @@ export function TaskBoardColumn({
           <header className="flex items-center gap-2 px-3 pb-2 pt-3">
             <ColorDot color={status.color} />
             <h2 className="min-w-0 flex-1 truncate text-sm font-medium">{status.name}</h2>
-            <span className="text-xs tabular-nums text-muted-foreground">{tasks.length}</span>
+            <span className="text-xs tabular-nums text-muted-foreground">{archivePaging ? archivePaging.total(status.id) : tasks.length}</span>
             <StatusColumnMenu
               status={status}
               statuses={statuses}
@@ -124,7 +134,17 @@ export function TaskBoardColumn({
           {/* Inside the tint, right after the cards — not pinned to the column's bottom edge,
               which for a short column left it floating far below the last card. Text picks up
               the status's own ink colour, same as the reference layout, instead of plain grey. */}
-          {!archiveView && (
+          {archivePaging && (
+            <Pagination
+              page={archivePaging.page(status.id)}
+              pageCount={archivePaging.pageCount(status.id)}
+              onPageChange={(page) => archivePaging.onPage(status.id, page)}
+              label={`${status.name} archive pages`}
+              disabled={archivePaging.busy}
+              className="px-2 pb-2 pt-1"
+            />
+          )}
+          {!archivePaging && (
           <div className="px-2 pb-2 pt-1">
             {adding ? (
               <div ref={outsideRef}>

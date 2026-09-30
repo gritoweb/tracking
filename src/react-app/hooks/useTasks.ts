@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueries, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Archive, ArchiveRestore } from "lucide-react";
 import { api } from "@/lib/api-client";
@@ -47,15 +47,46 @@ export function useTaskOptions() {
   });
 }
 
-/** "Show archived": the archive alone, the `limit` most recently archived parents ("Load more" raises it). */
-export function useArchivedTasks(enabled: boolean, limit: number) {
+const archivePageQuery = (statusId: string | null, projectId: string | null, page: number, enabled: boolean) => ({
+  queryKey: ["tasks", "archived", statusId ?? "all", projectId ?? "all", page],
+  queryFn: () =>
+    api.tasks.list({
+      includeInactive: "true",
+      archivedOnly: "true",
+      archivePage: String(page),
+      ...(statusId ? { statusId } : {}),
+      ...(projectId ? { projectId } : {}),
+    }),
+  staleTime: 30_000,
+  enabled,
+  // Keeps the current page on screen while the next one loads, instead of flashing the skeleton.
+  placeholderData: <T,>(previous: T | undefined) => previous,
+});
+
+/** "Show archived" in the List: one page of the whole archive (of one project when given). */
+export function useArchivedPage(projectId: string | null, page: number, enabled: boolean) {
+  return useQuery(archivePageQuery(null, projectId, page, enabled));
+}
+
+/** "Show archived" on the Board: each column's own page, merged into one list the board splits back by column. */
+export function useArchivedColumns(pages: { statusId: string; page: number }[], projectId: string | null, enabled: boolean) {
+  return useQueries({
+    queries: pages.map(({ statusId, page }) => archivePageQuery(statusId, projectId, page, enabled)),
+    combine: (results) => ({
+      data: results.flatMap((r) => r.data ?? []),
+      isLoading: results.some((r) => r.isLoading),
+      isFetching: results.some((r) => r.isFetching),
+    }),
+  });
+}
+
+/** Archived parent tasks per column, for the archive's page numbers. */
+export function useArchiveCounts(projectId: string | null, enabled: boolean) {
   return useQuery({
-    queryKey: ["tasks", "archived", limit],
-    queryFn: () => api.tasks.list({ includeInactive: "true", archivedOnly: "true", archiveLimit: String(limit) }),
+    queryKey: ["tasks", "archive-counts", projectId ?? "all"],
+    queryFn: () => api.tasks.archiveCounts(projectId ?? undefined),
     staleTime: 30_000,
     enabled,
-    // Keeps the board on screen while the next step loads, instead of flashing the skeleton.
-    placeholderData: (previous) => previous,
   });
 }
 

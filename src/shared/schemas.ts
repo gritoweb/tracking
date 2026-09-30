@@ -364,10 +364,15 @@ export const TaskOptionSchema = z.object({
 export type TaskOption = z.infer<typeof TaskOptionSchema>;
 
 export const BULK_TASK_IDS_MAX = 100;
-/** "Show archived" loads the most recently archived parent tasks (with their subtasks) in steps of this size. */
+/** One page of the archive: this many archived parent tasks (with their subtasks), most recently archived first. */
 export const ARCHIVE_PAGE_LIMIT = 50;
-/** Ceiling for "Load more", so one request can never ask for the whole archive of a very old workspace. */
-export const ARCHIVE_MAX_LIMIT = 5000;
+
+/** Archived parent tasks per column (status id), for the archive's page numbers. */
+export const ArchiveCountsSchema = z.object({
+  byStatus: z.record(z.string(), z.number()),
+  total: z.number(),
+});
+export type ArchiveCounts = z.infer<typeof ArchiveCountsSchema>;
 
 /** What the board's selection bar sends: one action over several tasks, all or nothing. */
 export const BulkTaskActionSchema = z.object({

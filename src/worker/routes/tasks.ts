@@ -6,7 +6,6 @@ import {
   CreateTaskCommentSchema,
   TaskCommentsQuerySchema,
   CreateTaskSchema,
-  ARCHIVE_MAX_LIMIT,
   ARCHIVE_PAGE_LIMIT,
   BulkTaskActionSchema,
   BulkUpdateTasksSchema,
@@ -41,7 +40,7 @@ import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENT_LABEL } from "@shared/attachments"
 import { formatAttachment } from "./attachments";
 import { chunked, placeholdersFor } from "../lib/sql-chunks";
 import { actorDisplayName, NotificationBatch, notifyAssigneesOfStatusChange, notifyMentions, notifyNewAssignees, type Deliver } from "../lib/notifications";
-import type { CreateTask, Task, TaskComment, TaskOption, TaskStatus } from "@shared/schemas";
+import type { ArchiveCounts, CreateTask, Task, TaskComment, TaskOption, TaskStatus } from "@shared/schemas";
 
 // Multipart framing (boundary + part headers) rides on top of the file itself.
 const MULTIPART_SLACK_BYTES = 64 * 1024;
@@ -441,22 +440,26 @@ export const tasksRouter = new Hono<{
   // ─── List tasks ───────────────────────────────────────────────────────────
   .get("/", async (c) => {
     const workspaceId = c.get("workspaceId");
-    const { projectId, statusId, includeInactive, includeArchived, archivedOnly, archiveLimit, assignee, parentId } = c.req.query();
+    const { projectId, statusId, includeInactive, includeArchived, archivedOnly, archivePage, assignee, parentId } = c.req.query();
 
     let where = `WHERE tk.workspace_id = ?`;
     const bindings: unknown[] = [workspaceId];
 
     if (projectId) { where += ` AND tk.project_id = ?`; bindings.push(projectId); }
-    if (statusId) { where += ` AND tk.status_id = ?`; bindings.push(statusId); }
+    // In the archive, the column filters the parents (below): a subtask can sit in another column than its parent.
+    if (statusId && !archivedOnly) { where += ` AND tk.status_id = ?`; bindings.push(statusId); }
     if (parentId) { where += ` AND tk.parent_id = ?`; bindings.push(parentId); }
     if (!includeInactive) { where += ` AND tk.active = 1`; }
     if (archivedOnly) {
-      // The archive only grows: the most recently archived parents, with their subtasks.
+      // One page of the archive (of one column when statusId is given): the most recently archived parents, with their subtasks.
+      let parents = `SELECT a.id FROM tasks a WHERE a.workspace_id = ? AND a.parent_id IS NULL AND a.archived_at IS NOT NULL`;
+      const parentBindings: unknown[] = [workspaceId];
+      if (statusId) { parents += ` AND a.status_id = ?`; parentBindings.push(statusId); }
+      if (projectId) { parents += ` AND a.project_id = ?`; parentBindings.push(projectId); }
+      const page = Math.max(Number.parseInt(archivePage ?? "", 10) || 1, 1);
       where += ` AND tk.archived_at IS NOT NULL AND COALESCE(tk.parent_id, tk.id) IN (
-        SELECT a.id FROM tasks a WHERE a.workspace_id = ? AND a.parent_id IS NULL AND a.archived_at IS NOT NULL
-        ORDER BY a.archived_at DESC LIMIT ?)`;
-      const limit = Math.min(Math.max(Number.parseInt(archiveLimit ?? "", 10) || ARCHIVE_PAGE_LIMIT, 1), ARCHIVE_MAX_LIMIT);
-      bindings.push(workspaceId, limit);
+        ${parents} ORDER BY a.archived_at DESC, a.id LIMIT ? OFFSET ?)`;
+      bindings.push(...parentBindings, ARCHIVE_PAGE_LIMIT, (page - 1) * ARCHIVE_PAGE_LIMIT);
     } else if (!includeArchived) { where += ` AND tk.archived_at IS NULL`; }
     if (assignee) {
       const assigneeId = assignee === "me" ? c.get("userId") : assignee;
@@ -474,6 +477,19 @@ export const tasksRouter = new Hono<{
     ).bind(...(scopeUserId ? [scopeUserId] : []), ...bindings).all<TaskJoinRow>();
 
     return c.json(results.map(formatTask), 200);
+  })
+  // How many archived parents each column holds: the archive's page numbers.
+  .get("/archive-counts", async (c) => {
+    const { projectId } = c.req.query();
+    const { results } = await c.env.DB.prepare(
+      `SELECT status_id, COUNT(*) AS n FROM tasks
+        WHERE workspace_id = ? AND parent_id IS NULL AND archived_at IS NOT NULL ${projectId ? "AND project_id = ?" : ""}
+        GROUP BY status_id`
+    ).bind(c.get("workspaceId"), ...(projectId ? [projectId] : [])).all<{ status_id: string | null; n: number }>();
+    const byStatus: Record<string, number> = {};
+    for (const r of results) if (r.status_id) byStatus[r.status_id] = r.n;
+    const counts: ArchiveCounts = { byStatus, total: results.reduce((sum, r) => sum + r.n, 0) };
+    return c.json(counts, 200);
   })
   // Reports' task filter: every task, archived ones too (their hours still count), without the rollups of the full list.
   .get("/options", async (c) => {

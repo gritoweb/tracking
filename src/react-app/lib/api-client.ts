@@ -294,9 +294,11 @@ export const api = {
 
   // ─── Tasks ────────────────────────────────────────────────────────────────
   tasks: {
-    list: (params?: { projectId?: string; parentId?: string; includeInactive?: string; includeArchived?: string; archivedOnly?: string; archiveLimit?: string }) =>
+    list: (params?: { projectId?: string; parentId?: string; includeInactive?: string; includeArchived?: string; archivedOnly?: string; archivePage?: string; statusId?: string }) =>
       request<TasksListResponse>(`/tasks${queryString(params)}`),
     get: (id: string) => json(tasksClient[":id"].$get({ param: { id } })),
+    /** Archived parent tasks per column, for the archive's page numbers. */
+    archiveCounts: (projectId?: string) => json(tasksClient["archive-counts"].$get({ query: projectId ? { projectId } : {} })),
     /** Id, name, project and archived flag of every task — Reports' filter, archive included. */
     options: () => json(tasksClient.options.$get()),
     /** The selection bar: one action over several tasks, all or nothing. */

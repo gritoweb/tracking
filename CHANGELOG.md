@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-09-30 (27) — `refactor` only (not deployed)
+### Changed
+- **The archive pages per column, with page numbers.** With "Show archived" on, each Board column loads its own archive 50 at a time and ends with numbered pages (`‹ 1 2 [3] 4 … 11 ›`, new primitive `ui/pagination.tsx`, page list in `lib/pagination.ts`) to jump straight to any page; its header shows how many archived tasks the column holds. The List, which has no columns, pages its archive once under the list. The single "Load 50 more" footer is gone. Server: `GET /api/tasks?archivedOnly=true` takes `archivePage` (and `statusId` / `projectId`, applied to the parents so a subtask in another column still comes with its parent) — `archiveLimit` and `ARCHIVE_MAX_LIMIT` are removed — and `GET /api/tasks/archive-counts[?projectId]` returns archived parents per column. Pages are remembered per project for the session.
+- Known limit: on "All tasks", an archived task sitting in a project's own (forked) column appears when that project is picked in the rail.
+### Verified
+- `tsc -b` (0), `lint` (0), `vitest run` 1211/1211 (new: a column's page 2 holds the oldest parent with its subtask from another column; archive counts per column and per project; `pageItems` and the `Pagination` component). In the browser (local, Playwright, 120 archived in Backlog, removed afterwards): Backlog header 120, page 1 = 50 cards, pages 1 2 3, page 3 = 20 cards and marked current; List view shows one pagination (1 2 3).
+
 ## 2026-09-30 (26) — `refactor` only (not deployed)
 ### Changed
 - **The archive loads 50 at a time, and "Load more" sits below the board.** `ARCHIVE_PAGE_LIMIT` is 50 (was 500): the archive is opened rarely, to find or restore something, so a small first step is enough. The note and button moved from above the board to a footer under it (and under the List), where more of a list would continue — above the board it read as a note rather than something to load — and the button says what it does ("Load 50 more") and shows a spinner while the next step loads.
