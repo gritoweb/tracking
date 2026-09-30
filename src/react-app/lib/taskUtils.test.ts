@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   toggleCardSelection,
   selectColumn,
+  deselectColumn,
   buildTaskSections,
   clusterTasks,
   comparePlanned,
@@ -445,5 +446,9 @@ describe("board selection", () => {
 
   it("adds a whole column to the selection, keeping what was already picked", () => {
     expect([...selectColumn(new Set(["x", "b"]), column)].sort()).toEqual(["a", "b", "c", "d", "x"]);
+  });
+
+  it("drops a whole column from the selection, keeping the other columns' cards", () => {
+    expect([...deselectColumn(new Set(["a", "b", "c", "d", "x"]), column)]).toEqual(["x"]);
   });
 });

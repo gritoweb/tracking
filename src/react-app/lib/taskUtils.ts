@@ -487,3 +487,9 @@ export function toggleCardSelection(
 export function selectColumn(selected: ReadonlySet<string>, columnIds: string[]): Set<string> {
   return new Set([...selected, ...columnIds]);
 }
+
+/** The column menu's "Deselect all" (once the whole column is selected): drops the column, keeps the rest. */
+export function deselectColumn(selected: ReadonlySet<string>, columnIds: string[]): Set<string> {
+  const drop = new Set(columnIds);
+  return new Set([...selected].filter((id) => !drop.has(id)));
+}

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowLeft, ArrowRight, Archive, Check, CheckSquare, MoreHorizontal, Pencil } from "lucide-react";
+import { ArrowLeft, ArrowRight, Archive, ArchiveRestore, Check, CheckSquare, MoreHorizontal, Pencil, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -45,13 +45,17 @@ interface StatusColumnMenuProps {
   /** Configuring the column is owner/admin only; the task actions above it are everyone's. */
   canManage: boolean;
   onSelectAll: () => void;
+  /** Every card of the column is selected: the item reads "Deselect all" and clears them. */
+  allSelected: boolean;
   onArchiveAll: () => void;
   /** Like Delete: shown only when every task in the column is the person's to archive. */
   canArchiveAll: boolean;
+  /** Every task in the column is archived ("Show archived"): the item unarchives them instead. */
+  allArchived: boolean;
 }
 
 /** Configuring a column. Every rule enforced here is refused server-side too — this just says why sooner. */
-export function StatusColumnMenu({ status, statuses, taskCount, projectId, canManage, onSelectAll, onArchiveAll, canArchiveAll }: StatusColumnMenuProps) {
+export function StatusColumnMenu({ status, statuses, taskCount, projectId, canManage, onSelectAll, allSelected, onArchiveAll, canArchiveAll, allArchived }: StatusColumnMenuProps) {
   const update = useUpdateTaskStatus(projectId);
   const archive = useArchiveTaskStatus(projectId);
   const [renaming, setRenaming] = useState(false);
@@ -127,13 +131,13 @@ export function StatusColumnMenu({ status, statuses, taskCount, projectId, canMa
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-52">
           <DropdownMenuItem disabled={taskCount === 0} onClick={onSelectAll}>
-            <CheckSquare className="mr-2 h-3.5 w-3.5" />
-            Select all
+            {allSelected ? <Square className="mr-2 h-3.5 w-3.5" /> : <CheckSquare className="mr-2 h-3.5 w-3.5" />}
+            {allSelected ? "Deselect all" : "Select all"}
           </DropdownMenuItem>
           {canArchiveAll && (
             <DropdownMenuItem disabled={taskCount === 0} onClick={onArchiveAll}>
-              <Archive className="mr-2 h-3.5 w-3.5" />
-              Archive all tasks
+              {allArchived ? <ArchiveRestore className="mr-2 h-3.5 w-3.5" /> : <Archive className="mr-2 h-3.5 w-3.5" />}
+              {allArchived ? "Unarchive all tasks" : "Archive all tasks"}
             </DropdownMenuItem>
           )}
 

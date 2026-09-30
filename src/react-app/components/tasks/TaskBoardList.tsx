@@ -3,6 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { CollectionHeader } from "@/components/layout/CollectionHeader";
 import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Button } from "@/components/ui/button";
+import { Archive } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { TaskBoardListToolbar } from "./TaskBoardListToolbar";
 import { TaskListView } from "./TaskListView";
@@ -107,7 +110,9 @@ export function TaskBoardList({ openTaskId = null, openTab = "task" }: TaskBoard
   const openSheet = (task: Task) => navigate(taskPath(task.id));
 
   const today = todayLocalDate();
-  const hasAnyTask = tasks.length > 0;
+  // Whether the workspace has tasks at all is a question for the live list, even while the archive is on screen.
+  const hasAnyTask = (live.data?.length ?? 0) > 0 || tasks.length > 0;
+  const archiveEmpty = showArchived && !isLoading && tasks.length === 0;
   const defaultDueDate = dueFilter === "today" ? today : null;
 
   // Assignee filter applies before the Board does its own project/due filtering internally.
@@ -225,7 +230,19 @@ export function TaskBoardList({ openTaskId = null, openTab = "task" }: TaskBoard
         </p>
       )}
 
-      {isLoading ? (
+      {archiveEmpty ? (
+        <EmptyState
+          icon={Archive}
+          title="No archived tasks"
+          description="Archived tasks show up here, with their subtasks. Nothing is archived in this view yet."
+          className="py-24"
+          action={
+            <Button size="sm" variant="outline" onClick={() => setShowArchived(false)}>
+              Back to tasks
+            </Button>
+          }
+        />
+      ) : isLoading ? (
         <div className="space-y-2 p-4">
           {[...Array(4)].map((_, i) => (
             <Skeleton key={i} className="h-10 w-full" />
@@ -249,6 +266,7 @@ export function TaskBoardList({ openTaskId = null, openTab = "task" }: TaskBoard
               groupBy={boardGroupBy}
               onOpenTask={openSheet}
               onRequestDelete={setDeleteTarget}
+              archiveView={showArchived}
             />
           ) : (
             <TaskListView
@@ -272,6 +290,7 @@ export function TaskBoardList({ openTaskId = null, openTab = "task" }: TaskBoard
               onEdit={openSheet}
               onLogTime={(t) => openTaskLogTime(t.id)}
               onCreateTask={() => setAddOpen(true)}
+              archiveView={showArchived}
               onClearFilters={clearFilters}
             />
           )}

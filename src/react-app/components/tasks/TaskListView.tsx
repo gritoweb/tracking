@@ -18,6 +18,8 @@ import type { Task } from "@shared/schemas";
 export type { TaskSection } from "@/lib/taskUtils";
 
 interface TaskListViewProps {
+  /** "Show archived" is on: a task added here would be live and vanish from this view, so there is no quick-add. */
+  archiveView?: boolean;
   sections: TaskSection[];
   groupBy: GroupBy;
   isLoading: boolean;
@@ -43,6 +45,7 @@ interface TaskListViewProps {
 
 /** The List layout's grouped rows, empty states and inline quick-add — pure view. */
 export function TaskListView({
+  archiveView = false,
   sections,
   groupBy,
   isLoading,
@@ -166,7 +169,7 @@ export function TaskListView({
 
   return (
     <>
-      {hasAnyTask && <QuickAddTask className="mb-4" defaultDueDate={defaultDueDate} />}
+      {hasAnyTask && !archiveView && <QuickAddTask className="mb-4" defaultDueDate={defaultDueDate} />}
 
       <div className="space-y-6">
         {sections.map((section) => {

@@ -29,6 +29,10 @@ interface TaskBoardColumnProps {
   onToggleSelect: (task: Task, range: boolean) => void;
   /** The column menu's "Select all": adds the column's cards to the selection. */
   onSelectColumn: (tasks: Task[]) => void;
+  /** "Deselect all", shown instead once every card of the column is selected. */
+  onDeselectColumn: (tasks: Task[]) => void;
+  /** "Show archived" is on: a task added here would be live and vanish from this view, so there is no quick-add. */
+  archiveView: boolean;
 }
 
 /** One column of the board — `useDroppable` here (not just the sortable list) is what lets an empty column receive a card. */
@@ -44,6 +48,8 @@ export function TaskBoardColumn({
   selectedIds,
   onToggleSelect,
   onSelectColumn,
+  onDeselectColumn,
+  archiveView,
 }: TaskBoardColumnProps) {
   const { setNodeRef } = useDroppable({ id: `column:${status.id}` });
   const [adding, setAdding] = useState(false);
@@ -53,6 +59,11 @@ export function TaskBoardColumn({
   const bulk = useBulkTaskAction();
   const canDelete = useCanDeleteTask();
   const [archiveAllOpen, setArchiveAllOpen] = useState(false);
+  const allSelected = tasks.length > 0 && tasks.every((t) => selectedIds.has(t.id));
+  // Same rule as the selection bar: unarchive only when every card is archived; otherwise archive the live ones.
+  const allArchived = tasks.length > 0 && tasks.every((t) => t.archivedAt);
+  const archiveTargets = allArchived ? tasks : tasks.filter((t) => !t.archivedAt);
+  const countLabel = `${archiveTargets.length} task${archiveTargets.length === 1 ? "" : "s"}`;
 
   return (
     <section aria-label={status.name} className="flex w-(--size-board-column) shrink-0 flex-col rounded-container">
@@ -75,9 +86,11 @@ export function TaskBoardColumn({
               taskCount={tasks.length}
               projectId={defaultProjectId}
               canManage={canManage}
-              onSelectAll={() => onSelectColumn(tasks)}
+              onSelectAll={() => (allSelected ? onDeselectColumn(tasks) : onSelectColumn(tasks))}
+              allSelected={allSelected}
               onArchiveAll={() => setArchiveAllOpen(true)}
               canArchiveAll={tasks.every(canDelete)}
+              allArchived={allArchived}
             />
           </header>
 
@@ -111,6 +124,7 @@ export function TaskBoardColumn({
           {/* Inside the tint, right after the cards — not pinned to the column's bottom edge,
               which for a short column left it floating far below the last card. Text picks up
               the status's own ink colour, same as the reference layout, instead of plain grey. */}
+          {!archiveView && (
           <div className="px-2 pb-2 pt-1">
             {adding ? (
               <div ref={outsideRef}>
@@ -135,17 +149,22 @@ export function TaskBoardColumn({
               </Button>
             )}
           </div>
+          )}
         </div>
       </div>
       <ConfirmDialog
         open={archiveAllOpen}
         onOpenChange={setArchiveAllOpen}
-        title={`Archive ${tasks.length} task${tasks.length === 1 ? "" : "s"} in ${status.name}?`}
-        description="They leave the board with their subtasks; nothing is deleted and their tracked time stays. Turn on Show archived to see or unarchive them."
-        confirmLabel="Archive"
+        title={allArchived ? `Unarchive ${countLabel} in ${status.name}?` : `Archive ${countLabel} in ${status.name}?`}
+        description={
+          allArchived
+            ? "They go back to the board with their subtasks, in the column they were in."
+            : "They leave the board with their subtasks; nothing is deleted and their tracked time stays. Turn on Show archived to see or unarchive them."
+        }
+        confirmLabel={allArchived ? "Unarchive" : "Archive"}
         onConfirm={() => {
           setArchiveAllOpen(false);
-          bulk.mutate({ ids: tasks.map((t) => t.id), action: "archive" });
+          bulk.mutate({ ids: archiveTargets.map((t) => t.id), action: allArchived ? "unarchive" : "archive" });
         }}
       />
     </section>

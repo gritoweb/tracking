@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-09-30 (22) — `refactor` only (not deployed)
+### Fixed
+- **The column menu reads the state it acts on.** With "Show archived" on, every card in a column is archived, yet the "…" still offered "Archive all tasks"; it now offers **"Unarchive all tasks"** (with its own confirmation) whenever every card in the column is archived — the same rule the selection bar already follows — and otherwise "Archive all tasks" archives only the live cards. Likewise **"Select all" becomes "Deselect all"** once every card of the column is selected, and clears just that column (`deselectColumn`).
+- **The archive view no longer behaves like the live board.** An empty archive showed the first-run "What do you plan to work on?" screen and hid "Add task", as if the workspace had no tasks; it now says "No archived tasks" with a "Back to tasks" button, and "does this workspace have tasks" is read from the live list. The columns' "Add a task" and the List's quick-add are hidden while archived tasks are shown, since a task created there would be live and vanish from the view.
+### Verified
+- `tsc -b` (0), `lint` (0), `vitest run` 1204/1204 (new: `deselectColumn` drops one column and keeps the others). In the browser (local, Playwright): menu "Select all" → "Deselect all" after selecting → selection cleared; with "Show archived" on, "Unarchive all tasks" → "Unarchive 1 task in In progress?" → unarchived, and back to "Archive all tasks" when off; empty archive shows "No archived tasks" + "Back to tasks" with "Add task" still in the toolbar; archive view has no "Add a task" in columns or List.
+
 ## 2026-09-30 (21) — `refactor` only (not deployed)
 ### Changed
 - **Migration `0056_task_archiving.sql` now adds only `tasks.archived_at`.** With archiving manual, `tasks.unarchived_at` was written and never read, and the partial index `idx_tasks_auto_archive` served no query while costing every write to `tasks`. The migration has never run on the remote D1 (last remote one: `0055`, 2026-09-29), so it was rewritten rather than followed by a drop: production will get the single column. Unarchiving no longer stamps anything. The local D1, which had applied the earlier version, had the index and column dropped by hand so it matches.

@@ -31,6 +31,7 @@ import {
   SORTERS,
   toggleCardSelection,
   selectColumn,
+  deselectColumn,
   type DueFilter,
   type GroupBy,
   type SortBy,
@@ -53,6 +54,8 @@ interface TaskBoardProps {
   groupBy: GroupBy;
   onOpenTask: (task: Task) => void;
   onRequestDelete: (task: Task) => void;
+  /** "Show archived" is on: the columns hold archived cards, so they offer no quick-add. */
+  archiveView?: boolean;
 }
 
 /** Which column a droppable id names — a column's own background, or the task sitting in it. */
@@ -74,6 +77,7 @@ export function TaskBoard({
   groupBy,
   onOpenTask,
   onRequestDelete,
+  archiveView = false,
 }: TaskBoardProps) {
   const { data: statuses = [], isLoading } = useTaskStatuses(projectId);
   const { canManage } = useWorkspaceRole();
@@ -131,6 +135,8 @@ export function TaskBoard({
   };
   const selectWholeColumn = (columnTasks: Task[]) =>
     setPickedIds((prev) => selectColumn(visibleOnly(prev), columnTasks.map((t) => t.id)));
+  const deselectWholeColumn = (columnTasks: Task[]) =>
+    setPickedIds((prev) => deselectColumn(visibleOnly(prev), columnTasks.map((t) => t.id)));
 
   // Esc clears the selection unless a menu, popover or dialog is open: that Esc is for closing it (still in the DOM here).
   const selecting = selectedIds.size > 0;
@@ -288,6 +294,8 @@ export function TaskBoard({
             selectedIds={selectedIds}
             onToggleSelect={toggleSelect}
             onSelectColumn={selectWholeColumn}
+            onDeselectColumn={deselectWholeColumn}
+            archiveView={archiveView}
           />
         ))}
         {canManage && <AddStatusColumn statuses={statuses} projectId={projectId} />}
