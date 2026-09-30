@@ -44,7 +44,7 @@ export function useClearAllNotifications() {
   });
 }
 
-/** Opening a task (in a visible tab) reads the notifications it already has; one that arrives while it stays open waits for a click or a reopen. */
+/** Opening a task reads the notifications it already has; one that arrives while it stays open waits for a click or a reopen. */
 export function useReadTaskNotifications(taskId: string | null, open: boolean) {
   const queryClient = useQueryClient();
   const { data } = useNotifications();
@@ -65,13 +65,7 @@ export function useReadTaskNotifications(taskId: string | null, open: boolean) {
       return;
     }
     if (readFor.current === taskId || !data) return;
-    const read = () => {
-      if (document.visibilityState !== "visible" || readFor.current === taskId) return;
-      readFor.current = taskId;
-      if (unreadHere) mutate(taskId);
-    };
-    read();
-    document.addEventListener("visibilitychange", read);
-    return () => document.removeEventListener("visibilitychange", read);
+    readFor.current = taskId;
+    if (unreadHere) mutate(taskId);
   }, [open, taskId, data, unreadHere, mutate]);
 }

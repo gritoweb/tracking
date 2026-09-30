@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-30 (36) — `refactor`, local only (not pushed, not deployed)
+### Changed
+- **Reading a task's notifications on open is one request, with no listener.** The visibility check and its `visibilitychange` listener only covered a task opened in a background tab; opening a task is already the gesture of reading it, so the hook now reads once per opening (again on each reopen) and nothing else. `PATCH /api/notifications/read-task/:taskId` answers `{ ok: true }` like its neighbours — the count it returned was used by no caller.
+### Verified
+- `tsc -b` (0), `lint` (0), `vitest run` green. In the browser (local, Playwright, two accounts): opening the task → assignment read, 1 `read-task` request; a mention while open → still unread, still 1 request; reopening → mention read, 2 requests.
+
 ## 2026-09-30 (35) — `refactor`, local only (not pushed, not deployed)
 ### Changed
 - **Opening a task reads the notifications it already has — no more, no less.** (32) also read notifications that arrived while the task stayed open, so someone who left a task on screen and walked away lost the Slack DM for a new mention. Now the task reads its notifications once, when it is opened in a visible tab (again on each reopen); one that arrives while it stays open waits for a click on it or for the task to be opened again, and goes to Slack after 5 minutes if neither happens. It is also lighter: one request per opening, and only when the task has an unread notification. Verified in production beforehand: a mention made while the task was open went to Slack under (32) only because no tab had read it — which (35) makes the intended behaviour.

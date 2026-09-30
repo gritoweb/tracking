@@ -30,11 +30,11 @@ export const notificationsRouter = new Hono<{
   // Viewing a task reads its notifications: any of the person's unread ones that link to it (task or comments tab).
   .patch("/read-task/:taskId", async (c) => {
     const path = taskPath(c.req.param("taskId"));
-    const { meta } = await c.env.DB.prepare(
+    await c.env.DB.prepare(
       `UPDATE notifications SET is_read = 1
         WHERE user_id = ? AND workspace_id = ? AND is_read = 0 AND (link = ? OR substr(link, 1, ?) = ?)`
     ).bind(c.get("userId"), c.get("workspaceId"), path, path.length + 1, `${path}/`).run();
-    return c.json({ ok: true, read: meta.changes ?? 0 }, 200);
+    return c.json({ ok: true }, 200);
   })
   .patch("/read-all", async (c) => {
     const workspaceId = c.get("workspaceId");
