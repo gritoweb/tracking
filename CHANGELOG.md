@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-09-30 (21) — `refactor` only (not deployed)
+### Changed
+- **Migration `0056_task_archiving.sql` now adds only `tasks.archived_at`.** With archiving manual, `tasks.unarchived_at` was written and never read, and the partial index `idx_tasks_auto_archive` served no query while costing every write to `tasks`. The migration has never run on the remote D1 (last remote one: `0055`, 2026-09-29), so it was rewritten rather than followed by a drop: production will get the single column. Unarchiving no longer stamps anything. The local D1, which had applied the earlier version, had the index and column dropped by hand so it matches.
+### Release note
+- Before this code reaches `master`: `npx wrangler d1 migrations apply time-tracker --remote` (runs `0056`, one additive `ALTER TABLE`), after a time-travel bookmark.
+### Verified
+- `tsc -b` (0), `lint` (0), `vitest run` 1203/1203 (every test database applies all migrations from scratch, as production will). Local server: archive/unarchive of a parent 200, of a subtask alone 400, `archivedOnly` lists what is archived. Local D1 `tasks` has `archived_at` and no `unarchived_at` or `idx_tasks_auto_archive`.
+
 ## 2026-09-30 (20) — `refactor` only (not deployed)
 ### Changed
 - The board's column selection is named for what it does now that the header checkbox is gone: `selectColumn` (was `toggleColumnSelection`) only adds the column's cards, and `onSelectColumn` (was `onToggleColumn`) is what the column menu's "Select all" calls. The never-used "clear the column" branch is removed. No behaviour change.

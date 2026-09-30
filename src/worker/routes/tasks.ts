@@ -1023,8 +1023,8 @@ export const tasksRouter = new Hono<{
                 `UPDATE tasks SET archived_at = ? WHERE workspace_id = ? AND archived_at IS NULL AND id IN (${placeholdersFor(part)})`
               ).bind(now, workspaceId, ...part)
             : c.env.DB.prepare(
-                `UPDATE tasks SET archived_at = NULL, unarchived_at = ? WHERE workspace_id = ? AND archived_at IS NOT NULL AND id IN (${placeholdersFor(part)})`
-              ).bind(now, workspaceId, ...part)
+                `UPDATE tasks SET archived_at = NULL WHERE workspace_id = ? AND archived_at IS NOT NULL AND id IN (${placeholdersFor(part)})`
+              ).bind(workspaceId, ...part)
         )
       );
       const changed = rows.filter((r) => (archiving ? !r.archived_at : Boolean(r.archived_at)));

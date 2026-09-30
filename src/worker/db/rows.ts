@@ -178,7 +178,6 @@ export interface TaskRow {
   created_by: string | null;
   created_at: string;
   archived_at?: string | null;
-  unarchived_at?: string | null;
   // Present only on rows read via `taskSelect()` — see TaskJoinRow.
   status_name?: string | null;
   status_color?: string | null;

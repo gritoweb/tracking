@@ -220,7 +220,7 @@ A task comment's `body` is one of two things: legacy text, where a tagged person
 
 ## Task archiving and bulk actions
 
-- `tasks.archived_at` (NULL = live) and `tasks.unarchived_at` (migration 0056, additive). `GET /api/tasks` hides archived tasks unless `includeArchived=true`; by-id reads still load them. Time entries are never touched: archiving keeps `task_id`, deleting sets it NULL (`ON DELETE SET NULL`).
+- `tasks.archived_at` (NULL = live; migration 0056, additive). `GET /api/tasks` hides archived tasks unless `includeArchived=true`; by-id reads still load them. Time entries are never touched: archiving keeps `task_id`, deleting sets it NULL (`ON DELETE SET NULL`).
 - `POST /api/tasks/bulk` — `archive | unarchive | delete` over up to 100 ids, all or nothing: `canDeleteTask` for every id (403 lists the refused), 404 for an id outside the workspace, archive/unarchive refuse a subtask and carry the parent's subtasks. `DELETE /api/tasks/:id` shares `deleteTaskTrees`.
 - `POST /api/tasks/bulk-update` — each item runs through the task's own `PUT /:id` on an inner Hono app, so there is no second write path. Its notifications go through a `NotificationBatch` (the inner Request is the WeakMap key), sent once per person and kind at the end.
 - Frontend: `ui/selection-bar.tsx` (primitive) + `tasks/board/TaskSelectionBar.tsx` (the board's actions); selection rules are pure functions in `lib/taskUtils.ts` (`toggleCardSelection`, `toggleColumnSelection`).

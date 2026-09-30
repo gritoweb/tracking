@@ -100,15 +100,13 @@ describe("POST /bulk — archive, unarchive, delete", () => {
     expect(kinds).toEqual([{ kind: "archived", user_id: "u-owner" }]);
   });
 
-  it("unarchives the task and its subtasks and marks when it was unarchived", async () => {
+  it("unarchives the task and its subtasks", async () => {
     const { raw, as, archivedAt } = archivingWorld();
     raw.exec(`UPDATE tasks SET archived_at = '2026-02-01T00:00:00.000Z' WHERE id IN ('t-owner', 't-owner-sub')`);
     const res = await as("u-owner").post("/bulk", { ids: ["t-owner"], action: "unarchive" });
     expect(res.status).toBe(200);
     expect(archivedAt("t-owner")).toBeNull();
     expect(archivedAt("t-owner-sub")).toBeNull();
-    const row = raw.prepare(`SELECT unarchived_at FROM tasks WHERE id = 't-owner'`).get() as { unarchived_at: string | null };
-    expect(row.unarchived_at).toBeTruthy();
   });
 
   it("lets a member archive their own task", async () => {
