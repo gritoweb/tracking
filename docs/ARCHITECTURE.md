@@ -103,6 +103,8 @@ Four independent, idempotent jobs, each iterating its own subjects and swallowin
 - **Recurring entries** (`lib/recurring.ts`) — materializes each active template once its scheduled UTC time passes. Idempotent via `last_materialized` (UTC date). Schedules stored as UTC weekday + minutes-of-day; the client converts to local time (`react-app/lib/recurrence.ts`).
 - **Email digests** (`lib/digest.ts`) — the morning briefing and the Monday weekly summary, for users who opted in. The cron has no request to read a timezone from, so it works off `user.digest_tz_offset` (reconciled client-side by `useHydrateSettings` whenever it drifts, so a DST change doesn't send an hour off for months). The 5-minute cron ticks twelve times inside the target hour, so the send is exactly-once by comparing `digest_daily_sent`/`digest_weekly_sent` against the user's **local** date rather than by locking.
 
+- **Task auto-archive** (`lib/task-auto-archive.ts`) — hourly (first tick of the hour): top-level tasks with `completed_at` older than 72h and no `unarchived_at` after it get `archived_at`, with their subtasks, 500 per sweep via one `UPDATE … RETURNING` on a partial index (migration 0056), a history row with no user, and one `tasks:changed` per workspace. Never moves a task's column and never touches time entries.
+
 - **Desktop notifications** (`lib/web-push.ts`, not a cron) — `notifyUser` sends a payload-less VAPID push to each of the person's browsers; `public/sw.js` reads the bell and shows what is new. See `docs/PUSH_NOTIFICATIONS.md`.
 - **Slack notifications** (`lib/slack.ts`) — a bell notification still unread after 5 minutes (and under 24 hours old) goes to its person as a Slack DM, grouped per person. At most once: each row is claimed (`slack_sent_at`) before the send. Only current, unbanned members who haven't opted out; a revoked token removes the installation. `SLACK_DRY_RUN=1` (local) logs instead of calling Slack. See `docs/SLACK.md`.
 
@@ -217,3 +219,10 @@ A task description can be edited by several people at once when `COLLAB_DESCRIPT
 ## Comment bodies
 
 A task comment's `body` is one of two things: legacy text, where a tagged person is `@[Name](user:ID)`, or (since the rich composer) the same tiptap JSON doc as a description. Nothing on the server reads `body` directly: `commentText` (`src/shared/comment-body.ts`) turns either into the text form, and mention lookup, the mention notification's text and MCP's comment view all read that, so the two formats behave the same and MCP/the Assistant can keep writing plain text. The client opens either kind in the editor through `commentDoc`. The size cap is the description's (`TASK_DESCRIPTION_MAX`); a body with no text, mention or image is refused.
+
+## Task archiving and bulk actions
+
+- `tasks.archived_at` (NULL = live) and `tasks.unarchived_at` (migration 0056, additive). `GET /api/tasks` hides archived tasks unless `includeArchived=true`; by-id reads still load them. Time entries are never touched: archiving keeps `task_id`, deleting sets it NULL (`ON DELETE SET NULL`).
+- `POST /api/tasks/bulk` — `archive | unarchive | delete` over up to 100 ids, all or nothing: `canDeleteTask` for every id (403 lists the refused), 404 for an id outside the workspace, archive/unarchive refuse a subtask and carry the parent's subtasks. `DELETE /api/tasks/:id` shares `deleteTaskTrees`.
+- `POST /api/tasks/bulk-update` — each item runs through the task's own `PUT /:id` on an inner Hono app, so there is no second write path. Its notifications go through a `NotificationBatch` (the inner Request is the WeakMap key), sent once per person and kind at the end.
+- Frontend: `ui/selection-bar.tsx` (primitive) + `tasks/board/TaskSelectionBar.tsx` (the board's actions); selection rules are pure functions in `lib/taskUtils.ts` (`toggleCardSelection`, `toggleColumnSelection`).

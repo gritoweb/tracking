@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-09-30 (6) — `refactor` only (not deployed)
+### Docs
+- Task archiving, "Show archived", the auto-archive and bulk actions documented in `docs/USER_GUIDE.md` ("Archiving a task", "Working on several tasks at once"), `docs/ARCHITECTURE.md` (cron job + "Task archiving and bulk actions"), `docs/MCP.md` (`includeArchived`, `update_task` `archived`) and `CLAUDE.md` (cron list). Not deployed: migration 0056 must be applied to the remote D1 before this code reaches `master`.
+
 ## 2026-09-30 (5) — `refactor` only (not deployed)
 ### Added
 - **Select tasks on the Board and act on them from a floating bar.** Each card has a checkbox (revealed on hover, shown on every card while anything is selected; Shift-click adds a range in the column), and each column header has "select all" (nothing picked → all of the column; some or all → clear it). Only cards on screen count as selected, so a filter or project switch drops the rest; Esc clears unless it is closing a menu or dialog. The bar (`ui/selection-bar.tsx`, a new primitive on `floatingToolbarVariants`' new `bar` layout, `z-overlay` so its own menus open above it) offers Status, Assignees (add or remove someone on every selected task), Due date, Priority, Move to project, Convert to subtask, Copy names and links, Archive/Unarchive and Delete (with confirmation). Archive and Delete are disabled, with the reason in the tooltip, unless every selected task is the person's (author) or they are owner/admin.
