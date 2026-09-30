@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { taskPath } from "@shared/task-links";
 import { api } from "@/lib/api-client";
@@ -44,7 +44,7 @@ export function useClearAllNotifications() {
   });
 }
 
-/** While a task is open in a visible tab, its notifications count as read — also those that arrive while it is open (so Slack never repeats them). */
+/** Opening a task (in a visible tab) reads the notifications it already has; one that arrives while it stays open waits for a click or a reopen. */
 export function useReadTaskNotifications(taskId: string | null, open: boolean) {
   const queryClient = useQueryClient();
   const { data } = useNotifications();
@@ -56,13 +56,22 @@ export function useReadTaskNotifications(taskId: string | null, open: boolean) {
   const unreadHere =
     !!path && (data?.notifications ?? []).some((n) => !n.isRead && (n.link === path || n.link?.startsWith(`${path}/`)));
 
+  // The task this open has already read; cleared on close, so reopening reads again.
+  const readFor = useRef<string | null>(null);
+
   useEffect(() => {
-    if (!open || !taskId || !unreadHere) return;
+    if (!open || !taskId) {
+      readFor.current = null;
+      return;
+    }
+    if (readFor.current === taskId || !data) return;
     const read = () => {
-      if (document.visibilityState === "visible") mutate(taskId);
+      if (document.visibilityState !== "visible" || readFor.current === taskId) return;
+      readFor.current = taskId;
+      if (unreadHere) mutate(taskId);
     };
     read();
     document.addEventListener("visibilitychange", read);
     return () => document.removeEventListener("visibilitychange", read);
-  }, [open, taskId, unreadHere, mutate]);
+  }, [open, taskId, data, unreadHere, mutate]);
 }

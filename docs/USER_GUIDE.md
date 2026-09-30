@@ -304,7 +304,7 @@ Turn them on once per browser in **Settings → General → Desktop notification
 
 ## Slack notifications
 
-If a workspace owner or admin connects Slack (**Settings → Workspace → Integrations → Slack → Add to Slack**), notifications about **you** that you haven't opened in the app within **5 minutes** — a task assigned to you, or someone mentioning you in a task's title, description or a comment — arrive as a direct message from the TimeTracker bot, with a button that opens the task. If you read the notification in time, Slack stays quiet — and opening the task counts as reading it: every notification about that task is marked read, including one that arrives while you have the task open (in a visible tab).
+If a workspace owner or admin connects Slack (**Settings → Workspace → Integrations → Slack → Add to Slack**), notifications about **you** that you haven't opened in the app within **5 minutes** — a task assigned to you, or someone mentioning you in a task's title, description or a comment — arrive as a direct message from the TimeTracker bot, with a button that opens the task. If you read the notification in time, Slack stays quiet — and opening the task counts as reading the notifications it already has. One that arrives while you keep the task open stays unread until you click it or open the task again, so a new mention is never hidden just because the task was on screen.
 
 - You're matched in Slack by the **email address** of your account. If your Slack uses another address, enter it under **Slack email** in the Slack panel; leave it empty to go back to your account email. **Send me a test message** tells you right away whether Slack found you.
 - **Send me a test message** checks that it works for you.

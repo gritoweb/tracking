@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-30 (35) — `refactor`, local only (not pushed, not deployed)
+### Changed
+- **Opening a task reads the notifications it already has — no more, no less.** (32) also read notifications that arrived while the task stayed open, so someone who left a task on screen and walked away lost the Slack DM for a new mention. Now the task reads its notifications once, when it is opened in a visible tab (again on each reopen); one that arrives while it stays open waits for a click on it or for the task to be opened again, and goes to Slack after 5 minutes if neither happens. It is also lighter: one request per opening, and only when the task has an unread notification. Verified in production beforehand: a mention made while the task was open went to Slack under (32) only because no tab had read it — which (35) makes the intended behaviour.
+### Verified
+- `tsc -b` (0), `lint` (0), `vitest run` green. In the browser (local, Playwright, two accounts): the member opens the task → its assignment reads; a mention arrives while it stays open → still unread after 6 s; the member leaves and reopens the task → the mention reads.
+
 ## 2026-09-30 (34) — deployed to production (`refactor` → `master`)
 ### Released
 - Everything since 2026-09-29 (5): manual task archiving with "Show archived" (per-column pages of 50), board bulk selection with the floating action bar, bulk archive/unarchive/delete/edit with one notification per person, the AI looking at archived tasks only when asked, Reports' light task list, notifications read when their task is viewed (so Slack doesn't repeat them), the description's formatting bar after Ctrl/Cmd+A, and sandboxed HTML attachment previews.
