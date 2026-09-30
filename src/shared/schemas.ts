@@ -353,6 +353,16 @@ export const UpdateTaskSchema = z.object({
 });
 
 /** What a drag on the board sends: the column it landed in and where in it. */
+/** A task as a filter lists it: no rollups, so the whole workspace (archive included) stays a light read. */
+export const TaskOptionSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  projectId: z.string(),
+  parentId: z.string().nullable(),
+  archived: z.boolean(),
+});
+export type TaskOption = z.infer<typeof TaskOptionSchema>;
+
 export const BULK_TASK_IDS_MAX = 100;
 /** "Show archived" loads this many of the most recently archived parent tasks (with their subtasks). */
 export const ARCHIVE_PAGE_LIMIT = 500;

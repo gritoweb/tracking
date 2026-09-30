@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-30 (14) — `refactor`, local only (not pushed, not deployed)
+### Changed
+- **Reports' task filter reads a light list.** It loaded every task with the full task rollups (tracked hours, subtask and comment counts, assignees) — and, to keep archived tasks filterable, the whole archive too, which the auto-archive grows forever. `GET /api/tasks/options` returns just `{ id, name, projectId, parentId, archived }` for every task in the workspace, archived included, with no subqueries; archived tasks read "(archived)" in the filter. Hours of archived tasks keep counting in reports as before.
+### Verified
+- `tsc -b` (0), `lint` (0), `vitest run` 1208/1208 (new: `/options` lists live and archived tasks of the workspace only, the archived one flagged, and no other field).
+
 ## 2026-09-30 (13) — `refactor`, local only (not pushed, not deployed)
 ### Fixed
 - **"Show archived" fetches only the archive, and a bounded slice of it.** It used to load every live task plus every archived one (with their hour and count rollups) and filter on the client — a list the auto-archive makes grow forever. `GET /api/tasks?archivedOnly=true` returns only archived tasks: the `ARCHIVE_PAGE_LIMIT` (500) most recently archived parents with their subtasks; the page says so when the cap is reached. Opening a link to a task that isn't in the list on screen now fetches that one task (`useTask`, `GET /api/tasks/:id`) instead of the whole archive, and an archived task's detail reads its own subtasks (`useSubtasks`) and, for an archived subtask, its parent by id.

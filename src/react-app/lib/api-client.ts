@@ -297,6 +297,8 @@ export const api = {
     list: (params?: { projectId?: string; parentId?: string; includeInactive?: string; includeArchived?: string; archivedOnly?: string }) =>
       request<TasksListResponse>(`/tasks${queryString(params)}`),
     get: (id: string) => json(tasksClient[":id"].$get({ param: { id } })),
+    /** Id, name, project and archived flag of every task — Reports' filter, archive included. */
+    options: () => json(tasksClient.options.$get()),
     /** The selection bar: one action over several tasks, all or nothing. */
     bulk: (body: BulkTaskAction) => json(tasksClient.bulk.$post({ json: body })),
     /** The selection bar's edits: each item is the task's own PUT, reported one by one. */

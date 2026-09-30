@@ -29,11 +29,19 @@ export function useTasks(projectId?: string | null) {
   });
 }
 
-/** `includeArchived`: Reports' task filter only (archived hours still count). */
-export function useAllTasks(includeArchived = false) {
+export function useAllTasks() {
   return useQuery({
-    queryKey: includeArchived ? ["tasks", "all", "withDone", "withArchived"] : ["tasks", "all", "withDone"],
-    queryFn: () => api.tasks.list({ includeInactive: "true", ...(includeArchived ? { includeArchived: "true" } : {}) }),
+    queryKey: ["tasks", "all", "withDone"],
+    queryFn: () => api.tasks.list({ includeInactive: "true" }),
+    staleTime: 30_000,
+  });
+}
+
+/** Reports' task filter: every task, archived included, as a light list (no hour or count rollups). */
+export function useTaskOptions() {
+  return useQuery({
+    queryKey: ["tasks", "options"],
+    queryFn: () => api.tasks.options(),
     staleTime: 30_000,
   });
 }

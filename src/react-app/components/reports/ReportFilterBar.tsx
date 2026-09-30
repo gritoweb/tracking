@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/select";
 import { MultiSelect, type MultiSelectOption } from "@/components/pickers/MultiSelect";
 import { useAllClients, useAllProjects, useTags } from "@/hooks/useProjects";
-import { useAllTasks } from "@/hooks/useTasks";
+import { useTaskOptions } from "@/hooks/useTasks";
 import { useWorkspaceMembers } from "@/hooks/useWorkspaceRole";
 import {
   EMPTY_FILTERS,
@@ -36,7 +36,7 @@ export function ReportFilterBar({ filters, onChange, canFilterPeople = false }: 
   const { data: clients = [] } = useAllClients();
   const { data: projects = [] } = useAllProjects();
   // Archived tasks keep their hours, so they stay filterable here.
-  const { data: tasks = [] } = useAllTasks(true);
+  const { data: tasks = [] } = useTaskOptions();
   const { data: tags = [] } = useTags();
   const { data: members = [] } = useWorkspaceMembers(canFilterPeople);
 
@@ -75,7 +75,7 @@ export function ReportFilterBar({ filters, onChange, canFilterPeople = false }: 
   }));
   const taskOptions: MultiSelectOption[] = visibleTasks.map((t) => ({
     value: t.id,
-    label: t.name,
+    label: t.archived ? `${t.name} (archived)` : t.name,
   }));
   const tagOptions: MultiSelectOption[] = tags.map((t) => ({
     value: t.id,

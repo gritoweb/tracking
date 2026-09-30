@@ -40,7 +40,7 @@ import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENT_LABEL } from "@shared/attachments"
 import { formatAttachment } from "./attachments";
 import { chunked, placeholdersFor } from "../lib/sql-chunks";
 import { actorDisplayName, NotificationBatch, notifyAssigneesOfStatusChange, notifyMentions, notifyNewAssignees, type Deliver } from "../lib/notifications";
-import type { CreateTask, Task, TaskComment, TaskStatus } from "@shared/schemas";
+import type { CreateTask, Task, TaskComment, TaskOption, TaskStatus } from "@shared/schemas";
 
 // Multipart framing (boundary + part headers) rides on top of the file itself.
 const MULTIPART_SLACK_BYTES = 64 * 1024;
@@ -474,6 +474,20 @@ export const tasksRouter = new Hono<{
     ).bind(...(scopeUserId ? [scopeUserId] : []), ...bindings).all<TaskJoinRow>();
 
     return c.json(results.map(formatTask), 200);
+  })
+  // Reports' task filter: every task, archived ones too (their hours still count), without the rollups of the full list.
+  .get("/options", async (c) => {
+    const { results } = await c.env.DB.prepare(
+      `SELECT id, name, project_id, parent_id, archived_at FROM tasks WHERE workspace_id = ? ORDER BY name ASC`
+    ).bind(c.get("workspaceId")).all<{ id: string; name: string; project_id: string; parent_id: string | null; archived_at: string | null }>();
+    const options: TaskOption[] = results.map((r) => ({
+      id: r.id,
+      name: r.name,
+      projectId: r.project_id,
+      parentId: r.parent_id,
+      archived: r.archived_at !== null,
+    }));
+    return c.json(options, 200);
   })
   // One task — the MCP's get_task used to load the whole workspace's list to find it.
   .get("/:id", async (c) => {

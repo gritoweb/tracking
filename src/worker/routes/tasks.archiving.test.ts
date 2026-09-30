@@ -278,3 +278,18 @@ describe("POST /bulk-update — each item is the task's own PUT, notifications g
     expect(raw.prepare(`SELECT status_id FROM tasks WHERE id = 't-foreign'`).get()).toEqual({ status_id: "s-todo-B" });
   });
 });
+
+describe("GET /options — Reports' light task list", () => {
+  it("lists every task of the workspace, archived ones flagged, without rollups", async () => {
+    const { raw, as } = archivingWorld();
+    raw.exec(`UPDATE tasks SET archived_at = '2026-02-01T00:00:00.000Z' WHERE id IN ('t-owner', 't-owner-sub')`);
+    const res = await as("u-member").get("/options");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Array<Record<string, unknown>>;
+    expect(body.map((t) => t.id).sort()).toEqual(["t-mine", "t-owner", "t-owner-sub"]);
+    expect(body.find((t) => t.id === "t-owner")).toEqual({
+      id: "t-owner", name: "Owner task", projectId: "p-A", parentId: null, archived: true,
+    });
+    expect(Object.keys(body[0]).sort()).toEqual(["archived", "id", "name", "parentId", "projectId"]);
+  });
+});
