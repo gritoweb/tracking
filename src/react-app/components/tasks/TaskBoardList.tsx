@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { CollectionHeader } from "@/components/layout/CollectionHeader";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Pagination } from "@/components/ui/pagination";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { Archive } from "lucide-react";
@@ -12,7 +13,7 @@ import { TaskListView } from "./TaskListView";
 import { TaskDialog } from "./TaskDialog";
 import { TaskDetail } from "./TaskDetail";
 import { TaskBoard } from "./board/TaskBoard";
-import type { ArchiveLoading } from "./board/TaskBoardColumn";
+import type { ArchivePaging } from "./board/TaskBoardColumn";
 import { TaskProjectRail } from "./TaskProjectRail";
 import { useAllTasks, useArchiveCounts, useArchivedLists, useDeleteTask, useTask, useUpdateTask } from "@/hooks/useTasks";
 import { useProjects } from "@/hooks/useProjects";
@@ -90,25 +91,28 @@ export function TaskBoardList({ openTaskId = null, openTab = "task" }: TaskBoard
   // A client has no status fork of its own — falls back to the workspace's global set.
   const { data: statuses = [] } = useTaskStatuses(railClientId ? null : railProjectId);
 
-  // "Show archived" is a view of the archive alone, loaded 50 at a time per column (Board) or for the whole list (List).
-  // Loaded pages are keyed by project, so switching the rail's project starts that project's archive over.
-  const [loadedPages, setLoadedPages] = useState<Record<string, number>>({});
+  // "Show archived" is a view of the archive alone, one page of 50 per column (Board) or for the whole list (List).
+  // Pages are keyed by project, so switching the rail's project starts that project's archive at page 1.
+  const [archivePages, setArchivePages] = useState<Record<string, { page: number; previous: number | null }>>({});
   const pageKey = (statusId: string | null) => `${railProjectId ?? "all"}:${statusId ?? "list"}`;
-  const pagesOf = (statusId: string | null) => loadedPages[pageKey(statusId)] ?? 1;
+  const pageOf = (statusId: string | null) => archivePages[pageKey(statusId)] ?? { page: 1, previous: null };
   const archiveLists = layout === "board" ? statuses.map((s) => s.id) : [null];
   const archive = useArchivedLists(
-    archiveLists.map((statusId) => ({ statusId, pages: pagesOf(statusId) })),
+    archiveLists.map((statusId) => ({ statusId, page: pageOf(statusId).page, previousPage: pageOf(statusId).previous })),
     railProjectId,
     showArchived
   );
   const { data: archiveCounts } = useArchiveCounts(railProjectId, showArchived);
   const { data: tasks = [], isLoading } = showArchived ? archive : live;
   const totalOf = (statusId: string | null) => (statusId ? archiveCounts?.byStatus[statusId] ?? 0 : archiveCounts?.total ?? 0);
-  const archiveLoading: ArchiveLoading = {
+  const contentScrollRef = useRef<HTMLDivElement>(null);
+  const archivePaging: ArchivePaging = {
     total: totalOf,
-    remaining: (statusId) => Math.max(totalOf(statusId) - pagesOf(statusId) * ARCHIVE_PAGE_LIMIT, 0),
-    loadingMore: (statusId) => archive.loadingMore.has(statusId),
-    loadMore: (statusId) => setLoadedPages((p) => ({ ...p, [pageKey(statusId)]: pagesOf(statusId) + 1 })),
+    page: (statusId) => pageOf(statusId).page,
+    pageCount: (statusId) => Math.ceil(totalOf(statusId) / ARCHIVE_PAGE_LIMIT),
+    busy: (statusId) => archive.busy.has(statusId),
+    onPage: (statusId, page) =>
+      setArchivePages((p) => ({ ...p, [pageKey(statusId)]: { page, previous: pageOf(statusId).page } })),
   };
 
   const listedTask = openTaskId ? tasks.find((t) => t.id === openTaskId) ?? null : null;
@@ -262,6 +266,7 @@ export function TaskBoardList({ openTaskId = null, openTab = "task" }: TaskBoard
         </div>
       ) : (
         <div
+          ref={contentScrollRef}
           className={cn(
             "-mx-6 min-h-0 flex-1 px-6 pb-6",
             // The board and each column scroll themselves; a page scroll too would fight the cursor.
@@ -278,7 +283,7 @@ export function TaskBoardList({ openTaskId = null, openTab = "task" }: TaskBoard
               groupBy={boardGroupBy}
               onOpenTask={openSheet}
               onRequestDelete={setDeleteTarget}
-              archiveLoading={showArchived ? archiveLoading : undefined}
+              archivePaging={showArchived ? archivePaging : undefined}
             />
           ) : (
             <TaskListView
@@ -302,11 +307,26 @@ export function TaskBoardList({ openTaskId = null, openTab = "task" }: TaskBoard
               onEdit={openSheet}
               onLogTime={(t) => openTaskLogTime(t.id)}
               onCreateTask={() => setAddOpen(true)}
-              archiveLoading={showArchived ? archiveLoading : undefined}
+              archivePaging={showArchived ? archivePaging : undefined}
               onClearFilters={clearFilters}
             />
           )}
         </div>
+      )}
+
+      {/* The List has no columns to page, so its archive pages once, under the list. */}
+      {showArchived && layout === "list" && (
+        <Pagination
+          page={archivePaging.page(null)}
+          pageCount={archivePaging.pageCount(null)}
+          onPageChange={(page) => {
+            archivePaging.onPage(null, page);
+            contentScrollRef.current?.scrollTo({ top: 0 });
+          }}
+          label="Archive pages"
+          disabled={archivePaging.busy(null)}
+          className="shrink-0 border-t py-2"
+        />
       )}
 
       <TaskDialog

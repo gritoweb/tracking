@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from "react";
+import { useRef, useState, type CSSProperties } from "react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useBulkTaskAction } from "@/hooks/useTasks";
 import { useCanDeleteTask } from "@/hooks/useTaskPermissions";
@@ -6,7 +6,7 @@ import { Plus } from "lucide-react";
 import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { Button } from "@/components/ui/button";
-import { LoadMore } from "@/components/ui/load-more";
+import { Pagination } from "@/components/ui/pagination";
 import { ColorDot } from "@/components/ColorDot";
 import { QuickAddTask } from "../QuickAddTask";
 import { TaskCard } from "./TaskCard";
@@ -32,16 +32,17 @@ interface TaskBoardColumnProps {
   onSelectColumn: (tasks: Task[]) => void;
   /** "Deselect all", shown instead once every card of the column is selected. */
   onDeselectColumn: (tasks: Task[]) => void;
-  /** Present while "Show archived" is on: the column loads more at its end, and offers no quick-add (a new task would be live). */
-  archiveLoading?: ArchiveLoading;
+  /** Present while "Show archived" is on: the column pages through its archive, and offers no quick-add (a new task would be live). */
+  archivePaging?: ArchivePaging;
 }
 
-/** How the archive view loads each list, 50 at a time; `null` status is the List's single archive list. */
-export interface ArchiveLoading {
+/** How the archive view pages each list, 50 per page; `null` status is the List's single archive list. */
+export interface ArchivePaging {
   total: (statusId: string | null) => number;
-  remaining: (statusId: string | null) => number;
-  loadingMore: (statusId: string | null) => boolean;
-  loadMore: (statusId: string | null) => void;
+  page: (statusId: string | null) => number;
+  pageCount: (statusId: string | null) => number;
+  busy: (statusId: string | null) => boolean;
+  onPage: (statusId: string | null, page: number) => void;
 }
 
 /** One column of the board — `useDroppable` here (not just the sortable list) is what lets an empty column receive a card. */
@@ -58,9 +59,10 @@ export function TaskBoardColumn({
   onToggleSelect,
   onSelectColumn,
   onDeselectColumn,
-  archiveLoading,
+  archivePaging,
 }: TaskBoardColumnProps) {
   const { setNodeRef } = useDroppable({ id: `column:${status.id}` });
+  const scrollRef = useRef<HTMLDivElement | null>(null);
   const [adding, setAdding] = useState(false);
   const outsideRef = useOutsideClick<HTMLDivElement>(() => setAdding(false));
   const clusters = clusterTasks(tasks, groupBy, todayLocalDate());
@@ -80,7 +82,13 @@ export function TaskBoardColumn({
           space below a short list), but the tint wrapper inside it is natural-height — it only
           covers the header and however many cards there are, same as the reference layout,
           instead of always painting the whole column down to the bottom. */}
-      <div ref={setNodeRef} className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+      <div
+        ref={(node) => {
+          setNodeRef(node);
+          scrollRef.current = node;
+        }}
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto"
+      >
         <div
           style={{ "--swatch": status.color } as CSSProperties}
           className="flex flex-col tt-swatch-column rounded-container"
@@ -88,7 +96,7 @@ export function TaskBoardColumn({
           <header className="flex items-center gap-2 px-3 pb-2 pt-3">
             <ColorDot color={status.color} />
             <h2 className="min-w-0 flex-1 truncate text-sm font-medium">{status.name}</h2>
-            <span className="text-xs tabular-nums text-muted-foreground">{archiveLoading ? archiveLoading.total(status.id) : tasks.length}</span>
+            <span className="text-xs tabular-nums text-muted-foreground">{archivePaging ? archivePaging.total(status.id) : tasks.length}</span>
             <StatusColumnMenu
               status={status}
               statuses={statuses}
@@ -133,16 +141,21 @@ export function TaskBoardColumn({
           {/* Inside the tint, right after the cards — not pinned to the column's bottom edge,
               which for a short column left it floating far below the last card. Text picks up
               the status's own ink colour, same as the reference layout, instead of plain grey. */}
-          {archiveLoading && archiveLoading.remaining(status.id) > 0 && (
-            <div className="px-2 pb-2">
-              <LoadMore
-                onLoadMore={() => archiveLoading.loadMore(status.id)}
-                loading={archiveLoading.loadingMore(status.id)}
-                remaining={`${archiveLoading.remaining(status.id)} left`}
-              />
-            </div>
+          {archivePaging && (
+            <Pagination
+              page={archivePaging.page(status.id)}
+              pageCount={archivePaging.pageCount(status.id)}
+              onPageChange={(page) => {
+                archivePaging.onPage(status.id, page);
+                // The new page starts at the column's top, not where the old one was scrolled to.
+                scrollRef.current?.scrollTo({ top: 0 });
+              }}
+              label={`${status.name} archive pages`}
+              disabled={archivePaging.busy(status.id)}
+              className="px-2 pb-2 pt-1"
+            />
           )}
-          {!archiveLoading && (
+          {!archivePaging && (
           <div className="px-2 pb-2 pt-1">
             {adding ? (
               <div ref={outsideRef}>

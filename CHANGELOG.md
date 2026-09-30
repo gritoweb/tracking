@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-30 (31) — `refactor` only (not deployed)
+### Changed
+- **Numbered pages again, without reloading the board.** The automatic "load below" of (30) is removed — it also had a runaway loop: after a page landed, its "Load more" row was still in view and fetched the next one, then the next, so the column kept scrolling down on its own. Each Board column (and the List) is back to numbered pages, and a page change now touches only that column: `useArchivedLists` keeps one query per list, and a new page borrows the page it replaces from the cache as placeholder, so nothing falls back to the loading skeleton; the column scrolls to its top so the new page is in view, and its page numbers are disabled while it loads. `Pagination` / `lib/pagination.ts` are restored; `LoadMore` is removed.
+### Verified
+- `tsc -b` (0), `lint` (0), `vitest run` green. In the browser (local, Playwright, 121 archived): clicking Backlog's "Page 2" sent one request (Backlog page 2), replaced its 50 cards with the next 50, marked "2" current and scrolled the column to the top; another column's card stayed the same DOM node and no skeleton appeared; resting at the bottom of the column afterwards sent no request.
+
 ## 2026-09-30 (30) — `refactor` only (not deployed)
 ### Changed
 - **The archive loads more below, like a comment thread, instead of numbered pages.** Changing a column's page swapped its query key, the whole Tasks view fell back to its loading skeleton, and the board unmounted and remounted every column (measured: another column's card was a new DOM node, the skeleton showed, the scroll jumped to the top). Now each list — a Board column, or the List as a whole — holds pages 1…n as separate TanStack Query entries (`useArchivedLists`): reaching the end of a column (or its "Load more · N left" button, new `ui/load-more.tsx`, which loads by itself when scrolled into view) adds only the next page's query and appends its 50 cards under the last one. Only the first page of a list counts as loading the view; later pages show a spinner inside their own list. The numbered `Pagination` primitive and `lib/pagination.ts`, now unused, are removed. Column headers still show each column's archived total.

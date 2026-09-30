@@ -47,30 +47,37 @@ export function useTaskOptions() {
   });
 }
 
-const archivePageQuery = (statusId: string | null, projectId: string | null, page: number, enabled: boolean) => ({
-  queryKey: ["tasks", "archived", statusId ?? "all", projectId ?? "all", page],
-  queryFn: () =>
-    api.tasks.list({
-      includeInactive: "true",
-      archivedOnly: "true",
-      archivePage: String(page),
-      ...(statusId ? { statusId } : {}),
-      ...(projectId ? { projectId } : {}),
-    }),
-  staleTime: 30_000,
-  enabled,
-});
+const archivePageKey = (statusId: string | null, projectId: string | null, page: number) =>
+  ["tasks", "archived", statusId ?? "all", projectId ?? "all", page];
 
-/** "Show archived": each list (a column, or the List's `null`) holds pages 1…n as separate queries, so loading more appends one page. */
-export function useArchivedLists(lists: { statusId: string | null; pages: number }[], projectId: string | null, enabled: boolean) {
-  const pages = lists.flatMap(({ statusId, pages: n }) => Array.from({ length: n }, (_, i) => ({ statusId, page: i + 1 })));
+/** "Show archived": one page per list (a column, or the List's `null`); while a new page loads, the page it replaces stays on screen. */
+export function useArchivedLists(
+  lists: { statusId: string | null; page: number; previousPage: number | null }[],
+  projectId: string | null,
+  enabled: boolean
+) {
+  const queryClient = useQueryClient();
   return useQueries({
-    queries: pages.map(({ statusId, page }) => archivePageQuery(statusId, projectId, page, enabled)),
+    queries: lists.map(({ statusId, page, previousPage }) => ({
+      queryKey: archivePageKey(statusId, projectId, page),
+      queryFn: () =>
+        api.tasks.list({
+          includeInactive: "true",
+          archivedOnly: "true",
+          archivePage: String(page),
+          ...(statusId ? { statusId } : {}),
+          ...(projectId ? { projectId } : {}),
+        }),
+      staleTime: 30_000,
+      enabled,
+      // A new page is a new query; the one it replaces, already cached, fills in so neither the column nor the view falls back to loading.
+      placeholderData: () =>
+        previousPage === null ? undefined : queryClient.getQueryData<Task[]>(archivePageKey(statusId, projectId, previousPage)),
+    })),
     combine: (results) => ({
       data: results.flatMap((r) => r.data ?? []),
-      // Only the first page of a list counts as loading the view; later pages load inside their own list.
-      isLoading: results.some((r, i) => pages[i].page === 1 && r.isLoading),
-      loadingMore: new Set(results.flatMap((r, i) => (pages[i].page > 1 && r.isFetching ? [pages[i].statusId] : []))),
+      isLoading: results.some((r) => r.isLoading),
+      busy: new Set(results.flatMap((r, i) => (r.isFetching ? [lists[i].statusId] : []))),
     }),
   });
 }

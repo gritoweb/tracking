@@ -16,7 +16,7 @@ import {
 } from "@dnd-kit/core";
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TaskBoardColumn, type ArchiveLoading } from "./TaskBoardColumn";
+import { TaskBoardColumn, type ArchivePaging } from "./TaskBoardColumn";
 import { TaskCard } from "./TaskCard";
 import { AddStatusColumn } from "./AddStatusColumn";
 import { TaskSelectionBar } from "./TaskSelectionBar";
@@ -54,8 +54,8 @@ interface TaskBoardProps {
   groupBy: GroupBy;
   onOpenTask: (task: Task) => void;
   onRequestDelete: (task: Task) => void;
-  /** "Show archived" is on: each column loads more of its own archive at its end. */
-  archiveLoading?: ArchiveLoading;
+  /** "Show archived" is on: each column pages through its own archive. */
+  archivePaging?: ArchivePaging;
 }
 
 /** Which column a droppable id names — a column's own background, or the task sitting in it. */
@@ -77,7 +77,7 @@ export function TaskBoard({
   groupBy,
   onOpenTask,
   onRequestDelete,
-  archiveLoading,
+  archivePaging,
 }: TaskBoardProps) {
   const { data: statuses = [], isLoading } = useTaskStatuses(projectId);
   const { canManage } = useWorkspaceRole();
@@ -295,7 +295,7 @@ export function TaskBoard({
             onToggleSelect={toggleSelect}
             onSelectColumn={selectWholeColumn}
             onDeselectColumn={deselectWholeColumn}
-            archiveLoading={archiveLoading}
+            archivePaging={archivePaging}
           />
         ))}
         {canManage && <AddStatusColumn statuses={statuses} projectId={projectId} />}
