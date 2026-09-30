@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-30 (8) — `refactor` only (not deployed)
+### Added
+- **The column's "…" menu has "Select all" and "Archive all tasks"**, for everyone (before, the menu held only column configuration and only owners/admins saw it). "Archive all tasks" asks for confirmation, archives the column's cards with their subtasks, and is disabled — with the reason in its tooltip — when the column holds a task that isn't the person's to archive. Renaming, colour, type, default, moving and archiving the column itself stay owner/admin only; the column's own archive item now reads "Archive column" so it can't be mistaken for archiving its tasks. A member's trigger is labelled "<column> options" (an owner/admin's stays "Configure <column>"). A bulk action over more than 100 tasks is sent in consecutive requests of 100.
+### Verified
+- `tsc -b` (0), `lint` (0), `vitest run` 1204/1204. In the browser (local): the menu lists Select all / Archive all tasks above the configuration items; Select all → "3 tasks selected"; Archive all tasks → confirmation "Archive 3 tasks in In progress?" → the column empties, subtasks archived too, "3 tasks archived".
+
 ## 2026-09-30 (7) — `refactor` only (not deployed)
 ### Fixed
 - **Bulk task edits carry at most 50 items per request** (`BULK_UPDATE_ITEMS_MAX`, was 100). Each item is a full `PUT` — several queries, the history and a broadcast — so a request now carries as many as the MCP's `items` already does in production; the board sends a larger selection as consecutive requests and reports them as one. Archive/unarchive/delete (one statement per 90 ids) keeps 100.

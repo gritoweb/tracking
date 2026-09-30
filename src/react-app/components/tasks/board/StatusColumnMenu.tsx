@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowLeft, ArrowRight, Archive, Check, MoreHorizontal, Pencil } from "lucide-react";
+import { ArrowLeft, ArrowRight, Archive, Check, CheckSquare, MoreHorizontal, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -42,10 +42,16 @@ interface StatusColumnMenuProps {
   taskCount: number;
   /** The board's own project scope — editing a column shown as the global fallback forks it for this project first. */
   projectId: string | null;
+  /** Configuring the column is owner/admin only; the task actions above it are everyone's. */
+  canManage: boolean;
+  onSelectAll: () => void;
+  onArchiveAll: () => void;
+  /** Why "Archive all tasks" is off (someone else's task in the column), or null when it is allowed. */
+  archiveAllBlocked: string | null;
 }
 
 /** Configuring a column. Every rule enforced here is refused server-side too — this just says why sooner. */
-export function StatusColumnMenu({ status, statuses, taskCount, projectId }: StatusColumnMenuProps) {
+export function StatusColumnMenu({ status, statuses, taskCount, projectId, canManage, onSelectAll, onArchiveAll, archiveAllBlocked }: StatusColumnMenuProps) {
   const update = useUpdateTaskStatus(projectId);
   const archive = useArchiveTaskStatus(projectId);
   const [renaming, setRenaming] = useState(false);
@@ -113,13 +119,25 @@ export function StatusColumnMenu({ status, statuses, taskCount, projectId }: Sta
           <Button
             variant="ghost"
             size="icon-xs"
-            aria-label={`Configure ${status.name}`}
+            aria-label={canManage ? `Configure ${status.name}` : `${status.name} options`}
             className="shrink-0 text-muted-foreground"
           >
             <MoreHorizontal className="h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-52">
+          <DropdownMenuItem disabled={taskCount === 0} onClick={onSelectAll}>
+            <CheckSquare className="mr-2 h-3.5 w-3.5" />
+            Select all
+          </DropdownMenuItem>
+          <DropdownMenuItem disabled={taskCount === 0 || archiveAllBlocked !== null} title={archiveAllBlocked ?? undefined} onClick={onArchiveAll}>
+            <Archive className="mr-2 h-3.5 w-3.5" />
+            Archive all tasks
+          </DropdownMenuItem>
+
+          {canManage && (
+            <>
+          <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => { setName(status.name); setRenaming(true); }}>
             <Pencil className="mr-2 h-3.5 w-3.5" />
             Rename
@@ -195,8 +213,10 @@ export function StatusColumnMenu({ status, statuses, taskCount, projectId }: Sta
             }}
           >
             <Archive className="mr-2 h-3.5 w-3.5" />
-            Archive
+            Archive column
           </DropdownMenuItem>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 

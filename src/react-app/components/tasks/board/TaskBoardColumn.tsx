@@ -1,4 +1,7 @@
 import { useState, type CSSProperties } from "react";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useBulkTaskAction } from "@/hooks/useTasks";
+import { useCanDeleteTask } from "@/hooks/useTaskPermissions";
 import { Plus } from "lucide-react";
 import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
@@ -51,6 +54,12 @@ export function TaskBoardColumn({
   const selecting = selectedIds.size > 0;
   const picked = tasks.filter((t) => selectedIds.has(t.id)).length;
   const columnState = picked === 0 ? false : picked === tasks.length ? true : "indeterminate";
+  const bulk = useBulkTaskAction();
+  const canDelete = useCanDeleteTask();
+  const [archiveAllOpen, setArchiveAllOpen] = useState(false);
+  const selectAll = () => {
+    if (picked !== tasks.length) onToggleColumn(tasks.filter((t) => !selectedIds.has(t.id)));
+  };
 
   return (
     <section aria-label={status.name} className="flex w-(--size-board-column) shrink-0 flex-col rounded-container">
@@ -80,14 +89,18 @@ export function TaskBoardColumn({
             <ColorDot color={status.color} />
             <h2 className="min-w-0 flex-1 truncate text-sm font-medium">{status.name}</h2>
             <span className="text-xs tabular-nums text-muted-foreground">{tasks.length}</span>
-            {canManage && (
-              <StatusColumnMenu
-                status={status}
-                statuses={statuses}
-                taskCount={tasks.length}
-                projectId={defaultProjectId}
-              />
-            )}
+            <StatusColumnMenu
+              status={status}
+              statuses={statuses}
+              taskCount={tasks.length}
+              projectId={defaultProjectId}
+              canManage={canManage}
+              onSelectAll={selectAll}
+              onArchiveAll={() => setArchiveAllOpen(true)}
+              archiveAllBlocked={
+                tasks.every(canDelete) ? null : "Some of these tasks can only be archived by their author or a workspace owner/admin"
+              }
+            />
           </header>
 
           <div className="px-2 pb-2">
@@ -146,6 +159,17 @@ export function TaskBoardColumn({
           </div>
         </div>
       </div>
+      <ConfirmDialog
+        open={archiveAllOpen}
+        onOpenChange={setArchiveAllOpen}
+        title={`Archive ${tasks.length} task${tasks.length === 1 ? "" : "s"} in ${status.name}?`}
+        description="They leave the board with their subtasks; nothing is deleted and their tracked time stays. Turn on Show archived to see or unarchive them."
+        confirmLabel="Archive"
+        onConfirm={() => {
+          setArchiveAllOpen(false);
+          bulk.mutate({ ids: tasks.map((t) => t.id), action: "archive" });
+        }}
+      />
     </section>
   );
 }

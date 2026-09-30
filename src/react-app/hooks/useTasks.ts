@@ -10,7 +10,7 @@ import {
   nextOccurrence,
   todayLocalDate,
 } from "@shared/task-recurrence";
-import { BULK_UPDATE_ITEMS_MAX, type Task, type CreateTask, type TaskStatus, type UpdateTask, type BulkTaskAction, type BulkUpdateTasks } from "@shared/schemas";
+import { BULK_TASK_IDS_MAX, BULK_UPDATE_ITEMS_MAX, type Task, type CreateTask, type TaskStatus, type UpdateTask, type BulkTaskAction, type BulkUpdateTasks } from "@shared/schemas";
 
 // The API hides inactive (done) tasks unless asked, so every list here opts in:
 // the Tasks page offers an All/Active/Done filter and a "Done" group, and without
@@ -259,7 +259,10 @@ const plural = (n: number) => `${n} task${n === 1 ? "" : "s"}`;
 export function useBulkTaskAction() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: BulkTaskAction) => api.tasks.bulk(body),
+    // "Archive all tasks" on a long column can pass the server's cap: consecutive requests, each still all or nothing.
+    mutationFn: async ({ ids, action }: BulkTaskAction) => {
+      for (let i = 0; i < ids.length; i += BULK_TASK_IDS_MAX) await api.tasks.bulk({ ids: ids.slice(i, i + BULK_TASK_IDS_MAX), action });
+    },
     onSuccess: (_data, { action, ids }) => {
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
       queryClient.invalidateQueries({ queryKey: ["task-activity"] });
