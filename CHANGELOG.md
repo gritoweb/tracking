@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-30 (11) — `refactor` only (not deployed)
+### Changed
+- **"Show archived" now shows only the archived tasks**, instead of adding them to the live ones — turning it on is a view of the archive, turning it off goes back. The other filters (due date, status, assigned to me, project rail) still narrow it; archived subtasks come with their archived parent.
+### Verified
+- `tsc -b` (0), `lint` (0), `vitest run` 1204/1204. In the browser (local), with one of three tasks archived: off → the two live cards; on → only the archived card, with its badge; off again → the two live cards.
+
 ## 2026-09-30 (10) — `refactor` only (not deployed)
 ### Removed
 - **The checkbox on the column header.** Selecting a whole column is the "…" menu's "Select all"; each card keeps its own checkbox (and Shift-click for a range). Clearing is the bar's × or Esc.

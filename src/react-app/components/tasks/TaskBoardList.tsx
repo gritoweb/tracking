@@ -107,13 +107,16 @@ export function TaskBoardList({ openTaskId = null, openTab = "task" }: TaskBoard
   const defaultDueDate = dueFilter === "today" ? today : null;
 
   // Assignee filter applies before the Board does its own project/due filtering internally.
+  // "Show archived" is a view of the archive alone; subtasks are archived with their parent, so they come along.
+  const shownTasks = useMemo(() => (showArchived ? tasks.filter((t) => t.archivedAt) : tasks), [tasks, showArchived]);
+
   const assigneeFilteredTasks = useMemo(() => {
-    if (!assignedToMe || !user) return tasks;
+    if (!assignedToMe || !user) return shownTasks;
     return withSubtasks(
-      tasks.filter((t) => t.assignees.some((a) => a.userId === user.id)),
-      tasks
+      shownTasks.filter((t) => t.assignees.some((a) => a.userId === user.id)),
+      shownTasks
     );
-  }, [tasks, assignedToMe, user]);
+  }, [shownTasks, assignedToMe, user]);
 
   // Both layouts read this: the Board has no client filter of its own.
   const scopedTasks = useMemo(() => {

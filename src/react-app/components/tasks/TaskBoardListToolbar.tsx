@@ -103,7 +103,7 @@ export function TaskBoardListToolbar({
         </SelectContent>
       </Select>
 
-      {/* A separate toggle, not a fourth status: an archived task can also be done, so it adds to any filter. */}
+      {/* A separate toggle, not a fourth status: an archived task can also be done, so the status filter still applies within it. */}
       <Button
         variant={showArchived ? "secondary" : "outline"}
         size="sm"

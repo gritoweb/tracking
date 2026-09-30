@@ -98,7 +98,7 @@ interface UIStore {
   /** Bell notifications as desktop notifications, turned on in this browser (Settings). Persisted per browser. */
   browserNotifications: boolean;
   setBrowserNotifications: (v: boolean) => void;
-  /** The Tasks page's "Show archived": adds archived tasks to whatever filter is on. Persisted per browser. */
+  /** The Tasks page's "Show archived": shows only archived tasks, still narrowed by the other filters. Persisted per browser. */
   showArchivedTasks: boolean;
   setShowArchivedTasks: (v: boolean) => void;
   /** How a task opens: a centered two-column modal (default) or the side panel. Persisted per browser. */
