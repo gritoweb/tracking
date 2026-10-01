@@ -71,23 +71,3 @@ export function useUpdateTaskStatus(projectId?: string | null) {
     onError: (error: Error) => toast.error(error.message || "Failed to update status"),
   });
 }
-
-export function useArchiveTaskStatus(projectId?: string | null) {
-  const queryClient = useQueryClient();
-  const invalidate = useStatusInvalidation();
-  return useMutation({
-    mutationFn: async ({ id, moveTo }: { id: string; moveTo?: string }) => {
-      const targetId = await forkedTargetId(queryClient, projectId, id);
-      return api.taskStatuses.archive(targetId, { moveTo });
-    },
-    onSuccess: (result) => {
-      invalidate();
-      toast.success(
-        result.moved > 0
-          ? `Status archived — ${result.moved} task${result.moved === 1 ? "" : "s"} moved`
-          : "Status archived"
-      );
-    },
-    onError: (error: Error) => toast.error(error.message || "Failed to archive status"),
-  });
-}

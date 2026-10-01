@@ -15,29 +15,14 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { ColorSwatchPicker } from "@/components/ui/color-swatch-picker";
-import { useArchiveTaskStatus, useUpdateTaskStatus } from "@/hooks/useTaskStatuses";
+import { useUpdateTaskStatus } from "@/hooks/useTaskStatuses";
 import { midpointOrder, STATUS_CATEGORY_LABEL } from "@/lib/taskUtils";
 import type { TaskStatus, TaskStatusCategory } from "@shared/schemas";
 
 interface StatusColumnMenuProps {
   status: TaskStatus;
-  /** Every live column, in board order — reordering and the archive target read it. */
+  /** Every live column, in board order — reordering reads it. */
   statuses: TaskStatus[];
   taskCount: number;
   /** The board's own project scope — editing a column shown as the global fallback forks it for this project first. */
@@ -57,11 +42,8 @@ interface StatusColumnMenuProps {
 /** Configuring a column. Every rule enforced here is refused server-side too — this just says why sooner. */
 export function StatusColumnMenu({ status, statuses, taskCount, projectId, canManage, onSelectAll, allSelected, onArchiveAll, canArchiveAll, allArchived }: StatusColumnMenuProps) {
   const update = useUpdateTaskStatus(projectId);
-  const archive = useArchiveTaskStatus(projectId);
   const [renaming, setRenaming] = useState(false);
   const [name, setName] = useState(status.name);
-  const [archiveOpen, setArchiveOpen] = useState(false);
-  const [moveTo, setMoveTo] = useState<string>("");
 
   const index = statuses.findIndex((s) => s.id === status.id);
   const others = statuses.filter((s) => s.id !== status.id);
@@ -87,13 +69,6 @@ export function StatusColumnMenu({ status, statuses, taskCount, projectId, canMa
       id: status.id,
       data: { sortOrder: midpointOrder(before?.sortOrder ?? null, after?.sortOrder ?? null) },
     });
-  };
-
-  const confirmArchive = () => {
-    archive.mutate(
-      { id: status.id, ...(taskCount > 0 ? { moveTo } : {}) },
-      { onSuccess: () => setArchiveOpen(false) }
-    );
   };
 
   if (renaming) {
@@ -134,13 +109,6 @@ export function StatusColumnMenu({ status, statuses, taskCount, projectId, canMa
             {allSelected ? <Square className="mr-2 h-3.5 w-3.5" /> : <CheckSquare className="mr-2 h-3.5 w-3.5" />}
             {allSelected ? "Deselect all" : "Select all"}
           </DropdownMenuItem>
-          {canArchiveAll && (
-            <DropdownMenuItem disabled={taskCount === 0} onClick={onArchiveAll}>
-              {allArchived ? <ArchiveRestore className="mr-2 h-3.5 w-3.5" /> : <Archive className="mr-2 h-3.5 w-3.5" />}
-              {allArchived ? "Unarchive all tasks" : "Archive all tasks"}
-            </DropdownMenuItem>
-          )}
-
           {canManage && (
             <>
           <DropdownMenuSeparator />
@@ -207,66 +175,21 @@ export function StatusColumnMenu({ status, statuses, taskCount, projectId, canMa
             <ArrowRight className="mr-2 h-3.5 w-3.5" />
             Move right
           </DropdownMenuItem>
+            </>
+          )}
 
-          <DropdownMenuSeparator />
-
-          <DropdownMenuItem
-            variant="destructive"
-            disabled={lastCompleted || lastOpen || statuses.length <= 1}
-            onClick={() => {
-              setMoveTo(others[0]?.id ?? "");
-              setArchiveOpen(true);
-            }}
-          >
-            <Archive className="mr-2 h-3.5 w-3.5" />
-            Archive column
-          </DropdownMenuItem>
+          {canArchiveAll && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem variant="destructive" disabled={taskCount === 0} onClick={onArchiveAll}>
+                {allArchived ? <ArchiveRestore className="mr-2 h-3.5 w-3.5" /> : <Archive className="mr-2 h-3.5 w-3.5" />}
+                {allArchived ? "Unarchive all tasks" : "Archive all tasks"}
+              </DropdownMenuItem>
             </>
           )}
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* A column that still holds work must say where it goes — the server refuses it too. */}
-      <Dialog open={archiveOpen} onOpenChange={setArchiveOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Archive “{status.name}”?</DialogTitle>
-            <DialogDescription>
-              {taskCount > 0
-                ? `${taskCount} task${taskCount === 1 ? "" : "s"} still sit${taskCount === 1 ? "s" : ""} in this status. Choose where they go.`
-                : "The column disappears from the board. Nothing is deleted."}
-            </DialogDescription>
-          </DialogHeader>
-
-          {taskCount > 0 && (
-            <Select value={moveTo} onValueChange={setMoveTo}>
-              <SelectTrigger aria-label="Move tasks to">
-                <SelectValue placeholder="Move tasks to…" />
-              </SelectTrigger>
-              <SelectContent>
-                {others.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>
-                    {s.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setArchiveOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              disabled={(taskCount > 0 && !moveTo) || archive.isPending}
-              onClick={confirmArchive}
-            >
-              Archive
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </>
   );
 }
