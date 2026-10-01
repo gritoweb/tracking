@@ -29,7 +29,7 @@ function world() {
   const status = (id: string) => raw.prepare(`SELECT * FROM task_statuses WHERE id = ?`).get(id) as Record<string, unknown>;
   const task = (id: string) => raw.prepare(`SELECT status_id, active, completed_at FROM tasks WHERE id = ?`).get(id) as Record<string, unknown>;
   const defaults = () => (raw.prepare(`SELECT id FROM task_statuses WHERE workspace_id = 'ws-A' AND is_default = 1 AND archived = 0`).all() as { id: string }[]).map((r) => r.id);
-  return { as, status, task, defaults };
+  return { as, raw, status, task, defaults };
 }
 
 describe("GET /", () => {
@@ -166,6 +166,20 @@ describe("POST /:id/archive", () => {
   it("refuses to move tasks into another workspace's status", async () => {
     const { as, task, status } = world();
     expect((await as("u-owner").post("/s-doing/archive", { moveTo: "s-B" })).status).toBe(400);
+    expect(task("t-open").status_id).toBe("s-doing");
+    expect(status("s-doing").archived).toBe(0);
+  });
+
+  it("refuses to move tasks into another board's column", async () => {
+    const { as, raw, task, status } = world();
+    raw.exec(`
+      INSERT INTO projects (id, workspace_id, name, client_id) VALUES ('p2', 'ws-A', 'Two', 'cl-A');
+      INSERT INTO task_statuses (id, workspace_id, project_id, name, color, category, sort_order, is_default) VALUES
+        ('s-p2', 'ws-A', 'p2', 'Two to do', '#3b82f6', 'not_started', 1, 1);
+    `);
+    const res = await as("u-owner").post("/s-doing/archive", { moveTo: "s-p2" });
+    expect(res.status).toBe(400);
+    expect(JSON.stringify(await res.json())).toContain("isn't a column on this task's board");
     expect(task("t-open").status_id).toBe("s-doing");
     expect(status("s-doing").archived).toBe(0);
   });

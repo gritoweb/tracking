@@ -4,7 +4,7 @@ import { RICH_TEXT_SYNTAX, RICH_TEXT_UNSUPPORTED, docJsonToMarkdown, markdownToD
 import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENT_LABEL } from "@shared/attachments";
 import type { CreateTask, Task, TaskActivity, TaskAttachment, TaskComment, TaskStatus, UpdateTask } from "@shared/schemas";
 import {
-  ArchiveTaskStatusSchema, CreateTaskCommentSchema, CreateTaskSchema, CreateTaskStatusSchema,
+  CreateTaskCommentSchema, CreateTaskSchema, CreateTaskStatusSchema,
   MoveTaskSchema, UpdateTaskCommentSchema, UpdateTaskSchema, UpdateTaskStatusSchema,
 } from "@shared/schemas";
 import { findActiveProject } from "../../lib/projects";
@@ -325,7 +325,7 @@ export function registerTaskWrites(d: ToolDeps): void {
   const archived = {
     archived: z.boolean().optional().describe("true archives the task (off the board and out of lists, nothing deleted; its subtasks follow), false brings it back. Only its author or an owner/admin; a subtask can't be archived on its own."),
   };
-  const updateInput = { taskId: IdArg("task"), ...UpdateTaskSchema.shape, ...description, ...archived };
+  const updateInput = { taskId: IdArg("task"), ...UpdateTaskSchema.omit({ parentId: true }).shape, ...description, ...archived };
   const moveInput = { taskId: IdArg("task"), statusId: IdArg("status"), completedOn: MoveTaskSchema.shape.completedOn };
   const deleteInput = { taskId: IdArg("task") };
 
@@ -333,7 +333,7 @@ export function registerTaskWrites(d: ToolDeps): void {
     "Never re-create a task to change it — use update_task/move_task. An open task with the same name in the same project (or under the same parent) created in the last 10 minutes is returned with `alreadyExisted: true` instead of a duplicate. " +
     "Only when the person asked for this task. Use list_projects for the projectId; never guess it. `assigneeIds` must already be workspace members — ask the person who, rather than guessing; one task for several people is ONE task with several assigneeIds.";
   const UPDATE_DOC =
-    "Change a task's name, notes, due date (a local YYYY-MM-DD day), priority (1 highest … 4 none), estimate, parent, project, repeat rule, status or assignees — only the fields passed change. To mark it done, set `active: false` and pass `completedOn` (the person's local date) so a repeating task schedules its next occurrence. `assigneeIds` replaces the whole list. `archived` archives or unarchives it — confirm with the person first.";
+    "Change a task's name, notes, due date (a local YYYY-MM-DD day), priority (1 highest … 4 none), estimate, project, repeat rule, status or assignees — only the fields passed change. To mark it done, set `active: false` and pass `completedOn` (the person's local date) so a repeating task schedules its next occurrence. `assigneeIds` replaces the whole list. `archived` archives or unarchives it — confirm with the person first.";
   const MOVE_DOC =
     "Exactly what dragging a card on the board does: moving into a completed status closes the subtasks too (reopening brings them back), the card goes to the end of the new column, the change is recorded in the task's history, and the assignees are notified (except whoever's key makes this call). " +
     "Get taskId from list_tasks, then statusId from list_task_statuses called with that task's projectId — only a column of the task's own board is accepted. " +
@@ -507,18 +507,5 @@ export function registerTaskWrites(d: ToolDeps): void {
     },
     async ({ statusId, ...body }) =>
       fromBridge(await bridge("PUT", `/api/task-statuses/${segment(statusId)}`, body))
-  );
-
-  server.registerTool(
-    "archive_task_status",
-    {
-      title: "Archive a board column",
-      description:
-        "Retire a status column. Owners/admins only. A column that still holds tasks needs `moveTo` (another status id) for them; the workspace always keeps one open, one completed and one default column.",
-      inputSchema: { statusId: IdArg("status"), ...ArchiveTaskStatusSchema.shape },
-      annotations: DESTRUCTIVE,
-    },
-    async ({ statusId, ...body }) =>
-      fromBridge(await bridge("POST", `/api/task-statuses/${segment(statusId)}/archive`, body))
   );
 }

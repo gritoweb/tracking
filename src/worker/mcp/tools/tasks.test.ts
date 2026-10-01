@@ -320,13 +320,20 @@ describe("a task only takes a column of its own board", () => {
     expect(w.row(parent.id as string).status_id).toBe(twin.id);
     expect(w.row(kid.id as string).status_id).toBe(twin.id);
   });
+});
 
-  it("refuses to archive a column into another board's column", async () => {
-    const { w, admin, forked, global } = await forkedWorld();
-    const qa = global[4];
-    await w.call(admin, "create_task", { name: "Sits in QA", projectId: "p1", statusId: qa.id });
-    const res = await w.call(admin, "archive_task_status", { statusId: qa.id, moveTo: forked[0].id });
-    expect(res.error).toContain("isn't a column on this task's board");
+describe("the MCP offers what the board offers", () => {
+  it("has no tool to archive a column", () => {
+    expect(world().toolsFor("u-admin").has("archive_task_status")).toBe(false);
+  });
+
+  it("does not move an existing task under a parent through update_task", async () => {
+    const w = world();
+    const admin = w.toolsFor("u-admin");
+    const parent = (await w.call(admin, "create_task", { name: "Parent", projectId: "p1" })).data!;
+    const loose = (await w.call(admin, "create_task", { name: "Loose", projectId: "p1" })).data!;
+    await w.call(admin, "update_task", { taskId: loose.id, parentId: parent.id });
+    expect((w.raw.prepare(`SELECT parent_id FROM tasks WHERE id = ?`).get(loose.id as string) as { parent_id: string | null }).parent_id).toBeNull();
   });
 });
 

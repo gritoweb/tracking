@@ -23,7 +23,6 @@ export const MANAGER_ONLY_TOOLS: ReadonlySet<string> = new Set([
   "fork_task_statuses",
   "create_task_status",
   "update_task_status",
-  "archive_task_status",
 ]);
 
 export type ToolGroup = "Time and reports" | "Tasks" | "Projects, clients and tags" | "Planning and saved items" | "You and the workspace";
