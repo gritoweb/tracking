@@ -137,8 +137,9 @@ export function useUpdateTask() {
     onMutate: async ({ id, data, optimisticAssignees }) => {
       await queryClient.cancelQueries({ queryKey: ["tasks"] });
       const snapshot = queryClient.getQueriesData<Task[]>({ queryKey: ["tasks"] });
+      // The prefix also holds non-lists (archive counts, a single task): patch only the lists.
       queryClient.setQueriesData<Task[]>({ queryKey: ["tasks"] }, (old) =>
-        old?.map((t) => {
+        !Array.isArray(old) ? old : old.map((t) => {
           if (t.id === id) {
             return {
               ...t,
@@ -204,8 +205,9 @@ export function useMoveTask() {
         active: !done,
         completedAt: done ? (t.completedAt ?? new Date().toISOString()) : null,
       });
+      // The prefix also holds non-lists (archive counts, a single task): patch only the lists.
       queryClient.setQueriesData<Task[]>({ queryKey: ["tasks"] }, (old) =>
-        old?.map((t) => {
+        !Array.isArray(old) ? old : old.map((t) => {
           if (t.id === id) return { ...patch(t), boardOrder };
           // A parent's children follow it server-side; mirror that so rows don't contradict.
           if (t.parentId === id) return patch(t);
