@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
 import { reportClientError } from "@/lib/errorReporter";
+import { isReloadingForStaleChunk } from "@/lib/staleChunkReload";
 
 interface RouteErrorBoundaryProps {
   /** Center on a standalone full-height surface (use outside the app shell). */
@@ -49,13 +50,16 @@ function describeError(error: unknown): {
 export function RouteErrorBoundary({ fullScreen = false }: RouteErrorBoundaryProps) {
   const error = useRouteError();
   const { title, description, message, stack } = describeError(error);
+  const reloading = isReloadingForStaleChunk();
 
   useEffect(() => {
+    if (reloading) return;
     console.error("Route error:", error);
     reportClientError(error, { kind: "route" });
-  }, [error]);
+  }, [error, reloading]);
 
   const details = stack ? `${message}\n\n${stack}` : message;
+  if (reloading) return null;
 
   const copyDetails = () => {
     void navigator.clipboard

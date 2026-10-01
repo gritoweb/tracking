@@ -1,4 +1,4 @@
-import { Suspense } from "react";
+import { Suspense, lazy } from "react";
 import type { ReactNode } from "react";
 import { createBrowserRouter, RouterProvider, Navigate } from "react-router-dom";
 import { AppShell } from "@/components/layout/AppShell";
@@ -6,47 +6,45 @@ import { AuthGuard } from "@/components/auth/AuthGuard";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 import { PageFallback } from "@/components/layout/PageFallback";
-import { lazyWithReload } from "@/lib/lazyWithReload";
 import { TimerPage } from "@/pages/TimerPage";
 
 // Timer is the landing route and stays eager. Every other route is split into
 // its own chunk (Reports pulls in recharts, the largest of them) and loaded on
-// demand behind a Suspense fallback. lazyWithReload recovers from stale-chunk
-// import failures after a deploy by reloading once to fetch the fresh assets.
-const ProjectsPage = lazyWithReload(() =>
+// demand behind a Suspense fallback. A chunk gone after a deploy reloads the page (lib/staleChunkReload).
+const ProjectsPage = lazy(() =>
   import("@/pages/ProjectsPage").then((m) => ({ default: m.ProjectsPage }))
 );
-const TasksPage = lazyWithReload(() =>
+const TasksPage = lazy(() =>
   import("@/pages/TasksPage").then((m) => ({ default: m.TasksPage }))
 );
-const ClientsPage = lazyWithReload(() =>
+const ClientsPage = lazy(() =>
   import("@/pages/ClientsPage").then((m) => ({ default: m.ClientsPage }))
 );
-const ClientDetailPage = lazyWithReload(() =>
+const ClientDetailPage = lazy(() =>
   import("@/pages/ClientDetailPage").then((m) => ({ default: m.ClientDetailPage }))
 );
-const ReportsPage = lazyWithReload(() =>
+const ReportsPage = lazy(() =>
   import("@/pages/ReportsPage").then((m) => ({ default: m.ReportsPage }))
 );
-const SettingsPage = lazyWithReload(() =>
+const SettingsPage = lazy(() =>
   import("@/pages/SettingsPage").then((m) => ({ default: m.SettingsPage }))
 );
-const AdminPage = lazyWithReload(() =>
+const AdminPage = lazy(() =>
   import("@/pages/AdminPage").then((m) => ({ default: m.AdminPage }))
 );
-const LoginPage = lazyWithReload(() =>
+const LoginPage = lazy(() =>
   import("@/pages/LoginPage").then((m) => ({ default: m.LoginPage }))
 );
-const SignUpPage = lazyWithReload(() =>
+const SignUpPage = lazy(() =>
   import("@/pages/SignUpPage").then((m) => ({ default: m.SignUpPage }))
 );
-const AcceptInvitePage = lazyWithReload(() =>
+const AcceptInvitePage = lazy(() =>
   import("@/pages/AcceptInvitePage").then((m) => ({ default: m.AcceptInvitePage }))
 );
-const ResetPasswordPage = lazyWithReload(() =>
+const ResetPasswordPage = lazy(() =>
   import("@/pages/ResetPasswordPage").then((m) => ({ default: m.ResetPasswordPage }))
 );
-const NotFoundPage = lazyWithReload(() =>
+const NotFoundPage = lazy(() =>
   import("@/pages/NotFoundPage").then((m) => ({ default: m.NotFoundPage }))
 );
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-01 (6) — `refactor`, local only (not pushed to master, not deployed)
+### Fixed
+- **A tab open across a deploy no longer crashes on views it hasn't loaded yet.** After the 2026-10-01 release, opening the calendar in a tab loaded before it failed with `Failed to fetch dynamically imported module` (`CalendarBody-*.js`): the deploy removed the old chunk, the asset fallback answered with `index.html`, and six `lazy()` views (calendar, timesheet, planner, task rail, draft review, PDF viewer) had never been wrapped in `lazyWithReload`, the only recovery. Recovery is now one `vite:preloadError` listener (`lib/staleChunkReload.ts`, installed in `main.tsx`) that reloads the page for every failed dynamic import, present and future, so nothing depends on a call site remembering a wrapper. A second failure within 10 s surfaces instead of looping, and the route error screen stays blank and unreported while the reload is under way. `lazyWithReload` is deleted; every view uses plain `lazy()`.
+### Verified
+- `lib/staleChunkReload.test.ts` (reloads once, no loop inside 10 s, reloads again later). `vite:preloadError` is dispatched for a failed import in the built bundle (`e().catch(...)` in Vite's preload helper). `tsc -b` (0), `pnpm lint` (0), `vitest run` 1220/1220, `pnpm build` (0).
+
 ## 2026-10-01 (5) — deployed to production (`refactor` → `master`; no migration)
 ### Released
 - (2) + (3) + (4): the column menu ends on a red "Archive all tasks" and no longer archives columns; cards move again after "Show archived" is toggled; the selection bar drops Copy and Convert to subtask and its Archive is red; the MCP drops `archive_task_status` and `update_task`'s `parentId`.

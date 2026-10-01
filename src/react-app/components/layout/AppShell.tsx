@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 import { WifiOff } from "lucide-react";
 import { useHotkeys } from "react-hotkeys-hook";
 import { Sidebar } from "./Sidebar";
@@ -19,19 +19,18 @@ import { useOfflineSync } from "@/hooks/useOfflineSync";
 import { useHydrateSettings } from "@/hooks/useSettings";
 import { useUIStore } from "@/stores/uiStore";
 import { useAssistantStore } from "@/stores/assistantStore";
-import { lazyWithReload } from "@/lib/lazyWithReload";
 
 // The Assistant's chat pulls the whole agents/AI SDK chain (~a quarter of the
 // entry chunk) — split it out and mount it on first open. The nudge notifier
 // stays eager: it's tiny and must toast without the panel ever opening.
-const AssistantPanel = lazyWithReload(() =>
+const AssistantPanel = lazy(() =>
   import("@/components/assistant/AssistantPanel").then((m) => ({ default: m.AssistantPanel }))
 );
 
 // Mounted once, here, because the toast that opens it fires from the Tasks page,
 // the Timer rail and the timer's own stop handler. Lazy: it pulls the whole
 // entry form, and most sessions never log time this way.
-const LogTaskTimeSheet = lazyWithReload(() =>
+const LogTaskTimeSheet = lazy(() =>
   import("@/components/tasks/LogTaskTimeSheet").then((m) => ({ default: m.LogTaskTimeSheet }))
 );
 
