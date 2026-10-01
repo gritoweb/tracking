@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-01 (1) — deployed to production (`refactor` → `master`; no migration)
+### Released
+- (35) + (36): opening a task reads the notifications it already has, with one request per opening; one that arrives while the task stays open waits for a click or a reopen (and goes to Slack after 5 minutes otherwise). Replaces the 2026-09-30 behaviour that also read notifications arriving while the task was open.
+### Verified
+- `pnpm check` (0), `vitest run` 1213/1213 before release.
+
 ## 2026-09-30 (36) — `refactor`, local only (not pushed, not deployed)
 ### Changed
 - **Reading a task's notifications on open is one request, with no listener.** The visibility check and its `visibilitychange` listener only covered a task opened in a background tab; opening a task is already the gesture of reading it, so the hook now reads once per opening (again on each reopen) and nothing else. `PATCH /api/notifications/read-task/:taskId` answers `{ ok: true }` like its neighbours — the count it returned was used by no caller.
