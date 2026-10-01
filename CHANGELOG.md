@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-01 (5) — deployed to production (`refactor` → `master`; no migration)
+### Released
+- (2) + (3) + (4): the column menu ends on a red "Archive all tasks" and no longer archives columns; cards move again after "Show archived" is toggled; the selection bar drops Copy and Convert to subtask and its Archive is red; the MCP drops `archive_task_status` and `update_task`'s `parentId`.
+### Verified
+- CI green on `refactor` (run 36863737781), `pnpm check` (0), `pnpm run deploy` (version `36458fc4-993c-4a4c-bfe9-8d7a3aacd18d`), `https://tracking.gritoweb.com.br/` answers 200 and serves the new bundle `index-hZIjmtsM.js`.
+
 ## 2026-10-01 (4) — `refactor`, local only (not pushed, not deployed)
 ### Removed
 - **The MCP now offers what the board offers.** The `archive_task_status` tool is gone (the board's "Archive column" was removed in (2)); an assistant asked to "archive Backlog" could have made the same mistake a person did. `update_task` no longer takes `parentId`, matching the removal of "Convert to subtask" in (3). `create_task` keeps `parentId`, since the board still creates subtasks. The `POST /api/task-statuses/:id/archive` route stays.
