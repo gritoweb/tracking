@@ -1,5 +1,29 @@
 # Changelog
 
+## 2026-10-01 (4) — `refactor`, local only (not pushed, not deployed)
+### Removed
+- **The MCP now offers what the board offers.** The `archive_task_status` tool is gone (the board's "Archive column" was removed in (2)); an assistant asked to "archive Backlog" could have made the same mistake a person did. `update_task` no longer takes `parentId`, matching the removal of "Convert to subtask" in (3). `create_task` keeps `parentId`, since the board still creates subtasks. The `POST /api/task-statuses/:id/archive` route stays.
+### Verified
+- New tests in `mcp/tools/tasks.test.ts` (no `archive_task_status` tool; `update_task` with `parentId` leaves the task top-level) fail without the change and pass with it. The MCP test of the cross-board `moveTo` refusal moved to `routes/task-statuses.test.ts`, so the rule the route still enforces keeps a test. `tsc -b` (0), `eslint` (0), `vitest run` all green.
+
+## 2026-10-01 (3) — `refactor`, local only (not pushed, not deployed)
+### Fixed
+- **Cards could not be moved after turning "Show archived" on and off.** Turning it on caches the archive counts (an object, not a list) under the `["tasks"]` key prefix, and the optimistic patches in `useMoveTask` and `useUpdateTask` ran `old?.map` over every query under that prefix. The patch threw `old?.map is not a function`, the mutation failed and the card snapped back. The same thing happened after opening a task by link, which caches a single task under the same prefix. Both patches now skip anything that is not a list.
+### Changed
+- **The selection bar's Archive/Unarchive button is red**, matching the Delete button beside it and "Archive all tasks" in the column menu.
+### Removed
+- **"Copy names and links" and "Convert to subtask" are gone from the board's selection bar**, with their code (the clipboard helper, the parent-task picker and the `tasks` prop that only fed it). The server's bulk `parentId` patch stays, since MCP still uses it.
+### Verified
+- `src/react-app/hooks/useTasks.test.tsx` failed with `old?.map is not a function` before the fix and passes after it. `tsc -b` (0), `eslint` (0), `vitest run` 1215/1215 (also after the removals). Not checked in the browser.
+
+## 2026-10-01 (2) — `refactor`, local only (not pushed, not deployed)
+### Removed
+- **"Archive column" is gone from the board's column menu**, with its move-tasks-to dialog and the `useArchiveTaskStatus` hook. Sitting just under "Archive all tasks" with the same icon and word, it was clicked by someone who meant to archive the tasks: it would have hidden the column and moved its tasks to another status without archiving any of them. Archiving a column is not needed for now; the server route and the `archive_task_status` MCP tool are untouched.
+### Changed
+- **"Archive all tasks" now sits at the bottom of the menu, in red**, where "Archive column" was.
+### Verified
+- `tsc -b` (0), `eslint` on both files (0), `vitest run` 1213/1213. Not checked in the browser: the local database has no demo account to sign in with.
+
 ## 2026-10-01 (1) — deployed to production (`refactor` → `master`; no migration)
 ### Released
 - (35) + (36): opening a task reads the notifications it already has, with one request per opening; one that arrives while the task stays open waits for a click or a reopen (and goes to Slack after 5 minutes otherwise). Replaces the 2026-09-30 behaviour that also read notifications arriving while the task was open.
