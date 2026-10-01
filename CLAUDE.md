@@ -31,7 +31,7 @@ Unit and route tests run under **vitest** (`pnpm exec vitest run`, ~800 tests; r
 
 1. Land the change on `master` (CI green).
 2. If the change added a file in `migrations/`, apply it to the **remote** D1 database first: `npx wrangler d1 migrations apply time-tracker --remote` (the `db`/`migrate` skills default to local).
-3. `pnpm check` (dry-run validation), then `pnpm run deploy`.
+3. `pnpm check` (dry-run validation). **Pushing `master` deploys by itself** (Workers Builds, ~2 min; verified 2026-10-01): watch `npx wrangler deployments list` for the new version and run `pnpm run deploy` only if none appears. Never both — two deploys minutes apart rehash the chunks under every tab opened in between.
 4. Smoke-check: `curl -s -o /dev/null -w "%{http_code}" https://tracking.gritoweb.com.br/` should be `200`.
 
 Migrations must land before the worker code that queries their new columns/tables — D1 is one shared remote database, not a per-deploy migration step.

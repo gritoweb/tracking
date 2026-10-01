@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-10-01 (7) — deployed to production (`refactor` → `master`; no migration)
+### Released
+- (6): a tab open across a deploy reloads itself instead of crashing on a view it hadn't loaded yet.
+### Verified
+- CI green on `refactor` for `e89944b`. Locally on the production build (`vite preview` on 5173, signed in): three simulated deploys, each a rebuild with new chunk hashes and a server restart, with the tab left open — opening Reset password, Timer (calendar) and Reports from the old tab reloaded it onto the new bundle and rendered the view, with no error screen. Pushing `master` deployed by itself (version `c1eeb45f-1b34-417f-82e5-e9492b17c09c`, ~2 min after the push; no manual `pnpm run deploy`); `https://tracking.gritoweb.com.br/` answers 200 and its bundle `index-Cr8tLsCF.js` carries the listener.
+### Changed
+- `CLAUDE.md` deploy sequence: pushing `master` already deploys; a manual `pnpm run deploy` on top of it is what put two versions out two minutes apart earlier today and broke the tab in the report.
+
 ## 2026-10-01 (6) — `refactor`, local only (not pushed to master, not deployed)
 ### Fixed
 - **A tab open across a deploy no longer crashes on views it hasn't loaded yet.** After the 2026-10-01 release, opening the calendar in a tab loaded before it failed with `Failed to fetch dynamically imported module` (`CalendarBody-*.js`): the deploy removed the old chunk, the asset fallback answered with `index.html`, and six `lazy()` views (calendar, timesheet, planner, task rail, draft review, PDF viewer) had never been wrapped in `lazyWithReload`, the only recovery. Recovery is now one `vite:preloadError` listener (`lib/staleChunkReload.ts`, installed in `main.tsx`) that reloads the page for every failed dynamic import, present and future, so nothing depends on a call site remembering a wrapper. A second failure within 10 s surfaces instead of looping, and the route error screen stays blank and unreported while the reload is under way. `lazyWithReload` is deleted; every view uses plain `lazy()`.
