@@ -1,12 +1,9 @@
 import { useState } from "react";
-import { toast } from "sonner";
 import {
   Archive,
   ArchiveRestore,
   CalendarDays,
   CircleDot,
-  Copy,
-  CornerDownRight,
   Flag,
   FolderInput,
   Trash2,
@@ -22,7 +19,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { SelectionBar } from "@/components/ui/selection-bar";
 import { ColorDot } from "@/components/ColorDot";
 import { MultiSelect } from "@/components/pickers/MultiSelect";
@@ -32,7 +28,6 @@ import { useCanDeleteTask } from "@/hooks/useTaskPermissions";
 import { useWorkspaceMembers } from "@/hooks/useWorkspaceRole";
 import { PRIORITIES, PRIORITY_LABEL, dateToLocalDate } from "@/lib/taskUtils";
 import { todayLocalDate } from "@shared/task-recurrence";
-import { taskPath } from "@shared/task-links";
 import type { BulkUpdateTasks, Task, TaskStatus } from "@shared/schemas";
 
 type Patch = BulkUpdateTasks["items"][number]["patch"];
@@ -41,26 +36,22 @@ interface TaskSelectionBarProps {
   selected: Task[];
   /** The board's columns, for "Status". */
   statuses: TaskStatus[];
-  /** Every task on the page, for "Convert to subtask"'s parent list. */
-  tasks: Task[];
   onClear: () => void;
 }
 
 /** The board's bulk actions; every edit is each task's own PUT on the server, so rules and history match a single edit. */
-export function TaskSelectionBar({ selected, statuses, tasks, onClear }: TaskSelectionBarProps) {
+export function TaskSelectionBar({ selected, statuses, onClear }: TaskSelectionBarProps) {
   const bulk = useBulkTaskAction();
   const bulkUpdate = useBulkUpdateTasks();
   const canDelete = useCanDeleteTask();
   const { data: members = [], isPending: membersLoading } = useWorkspaceMembers(true);
   const [dueOpen, setDueOpen] = useState(false);
-  const [parentOpen, setParentOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const ids = selected.map((t) => t.id);
   const busy = bulk.isPending || bulkUpdate.isPending;
   const allYours = selected.every(canDelete);
   const allArchived = selected.every((t) => t.archivedAt);
-  const hasSubtasks = selected.some((t) => t.subtaskTotal > 0);
   const label = `${selected.length} task${selected.length === 1 ? "" : "s"} selected`;
 
   const apply = (patchFor: (task: Task) => Patch) =>
@@ -76,19 +67,6 @@ export function TaskSelectionBar({ selected, statuses, tasks, onClear }: TaskSel
     apply((t) => ({
       assigneeIds: [...new Set([...t.assignees.map((a) => a.userId), ...added])].filter((id) => !removed.includes(id)),
     }));
-  };
-
-  const selectedIds = new Set(ids);
-  const parents = tasks.filter((t) => !t.parentId && !t.archivedAt && !selectedIds.has(t.id));
-
-  const copy = async () => {
-    const text = selected.map((t) => `${t.name} — ${window.location.origin}${taskPath(t.id)}`).join("\n");
-    try {
-      await navigator.clipboard.writeText(text);
-      toast.success(`Copied ${selected.length} task${selected.length === 1 ? "" : "s"}`);
-    } catch {
-      toast.error("Couldn't copy to the clipboard");
-    }
   };
 
   return (
@@ -179,44 +157,6 @@ export function TaskSelectionBar({ selected, statuses, tasks, onClear }: TaskSel
           </Button>
         </ProjectPicker>
 
-        <Popover open={parentOpen} onOpenChange={setParentOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Convert to subtask"
-              title={hasSubtasks ? "A task that has subtasks can't become a subtask" : "Convert to subtask"}
-              disabled={busy || hasSubtasks}
-            >
-              <CornerDownRight className="h-4 w-4" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent side="top" className="w-72 p-0">
-            <Command>
-              <CommandInput placeholder="Parent task…" />
-              <CommandList>
-                <CommandEmpty>No task found</CommandEmpty>
-                {parents.map((p) => (
-                  <CommandItem
-                    key={p.id}
-                    value={`${p.name} ${p.id}`}
-                    onSelect={() => {
-                      apply(() => ({ parentId: p.id }));
-                      setParentOpen(false);
-                    }}
-                  >
-                    <span className="truncate">{p.name}</span>
-                  </CommandItem>
-                ))}
-              </CommandList>
-            </Command>
-          </PopoverContent>
-        </Popover>
-
-        <Button variant="ghost" size="icon-sm" aria-label="Copy names and links" title="Copy names and links" onClick={copy}>
-          <Copy className="h-4 w-4" />
-        </Button>
-
         {/* Like Delete everywhere else: shown only when every selected task is the person's to change. */}
         {allYours && (
           <>
@@ -227,6 +167,7 @@ export function TaskSelectionBar({ selected, statuses, tasks, onClear }: TaskSel
               title={allArchived ? "Unarchive" : "Archive"}
               disabled={busy}
               onClick={() => bulk.mutate({ ids, action: allArchived ? "unarchive" : "archive" }, { onSuccess: onClear })}
+              className="text-destructive hover:text-destructive"
             >
               {allArchived ? <ArchiveRestore className="h-4 w-4" /> : <Archive className="h-4 w-4" />}
             </Button>

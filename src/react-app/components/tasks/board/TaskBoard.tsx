@@ -309,7 +309,7 @@ export function TaskBoard({
       </DragOverlay>
 
       {selecting && (
-        <TaskSelectionBar selected={selectedTasks} statuses={statuses} tasks={tasks} onClear={clearSelection} />
+        <TaskSelectionBar selected={selectedTasks} statuses={statuses} onClear={clearSelection} />
       )}
     </DndContext>
   );
