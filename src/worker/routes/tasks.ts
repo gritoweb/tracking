@@ -81,7 +81,7 @@ function formatTask(row: TaskJoinRow): Task {
     commentCount: row.comment_count ?? 0,
     subtaskDone: row.subtask_done ?? 0,
     assignees: parseJsonColumn(row.assignees_json, taskAssigneeArray, [], "tasks.assignees_json"),
-    createdAt: row.created_at,
+    createdAt: sqliteUtcToIso(row.created_at),
   };
 }
 

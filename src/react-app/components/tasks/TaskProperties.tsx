@@ -1,4 +1,4 @@
-import { CalendarDays, CircleDot, Flag, FolderOpen, Hourglass, Play, Square, Timer as TimerIcon, Users } from "lucide-react";
+import { CalendarDays, CalendarPlus, CircleDot, Flag, FolderOpen, Hourglass, Play, Square, Timer as TimerIcon, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
@@ -17,10 +17,11 @@ import { ColorDot } from "@/components/ColorDot";
 import { FieldRow } from "@/components/FieldRow";
 import { TaskStatusChip } from "./TaskStatusChip";
 import type { WorkspaceMember } from "@/hooks/useWorkspaceRole";
-import { formatDurationShort } from "@/lib/dateUtils";
+import { formatDurationShort, formatStamp } from "@/lib/dateUtils";
 import { TASK_TIMER_ENABLED } from "@/lib/features";
 import { PRIORITIES, PRIORITY_LABEL, PRIORITY_RING, dateToLocalDate, formatDueDate, localDateToDate } from "@/lib/taskUtils";
 import { cn } from "@/lib/utils";
+import { useUIStore } from "@/stores/uiStore";
 import type { Task } from "@shared/schemas";
 
 interface TaskPropertiesProps {
@@ -59,6 +60,7 @@ export function TaskProperties({
   onChangeDueDate,
   onChangePriority,
 }: TaskPropertiesProps) {
+  const timeFormat = useUIStore((s) => s.timeFormat);
   return (
     // Sized by its own width, not the viewport: two fields per line in the modal, one per line in the sidebar.
     <div className="@container">
@@ -220,6 +222,12 @@ export function TaskProperties({
               </Button>
             )}
           </div>
+        </FieldRow>
+
+        <FieldRow icon={<CalendarPlus className="h-3.5 w-3.5" />} label="Created">
+          <span className="px-1.5 py-1 text-sm" title={new Date(task.createdAt).toLocaleString()}>
+            {formatStamp(task.createdAt, timeFormat)}
+          </span>
         </FieldRow>
       </div>
     </div>

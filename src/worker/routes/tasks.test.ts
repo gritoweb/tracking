@@ -86,6 +86,20 @@ describe("GET / — formatTask's assignees_json (TYPE-2: typed rows, parsed via 
     expect(calls.some((c) => c.sql.includes("FROM task_comments") && c.sql.includes("comment_count"))).toBe(true);
   });
 
+  it("returns createdAt as UTC ISO even for a row stored in SQLite's datetime('now') format", async () => {
+    const { app, env } = mountedApp({
+      first: () => ({ role: "member" }),
+      all: (call) =>
+        call.sql.includes("FROM tasks tk")
+          ? { results: [{ ...baseRow, assignees_json: null, created_at: "2026-01-01 10:00:00" }, { ...baseRow, id: "task-2", assignees_json: null }] }
+          : { results: [] },
+    });
+    const res = await app.request("/", {}, env);
+    const body = (await res.json()) as Array<{ id: string; createdAt: string }>;
+    expect(body.find((t) => t.id === "task-1")?.createdAt).toBe("2026-01-01T10:00:00Z");
+    expect(body.find((t) => t.id === "task-2")?.createdAt).toBe("2026-01-01T00:00:00.000Z");
+  });
+
   it("falls back to an empty list rather than throwing on malformed assignees_json", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const { app, env } = mountedApp({

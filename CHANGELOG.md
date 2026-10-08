@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-10-08 — `refactor`, local only (not pushed to master, not deployed)
+### Added
+- **A task shows when it was created.** The task detail (modal and side panel) has a read-only "Created" field ("Oct 8 at 14:05", full date on hover), so time can be logged later against the day the task came in. The date was already in the API (`createdAt`) but shown nowhere.
+### Fixed
+- `GET /api/tasks` now returns `createdAt` as UTC ISO for every row. Older tasks were stored in SQLite's `datetime('now')` format (`2026-01-01 10:00:00`), which a browser reads as local time, so the new field would have been off by the user's UTC offset.
+### Verified
+- New route test (`tasks.test.ts`): a legacy-format row comes back as `2026-01-01T10:00:00Z`, an ISO row unchanged; it fails without the fix. `tsc -b` (0), `pnpm lint` (0), `vitest run` 1221/1221, `pnpm check` (0). Not checked in a browser: `pnpm dev` refused to start (expired `wrangler` login for the remote AI proxy).
+
 ## 2026-10-01 (7) — deployed to production (`refactor` → `master`; no migration)
 ### Released
 - (6): a tab open across a deploy reloads itself instead of crashing on a view it hadn't loaded yet.
