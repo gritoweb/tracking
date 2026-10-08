@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-08 (2) — `refactor` → `master`
+### Changed
+- **The task's creation is now the first line of its comments feed** ("Luis created this task · Oct 8 at 10:43"), next to the status and due-date changes, instead of a "Created" field among the properties (removed). It is derived from the task row (`created_at`, `created_by`) in `listActivity`, not written to `task_activity`, so every existing task has it with no data migration. The MCP `list_task_activity` returns it too (`change: "created"`).
+### Verified
+- Route test (`tasks.archiving.test.ts`): the history leads with `created` by the task's author, then the recorded changes; another workspace's task is 404. `describeActivity` test for the sentence. `tsc -b` (0), `pnpm lint` (0), `vitest run` 1224/1224. Locally in Playwright: a new task's comments panel shows "Test User created this task · Just now" and no "Created" field.
+
 ## 2026-10-08 — `refactor`, local only (not pushed to master, not deployed)
 ### Added
 - **A task shows when it was created.** The task detail (modal and side panel) has a read-only "Created" field ("Oct 8 at 14:05", full date on hover), so time can be logged later against the day the task came in. The date was already in the API (`createdAt`) but shown nowhere.

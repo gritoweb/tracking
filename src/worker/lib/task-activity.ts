@@ -28,7 +28,17 @@ export function formatActivity(row: ActivityRow): TaskActivity {
   };
 }
 
+/** The task's history, opened by its creation — derived from the task row, so tasks older than the history have it too. */
 export async function listActivity(db: D1Database, workspaceId: string, taskId: string): Promise<TaskActivity[]> {
+  const created = await db
+    .prepare(
+      `SELECT t.id AS task_id, t.created_by AS user_id, t.created_at, u.name AS user_name, u.email AS user_email, u.image AS user_image
+         FROM tasks t
+         LEFT JOIN "user" u ON u.id = t.created_by
+        WHERE t.id = ? AND t.workspace_id = ?`
+    )
+    .bind(taskId, workspaceId)
+    .first<Omit<ActivityRow, "id" | "kind" | "from_value" | "to_value">>();
   const { results } = await db
     .prepare(
       `SELECT a.*, u.name AS user_name, u.email AS user_email, u.image AS user_image
@@ -38,7 +48,9 @@ export async function listActivity(db: D1Database, workspaceId: string, taskId: 
     )
     .bind(taskId, workspaceId)
     .all<ActivityRow>();
-  return results.map(formatActivity);
+  const changes = results.map(formatActivity);
+  if (!created) return changes;
+  return [formatActivity({ ...created, id: `created-${taskId}`, kind: "created", from_value: null, to_value: null }), ...changes];
 }
 
 export interface ActivityInput {

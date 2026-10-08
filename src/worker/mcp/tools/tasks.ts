@@ -240,7 +240,7 @@ export function registerTaskReads(d: ToolDeps): void {
     {
       title: "List a task's history",
       description:
-        "What changed on a task and who changed it, oldest first: status, due date, priority and assignee changes (the same lines the app shows between the comments). Comments themselves come from list_task_comments.",
+        "What changed on a task and who changed it, oldest first, starting with who created it: status, due date, priority and assignee changes (the same lines the app shows between the comments). Comments themselves come from list_task_comments.",
       inputSchema: { taskId: IdArg("task") },
       annotations: READ_ONLY,
     },

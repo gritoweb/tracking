@@ -17,6 +17,8 @@ const priority = (n: string) => PRIORITY_LABEL[Number(n)] ?? n;
 /** The sentence after the person's name, as segments so the changed values can be emphasised. */
 export function describeActivity(a: TaskActivity): ActivitySegment[] {
   switch (a.kind) {
+    case "created":
+      return [plain("created this task")];
     case "status":
       return a.from
         ? [plain("changed status from "), value(a.from), plain(" to "), value(a.to ?? "")]

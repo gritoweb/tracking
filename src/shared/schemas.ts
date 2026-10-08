@@ -965,7 +965,7 @@ export const UpdateTaskCommentSchema = z.object({
   attachmentId: z.string().nullable().optional(),
 });
 
-export const TaskActivityKindSchema = z.enum(["status", "due_date", "priority", "assignees", "archived", "unarchived"]);
+export const TaskActivityKindSchema = z.enum(["created", "status", "due_date", "priority", "assignees", "archived", "unarchived"]);
 
 /** One change to a task, shown in the comments feed. For `assignees`, `from` is who was removed and `to` who was added. */
 export const TaskActivitySchema = z.object({

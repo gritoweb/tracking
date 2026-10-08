@@ -9,6 +9,10 @@ const base: TaskActivity = {
 const sentence = (a: Partial<TaskActivity>) => describeActivity({ ...base, ...a }).map((s) => s.text).join("");
 
 describe("describeActivity", () => {
+  it("describes the task's creation", () => {
+    expect(sentence({ kind: "created" })).toBe("created this task");
+  });
+
   it("describes a status change, with and without a previous status", () => {
     expect(sentence({ kind: "status", from: "To do", to: "In progress" })).toBe("changed status from To do to In progress");
     expect(sentence({ kind: "status", from: null, to: "Backlog" })).toBe("set status to Backlog");

@@ -319,3 +319,20 @@ describe("GET /options — Reports' light task list", () => {
     expect(Object.keys(body[0]).sort()).toEqual(["archived", "id", "name", "parentId", "projectId"]);
   });
 });
+
+describe("GET /:id/activity — the history opens with the task's creation", () => {
+  it("leads with who created the task and when, from the task row itself, before the recorded changes", async () => {
+    const { raw, as } = archivingWorld();
+    raw.exec(`UPDATE tasks SET created_at = '2025-12-31 10:00:00' WHERE id = 't-owner'`);
+    await as("u-owner").post("/bulk", { ids: ["t-owner"], action: "archive" });
+    const res = await as("u-owner").get("/t-owner/activity");
+    const body = (await res.json()) as Array<{ kind: string; userName: string; createdAt: string }>;
+    expect(body.map((a) => a.kind)).toEqual(["created", "archived"]);
+    expect(body[0]).toMatchObject({ userName: "Owner", createdAt: "2025-12-31T10:00:00Z" });
+  });
+
+  it("does not leak another workspace's task", async () => {
+    const { as } = archivingWorld();
+    expect((await as("u-owner").get("/t-foreign/activity")).status).toBe(404);
+  });
+});
