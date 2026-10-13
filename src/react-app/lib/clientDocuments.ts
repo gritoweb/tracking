@@ -36,11 +36,13 @@ export interface DocumentPreset {
   from: string;
   to: string;
   number?: string;
+  /** An hourly rate for this invoice only. */
+  rate?: number;
 }
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
-/** The preset in `?document=invoice&from=…&to=…&lang=…&number=…`, or null when the link carries none or a broken one. */
+/** The preset in `?document=invoice&from=…&to=…&lang=…&number=…&rate=…`, or null when the link carries none or a broken one. */
 export function documentPresetFrom(params: URLSearchParams): DocumentPreset | null {
   const kind = params.get("document");
   const locale = params.get("lang") ?? "pt-BR";
@@ -48,5 +50,7 @@ export function documentPresetFrom(params: URLSearchParams): DocumentPreset | nu
   const to = params.get("to") ?? "";
   if ((kind !== "invoice" && kind !== "hours") || (locale !== "pt-BR" && locale !== "en")) return null;
   if (!DAY.test(from) || !DAY.test(to) || from > to) return null;
-  return { kind, locale, from, to, number: params.get("number") ?? undefined };
+  const rate = params.get("rate") === null ? undefined : Number(params.get("rate"));
+  if (rate !== undefined && !(rate >= 0)) return null;
+  return { kind, locale, from, to, number: params.get("number") ?? undefined, rate };
 }

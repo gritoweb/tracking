@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-13 (6) — `refactor`, local only (not pushed to master, not deployed)
+### Added
+- **The hourly rate is editable where the invoice is generated.** The dialog shows the rate it will bill (the client's, else the workspace default) in a money field; a different value bills that invoice only and says so ("For this invoice only; the workspace default stays R$ 100,00"). Nothing is saved, and choosing another client brings its own rate back. A blank or non-numeric rate disables Generate PDF. `prepare_client_document` takes the same one-off `hourlyRate` (answered as `rateSource: "this invoice only"`) and carries it in the link as `rate=`.
+### Verified
+- `documents.test.ts` (8): a one-off rate prices the invoice (8,25 h × 120 + 35 = 1.025) and leaves the client's rate unsaved; the link parser accepts `rate=120.5` and ignores `abc` or `-5`. `tsc -b` (0), `pnpm lint` (0), `vitest run` 1267/1267. Live, local only: a JSON-RPC session against `localhost:5173/mcp` with a temporary local read+write key for a local admin account (both removed afterwards; the production MCP config was not touched) listed 73 tools, read the document settings, added two fixed services to a client and prepared its September invoice (33,83 h × 65 one-off = 2.199,17 + 65 + 35 = 2.299,17) and hours report (30 entries, 2,82 h/day). Opening the two links as that account showed the dialog filled in with "R$ 65,00 — For this invoice only", and both PDFs downloaded.
+
 ## 2026-10-13 (5) — `refactor`, local only (not pushed to master, not deployed)
 ### Added
 - **Client documents through MCP and the in-app Assistant.** `prepare_client_document` (owners/admins) returns a client's hours, invoice lines and total for a period of local days, plus a link that opens the client's page with the generator filled in (document, period, language, invoice number), where the person clicks Generate PDF. Its description makes the model propose last month and confirm the period when the person didn't name one, and ask the language when unclear. New tools: `list_client_services`, `add_client_service`, `update_client_service`, `delete_client_service`, `get_report_settings`, `update_report_settings`; `update_client` now takes `rate`. The five writes and `prepare_client_document` are hidden from a member's key (their reports hold only their own hours).

@@ -19,6 +19,7 @@ import { useReportSettings } from "@/hooks/useReportSettings";
 import { api } from "@/lib/api-client";
 import { toastApiError } from "@/lib/toastApiError";
 import { formatMoney } from "@/lib/money";
+import { MoneyInput } from "@/components/forms/MoneyInput";
 import { useUIStore } from "@/stores/uiStore";
 import {
   DOCUMENT_TEXT,
@@ -78,11 +79,16 @@ export function ClientDocumentDialog({
   const [locale, setLocale] = useState<DocumentLocale>(preset?.locale ?? "pt-BR");
   const [{ from, to }, setRange] = useState(() => (preset ? { from: preset.from, to: preset.to } : lastMonth()));
   const [number, setNumber] = useState(() => preset?.number ?? (preset?.from ?? lastMonth().from).slice(0, 7));
+  // A rate typed here bills this invoice only; untouched (undefined), it is the client's rate or the workspace default.
+  const [rateOverride, setRateOverride] = useState<number | null | undefined>(preset?.rate);
   const [busy, setBusy] = useState(false);
 
   const client = clients.find((c) => c.id === (fixedClientId ?? clientId));
+  const savedRate = client && settings ? (client.rate ?? settings.defaultRate) : null;
+  const rate = rateOverride === undefined ? savedRate : rateOverride;
+  const validRate = kind === "hours" || (rate !== null && rate >= 0);
   const validRange = from !== "" && to !== "" && from <= to;
-  const canGenerate = Boolean(client && settings && validRange && !busy);
+  const canGenerate = Boolean(client && settings && validRange && validRate && !busy);
 
   const changeFrom = (value: string) => {
     setRange((r) => ({ ...r, from: value }));
@@ -119,7 +125,7 @@ export function ClientDocumentDialog({
           clientName: client.name,
           number,
           issueDate: formatDay(new Date().toISOString(), locale),
-          lines: invoiceLines(totalSeconds, client.rate ?? settings.defaultRate, services, locale),
+          lines: invoiceLines(totalSeconds, rate ?? 0, services, locale),
           currency: settings.currency,
         });
         download(blob, t.invoiceFile(client.name, number));
@@ -156,7 +162,13 @@ export function ClientDocumentDialog({
           {!fixedClientId && (
             <div className="space-y-1.5">
               <Label htmlFor="doc-client">Client</Label>
-              <Select value={clientId} onValueChange={setClientId}>
+              <Select
+                value={clientId}
+                onValueChange={(id) => {
+                  setClientId(id);
+                  setRateOverride(undefined);
+                }}
+              >
                 <SelectTrigger id="doc-client" className="w-full">
                   <SelectValue placeholder="Choose a client" />
                 </SelectTrigger>
@@ -189,12 +201,28 @@ export function ClientDocumentDialog({
             <div className="space-y-1.5">
               <Label htmlFor="doc-number">Invoice number</Label>
               <Input id="doc-number" value={number} onChange={(e) => setNumber(e.target.value)} className="w-40" />
-              {client && settings && (
-                <p className="text-xs text-muted-foreground">
-                  Billed at {formatMoney(client.rate ?? settings.defaultRate, settings.currency)}/h
-                  {client.rate === null ? " (workspace default)" : " (client rate)"}
-                </p>
-              )}
+            </div>
+          )}
+
+          {kind === "invoice" && client && settings && savedRate !== null && (
+            <div className="space-y-1.5">
+              <Label htmlFor="doc-rate">Hourly rate</Label>
+              <MoneyInput
+                // Another client brings its own rate back into the field.
+                key={client.id}
+                id="doc-rate"
+                className="w-40"
+                currency={settings.currency}
+                value={rate}
+                onValueChange={setRateOverride}
+              />
+              <p className="text-xs text-muted-foreground">
+                {rateOverride !== undefined && rateOverride !== savedRate
+                  ? `For this invoice only; the ${client.rate === null ? "workspace default" : "client's rate"} stays ${formatMoney(savedRate, settings.currency)}.`
+                  : client.rate === null
+                    ? "The workspace default (Settings → Reports)."
+                    : "This client's rate (Edit on the client page)."}
+              </p>
             </div>
           )}
         </div>

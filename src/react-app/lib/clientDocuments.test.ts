@@ -12,8 +12,9 @@ describe("a document link", () => {
 
   it("pre-fills the generator", () => {
     expect(preset("document=invoice&from=2026-09-01&to=2026-09-30&lang=en&number=2026-09")).toEqual({
-      kind: "invoice", locale: "en", from: "2026-09-01", to: "2026-09-30", number: "2026-09",
+      kind: "invoice", locale: "en", from: "2026-09-01", to: "2026-09-30", number: "2026-09", rate: undefined,
     });
+    expect(preset("document=invoice&from=2026-09-01&to=2026-09-30&rate=120.5")).toMatchObject({ rate: 120.5 });
     expect(preset("document=hours&from=2026-09-01&to=2026-09-30")).toMatchObject({ kind: "hours", locale: "pt-BR" });
   });
 
@@ -23,5 +24,7 @@ describe("a document link", () => {
     expect(preset("document=invoice&from=2026-09-30&to=2026-09-01")).toBeNull();
     expect(preset("document=invoice&from=yesterday&to=2026-09-01")).toBeNull();
     expect(preset("document=invoice&from=2026-09-01&to=2026-09-30&lang=fr")).toBeNull();
+    expect(preset("document=invoice&from=2026-09-01&to=2026-09-30&rate=abc")).toBeNull();
+    expect(preset("document=invoice&from=2026-09-01&to=2026-09-30&rate=-5")).toBeNull();
   });
 });

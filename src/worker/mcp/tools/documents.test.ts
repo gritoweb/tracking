@@ -76,6 +76,14 @@ describe("prepare_client_document", () => {
     expect(data).toMatchObject({ hourlyRate: 100, rateSource: "client", total: 860 });
   });
 
+  it("bills a one-off rate without saving it, and carries it in the link", async () => {
+    const { toolsFor, call, raw } = world();
+    const { data } = await call(toolsFor("u-owner"), "prepare_client_document", { ...SEPTEMBER, kind: "invoice", hourlyRate: 120 });
+    expect(data).toMatchObject({ hourlyRate: 120, rateSource: "this invoice only", total: 1025 });
+    expect(data?.url).toMatch(/&rate=120$/);
+    expect(raw.prepare(`SELECT rate FROM clients WHERE id = 'cl-A'`).get()).toEqual({ rate: null });
+  });
+
   it("summarises the hours report without money", async () => {
     const { toolsFor, call } = world();
     const { data } = await call(toolsFor("u-owner"), "prepare_client_document", { ...SEPTEMBER, kind: "hours" });
