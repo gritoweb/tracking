@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-13 (3) — `refactor`, local only (not pushed to master, not deployed)
+### Fixed
+- Generating a client PDF with a logo logged `Buffer is not defined` in the browser console. Cause: `@react-pdf/layout` 5.2.0 (`fetchImage`) calls `Buffer.isBuffer` unguarded after the image has loaded; `Buffer` only exists in Node, and 5.2.0 is the latest release. `patches/@react-pdf__layout@5.2.0.patch` guards it with `typeof Buffer !== "undefined"` (same mechanism as the `agents` patch). pnpm refuses to install if the version changes, so an upgrade has to revisit it.
+### Verified
+- Playwright against local `pnpm dev`: logo uploaded, invoice and hours report generated from the client page, zero console messages containing `Buffer` (before: two per document). `vite build` (0).
+
 ## 2026-10-13 (2) — `refactor`, local only (not pushed to master, not deployed)
 ### Added
 - **Client documents: an invoice and a worked-hours report, as PDFs, in Portuguese or English.** Owners/admins generate them per client from Reports (**Client document**) or from the client's page, for a period that opens on last month (1st to last day) and can be changed. The invoice (layout of the GritoWeb model) has one "Serviços Técnicos / Technical Services" line, hours of the period × the client's rate or the workspace default, then each billable fixed service, the total box and a thank-you line; the subtotal block above the total was dropped. Its number opens as the period's `YYYY-MM` and is editable; nothing is stored. The hours report is the analytical model restyled to the brand: title "Relatório de horas trabalhadas" + client, summary strip (total, entries, average per worked day), table with date only (no clock times, no project-filter pill), a header repeated on each page and "Página x/y". A client with no rate and no default can't be invoiced; the dialog says where to set one.
@@ -9,7 +15,6 @@
 - The Reports page's CSV, Excel and Print/PDF export menu is switched off (`LEGACY_EXPORTS_ENABLED = false` in `ReportHeader.tsx`, code kept); the client PDFs replace it. Settings → Data export (all entries CSV) is unchanged.
 ### Verified
 - `report-settings.test.ts` (defaults, save, partial save, bad hex 400, member 403 on every write, per workspace) and `clientDocuments.test.ts` (rate precedence, exact-hours line, non-billable left out, empty period, daily average, `32:10:00`). `tsc -b` (0), `pnpm lint` (0), `vitest run` 1241/1241, `pnpm build` (0), `pnpm check` (0). In Playwright against local `pnpm dev`: branding saved and the logo uploaded in Settings → Reports; the export menu is gone from Reports; the dialog opens on last month with number `2026-09`; four PDFs downloaded (invoice and hours report, PT and EN, from Reports and from the client page) and rendered with `pdftoppm`: 8:17 h × 65 = 538.42 + 65 + 35 = 638.42, the non-billable service and an entry outside the period absent; with 34 entries the hours report breaks onto two pages with the table header on both.
-- Known noise: react-pdf logs `Buffer is not defined` once per image in the browser, after the image has loaded (it only fails to set a cache key); the logo renders.
 
 ## 2026-10-13 — `refactor`, local only (not pushed to master, not deployed)
 ### Added
