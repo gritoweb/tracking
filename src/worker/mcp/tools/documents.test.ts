@@ -60,11 +60,12 @@ describe("prepare_client_document", () => {
       currency: "BRL",
       hourlyRate: 65,
       rateSource: "workspace default",
+      // 8h15 is billed as 8 whole hours.
       lines: [
-        { description: "Serviços Técnicos", hours: 8.25, amount: 536.25 },
+        { description: "Serviços Técnicos", hours: 8, amount: 520 },
         { description: "Email server", hours: null, amount: 35 },
       ],
-      total: 571.25,
+      total: 555,
       url: "https://app.test/clients/cl-A?document=invoice&from=2026-09-01&to=2026-09-30&lang=pt-BR&number=2026-09",
     });
   });
@@ -73,13 +74,13 @@ describe("prepare_client_document", () => {
     const { toolsFor, call, raw } = world();
     raw.exec(`UPDATE clients SET rate = 100 WHERE id = 'cl-A'`);
     const { data } = await call(toolsFor("u-owner"), "prepare_client_document", { ...SEPTEMBER, kind: "invoice", language: "en" });
-    expect(data).toMatchObject({ hourlyRate: 100, rateSource: "client", total: 860 });
+    expect(data).toMatchObject({ hourlyRate: 100, rateSource: "client", total: 835 });
   });
 
-  it("bills a one-off rate without saving it, and carries it in the link", async () => {
+  it("prices a new rate and carries it in the link, leaving the save to the app", async () => {
     const { toolsFor, call, raw } = world();
     const { data } = await call(toolsFor("u-owner"), "prepare_client_document", { ...SEPTEMBER, kind: "invoice", hourlyRate: 120 });
-    expect(data).toMatchObject({ hourlyRate: 120, rateSource: "this invoice only", total: 1025 });
+    expect(data).toMatchObject({ hourlyRate: 120, rateSource: "new rate, saved on the client when generated", total: 995 });
     expect(data?.url).toMatch(/&rate=120$/);
     expect(raw.prepare(`SELECT rate FROM clients WHERE id = 'cl-A'`).get()).toEqual({ rate: null });
   });

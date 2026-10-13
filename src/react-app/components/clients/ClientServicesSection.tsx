@@ -2,7 +2,6 @@ import { Fragment, useState } from "react";
 import { Edit2, Plus, Repeat, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -19,9 +18,11 @@ import { SettingsCardHeader } from "@/components/settings/SettingsCardHeader";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemSeparator, ItemTitle } from "@/components/ui/item";
 import { EmptyState } from "@/components/ui/empty-state";
 import { MoneyInput } from "@/components/forms/MoneyInput";
+import { Field, FieldLabel } from "@/components/forms/Field";
+import { SettingsRow } from "@/components/settings/SettingsRow";
 import { useClientServices, useSaveClientService } from "@/hooks/useProjects";
 import { useReportSettings } from "@/hooks/useReportSettings";
-import { formatMoney } from "@/lib/money";
+import { currencyLocale, formatMoney, formatMoneyInput } from "@/lib/money";
 import { useUIStore } from "@/stores/uiStore";
 import type { ClientService } from "@shared/schemas";
 
@@ -163,24 +164,34 @@ function ServiceDialog({
             if (valid) onSave({ name: name.trim(), description: description.trim() || null, amount, billable });
           }}
         >
-          <div className="space-y-1.5">
-            <Label htmlFor="service-name">Name</Label>
-            <Input id="service-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Email server" autoFocus />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="service-description">Description</Label>
-            <Textarea id="service-description" rows={2} value={description} onChange={(e) => setDescription(e.target.value)} />
-          </div>
-          <div className="flex items-end gap-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="service-amount">Amount</Label>
-              <MoneyInput id="service-amount" className="w-40" currency={currency} value={amount} onValueChange={setAmount} />
-            </div>
-            <div className="flex items-center gap-2 pb-2">
-              <Switch id="service-billable" checked={billable} onCheckedChange={setBillable} />
-              <Label htmlFor="service-billable" className="font-normal">Billable</Label>
-            </div>
-          </div>
+          <Field>
+            <FieldLabel htmlFor="service-name">Name</FieldLabel>
+            <Input id="service-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Service name" autoFocus />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="service-description">Description</FieldLabel>
+            <Textarea
+              id="service-description"
+              rows={2}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Internal note, not shown on the invoice"
+            />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="service-amount">Amount</FieldLabel>
+            <MoneyInput
+              id="service-amount"
+              className="w-40"
+              currency={currency}
+              value={amount}
+              onValueChange={setAmount}
+              placeholder={formatMoneyInput(0, currencyLocale(currency))}
+            />
+          </Field>
+          <SettingsRow htmlFor="service-billable" label="Billable" description="Listed on this client's invoice">
+            <Switch id="service-billable" checked={billable} onCheckedChange={setBillable} />
+          </SettingsRow>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
             <Button type="submit" disabled={!valid || pending}>{service ? "Save changes" : "Add service"}</Button>

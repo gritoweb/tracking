@@ -173,7 +173,7 @@ function FieldsForm({ settings, canManage }: { settings: ReportSettings; canMana
               />
               <Input
                 id={`report-color-${key}`}
-                className="w-28 font-mono"
+                className="w-28"
                 value={value}
                 disabled={!canManage}
                 aria-invalid={!valid}

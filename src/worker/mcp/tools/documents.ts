@@ -48,7 +48,7 @@ export function registerDocumentReads(d: ToolDeps): void {
       description:
         "Prepare a client's invoice or worked-hours report for a period and get the link that opens it, filled in, in the app — where the person clicks Generate PDF (the PDF is made in their browser, not here). " +
         "Before calling: if the person didn't say which period, propose last month (its first to its last day) and ask them to confirm or give other dates; never pick a period silently. Ask the language too when it isn't clear. " +
-        "The answer carries the hours, the invoice lines and total (hours × the client's rate, else the workspace default, plus billable fixed services) so you can tell the person before they open it. Owners/admins only.",
+        "The answer carries the hours, the invoice lines and total (whole hours rounded down × the client's rate, else the workspace default, plus billable fixed services) so you can tell the person before they open it. Owners/admins only.",
       inputSchema: {
         clientId: IdArg("client"),
         kind: z.enum(["invoice", "hours"]).describe("`invoice`, or `hours` for the worked-hours report"),
@@ -56,7 +56,7 @@ export function registerDocumentReads(d: ToolDeps): void {
         until: DateArg.describe("Last day of the period (inclusive), YYYY-MM-DD"),
         language: z.enum(["pt-BR", "en"]).describe("Language of the document"),
         invoiceNumber: z.string().trim().min(1).max(40).optional().describe("Invoice only; defaults to the period's YYYY-MM"),
-        hourlyRate: z.number().min(0).max(1_000_000).optional().describe("Invoice only: a rate for this invoice alone, when the person asks for one; nothing is saved. Omit to use the client's rate, else the workspace default"),
+        hourlyRate: z.number().min(0).max(1_000_000).optional().describe("Invoice only: a new hourly rate the person asked for. It prices this answer and is saved as the client's rate when they generate the PDF from the link. Omit to use the client's rate, else the workspace default"),
         timezoneOffsetMinutes: TimezoneArg,
       },
       annotations: READ_ONLY,
@@ -110,7 +110,7 @@ export function registerDocumentReads(d: ToolDeps): void {
         invoiceNumber: number,
         currency: settings.data.currency,
         hourlyRate: rate,
-        rateSource: hourlyRate !== undefined ? "this invoice only" : client.data.rate === null ? "workspace default" : "client",
+        rateSource: hourlyRate !== undefined ? "new rate, saved on the client when generated" : client.data.rate === null ? "workspace default" : "client",
         lines: lines.map((l) => ({ ...l, hours: l.hours === null ? null : hours(l.hours * 3600) })),
         total: invoiceTotal(lines),
       });

@@ -60,16 +60,16 @@ export interface InvoiceLine {
   amount: number;
 }
 
-/** Hours are charged exactly (decimal), one line; each billable fixed service is a line of its own. */
+/** Hours are billed in whole hours, rounded down (32h10 → 32), on one line; each billable fixed service is a line of its own. */
 export function invoiceLines(
   totalSeconds: number,
   rate: number,
   services: Pick<ClientService, "name" | "amount" | "billable">[],
   locale: DocumentLocale
 ): InvoiceLine[] {
-  const hours = totalSeconds / 3600;
+  const hours = Math.floor(totalSeconds / 3600);
   const lines: InvoiceLine[] = [];
-  if (totalSeconds > 0) {
+  if (hours > 0) {
     lines.push({ description: DOCUMENT_TEXT[locale].technicalServices, hours, amount: round2(hours * rate) });
   }
   for (const s of services) {

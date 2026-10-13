@@ -64,11 +64,9 @@ test.describe("reports charts", () => {
     await expect(page.getByRole("button", { name: "Choose metrics" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Saved" })).toBeVisible();
 
-    // Export menu offers CSV, Excel, and Print/PDF.
-    await page.getByRole("button", { name: "Export" }).click();
-    await expect(page.getByRole("menuitem", { name: "CSV" })).toBeVisible();
-    await expect(page.getByRole("menuitem", { name: "Excel" })).toBeVisible();
-    await expect(page.getByRole("menuitem", { name: "Print / PDF" })).toBeVisible();
+    // The client PDFs replaced the CSV/Excel/print export (LEGACY_EXPORTS_ENABLED in ReportHeader.tsx).
+    await expect(page.getByRole("button", { name: "Client document" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Export" })).toHaveCount(0);
   });
 
   test("charts render in dark mode", async ({ page }) => {

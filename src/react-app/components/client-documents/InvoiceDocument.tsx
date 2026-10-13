@@ -6,7 +6,6 @@ import {
   type InvoiceLine,
 } from "@shared/client-documents";
 import {
-  formatHoursDecimal,
   formatMoney,
 } from "@/lib/clientDocuments";
 import type { BrandPalette } from "./brand";
@@ -66,7 +65,7 @@ export function InvoiceDocument(p: InvoiceProps) {
           {p.lines.map((l, i) => (
             <View key={i} style={[s.row, s.line]} wrap={false}>
               <Text style={[s.strong, s.colDesc]}>{l.description}</Text>
-              <Text style={[s.cell, s.colQty]}>{l.hours === null ? "—" : formatHoursDecimal(l.hours, p.locale)}</Text>
+              <Text style={[s.cell, s.colQty]}>{l.hours ?? "—"}</Text>
               <Text style={[s.cell, s.colAmount]}>{money(l.amount)}</Text>
             </View>
           ))}
@@ -117,7 +116,7 @@ function styles(c: BrandPalette) {
       justifyContent: "space-between",
       alignItems: "center",
       alignSelf: "flex-end",
-      width: 250,
+      width: 215,
       marginTop: 28,
       paddingVertical: 16,
       paddingHorizontal: 20,
@@ -125,7 +124,7 @@ function styles(c: BrandPalette) {
       borderColor: c.primary,
       borderRadius: 6,
     },
-    totalLabel: { fontFamily: "Helvetica-Bold", fontSize: 8.5, letterSpacing: 2.5, color: c.primary },
+    totalLabel: { fontFamily: "Helvetica-Bold", fontSize: 10, letterSpacing: 3, color: c.primary },
     totalValue: { fontFamily: "Helvetica-Bold", fontSize: 18, color: c.primary },
     thanks: { fontFamily: "Helvetica-Oblique", fontSize: 9.5, color: c.muted, marginTop: 40 },
   });

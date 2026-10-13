@@ -16,6 +16,7 @@ import { useWorkspaceRole } from "@/hooks/useWorkspaceRole";
 import { useReportSettings } from "@/hooks/useReportSettings";
 import { currencyLocale, formatMoneyInput } from "@/lib/money";
 import { MoneyInput } from "./MoneyInput";
+import { SettingsHint } from "@/components/settings/SettingsHint";
 import { clientFormSchema, type ClientFormValues } from "./ClientForm.schema";
 import type { Client } from "@shared/schemas";
 
@@ -124,7 +125,7 @@ export function ClientForm({ client, open, onClose }: ClientFormProps) {
                   />
                 )}
               />
-              <p className="text-xs text-muted-foreground">Blank uses the workspace default from Settings → Reports.</p>
+              <SettingsHint>Blank uses the workspace default from Settings → Reports.</SettingsHint>
               <FieldMessage name="rate" />
             </Field>
           )}

@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-10-13 (11) — `refactor`, local only (not pushed to master, not deployed)
+### Changed
+- **Invoices bill whole hours, rounded down** (`invoiceLines`, shared by the PDF and MCP): 32h10 is billed as 32 h, which is how the reference invoice reached R$ 2.080 at R$ 65/h. Less than an hour leaves the hours line out. The hours report still shows the exact durations.
+- **A rate typed in the generator becomes the client's rate**: it is saved on the client when the PDF is generated, as if it had been edited on the client page ("Saved as this client's rate when you generate"). `prepare_client_document`'s `hourlyRate` now means the same thing: it prices the answer, rides in the link, and is saved when the person generates.
+- The invoice's TOTAL box matches the reference: 215pt wide (was 248) and a 10pt label (was 8.5); the amount was already the reference's size (measured 145px vs 148px at 200dpi).
+- Fixed-service dialog: "Service name" and "Internal note, not shown on the invoice" placeholders, the amount shows `0,00` in the currency's format, the fields use the project's `Field`/`FieldLabel`, and Billable is a `SettingsRow` (label, explanation, switch) instead of a loose switch beside the amount. The generator dialog uses `Field`/`FieldLabel` too; the rate hints use `SettingsHint` instead of hand-written text classes.
+- e2e: `reports.spec.ts` now checks the generator instead of the retired export menu; the CSV "Hide amounts" test in `report-per-person.spec.ts` is skipped while the export is switched off. New `e2e/client-documents.spec.ts` (services typed with a comma, invoice at a new rate that ends up saved, hours report, a prepared link, Reports without the old exports).
+### Verified
+- `client-documents.test.ts` reproduces the reference invoice (32h10 × 65 → 32 h = 2.080, total 2.180) and the under-an-hour case; `documents.test.ts` totals follow the rounding (555, 835, 995). `tsc -b` (0), `pnpm lint` (0), `vitest run` 1267/1267, Playwright `client-documents` 3/3, `reports`/`report-per-person`/`clients` 10 passed + 1 skipped.
+
 ## 2026-10-13 (10) — `refactor`, local only (not pushed to master, not deployed)
 ### Changed
 - The fixed-services card has one icon, on its title (Lucide `Repeat`, for a recurring charge; the receipt icon is gone), and the rows have none. The card uses the project rows' 16px inset, so the title icon sits in the column of a project's colour dot, the title and every service name in the column of the project's name, and Add service and each row's actions end where the project's chevron does. The `Item`'s transparent 1px border is dropped (`border-0`), which had pushed both edges in by a pixel.
