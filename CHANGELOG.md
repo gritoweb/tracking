@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-13 (10) — `refactor`, local only (not pushed to master, not deployed)
+### Changed
+- The fixed-services card has one icon, on its title (Lucide `Repeat`, for a recurring charge; the receipt icon is gone), and the rows have none. The card uses the project rows' 16px inset, so the title icon sits in the column of a project's colour dot, the title and every service name in the column of the project's name, and Add service and each row's actions end where the project's chevron does. The `Item`'s transparent 1px border is dropped (`border-0`), which had pushed both edges in by a pixel.
+### Verified
+- Measured in Playwright at 1280px and 390px: icon left = dot left (264 / 40), title, service names and project name share one left edge (288 / 64), Add service, row actions and the project chevron share one right edge (1240 / 350); no row has an icon. `tsc -b` (0), `pnpm lint` (0).
+
 ## 2026-10-13 (9) — `refactor`, local only (not pushed to master, not deployed)
 ### Changed
 - The fixed-services card's title now has an icon (`SettingsCardHeader`, the icon + title + action header the settings cards already use), and its rows drop their side padding and take the header's icon gap, so each service's icon and name sit in the same columns as the title's (they were 14px and 20px to the right of it). The explanatory line moved into the empty state.

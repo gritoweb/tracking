@@ -1,5 +1,5 @@
 import { Fragment, useState } from "react";
-import { Edit2, Plus, Receipt, Trash2 } from "lucide-react";
+import { Edit2, Plus, Repeat, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,7 +16,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { SettingsCardHeader } from "@/components/settings/SettingsCardHeader";
-import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemSeparator, ItemTitle } from "@/components/ui/item";
+import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemSeparator, ItemTitle } from "@/components/ui/item";
 import { EmptyState } from "@/components/ui/empty-state";
 import { MoneyInput } from "@/components/forms/MoneyInput";
 import { useClientServices, useSaveClientService } from "@/hooks/useProjects";
@@ -37,8 +37,10 @@ export function ClientServicesSection({ clientId, canManage }: { clientId: strin
 
   return (
     <Card className="mt-8">
+      {/* px-4: the project rows' inset above, so this icon and title sit in the dot's and the project name's columns. */}
       <SettingsCardHeader
-        icon={Receipt}
+        className="px-4"
+        icon={Repeat}
         title="Fixed services"
         action={
           canManage && (
@@ -49,19 +51,16 @@ export function ClientServicesSection({ clientId, canManage }: { clientId: strin
           )
         }
       />
-      <CardContent>
+      <CardContent className="px-4">
         {services.length === 0 ? (
-          <EmptyState icon={Receipt} title="No fixed services" description="Hosting, email and other recurring charges for this client. The billable ones go on its invoice." />
+          <EmptyState icon={Repeat} title="No fixed services" description="Hosting, email and other recurring charges for this client. The billable ones go on its invoice." />
         ) : (
           <ItemGroup>
             {services.map((s, i) => (
               <Fragment key={s.id}>
                 {i > 0 && <ItemSeparator />}
-                {/* No side padding (and -mx-px for its transparent 1px border), the header's icon gap: icons and names line up under the card title's. */}
-                <Item size="sm" className="-mx-px gap-2 px-0">
-                  <ItemMedia variant="icon">
-                    <Receipt />
-                  </ItemMedia>
+                {/* pl-6 puts each name under the title's text; border-0 drops the transparent 1px that pushed both edges in. */}
+                <Item size="sm" className="border-0 pr-0 pl-6">
                   <ItemContent>
                     <ItemTitle>
                       {s.name}
