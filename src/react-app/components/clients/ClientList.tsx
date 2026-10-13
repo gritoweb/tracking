@@ -11,6 +11,7 @@ import {
 } from "@/lib/collectionPeriod";
 import { formatDurationShort } from "@/lib/dateUtils";
 import { formatCurrency } from "@/lib/currency";
+import { useReportSettings } from "@/hooks/useReportSettings";
 import { useUIStore } from "@/stores/uiStore";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -118,7 +119,9 @@ export function ClientList() {
   const [period, setPeriod] = useState<CollectionPeriod>("thisMonth");
   const { since, until } = resolveCollectionPeriod(period);
   const { byClient, isLoading: statsLoading } = useClientStats(since, until);
-  const currency = useUIStore((s) => s.currency);
+  // Amounts are priced at the invoice rate, so they show in the invoice currency.
+  const ownCurrency = useUIStore((s) => s.currency);
+  const currency = useReportSettings().data?.currency ?? ownCurrency;
   const deleteClient = useDeleteClient();
   // Editing and archiving a client is for owners/admins; the server refuses a member (D3).
   const { canManage } = useWorkspaceRole();

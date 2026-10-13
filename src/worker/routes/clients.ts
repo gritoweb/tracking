@@ -12,6 +12,7 @@ import {
 import { buildReportWhere } from "../db/queries";
 import type { ClientRow, ClientServiceRow } from "../db/rows";
 import { createClient, formatClient } from "../lib/clients";
+import { DEFAULT_HOURLY_RATE } from "./report-settings";
 import {
   canManageWorkspace,
   entryScopeUserId,
@@ -72,11 +73,9 @@ export const clientsRouter = new Hono<{
    * Per-client totals for a date window — what the Clients page shows instead
    * of a name and a chevron.
    *
-   * Deliberately the same aggregation the reports `byClient` breakdown uses
-   * (shared `buildReportWhere`, the same billable/amount expressions), so the
-   * two screens can never disagree about what a client is worth. Amount is a
-   * row-level product summed rather than hours × one rate, which is what keeps
-   * it correct across projects on different rates.
+   * Same filter as the reports (`buildReportWhere`), but the amount is billable
+   * hours × the invoice's rate (the client's, else the workspace default), so it
+   * agrees with what the client is invoiced, not with project rates.
    *
    * Rounding is deliberately NOT applied: rounding is a reporting preference
    * that belongs to an invoice you are about to send, and silently applying it
@@ -101,11 +100,13 @@ export const clientsRouter = new Hono<{
         SUM(te.duration)                              AS total_seconds,
         SUM(CASE WHEN te.billable = 1 THEN te.duration ELSE 0 END) AS billable_seconds,
         SUM((CASE WHEN te.billable = 1 THEN te.duration ELSE 0 END)
-            * COALESCE(p.rate, 0) / 3600.0)           AS billable_amount,
+            * COALESCE(c.rate, w.default_rate, ${DEFAULT_HOURLY_RATE}) / 3600.0) AS billable_amount,
         COUNT(DISTINCT te.project_id)                 AS project_count,
         MAX(te.start)                                 AS last_tracked
       FROM time_entries te
       LEFT JOIN projects p ON p.id = te.project_id
+      LEFT JOIN clients c ON c.id = p.client_id
+      LEFT JOIN workspaces w ON w.id = c.workspace_id
       WHERE ${where} AND p.client_id IS NOT NULL
       GROUP BY p.client_id
     `

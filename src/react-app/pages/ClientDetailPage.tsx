@@ -21,6 +21,7 @@ import {
   type CollectionPeriod,
 } from "@/lib/collectionPeriod";
 import { formatCurrency } from "@/lib/currency";
+import { useReportSettings } from "@/hooks/useReportSettings";
 import { useUIStore } from "@/stores/uiStore";
 import {
   Collapsible,
@@ -56,7 +57,9 @@ export function ClientDetailPage() {
   const [period, setPeriod] = useState<CollectionPeriod>("thisMonth");
   const { since, until } = resolveCollectionPeriod(period);
   const { byClient, isLoading: statsLoading } = useClientStats(since, until);
-  const currency = useUIStore((s) => s.currency);
+  // Amounts are priced at the invoice rate, so they show in the invoice currency.
+  const ownCurrency = useUIStore((s) => s.currency);
+  const currency = useReportSettings().data?.currency ?? ownCurrency;
   const stats = id ? byClient.get(id) : undefined;
 
   const toggle = (projectId: string) =>

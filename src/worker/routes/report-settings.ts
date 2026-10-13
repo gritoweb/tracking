@@ -9,7 +9,7 @@ import { isManager, MANAGER_ONLY_ERROR } from "../lib/permissions";
 
 const MAX_LOGO_BYTES = 1024 * 1024;
 // The one default not taken from the workspace itself: an invoice always needs some rate.
-const DEFAULT_HOURLY_RATE = 100;
+export const DEFAULT_HOURLY_RATE = 100;
 
 // Sniffed from the bytes; the PDF renderer embeds only PNG and JPEG (lib/image.ts is not imported: it pulls in the photon wasm).
 function logoContentType(b: Uint8Array): string | null {

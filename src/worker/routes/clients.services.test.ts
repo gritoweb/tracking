@@ -72,3 +72,23 @@ describe("a client's fixed services", () => {
     expect(count()).toBe(0);
   });
 });
+
+describe("a client's billable amount in /stats", () => {
+  it("prices only billable hours at the client's rate, else the workspace default", async () => {
+    const { as, raw } = world();
+    raw.exec(`
+      INSERT INTO clients (id, workspace_id, name) VALUES ('cl-A2', 'ws-A', 'No rate');
+      UPDATE clients SET rate = 65 WHERE id = 'cl-A';
+      UPDATE workspaces SET default_rate = 40 WHERE id = 'ws-A';
+      INSERT INTO projects (id, workspace_id, name, client_id) VALUES ('p1', 'ws-A', 'One', 'cl-A'), ('p2', 'ws-A', 'Two', 'cl-A2');
+      INSERT INTO time_entries (id, workspace_id, user_id, project_id, description, start, stop, duration, billable) VALUES
+        ('e1', 'ws-A', 'u-owner', 'p1', 'x', '2026-09-02T10:00:00.000Z', '2026-09-02T12:00:00.000Z', 7200, 1),
+        ('e2', 'ws-A', 'u-owner', 'p1', 'x', '2026-09-03T10:00:00.000Z', '2026-09-03T11:00:00.000Z', 3600, 0),
+        ('e3', 'ws-A', 'u-owner', 'p2', 'x', '2026-09-04T10:00:00.000Z', '2026-09-04T11:30:00.000Z', 5400, 1);
+    `);
+    const res = await as("u-owner", "ws-A").get("/stats?since=2026-09-01T00:00:00.000Z&until=2026-10-01T00:00:00.000Z");
+    const rows = (await res.json()) as { clientId: string; billableAmount: number }[];
+    expect(rows.find((r) => r.clientId === "cl-A")?.billableAmount).toBe(130);
+    expect(rows.find((r) => r.clientId === "cl-A2")?.billableAmount).toBe(60);
+  });
+});
