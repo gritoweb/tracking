@@ -128,6 +128,11 @@ test.describe("reports per person", () => {
     await expect(owner.getByRole("button", { name: "Invoices" })).toBeVisible();
     await expect(member.getByRole("button", { name: "Invoices" })).toHaveCount(0);
     await expect(member.getByRole("button", { name: "Hours reports" })).toBeVisible();
+    // An owner's hours report is the whole team's, with no such notice.
+    await owner.getByRole("button", { name: "Hours reports" }).click();
+    await expect(owner.getByRole("dialog", { name: "Hours report" })).toBeVisible();
+    await expect(owner.getByText("This report includes only the hours you logged.")).toHaveCount(0);
+    await owner.keyboard.press("Escape");
     await member.goto("/clients");
     await expect(member.getByRole("button", { name: "Client actions" })).toHaveCount(0);
     await expect(member.getByRole("button", { name: "Invoice", exact: true })).toHaveCount(0);
@@ -137,6 +142,7 @@ test.describe("reports per person", () => {
     await expect(member.getByRole("heading", { level: 1 })).toHaveText(client.name);
     await expect(member.getByRole("button", { name: "Invoice", exact: true })).toHaveCount(0);
     await member.getByRole("button", { name: "Hours report", exact: true }).click();
+    await expect(member.getByText("This report includes only the hours you logged.")).toBeVisible();
     const pending = member.waitForEvent("download");
     await member.getByRole("button", { name: "Generate PDF" }).click();
     expect((await pending).suggestedFilename()).toMatch(/^Relatorio de horas - /);

@@ -17,6 +17,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useClients, useUpdateClient } from "@/hooks/useProjects";
 import { useReportSettings } from "@/hooks/useReportSettings";
+import { useWorkspaceRole } from "@/hooks/useWorkspaceRole";
 import { api } from "@/lib/api-client";
 import { toastApiError } from "@/lib/toastApiError";
 import { formatMoney } from "@/lib/money";
@@ -75,6 +76,7 @@ export function ClientDocumentDialog({
   const updateClient = useUpdateClient();
   const { data: settings } = useReportSettings();
   const queryClient = useQueryClient();
+  const { canManage } = useWorkspaceRole();
   const roundMode = useUIStore((s) => s.roundMode);
   const roundMinutes = useUIStore((s) => s.roundMinutes);
 
@@ -185,6 +187,11 @@ export function ClientDocumentDialog({
                 </SelectContent>
               </Select>
             </Field>
+          )}
+
+          {/* A member's reports hold only their own hours (D3); owners/admins get the whole team's. */}
+          {kind === "hours" && !canManage && (
+            <SettingsHint>This report includes only the hours you logged.</SettingsHint>
           )}
 
           <SegmentedControl label="Language" options={LOCALE_OPTIONS} value={locale} onChange={setLocale} />
