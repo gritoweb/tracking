@@ -92,7 +92,7 @@ export async function drainQueue(userId: string | undefined) {
   }
 }
 
-export function useOnlineStatus(): boolean {
+function useOnlineStatus(): boolean {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const queryClient = useQueryClient();
 

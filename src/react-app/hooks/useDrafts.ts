@@ -113,18 +113,6 @@ export function useDiscardDraft(localDate: string) {
   });
 }
 
-export function useDiscardDay(localDate: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: () => api.drafts.discardDay(localDate),
-    onSuccess: ({ deleted }) => {
-      invalidateDay(queryClient, localDate);
-      if (deleted > 0) toast.success(`Discarded ${deleted} drafts`);
-    },
-    onError: (error) => toastApiError(error, "Couldn't discard the drafts"),
-  });
-}
-
 /**
  * Confirm drafts into real time entries.
  *

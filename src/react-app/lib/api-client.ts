@@ -264,7 +264,6 @@ type TimeEntriesListResponse = InferResponseType<typeof timeEntriesClient.index.
 type CalendarEventsResponse = InferResponseType<typeof calendarClient.events.$get>;
 type TaskStatusesListResponse = InferResponseType<typeof taskStatusesClient.index.$get>;
 type DraftsListResponse = InferResponseType<typeof draftsClient.index.$get>;
-type DraftsDiscardDayResponse = InferResponseType<typeof draftsClient.index.$delete>;
 
 export const api = {
   me: () => json(meClient.index.$get()),
@@ -553,8 +552,6 @@ export const api = {
     update: (id: string, body: UpdateDraft) =>
       json(draftsClient[":id"].$patch({ param: { id }, json: body })),
     discard: (id: string) => json(draftsClient[":id"].$delete({ param: { id } })),
-    discardDay: (date: string) =>
-      request<DraftsDiscardDayResponse>(`/drafts?date=${date}`, { method: "DELETE" }),
     confirm: (body: ConfirmDrafts) => json(draftsClient.confirm.$post({ json: body })),
   },
 

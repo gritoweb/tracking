@@ -1,7 +1,7 @@
 import type { ReportSettings } from "@shared/schemas";
 
 /** `hex` blended toward `toward` by `amount` (0–1); the PDFs' muted ink and hairlines derive from the three brand colours. */
-export function mix(hex: string, toward: string, amount: number): string {
+function mix(hex: string, toward: string, amount: number): string {
   const a = parseInt(hex.slice(1), 16);
   const b = parseInt(toward.slice(1), 16);
   const channel = (shift: number) => {

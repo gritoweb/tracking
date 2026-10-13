@@ -508,12 +508,4 @@ export function applyDate(iso: string, dateStr: string): string {
   return shiftDate(iso, dateDelta(iso, dateStr));
 }
 
-export {
-  format,
-  parseISO,
-  isToday,
-  isYesterday,
-  startOfDay,
-  endOfDay,
-  subDays,
-};
+export { isToday, isYesterday };

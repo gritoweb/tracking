@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-10-13 (12) — `refactor`, local only (not pushed to master, not deployed)
+### Removed (repo-wide simplification audit)
+- `components/reports/ProjectBreakdown.tsx` (132 lines), unused since the design-system pass (`401416b`).
+- Dependencies `mimetext`, `qrcode` and `@types/qrcode`: mail goes through Resend now and 2FA is gone. `CLAUDE.md` no longer describes the mailer as mimetext + the `send_email` binding.
+- `useDiscardDay` and its `api.drafts.discardDay` client method (no caller; the server route stays).
+- The unused `format`/`parseISO`/`startOfDay`/`endOfDay`/`subDays` re-exports from `lib/dateUtils.ts`.
+- `export` on `useOnlineStatus` and on `mix` (`client-documents/brand.ts`), both used only inside their own files. The audit had listed `useOnlineStatus` as dead; the typecheck showed `useOfflineSync` calls it, so it stays, unexported.
+### Verified
+- No visible or behavioural change intended. `tsc -b` (0), `pnpm lint` (0), `vitest run` 1267/1267, `pnpm build` (0), Playwright `client-documents`, `reports`, `clients`, `report-per-person`, `drafts-review`: 16 passed, 1 skipped (the CSV test, while the export is switched off).
+
 ## 2026-10-13 (11) — `refactor`, local only (not pushed to master, not deployed)
 ### Changed
 - **Invoices bill whole hours, rounded down** (`invoiceLines`, shared by the PDF and MCP): 32h10 is billed as 32 h, which is how the reference invoice reached R$ 2.080 at R$ 65/h. Less than an hour leaves the hours line out. The hours report still shows the exact durations.
