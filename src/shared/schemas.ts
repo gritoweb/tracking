@@ -128,7 +128,7 @@ export const ReportSettingsSchema = z.object({
   defaultRate: z.number(),
   // What the documents bill in, separate from each person's display currency.
   currency: z.string(),
-  // The number after the highest invoice generated, in its pattern; "1" before the first.
+  // The number after the last invoice generated, in its pattern; "1" before the first.
   nextInvoiceNumber: z.string(),
 });
 

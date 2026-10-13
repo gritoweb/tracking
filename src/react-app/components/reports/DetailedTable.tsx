@@ -210,7 +210,7 @@ export function DetailedTable({ entries, hideAmounts = false }: DetailedTablePro
           <TableBody>
             {sorted.map((entry) => (
               <TableRow key={entry.id} data-state={selected.has(entry.id) ? "selected" : undefined}>
-                <TableCell className="">
+                <TableCell>
                   <Checkbox
                     size="sm"
                     aria-label={`Select ${entry.description || "entry"}`}
