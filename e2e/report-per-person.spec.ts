@@ -123,6 +123,22 @@ test.describe("reports per person", () => {
     await owner.goto("/reports");
     await owner.getByRole("button", { name: /^Filters/ }).click();
     await expect(owner.getByText("Person", { exact: true }).first()).toBeVisible();
+
+    // The client PDFs are for owners/admins: on Reports, the client list and a client's page.
+    await expect(owner.getByRole("button", { name: "Invoices" })).toBeVisible();
+    await expect(member.getByRole("button", { name: "Invoices" })).toHaveCount(0);
+    await expect(member.getByRole("button", { name: "Hours reports" })).toHaveCount(0);
+    await owner.goto("/clients");
+    await expect(owner.getByRole("button", { name: "Invoice", exact: true }).first()).toBeVisible();
+    await member.goto("/clients");
+    await expect(member.getByRole("button", { name: "Client actions" })).toHaveCount(0);
+    await expect(member.getByRole("button", { name: /^(Invoice|Hours report)$/ })).toHaveCount(0);
+    const [client] = await (await member.request.get("/api/clients")).json();
+    await member.goto(`/clients/${client.id}`);
+    await expect(member.getByRole("heading", { level: 1 })).toHaveText(client.name);
+    await expect(member.getByRole("button", { name: /^(Invoice|Hours report)$/ })).toHaveCount(0);
+    // The sequence is moved only by them too.
+    expect((await member.request.post("/api/report-settings/invoice-number", { data: { number: "99" } })).status()).toBe(403);
   });
 });
 
