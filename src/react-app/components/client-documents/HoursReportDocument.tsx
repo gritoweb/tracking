@@ -1,11 +1,14 @@
 import { Document, Image, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import {
   DOCUMENT_TEXT,
+  hoursSummary,
+  type DocumentLocale,
+} from "@shared/client-documents";
+import {
   formatClock,
   formatDay,
   formatHoursDecimal,
-  hoursSummary,
-  type DocumentLocale,
+  localDay,
 } from "@/lib/clientDocuments";
 import type { ReportDetailedEntry } from "@shared/schemas";
 import type { BrandPalette } from "./brand";
@@ -26,7 +29,7 @@ const GUTTER = 40;
 export function HoursReportDocument(p: HoursReportProps) {
   const t = DOCUMENT_TEXT[p.locale];
   const s = styles(p.palette);
-  const summary = hoursSummary(p.entries);
+  const summary = hoursSummary(p.entries, localDay);
   const header = (
     <View style={s.th} fixed>
       <Text style={[s.thText, s.colDesc]}>{t.description.toUpperCase()}</Text>

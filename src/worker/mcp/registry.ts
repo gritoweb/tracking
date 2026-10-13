@@ -8,6 +8,7 @@ import { registerTaskReads, registerTaskWrites } from "./tools/tasks";
 import { registerCatalogReads, registerCatalogWrites } from "./tools/catalog";
 import { registerProductivityReads, registerProductivityWrites } from "./tools/productivity";
 import { registerAccountReads, registerAccountWrites, registerGuide } from "./tools/account";
+import { registerDocumentReads, registerDocumentWrites } from "./tools/documents";
 
 type RegisterFn = (name: string, config: { title?: string; inputSchema?: ZodRawShape }, cb: unknown) => unknown;
 
@@ -23,6 +24,11 @@ export const MANAGER_ONLY_TOOLS: ReadonlySet<string> = new Set([
   "fork_task_statuses",
   "create_task_status",
   "update_task_status",
+  "prepare_client_document",
+  "add_client_service",
+  "update_client_service",
+  "delete_client_service",
+  "update_report_settings",
 ]);
 
 export type ToolGroup = "Time and reports" | "Tasks" | "Projects, clients and tags" | "Planning and saved items" | "You and the workspace";
@@ -64,6 +70,7 @@ export function registerAllTools(registrar: ToolRegistrar, ctx: McpContext): Reg
   registerEntryReads(depsFor("Time and reports"));
   registerTaskReads(depsFor("Tasks"));
   registerCatalogReads(depsFor("Projects, clients and tags"));
+  registerDocumentReads(depsFor("Projects, clients and tags"));
   registerProductivityReads(depsFor("Planning and saved items"));
   registerAccountReads(depsFor("You and the workspace"));
 
@@ -72,6 +79,7 @@ export function registerAllTools(registrar: ToolRegistrar, ctx: McpContext): Reg
     registerEntryWrites(depsFor("Time and reports"));
     registerTaskWrites(depsFor("Tasks"));
     registerCatalogWrites(depsFor("Projects, clients and tags"));
+    registerDocumentWrites(depsFor("Projects, clients and tags"));
     registerProductivityWrites(depsFor("Planning and saved items"));
     registerAccountWrites(depsFor("You and the workspace"));
   }

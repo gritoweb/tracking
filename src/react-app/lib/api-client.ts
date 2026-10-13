@@ -50,7 +50,7 @@ import type {
   UpdateTaskStatus,
   ArchiveTaskStatus,
   CreateClient,
-  UpdateClientRest,
+  UpdateClient,
   CreateClientService,
   UpdateClientService,
   ReportSettings,
@@ -388,7 +388,7 @@ export const api = {
       json(clientsClient.stats.$get({ query: params })),
     get: (id: string) => json(clientsClient[":id"].$get({ param: { id } })),
     create: (body: CreateClient) => json(clientsClient.index.$post({ json: body })),
-    update: (id: string, body: UpdateClientRest) =>
+    update: (id: string, body: UpdateClient) =>
       json(clientsClient[":id"].$put({ param: { id }, json: body })),
     delete: (id: string) => json(clientsClient[":id"].$delete({ param: { id } })),
     services: (id: string) => json(clientsClient[":id"].services.$get({ param: { id } })),

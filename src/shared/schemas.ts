@@ -90,10 +90,7 @@ export const CreateClientSchema = z.object({
 
 export const UpdateClientSchema = CreateClientSchema.partial().extend({
   archived: z.boolean().optional(),
-});
-
-// The REST edit also takes the rate; kept off UpdateClientSchema so the MCP catalog's tool shape is unchanged.
-export const UpdateClientRestSchema = UpdateClientSchema.extend({
+  // The client's own hourly rate on invoices; null = the workspace default. Owners/admins only, like every client edit.
   rate: z.number().min(0).max(1_000_000).nullable().optional(),
 });
 
@@ -1332,7 +1329,6 @@ export type PacingStatus = z.infer<typeof PacingStatusSchema>;
 export type ProjectPacing = z.infer<typeof ProjectPacingSchema>;
 export type CreateClient = z.infer<typeof CreateClientSchema>;
 export type UpdateClient = z.infer<typeof UpdateClientSchema>;
-export type UpdateClientRest = z.infer<typeof UpdateClientRestSchema>;
 export type ClientService = z.infer<typeof ClientServiceSchema>;
 export type ReportSettings = z.infer<typeof ReportSettingsSchema>;
 export type UpdateReportSettings = z.infer<typeof UpdateReportSettingsSchema>;

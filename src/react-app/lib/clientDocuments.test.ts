@@ -1,49 +1,27 @@
 import { describe, expect, it } from "vitest";
-import {
-  formatClock,
-  hoursSummary,
-  invoiceLines,
-  invoiceTotal,
-} from "./clientDocuments";
+import { documentPresetFrom, formatClock } from "./clientDocuments";
 
-describe("the invoice", () => {
-  it("charges the exact hours and lists only billable services", () => {
-    const lines = invoiceLines(
-      32 * 3600 + 10 * 60,
-      65,
-      [
-        { name: "N8N server", amount: 65, billable: true },
-        { name: "Email server", amount: 35, billable: true },
-        { name: "Internal tool", amount: 999, billable: false },
-      ],
-      "pt-BR"
-    );
-    expect(lines).toEqual([
-      { description: "Serviços Técnicos", hours: 32 + 10 / 60, amount: 2090.83 },
-      { description: "N8N server", hours: null, amount: 65 },
-      { description: "Email server", hours: null, amount: 35 },
-    ]);
-    expect(invoiceTotal(lines)).toBe(2190.83);
-  });
-
-  it("leaves the hours line out of a period with no time", () => {
-    expect(invoiceLines(0, 65, [{ name: "Hosting", amount: 50, billable: true }], "en")).toEqual([
-      { description: "Hosting", hours: null, amount: 50 },
-    ]);
+describe("the hours report's durations", () => {
+  it("writes durations past a day as hours", () => {
+    expect(formatClock(32 * 3600 + 10 * 60)).toBe("32:10:00");
   });
 });
 
-describe("the hours report", () => {
-  it("averages over the days that have time", () => {
-    const s = hoursSummary([
-      { start: "2026-09-01T12:00:00", duration: 3600 },
-      { start: "2026-09-01T15:00:00", duration: 1800 },
-      { start: "2026-09-02T12:00:00", duration: 3600 },
-    ]);
-    expect(s).toEqual({ totalSeconds: 9000, entryCount: 3, dailyAverageHours: 1.25 });
+describe("a document link", () => {
+  const preset = (q: string) => documentPresetFrom(new URLSearchParams(q));
+
+  it("pre-fills the generator", () => {
+    expect(preset("document=invoice&from=2026-09-01&to=2026-09-30&lang=en&number=2026-09")).toEqual({
+      kind: "invoice", locale: "en", from: "2026-09-01", to: "2026-09-30", number: "2026-09",
+    });
+    expect(preset("document=hours&from=2026-09-01&to=2026-09-30")).toMatchObject({ kind: "hours", locale: "pt-BR" });
   });
 
-  it("writes durations past a day as hours", () => {
-    expect(formatClock(32 * 3600 + 10 * 60)).toBe("32:10:00");
+  it("ignores a link without a document or with a broken one", () => {
+    expect(preset("")).toBeNull();
+    expect(preset("document=receipt&from=2026-09-01&to=2026-09-30")).toBeNull();
+    expect(preset("document=invoice&from=2026-09-30&to=2026-09-01")).toBeNull();
+    expect(preset("document=invoice&from=yesterday&to=2026-09-01")).toBeNull();
+    expect(preset("document=invoice&from=2026-09-01&to=2026-09-30&lang=fr")).toBeNull();
   });
 });

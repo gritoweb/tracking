@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-10-13 (5) — `refactor`, local only (not pushed to master, not deployed)
+### Added
+- **Client documents through MCP and the in-app Assistant.** `prepare_client_document` (owners/admins) returns a client's hours, invoice lines and total for a period of local days, plus a link that opens the client's page with the generator filled in (document, period, language, invoice number), where the person clicks Generate PDF. Its description makes the model propose last month and confirm the period when the person didn't name one, and ask the language when unclear. New tools: `list_client_services`, `add_client_service`, `update_client_service`, `delete_client_service`, `get_report_settings`, `update_report_settings`; `update_client` now takes `rate`. The five writes and `prepare_client_document` are hidden from a member's key (their reports hold only their own hours).
+- The client page opens the generator from a `?document=invoice|hours&from=&to=&lang=&number=` link and drops the link once it is closed; a malformed link is ignored.
+### Changed
+- The document texts and money math moved to `src/shared/client-documents.ts`, so the MCP answer and the PDF are computed by the same code. `UpdateClientSchema` carries `rate` (the separate REST-only schema is gone).
+### Not done, on purpose
+- The PDF is still rendered in the browser. Rendering it in the Worker was tried and dropped: the layout engine compiles WebAssembly at run time, which Workers forbid, and working around it needed a vendored `.wasm` plus two library patches. A hosted browser (Browser Rendering) would bill per document.
+### Verified
+- `documents.test.ts` (7, real tools over the real REST bridge): invoice priced like the PDF (8,25 h × 65 + 35 = 571,25, the non-billable service and an October entry left out) with the exact link; client rate wins (860); hours report has no money; backwards period and unknown client refused; a member's key isn't shown the manager tools; rate and services edited through MCP; settings read/edited. `clientDocuments.test.ts` covers the link parser (valid, missing, wrong kind, backwards, bad date, unknown language). `tsc -b` (0), `pnpm lint` (0), `vitest run` 1266/1266, `pnpm check` (0). Live against local `pnpm dev`: a JSON-RPC `tools/call` of `prepare_client_document` over `/mcp` with a read+write key answered 3 h, R$ 300 + 35 = 335 and a link; opening it showed the dialog filled in (Invoice, Português, 1–30 Sep, 2026-09, "Billed at $100.00/h (workspace default)"), Generate PDF downloaded the invoice, and the link left the URL.
+
 ## 2026-10-13 (4) — `refactor`, local only (not pushed to master, not deployed)
 ### Changed
 - **Client-document defaults come from the workspace, not from code**: company name = the workspace's name, contact e-mail = its first owner's e-mail, currency = that owner's display currency, default hourly rate = 100, until saved in Settings → Reports. Nothing about any one company is hard-coded, so the feature works for any workspace. A cleared default rate falls back to 100, so an invoice always has a rate (the "no rate" block in the dialog is gone).

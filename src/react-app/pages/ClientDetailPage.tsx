@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
   Edit2,
@@ -30,6 +30,7 @@ import {
 import { ClientForm } from "@/components/forms/ClientForm";
 import { ClientServicesSection } from "@/components/clients/ClientServicesSection";
 import { ClientDocumentButton } from "@/components/client-documents/ClientDocumentButton";
+import { documentPresetFrom } from "@/lib/clientDocuments";
 import { ColorDot } from "@/components/ColorDot";
 import { TaskList } from "@/components/projects/TaskList";
 import { useClient, useAllProjects } from "@/hooks/useProjects";
@@ -43,6 +44,9 @@ export function ClientDetailPage() {
   const { data: client, isLoading, isError } = useClient(id);
   const { data: allProjects = [] } = useAllProjects();
   const [showEdit, setShowEdit] = useState(false);
+  // A link from the Assistant or an MCP client opens the document generator filled in.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const documentPreset = documentPresetFrom(searchParams);
   // Editing a client is for owners/admins; the server refuses a member (D3).
   const { canManage } = useWorkspaceRole();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -151,7 +155,11 @@ export function ClientDetailPage() {
         </div>
         {canManage && (
           <div className="flex shrink-0 items-center gap-2">
-            <ClientDocumentButton clientId={client.id} />
+            <ClientDocumentButton
+              clientId={client.id}
+              preset={documentPreset}
+              onClose={() => setSearchParams({}, { replace: true })}
+            />
             <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setShowEdit(true)}>
               <Edit2 className="h-3.5 w-3.5" />
               Edit

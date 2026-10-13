@@ -4,7 +4,7 @@ import { z } from "zod";
 import {
   CreateClientSchema,
   CreateClientServiceSchema,
-  UpdateClientRestSchema,
+  UpdateClientSchema,
   UpdateClientServiceSchema,
   type ClientService,
   type ClientStats,
@@ -138,7 +138,7 @@ export const clientsRouter = new Hono<{
     if (!results.length) return c.json({ error: "Not found" }, 404);
     return c.json(formatClient(results[0]), 200);
   })
-  .put("/:id", zValidator("json", UpdateClientRestSchema), async (c) => {
+  .put("/:id", zValidator("json", UpdateClientSchema), async (c) => {
     const workspaceId = c.get("workspaceId");
     const id = c.req.param("id");
     const data = c.req.valid("json");

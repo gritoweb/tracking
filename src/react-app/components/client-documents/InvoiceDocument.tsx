@@ -1,11 +1,13 @@
 import { Document, Image, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import {
   DOCUMENT_TEXT,
-  formatHoursDecimal,
-  formatMoney,
   invoiceTotal,
   type DocumentLocale,
   type InvoiceLine,
+} from "@shared/client-documents";
+import {
+  formatHoursDecimal,
+  formatMoney,
 } from "@/lib/clientDocuments";
 import type { BrandPalette } from "./brand";
 

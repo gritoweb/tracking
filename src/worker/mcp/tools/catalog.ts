@@ -239,7 +239,7 @@ export function registerCatalogWrites(d: ToolDeps): void {
     "update_client",
     {
       title: "Edit a client",
-      description: "Change a client's name, notes, email, phone or address — only the fields passed change. `archived: false` restores an archived client. Owners/admins only.",
+      description: "Change a client's name, notes, email, phone, address or hourly rate (`rate`, used on its invoices; null = the workspace default) — only the fields passed change. `archived: false` restores an archived client. Owners/admins only.",
       inputSchema: { clientId: IdArg("client"), ...UpdateClientSchema.shape },
       annotations: { ...MUTATES, idempotentHint: true },
     },

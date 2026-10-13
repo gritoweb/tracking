@@ -21,6 +21,7 @@ import { reportsRouter } from "../routes/reports";
 import { savedReportsRouter } from "../routes/saved-reports";
 import { plannerRouter } from "../routes/planner";
 import { settingsRouter } from "../routes/settings";
+import { reportSettingsRouter } from "../routes/report-settings";
 import { calendarRouter } from "../routes/calendar";
 import { meRouter } from "../routes/me";
 import { notificationsRouter } from "../routes/notifications";
@@ -52,6 +53,7 @@ export const BRIDGED_PREFIXES = [
   "/api/saved-reports",
   "/api/planner",
   "/api/settings",
+  "/api/report-settings",
   "/api/calendar",
   "/api/me",
   "/api/notifications",
@@ -77,6 +79,7 @@ function buildBridgeApp(workspaceId: string, userId: string) {
     .route("/api/saved-reports", savedReportsRouter)
     .route("/api/planner", plannerRouter)
     .route("/api/settings", settingsRouter)
+    .route("/api/report-settings", reportSettingsRouter)
     .route("/api/calendar", calendarRouter)
     .route("/api/me", meRouter)
     .route("/api/notifications", notificationsRouter);

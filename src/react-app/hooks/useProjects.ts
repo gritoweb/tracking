@@ -7,7 +7,7 @@ import type {
   CreateProject,
   UpdateProject,
   CreateClient,
-  UpdateClientRest,
+  UpdateClient,
   CreateClientService,
   UpdateClientService,
 } from "@shared/schemas";
@@ -146,7 +146,7 @@ export function useCreateClient() {
 export function useUpdateClient() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: UpdateClientRest }) =>
+    mutationFn: ({ id, data }: { id: string; data: UpdateClient }) =>
       api.clients.update(id, data),
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: ["clients"] }),

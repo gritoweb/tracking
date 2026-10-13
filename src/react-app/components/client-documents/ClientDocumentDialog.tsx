@@ -22,11 +22,14 @@ import { formatMoney } from "@/lib/money";
 import { useUIStore } from "@/stores/uiStore";
 import {
   DOCUMENT_TEXT,
-  formatDay,
-  formatMonth,
   invoiceLines,
   type ClientDocumentKind,
   type DocumentLocale,
+} from "@shared/client-documents";
+import {
+  formatDay,
+  formatMonth,
+  type DocumentPreset,
 } from "@/lib/clientDocuments";
 import { brandPalette } from "./brand";
 
@@ -58,10 +61,12 @@ export function ClientDocumentDialog({
   open,
   onOpenChange,
   clientId: fixedClientId,
+  preset,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   clientId?: string;
+  preset?: DocumentPreset | null;
 }) {
   const { data: clients = [] } = useClients();
   const { data: settings } = useReportSettings();
@@ -69,10 +74,10 @@ export function ClientDocumentDialog({
   const roundMinutes = useUIStore((s) => s.roundMinutes);
 
   const [clientId, setClientId] = useState(fixedClientId ?? "");
-  const [kind, setKind] = useState<ClientDocumentKind>("invoice");
-  const [locale, setLocale] = useState<DocumentLocale>("pt-BR");
-  const [{ from, to }, setRange] = useState(lastMonth);
-  const [number, setNumber] = useState(() => lastMonth().from.slice(0, 7));
+  const [kind, setKind] = useState<ClientDocumentKind>(preset?.kind ?? "invoice");
+  const [locale, setLocale] = useState<DocumentLocale>(preset?.locale ?? "pt-BR");
+  const [{ from, to }, setRange] = useState(() => (preset ? { from: preset.from, to: preset.to } : lastMonth()));
+  const [number, setNumber] = useState(() => preset?.number ?? (preset?.from ?? lastMonth().from).slice(0, 7));
   const [busy, setBusy] = useState(false);
 
   const client = clients.find((c) => c.id === (fixedClientId ?? clientId));
