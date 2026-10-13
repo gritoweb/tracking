@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-13 (7) — `refactor`, local only (not pushed to master, not deployed)
+### Fixed
+- **A project's task checkbox sat below the task name** (Projects and the client page, `TaskList`). Two causes stacked: the row centred its items while the name carries a second line under it (the estimate, invisible until hover), and the name was an inline `text-xs` span inside a block on the base 24px line, which pushed it 5px down. The row now aligns to the top, the name is a block on its own 16px line, and the checkbox is centred on that line.
+### Verified
+- Measured in Playwright against local `pnpm dev`: the checkbox's centre was 7.5px off the name's line before, and is 0px after at 1280px and, for a name wrapping onto three lines, 0px from the first line at 390px; a task with an estimate is aligned too. `tsc -b` (0), `pnpm lint` (0).
+
 ## 2026-10-13 (6) — `refactor`, local only (not pushed to master, not deployed)
 ### Added
 - **The hourly rate is editable where the invoice is generated.** The dialog shows the rate it will bill (the client's, else the workspace default) in a money field; a different value bills that invoice only and says so ("For this invoice only; the workspace default stays R$ 100,00"). Nothing is saved, and choosing another client brings its own rate back. A blank or non-numeric rate disables Generate PDF. `prepare_client_document` takes the same one-off `hourlyRate` (answered as `rateSource: "this invoice only"`) and carries it in the link as `rate=`.

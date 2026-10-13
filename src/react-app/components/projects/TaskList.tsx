@@ -110,11 +110,13 @@ export function TaskList({ projectId }: TaskListProps) {
         return (
           <div
             key={task.id}
-            className="group flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors duration-fast ease-out-quart hover:bg-muted/50"
+            // items-start: the name has a second line under it (the estimate), so centring put the box between the two.
+            className="group flex items-start gap-2 rounded-md px-2 py-1.5 transition-colors duration-fast ease-out-quart hover:bg-muted/50"
           >
-            {/* Done toggle */}
+            {/* Done toggle, centred on the name's 16px line */}
             <Checkbox
               size="sm"
+              className="mt-px"
               checked={!task.active}
               onCheckedChange={() => handleToggleDone(task)}
               aria-label={task.active ? "Mark task done" : "Mark task not done"}
@@ -136,7 +138,8 @@ export function TaskList({ projectId }: TaskListProps) {
                 />
               ) : (
                 <span
-                  className={`text-xs ${!task.active ? "text-muted-foreground line-through" : ""}`}
+                  // block: inline, it sat 5px down inside the wrapper's 24px base line.
+                  className={`block text-xs ${!task.active ? "text-muted-foreground line-through" : ""}`}
                 >
                   {task.name}
                 </span>
