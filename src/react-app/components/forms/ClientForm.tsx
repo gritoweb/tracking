@@ -12,6 +12,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { useCreateClient, useUpdateClient } from "@/hooks/useProjects";
+import { useWorkspaceRole } from "@/hooks/useWorkspaceRole";
 import { clientFormSchema, type ClientFormValues } from "./ClientForm.schema";
 import type { Client } from "@shared/schemas";
 
@@ -25,6 +26,9 @@ export function ClientForm({ client, open, onClose }: ClientFormProps) {
   const createClient = useCreateClient();
   const updateClient = useUpdateClient();
   const isPending = createClient.isPending || updateClient.isPending;
+  // The rate is an owner/admin edit (the server refuses a member), so it lives on the edit form only.
+  const { canManage } = useWorkspaceRole();
+  const showRate = Boolean(client) && canManage;
 
   const form = useForm<ClientFormValues>({
     resolver: zodResolver(clientFormSchema),
@@ -34,6 +38,7 @@ export function ClientForm({ client, open, onClose }: ClientFormProps) {
       phone: client?.phone ?? "",
       address: client?.address ?? "",
       notes: client?.notes ?? "",
+      rate: client?.rate?.toString() ?? "",
     },
   });
 
@@ -47,7 +52,8 @@ export function ClientForm({ client, open, onClose }: ClientFormProps) {
     };
 
     if (client) {
-      updateClient.mutate({ id: client.id, data }, { onSuccess: onClose });
+      const rate = showRate ? { rate: values.rate === "" ? null : Number(values.rate) } : {};
+      updateClient.mutate({ id: client.id, data: { ...data, ...rate } }, { onSuccess: onClose });
     } else {
       createClient.mutate(data, { onSuccess: onClose });
     }
@@ -96,6 +102,21 @@ export function ClientForm({ client, open, onClose }: ClientFormProps) {
             />
             <FieldMessage name="notes" />
           </Field>
+
+          {showRate && (
+            <Field>
+              <FieldLabel htmlFor="client-rate">Hourly rate</FieldLabel>
+              <Input
+                id="client-rate"
+                type="number"
+                min={0}
+                step={0.01}
+                {...form.register("rate")}
+                placeholder="Workspace default"
+              />
+              <FieldMessage name="rate" />
+            </Field>
+          )}
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>

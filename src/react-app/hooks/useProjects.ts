@@ -7,7 +7,9 @@ import type {
   CreateProject,
   UpdateProject,
   CreateClient,
-  UpdateClient,
+  UpdateClientRest,
+  CreateClientService,
+  UpdateClientService,
 } from "@shared/schemas";
 
 export function useProjects() {
@@ -144,11 +146,38 @@ export function useCreateClient() {
 export function useUpdateClient() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: UpdateClient }) =>
+    mutationFn: ({ id, data }: { id: string; data: UpdateClientRest }) =>
       api.clients.update(id, data),
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: ["clients"] }),
     onError: (error) => toastApiError(error, "Failed to update client"),
+  });
+}
+
+export function useClientServices(clientId: string | undefined) {
+  return useQuery({
+    queryKey: ["clients", clientId, "services"],
+    queryFn: () => api.clients.services(clientId as string),
+    enabled: !!clientId,
+  });
+}
+
+export function useSaveClientService(clientId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (
+      change:
+        | { kind: "create"; data: CreateClientService }
+        | { kind: "update"; serviceId: string; data: UpdateClientService }
+        | { kind: "delete"; serviceId: string }
+    ): Promise<unknown> =>
+      change.kind === "create"
+        ? api.clients.createService(clientId, change.data)
+        : change.kind === "update"
+          ? api.clients.updateService(clientId, change.serviceId, change.data)
+          : api.clients.deleteService(clientId, change.serviceId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["clients", clientId, "services"] }),
+    onError: (error) => toastApiError(error, "Failed to save the service"),
   });
 }
 

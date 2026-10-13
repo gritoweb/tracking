@@ -49,7 +49,9 @@ import type {
   UpdateTaskStatus,
   ArchiveTaskStatus,
   CreateClient,
-  UpdateClient,
+  UpdateClientRest,
+  CreateClientService,
+  UpdateClientService,
   CreateFavorite,
   CreateRecurringEntry,
   UpdateRecurringEntry,
@@ -383,9 +385,16 @@ export const api = {
       json(clientsClient.stats.$get({ query: params })),
     get: (id: string) => json(clientsClient[":id"].$get({ param: { id } })),
     create: (body: CreateClient) => json(clientsClient.index.$post({ json: body })),
-    update: (id: string, body: UpdateClient) =>
+    update: (id: string, body: UpdateClientRest) =>
       json(clientsClient[":id"].$put({ param: { id }, json: body })),
     delete: (id: string) => json(clientsClient[":id"].$delete({ param: { id } })),
+    services: (id: string) => json(clientsClient[":id"].services.$get({ param: { id } })),
+    createService: (id: string, body: CreateClientService) =>
+      json(clientsClient[":id"].services.$post({ param: { id }, json: body })),
+    updateService: (id: string, serviceId: string, body: UpdateClientService) =>
+      json(clientsClient[":id"].services[":serviceId"].$put({ param: { id, serviceId }, json: body })),
+    deleteService: (id: string, serviceId: string) =>
+      json(clientsClient[":id"].services[":serviceId"].$delete({ param: { id, serviceId } })),
   },
 
   // ─── Tags ─────────────────────────────────────────────────────────────────

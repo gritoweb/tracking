@@ -28,6 +28,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { ClientForm } from "@/components/forms/ClientForm";
+import { ClientServicesSection } from "@/components/clients/ClientServicesSection";
 import { ColorDot } from "@/components/ColorDot";
 import { TaskList } from "@/components/projects/TaskList";
 import { useClient, useAllProjects } from "@/hooks/useProjects";
@@ -202,6 +203,8 @@ export function ClientDetailPage() {
           </p>
         )}
       </div>
+
+      <ClientServicesSection clientId={client.id} canManage={canManage} />
 
       {/* Projects */}
       <div className="mb-3 flex items-center justify-between">

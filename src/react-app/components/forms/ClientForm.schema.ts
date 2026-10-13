@@ -12,6 +12,8 @@ export const clientFormSchema = z.object({
   phone: blankable(CreateClientSchema.shape.phone.unwrap().unwrap()),
   address: blankable(CreateClientSchema.shape.address.unwrap().unwrap()),
   notes: blankable(CreateClientSchema.shape.notes.unwrap().unwrap()),
+  // Blank = use the workspace default rate.
+  rate: z.string().refine((v) => v === "" || Number(v) >= 0, "Must be zero or more"),
 });
 
 export type ClientFormValues = z.infer<typeof clientFormSchema>;

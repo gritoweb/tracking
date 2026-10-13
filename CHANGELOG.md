@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-13 — `refactor`, local only (not pushed to master, not deployed)
+### Added
+- **A client can carry its own hourly rate and fixed services**, the inputs the client invoice needs. The rate (`clients.rate`, edited by owners/admins in the client's Edit dialog) overrides the new workspace default (`workspaces.default_rate`, set in Settings → Reports with the invoice work); blank means "use the default". Fixed services (`client_services`: name, description, amount, billable) are listed on the client page, where owners/admins add, edit, remove and toggle them billable; only billable ones go on an invoice. Project rates and every existing report and total are untouched: the client rate applies to invoices only. Migration `0057_client_billing.sql` adds columns and a table and rewrites no row.
+### Verified
+- Route test `clients.services.test.ts`: owner sets/clears the rate and adds/edits/removes a service; a member reads but gets 403 on writes; another workspace's client is 404 and its services untouched; deleting a client cascades its services. `ClientForm.schema` test rejects a negative rate. `tsc -b` (0), `pnpm lint` (0), `vitest run` 1231/1231 before this entry. In Playwright against local `pnpm dev`: rate 80 saved from the Edit dialog, "Email server $35" added and switched to "Not billable", both confirmed through the API.
+
 ## 2026-10-08 (2) — `refactor` → `master`
 ### Changed
 - **The task's creation is now the first line of its comments feed** ("Luis created this task · Oct 8 at 10:43"), next to the status and due-date changes, instead of a "Created" field among the properties (removed). It is derived from the task row (`created_at`, `created_by`) in `listActivity`, not written to `task_activity`, so every existing task has it with no data migration. The MCP `list_task_activity` returns it too (`change: "created"`).

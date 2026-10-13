@@ -48,6 +48,19 @@ export interface ClientRow {
   email: string | null;
   phone: string | null;
   address: string | null;
+  rate: number | null;
+}
+
+/** `client_services` (migration 0057). */
+export interface ClientServiceRow {
+  id: string;
+  workspace_id: string;
+  client_id: string;
+  name: string;
+  description: string | null;
+  amount: number;
+  billable: number;
+  created_at: string;
 }
 
 // ─── projects ────────────────────────────────────────────────────────────────

@@ -1,9 +1,16 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { CreateClientSchema, UpdateClientSchema, type ClientStats } from "@shared/schemas";
+import {
+  CreateClientSchema,
+  CreateClientServiceSchema,
+  UpdateClientRestSchema,
+  UpdateClientServiceSchema,
+  type ClientService,
+  type ClientStats,
+} from "@shared/schemas";
 import { buildReportWhere } from "../db/queries";
-import type { ClientRow } from "../db/rows";
+import type { ClientRow, ClientServiceRow } from "../db/rows";
 import { createClient, formatClient } from "../lib/clients";
 import {
   canManageWorkspace,
@@ -11,6 +18,18 @@ import {
   getMemberRole,
   MANAGER_ONLY_ERROR,
 } from "../lib/permissions";
+
+function formatService(r: ClientServiceRow): ClientService {
+  return {
+    id: r.id,
+    clientId: r.client_id,
+    name: r.name,
+    description: r.description ?? null,
+    amount: r.amount,
+    billable: Boolean(r.billable),
+    createdAt: r.created_at,
+  };
+}
 
 /** `GET /stats`'s own aggregation — one row per client_id, over the report's date window. */
 interface ClientStatsRow {
@@ -119,7 +138,7 @@ export const clientsRouter = new Hono<{
     if (!results.length) return c.json({ error: "Not found" }, 404);
     return c.json(formatClient(results[0]), 200);
   })
-  .put("/:id", zValidator("json", UpdateClientSchema), async (c) => {
+  .put("/:id", zValidator("json", UpdateClientRestSchema), async (c) => {
     const workspaceId = c.get("workspaceId");
     const id = c.req.param("id");
     const data = c.req.valid("json");
@@ -137,6 +156,7 @@ export const clientsRouter = new Hono<{
     if (data.phone !== undefined) { fields.push("phone = ?"); values.push(data.phone ?? null); }
     if (data.address !== undefined) { fields.push("address = ?"); values.push(data.address ?? null); }
     if (data.archived !== undefined) { fields.push("archived = ?"); values.push(data.archived ? 1 : 0); }
+    if (data.rate !== undefined) { fields.push("rate = ?"); values.push(data.rate ?? null); }
 
     if (fields.length) {
       await c.env.DB.prepare(
@@ -164,6 +184,81 @@ export const clientsRouter = new Hono<{
       `UPDATE clients SET archived = 1 WHERE id = ? AND workspace_id = ?`
     )
       .bind(c.req.param("id"), workspaceId)
+      .run();
+    return c.json({ ok: true }, 200);
+  })
+  // Fixed services: anyone in the workspace reads them, only owners/admins change them.
+  .get("/:id/services", async (c) => {
+    const { results } = await c.env.DB.prepare(
+      `SELECT * FROM client_services WHERE client_id = ? AND workspace_id = ? ORDER BY created_at ASC, name ASC`
+    )
+      .bind(c.req.param("id"), c.get("workspaceId"))
+      .all<ClientServiceRow>();
+    return c.json(results.map(formatService), 200);
+  })
+  .post("/:id/services", zValidator("json", CreateClientServiceSchema), async (c) => {
+    const workspaceId = c.get("workspaceId");
+    const clientId = c.req.param("id");
+    if (!canManageWorkspace(await getMemberRole(c.env.DB, workspaceId, c.get("userId")))) {
+      return c.json({ error: MANAGER_ONLY_ERROR }, 403);
+    }
+    const client = await c.env.DB.prepare(`SELECT 1 FROM clients WHERE id = ? AND workspace_id = ?`)
+      .bind(clientId, workspaceId)
+      .first();
+    if (!client) return c.json({ error: "Not found" }, 404);
+
+    const data = c.req.valid("json");
+    const row = await c.env.DB.prepare(
+      `INSERT INTO client_services (id, workspace_id, client_id, name, description, amount, billable, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`
+    )
+      .bind(
+        crypto.randomUUID(),
+        workspaceId,
+        clientId,
+        data.name,
+        data.description ?? null,
+        data.amount,
+        data.billable === false ? 0 : 1,
+        new Date().toISOString()
+      )
+      .first<ClientServiceRow>();
+    if (!row) throw new Error("client service insert did not produce a readable row");
+    return c.json(formatService(row), 201);
+  })
+  .put("/:id/services/:serviceId", zValidator("json", UpdateClientServiceSchema), async (c) => {
+    const workspaceId = c.get("workspaceId");
+    if (!canManageWorkspace(await getMemberRole(c.env.DB, workspaceId, c.get("userId")))) {
+      return c.json({ error: MANAGER_ONLY_ERROR }, 403);
+    }
+    const data = c.req.valid("json");
+    const fields: string[] = [];
+    const values: unknown[] = [];
+    if (data.name !== undefined) { fields.push("name = ?"); values.push(data.name); }
+    if (data.description !== undefined) { fields.push("description = ?"); values.push(data.description ?? null); }
+    if (data.amount !== undefined) { fields.push("amount = ?"); values.push(data.amount); }
+    if (data.billable !== undefined) { fields.push("billable = ?"); values.push(data.billable ? 1 : 0); }
+
+    const where = `id = ? AND client_id = ? AND workspace_id = ?`;
+    const keys = [c.req.param("serviceId"), c.req.param("id"), workspaceId];
+    if (fields.length) {
+      await c.env.DB.prepare(`UPDATE client_services SET ${fields.join(", ")} WHERE ${where}`)
+        .bind(...values, ...keys)
+        .run();
+    }
+    const row = await c.env.DB.prepare(`SELECT * FROM client_services WHERE ${where}`)
+      .bind(...keys)
+      .first<ClientServiceRow>();
+    if (!row) return c.json({ error: "Not found" }, 404);
+    return c.json(formatService(row), 200);
+  })
+  .delete("/:id/services/:serviceId", async (c) => {
+    const workspaceId = c.get("workspaceId");
+    if (!canManageWorkspace(await getMemberRole(c.env.DB, workspaceId, c.get("userId")))) {
+      return c.json({ error: MANAGER_ONLY_ERROR }, 403);
+    }
+    await c.env.DB.prepare(`DELETE FROM client_services WHERE id = ? AND client_id = ? AND workspace_id = ?`)
+      .bind(c.req.param("serviceId"), c.req.param("id"), workspaceId)
       .run();
     return c.json({ ok: true }, 200);
   });

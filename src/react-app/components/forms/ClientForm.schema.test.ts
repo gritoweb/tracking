@@ -9,6 +9,7 @@ describe("clientFormSchema", () => {
       phone: "",
       address: "",
       notes: "",
+      rate: "",
     });
     expect(result.success).toBe(false);
     if (!result.success) {
@@ -24,6 +25,7 @@ describe("clientFormSchema", () => {
       phone: "",
       address: "",
       notes: "",
+      rate: "",
     });
     expect(result.success).toBe(false);
     if (!result.success) {
@@ -38,8 +40,14 @@ describe("clientFormSchema", () => {
       phone: "",
       address: "",
       notes: "",
+      rate: "",
     });
     expect(result.success).toBe(true);
+  });
+
+  it("rejects a negative rate", () => {
+    const result = clientFormSchema.safeParse({ name: "Acme", email: "", phone: "", address: "", notes: "", rate: "-1" });
+    expect(result.success).toBe(false);
   });
 
   it("parses a fully filled form", () => {
@@ -49,6 +57,7 @@ describe("clientFormSchema", () => {
       phone: "555-1234",
       address: "1 Main St",
       notes: "Pays net-30",
+      rate: "80",
     });
     expect(result.success).toBe(true);
     if (result.success) {
@@ -58,6 +67,7 @@ describe("clientFormSchema", () => {
         phone: "555-1234",
         address: "1 Main St",
         notes: "Pays net-30",
+        rate: "80",
       });
     }
   });

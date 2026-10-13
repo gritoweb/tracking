@@ -65,6 +65,8 @@ export const ClientSchema = z.object({
   email: z.string().nullable(),
   phone: z.string().nullable(),
   address: z.string().nullable(),
+  // The client's own hourly rate for invoices; null = the workspace default.
+  rate: z.number().nullable(),
   archived: z.boolean(),
   createdAt: z.string(),
 });
@@ -89,6 +91,31 @@ export const CreateClientSchema = z.object({
 export const UpdateClientSchema = CreateClientSchema.partial().extend({
   archived: z.boolean().optional(),
 });
+
+// The REST edit also takes the rate; kept off UpdateClientSchema so the MCP catalog's tool shape is unchanged.
+export const UpdateClientRestSchema = UpdateClientSchema.extend({
+  rate: z.number().min(0).max(1_000_000).nullable().optional(),
+});
+
+// A recurring service billed to a client (hosting, email…); only billable ones reach the invoice.
+export const ClientServiceSchema = z.object({
+  id: z.string(),
+  clientId: z.string(),
+  name: z.string(),
+  description: z.string().nullable(),
+  amount: z.number(),
+  billable: z.boolean(),
+  createdAt: z.string(),
+});
+
+export const CreateClientServiceSchema = z.object({
+  name: z.string().trim().min(1).max(255),
+  description: z.string().max(1000).nullable().optional(),
+  amount: z.number().min(0).max(1_000_000),
+  billable: z.boolean().optional(),
+});
+
+export const UpdateClientServiceSchema = CreateClientServiceSchema.partial();
 
 // ─── Project ─────────────────────────────────────────────────────────────────
 
@@ -1279,6 +1306,10 @@ export type PacingStatus = z.infer<typeof PacingStatusSchema>;
 export type ProjectPacing = z.infer<typeof ProjectPacingSchema>;
 export type CreateClient = z.infer<typeof CreateClientSchema>;
 export type UpdateClient = z.infer<typeof UpdateClientSchema>;
+export type UpdateClientRest = z.infer<typeof UpdateClientRestSchema>;
+export type ClientService = z.infer<typeof ClientServiceSchema>;
+export type CreateClientService = z.infer<typeof CreateClientServiceSchema>;
+export type UpdateClientService = z.infer<typeof UpdateClientServiceSchema>;
 export type ClientStats = z.infer<typeof ClientStatsSchema>;
 export type CreateTask = z.infer<typeof CreateTaskSchema>;
 export type UpdateTask = z.infer<typeof UpdateTaskSchema>;
