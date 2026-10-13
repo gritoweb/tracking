@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { FileText, ImageUp, Trash2 } from "lucide-react";
+import { ImageUp, Trash2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,7 +30,7 @@ export function ReportBrandingCard() {
   if (!settings) {
     return (
       <Card>
-        <SettingsCardHeader icon={FileText} title="Client documents" />
+        <SettingsCardHeader title="Invoices" />
         <CardContent>
           <Skeleton className="h-60 w-full" />
         </CardContent>
@@ -41,7 +41,7 @@ export function ReportBrandingCard() {
   const { logoUrl, ...fields } = settings;
   return (
     <Card>
-      <SettingsCardHeader icon={FileText} title="Client documents" />
+      <SettingsCardHeader title="Invoices" />
       <CardContent className="space-y-5">
         {!canManage && <SettingsHint>Only workspace owners and admins can change these.</SettingsHint>}
         <LogoRow logoUrl={logoUrl} canManage={canManage} />
