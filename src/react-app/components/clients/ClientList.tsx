@@ -174,7 +174,7 @@ export function ClientList() {
           <span className="w-20 shrink-0 text-right">Tracked</span>
           <span className="w-20 shrink-0 text-right">Billable</span>
           <span className="w-24 shrink-0 text-right">Amount</span>
-          {canManage && <span className="w-17 shrink-0" aria-hidden />}
+          <span className={cn("shrink-0", canManage ? "w-17" : "w-8")} aria-hidden />
           <span className="w-8 shrink-0" aria-hidden />
           <span className="w-8 shrink-0" aria-hidden />
         </div>
@@ -228,19 +228,18 @@ export function ClientList() {
               currency={currency}
             />
 
+            {/* The invoice is for owners/admins; any member gets the hours report (of their own hours). */}
+            <div className="flex shrink-0 items-center gap-1">
+              {canManage && <ClientDocumentButton kind="invoice" clientId={client.id} />}
+              <ClientDocumentButton kind="hours" clientId={client.id} />
+            </div>
+
             {/* Decorative mirror of the row's navigation, not a second control:
                 it sits outside the button that navigates, at the far right
                 where a "go" chevron invites the click it was the one part of
                 the row that didn't answer. aria-hidden and not focusable, so it
                 adds a live target without adding a tab stop for an action the
                 name button already exposes to the keyboard. */}
-            {canManage && (
-              <div className="flex shrink-0 items-center gap-1">
-                <ClientDocumentButton kind="invoice" clientId={client.id} />
-                <ClientDocumentButton kind="hours" clientId={client.id} />
-              </div>
-            )}
-
             <Tooltip>
               <TooltipTrigger asChild>
                 <span

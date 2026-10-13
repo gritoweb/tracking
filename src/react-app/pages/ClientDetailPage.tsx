@@ -156,23 +156,24 @@ export function ClientDetailPage() {
             </p>
           )}
         </div>
-        {canManage && (
-          <div className="flex shrink-0 items-center gap-2">
-            {(["invoice", "hours"] as const).map((kind) => (
-              <ClientDocumentButton
-                key={kind}
-                kind={kind}
-                clientId={client.id}
-                preset={documentPreset}
-                onClose={() => setSearchParams({}, { replace: true })}
-              />
-            ))}
+        <div className="flex shrink-0 items-center gap-2">
+          {/* The invoice is for owners/admins; any member gets the hours report (of their own hours). */}
+          {(canManage ? (["invoice", "hours"] as const) : (["hours"] as const)).map((kind) => (
+            <ClientDocumentButton
+              key={kind}
+              kind={kind}
+              clientId={client.id}
+              preset={documentPreset}
+              onClose={() => setSearchParams({}, { replace: true })}
+            />
+          ))}
+          {canManage && (
             <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setShowEdit(true)}>
               <Edit2 className="h-3.5 w-3.5" />
               Edit
             </Button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* The same four figures the list row shows, in the framed strip the

@@ -100,12 +100,13 @@ describe("prepare_client_document", () => {
     expect((await call(tools, "prepare_client_document", { ...SEPTEMBER, kind: "hours", clientId: "nope" })).error).toMatch(/list_clients/);
   });
 
-  it("is not offered to a member, whose reports would only hold their own hours", () => {
-    const { toolsFor } = world();
+  it("gives a member the hours report of their own hours, never an invoice", async () => {
+    const { toolsFor, call } = world();
     const tools = toolsFor("u-member");
-    expect(tools.has("prepare_client_document")).toBe(false);
     expect(tools.has("add_client_service")).toBe(false);
-    expect(tools.has("list_client_services")).toBe(true);
+    const { data } = await call(tools, "prepare_client_document", { ...SEPTEMBER, kind: "hours" });
+    expect(data).toMatchObject({ kind: "hours", entryCount: 1 });
+    expect((await call(tools, "prepare_client_document", { ...SEPTEMBER, kind: "invoice" })).error).toBeDefined();
   });
 });
 

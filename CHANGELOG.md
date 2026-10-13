@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-10-13 (15)
+### Changed
+- **A member can generate a client's hours report** (of their own hours, like the rest of their reports) from Reports, the client list and the client's page; the invoice stays owner/admin-only. `prepare_client_document` is now offered to members too and refuses `kind: "invoice"` for them, so the Assistant follows.
+- The document settings card in Settings → Reports is titled "Invoices", with no icon (`SettingsCardHeader`'s icon is optional).
+### Verified
+- `vitest run` (MCP: a member prepares the hours report, the invoice is refused), Playwright `report-per-person` + `client-documents` 8/8 with one worker (a member sees "Hours report" but no "Invoice" anywhere, downloads the PDF, and gets 403 moving the invoice sequence). With two workers the dev server timed out on different tests each run.
+
 ## 2026-10-13 (14) — `refactor`, local only (not pushed to master, not deployed)
 ### Changed
 - **Invoices and hours reports are two documents, each with its own dialog and icon** (with a tooltip): on Reports ("Invoices", "Hours reports"), on the client's page and on each row of the client list ("Invoice", "Hours report"). The "Client document" button and its Document switch are gone. The list's open chevron and row menu got tooltips too.

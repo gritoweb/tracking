@@ -24,7 +24,6 @@ export const MANAGER_ONLY_TOOLS: ReadonlySet<string> = new Set([
   "fork_task_statuses",
   "create_task_status",
   "update_task_status",
-  "prepare_client_document",
   "add_client_service",
   "update_client_service",
   "delete_client_service",

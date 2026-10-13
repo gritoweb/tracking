@@ -49,7 +49,8 @@ export function registerDocumentReads(d: ToolDeps): void {
       description:
         "Prepare a client's invoice or worked-hours report for a period and get the link that opens it, filled in, in the app — where the person clicks Generate PDF (the PDF is made in their browser, not here). " +
         "Before calling: if the person didn't say which period, propose last month (its first to its last day) and ask them to confirm or give other dates; never pick a period silently. Ask the language too when it isn't clear. " +
-        "The answer carries the hours, the invoice lines and total (whole hours rounded down × the client's rate, else the workspace default, plus billable fixed services) so you can tell the person before they open it. Owners/admins only.",
+        "The answer carries the hours, the invoice lines and total (whole hours rounded down × the client's rate, else the workspace default, plus billable fixed services) so you can tell the person before they open it. " +
+        (d.canManage ? "" : "As a member you can prepare only the hours report, and it holds only your own hours; invoices are for owners/admins."),
       inputSchema: {
         clientId: IdArg("client"),
         kind: z.enum(["invoice", "hours"]).describe("`invoice`, or `hours` for the worked-hours report"),
@@ -64,6 +65,7 @@ export function registerDocumentReads(d: ToolDeps): void {
     },
     async ({ clientId, kind, since, until, language, invoiceNumber, hourlyRate, timezoneOffsetMinutes }) => {
       if (since > until) return refuse("`since` is after `until`.");
+      if (kind === "invoice" && !d.canManage) return refuse("Invoices are for owners/admins; you can prepare the hours report (`kind: \"hours\"`), with your own hours.");
       const [client, settings, prefs] = await Promise.all([
         bridge<Client>("GET", `/api/clients/${segment(clientId)}`),
         bridge<ReportSettings>("GET", "/api/report-settings"),

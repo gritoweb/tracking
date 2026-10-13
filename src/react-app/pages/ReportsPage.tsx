@@ -160,12 +160,9 @@ export function ReportsPage() {
         onExport={handleExport}
         actions={
           <>
-            {canManage && (
-              <>
-                <ClientDocumentButton kind="invoice" />
-                <ClientDocumentButton kind="hours" />
-              </>
-            )}
+            {/* The invoice is for owners/admins; any member gets the hours report (of their own hours). */}
+            {canManage && <ClientDocumentButton kind="invoice" />}
+            <ClientDocumentButton kind="hours" />
             <SavedReportsMenu current={currentConfig} onLoad={loadConfig} />
             <AiSummaryDialog since={range.since} until={range.until} />
           </>
