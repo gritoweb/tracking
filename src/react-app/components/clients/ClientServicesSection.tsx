@@ -14,7 +14,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { SettingsCardHeader } from "@/components/settings/SettingsCardHeader";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemSeparator, ItemTitle } from "@/components/ui/item";
 import { EmptyState } from "@/components/ui/empty-state";
 import { MoneyInput } from "@/components/forms/MoneyInput";
@@ -36,27 +37,28 @@ export function ClientServicesSection({ clientId, canManage }: { clientId: strin
 
   return (
     <Card className="mt-8">
-      <CardHeader>
-        <CardTitle>Fixed services</CardTitle>
-        <CardDescription>Recurring charges for this client. The billable ones go on its invoice.</CardDescription>
-        {canManage && (
-          <CardAction>
+      <SettingsCardHeader
+        icon={Receipt}
+        title="Fixed services"
+        action={
+          canManage && (
             <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setEditing("new")}>
               <Plus className="h-3.5 w-3.5" />
               Add service
             </Button>
-          </CardAction>
-        )}
-      </CardHeader>
+          )
+        }
+      />
       <CardContent>
         {services.length === 0 ? (
-          <EmptyState icon={Receipt} title="No fixed services" description="Hosting, email and other recurring charges go here." />
+          <EmptyState icon={Receipt} title="No fixed services" description="Hosting, email and other recurring charges for this client. The billable ones go on its invoice." />
         ) : (
           <ItemGroup>
             {services.map((s, i) => (
               <Fragment key={s.id}>
                 {i > 0 && <ItemSeparator />}
-                <Item size="sm">
+                {/* No side padding (and -mx-px for its transparent 1px border), the header's icon gap: icons and names line up under the card title's. */}
+                <Item size="sm" className="-mx-px gap-2 px-0">
                   <ItemMedia variant="icon">
                     <Receipt />
                   </ItemMedia>

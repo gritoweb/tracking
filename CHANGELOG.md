@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-13 (9) — `refactor`, local only (not pushed to master, not deployed)
+### Changed
+- The fixed-services card's title now has an icon (`SettingsCardHeader`, the icon + title + action header the settings cards already use), and its rows drop their side padding and take the header's icon gap, so each service's icon and name sit in the same columns as the title's (they were 14px and 20px to the right of it). The explanatory line moved into the empty state.
+### Verified
+- Measured in Playwright: title icon / text at 24px / 48px from the card edge, every row's icon / name at 24px / 48px, at 1280px and 390px. `tsc -b` (0), `pnpm lint` (0).
+
 ## 2026-10-13 (8) — `refactor`, local only (not pushed to master, not deployed)
 ### Changed
 - **A client's fixed services sit below its projects, inside a card**, instead of above them as loose bordered rows on the page background. Built only from shadcn/ui: the existing `Card` (title, description, `CardAction` for Add service) and the official `Item` (`ItemGroup`, `ItemMedia`, `ItemTitle`, `ItemDescription`, `ItemActions`, `ItemSeparator`), added with `shadcn add item`. The generated file was adjusted only where the project's lint requires (motion tokens `duration-fast ease-out-quart`, the `focus-ring` utility) and to import `cn` from `@/lib/utils`: the CLI resolved that alias to an npm package named `cn` and added it as a dependency, which was reverted.
