@@ -92,3 +92,24 @@ export function hoursSummary(entries: Pick<ReportDetailedEntry, "start" | "durat
   const days = new Set(entries.map((e) => dayOf(e.start))).size;
   return { totalSeconds, entryCount: entries.length, dailyAverageHours: days ? totalSeconds / 3600 / days : 0 };
 }
+
+/** An invoice number is digits, optionally in hyphen-separated groups: "7", "2026-09". */
+export const INVOICE_NUMBER = /^\d{1,12}(-\d{1,12}){0,3}$/;
+
+const groups = (n: string) => n.split("-").map(Number);
+
+/** Whether generating `number` moves the sequence on from `last`: a new pattern does; in the same one, only a later number ("5" after "10" is a re-issue). */
+export function movesInvoiceSequence(number: string, last: string): boolean {
+  const [x, y] = [groups(number), groups(last)];
+  if (x.length !== y.length) return true;
+  const i = x.findIndex((g, n) => g !== y[n]);
+  return i >= 0 && x[i] > y[i];
+}
+
+/** The number after `last` in its own pattern: its last group plus one, padding kept ("2026-09" → "2026-10"); "1" first. */
+export function nextInvoiceNumber(last: string | null): string {
+  if (!last) return "1";
+  const head = last.slice(0, last.lastIndexOf("-") + 1);
+  const tail = last.slice(head.length);
+  return head + String(Number(tail) + 1).padStart(tail.length, "0");
+}

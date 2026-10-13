@@ -158,11 +158,15 @@ export function ClientDetailPage() {
         </div>
         {canManage && (
           <div className="flex shrink-0 items-center gap-2">
-            <ClientDocumentButton
-              clientId={client.id}
-              preset={documentPreset}
-              onClose={() => setSearchParams({}, { replace: true })}
-            />
+            {(["invoice", "hours"] as const).map((kind) => (
+              <ClientDocumentButton
+                key={kind}
+                kind={kind}
+                clientId={client.id}
+                preset={documentPreset}
+                onClose={() => setSearchParams({}, { replace: true })}
+              />
+            ))}
             <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setShowEdit(true)}>
               <Edit2 className="h-3.5 w-3.5" />
               Edit

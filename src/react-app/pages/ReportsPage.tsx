@@ -125,8 +125,7 @@ export function ReportsPage() {
     const name = `time-entries-${range.label.replace(/\s/g, "-")}`;
     const options = { includeAmount: !hideAmounts };
     if (format === "csv") exportToCSV(entries, name, options);
-    else if (format === "excel") exportToExcel(entries, name, options);
-    else window.print();
+    else exportToExcel(entries, name, options);
   };
 
   const currentConfig: ReportConfig = {
@@ -161,20 +160,25 @@ export function ReportsPage() {
         onExport={handleExport}
         actions={
           <>
-            {canManage && <ClientDocumentButton />}
+            {canManage && (
+              <>
+                <ClientDocumentButton kind="invoice" />
+                <ClientDocumentButton kind="hours" />
+              </>
+            )}
             <SavedReportsMenu current={currentConfig} onLoad={loadConfig} />
             <AiSummaryDialog since={range.since} until={range.until} />
           </>
         }
       />
 
-      <div className="flex flex-wrap items-start justify-between gap-2 print:hidden">
+      <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <ReportRangeControl range={range} onRangeChange={setRange} />
           <ReportFilterBar filters={filters} onChange={setFilters} canFilterPeople={canManage} />
         </div>
         <div className="flex items-center gap-2">
-          {/* For a report that goes to a client: hides money on screen, in CSV/Excel and in print. */}
+          {/* For a report that goes to a client: hides money on screen and in CSV/Excel. */}
           <div className="flex items-center gap-2">
             <Switch id="report-hide-amounts" checked={hideAmounts} onCheckedChange={setHideAmounts} />
             <Label htmlFor="report-hide-amounts" className="text-sm font-normal text-muted-foreground">

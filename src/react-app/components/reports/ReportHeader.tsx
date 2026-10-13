@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Calendar, Download, FileText, FileSpreadsheet, Printer } from "lucide-react";
+import { Calendar, Download, FileText, FileSpreadsheet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -17,10 +17,8 @@ interface DateRange {
   label: string;
 }
 
-export type ExportFormat = "csv" | "excel" | "print";
+export type ExportFormat = "csv" | "excel";
 
-// Retired for the client PDFs (ClientDocumentDialog); kept switchable rather than deleted.
-const LEGACY_EXPORTS_ENABLED = false;
 
 interface ReportHeaderProps {
   onExport?: (format: ExportFormat) => void;
@@ -66,7 +64,7 @@ export function ReportRangeControl({ range, onRangeChange }: ReportRangeControlP
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-2 print:hidden">
+    <div className="flex flex-wrap items-center gap-2">
       {range.label === "Custom range" && (
         // Was a pair of bare <input>s with a hand-rolled border and rounded-md,
         // which put square corners and no focus ring beside the pill controls
@@ -134,8 +132,8 @@ export function ReportHeader({ onExport, actions }: ReportHeaderProps) {
     <div className="flex items-center justify-between">
       <h1 className="text-xl font-semibold">Reports</h1>
 
-      <div className="flex items-center gap-2 print:hidden">
-        {LEGACY_EXPORTS_ENABLED && onExport && (
+      <div className="flex items-center gap-2">
+        {onExport && (
           <DropdownMenu>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -155,10 +153,6 @@ export function ReportHeader({ onExport, actions }: ReportHeaderProps) {
               <DropdownMenuItem onClick={() => onExport("excel")}>
                 <FileSpreadsheet className="h-4 w-4" />
                 Excel
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onExport("print")}>
-                <Printer className="h-4 w-4" />
-                Print / PDF
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

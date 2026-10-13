@@ -104,7 +104,7 @@ export function ReportsSummarySection({
 
   return (
     <Tabs defaultValue="summary">
-      <TabsList className="print:hidden">
+      <TabsList>
         <TabsTrigger value="summary">Summary</TabsTrigger>
         <TabsTrigger value="weekly">Weekly</TabsTrigger>
         <TabsTrigger value="detailed">

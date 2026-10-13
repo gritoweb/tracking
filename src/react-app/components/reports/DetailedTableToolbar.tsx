@@ -32,7 +32,7 @@ export function DetailedTableToolbar({
   onToggleColumn,
 }: DetailedTableToolbarProps) {
   return (
-    <div className="flex justify-end print:hidden">
+    <div className="flex justify-end">
       {selectedCount > 0 && (
         <SelectionBar label={`${selectedCount} selected`} onClear={onClearSelection}>
           <Button variant="ghost" size="sm" onClick={() => onBulkBillable(true)}>

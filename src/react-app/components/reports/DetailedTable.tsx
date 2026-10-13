@@ -171,12 +171,11 @@ export function DetailedTable({ entries, hideAmounts = false }: DetailedTablePro
       {/* Table */}
       <div className="rounded-lg border">
         {/* Its own scroll region so the column headers survive a 500-row report
-            and the tabs/filters above stay put. Print unbounds it so the whole
-            table still flows onto pages. */}
-        <Table containerClassName="max-h-[60vh] overflow-y-auto print:max-h-none print:overflow-visible">
+            and the tabs/filters above stay put. */}
+        <Table containerClassName="max-h-[60vh] overflow-y-auto">
           <TableHeader>
             <TableRow className="[&>th]:sticky [&>th]:top-0 [&>th]:z-sticky [&>th]:bg-muted [&>th]:shadow-[inset_0_-1px_0_var(--border)] hover:bg-transparent">
-              <TableHead className="w-8 rounded-tl-lg print:hidden" aria-label="Select">
+              <TableHead className="w-8 rounded-tl-lg" aria-label="Select">
                 <Checkbox
                   size="sm"
                   aria-label="Select all"
@@ -205,13 +204,13 @@ export function DetailedTable({ entries, hideAmounts = false }: DetailedTablePro
                   </button>
                 </TableHead>
               ))}
-              <TableHead className="w-8 rounded-tr-lg print:hidden" aria-label="Actions" />
+              <TableHead className="w-8 rounded-tr-lg" aria-label="Actions" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {sorted.map((entry) => (
               <TableRow key={entry.id} data-state={selected.has(entry.id) ? "selected" : undefined}>
-                <TableCell className="print:hidden">
+                <TableCell className="">
                   <Checkbox
                     size="sm"
                     aria-label={`Select ${entry.description || "entry"}`}
@@ -232,7 +231,7 @@ export function DetailedTable({ entries, hideAmounts = false }: DetailedTablePro
                     {renderCell(c.key, entry, timeFormat, currency)}
                   </TableCell>
                 ))}
-                <TableCell className="py-2.5 print:hidden">
+                <TableCell className="py-2.5">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button

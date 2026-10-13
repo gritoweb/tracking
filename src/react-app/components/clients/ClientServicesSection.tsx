@@ -26,7 +26,7 @@ import { currencyLocale, formatMoney, formatMoneyInput } from "@/lib/money";
 import { useUIStore } from "@/stores/uiStore";
 import type { ClientService } from "@shared/schemas";
 
-/** A client's fixed services (hosting, email…); the billable ones are listed on its invoice. */
+/** A client's recurring services (hosting, email…); the billable ones are listed on its invoice. */
 export function ClientServicesSection({ clientId, canManage }: { clientId: string; canManage: boolean }) {
   const { data: services = [] } = useClientServices(clientId);
   const save = useSaveClientService(clientId);
@@ -42,7 +42,7 @@ export function ClientServicesSection({ clientId, canManage }: { clientId: strin
       <SettingsCardHeader
         className="px-4"
         icon={Repeat}
-        title="Fixed services"
+        title="Recurring services"
         action={
           canManage && (
             <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setEditing("new")}>
@@ -54,7 +54,7 @@ export function ClientServicesSection({ clientId, canManage }: { clientId: strin
       />
       <CardContent className="px-4">
         {services.length === 0 ? (
-          <EmptyState icon={Repeat} title="No fixed services" description="Hosting, email and other recurring charges for this client. The billable ones go on its invoice." />
+          <EmptyState icon={Repeat} title="No recurring services" description="Hosting, email and other recurring charges for this client. The billable ones go on its invoice." />
         ) : (
           <ItemGroup>
             {services.map((s, i) => (

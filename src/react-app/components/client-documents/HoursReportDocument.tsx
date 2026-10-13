@@ -84,12 +84,6 @@ export function HoursReportDocument(p: HoursReportProps) {
             <Text style={[s.cell, s.colDate]}>{formatDay(e.start, p.locale)}</Text>
           </View>
         ))}
-        <View style={s.totalRow} wrap={false}>
-          <Text style={[s.totalText, s.colDesc]}>{t.total}</Text>
-          <Text style={[s.totalText, s.colDur]}>{formatClock(summary.totalSeconds)}</Text>
-          <View style={s.colProject} />
-          <View style={s.colDate} />
-        </View>
         </View>
 
         <View style={s.footer} fixed>
@@ -128,8 +122,6 @@ function styles(c: BrandPalette) {
     colDate: { width: 66, textAlign: "right" },
     project: { flexDirection: "row", alignItems: "center" },
     dot: { width: 5, height: 5, borderRadius: 3, marginRight: 6 },
-    totalRow: { flexDirection: "row", paddingVertical: 10 },
-    totalText: { fontFamily: "Helvetica-Bold", fontSize: 10, color: c.primary },
     footer: {
       position: "absolute",
       bottom: 24,

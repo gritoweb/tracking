@@ -126,8 +126,7 @@ test.describe("reports per person", () => {
   });
 });
 
-// The export menu is switched off (LEGACY_EXPORTS_ENABLED in ReportHeader.tsx); turn this back on with it.
-test.skip("Hide amounts keeps money out of the CSV export", async ({ page }) => {
+test("Hide amounts keeps money out of the CSV export", async ({ page }) => {
   await signUp(page);
   const project = await createProject(page, { billable: true });
   const created = await page.request.post("/api/time_entries", {

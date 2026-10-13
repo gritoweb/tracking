@@ -64,9 +64,13 @@ test.describe("reports charts", () => {
     await expect(page.getByRole("button", { name: "Choose metrics" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Saved" })).toBeVisible();
 
-    // The client PDFs replaced the CSV/Excel/print export (LEGACY_EXPORTS_ENABLED in ReportHeader.tsx).
-    await expect(page.getByRole("button", { name: "Client document" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Export" })).toHaveCount(0);
+    // CSV/Excel export plus the two client PDFs; printing is gone.
+    await expect(page.getByRole("button", { name: "Invoices" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Hours reports" })).toBeVisible();
+    await page.getByRole("button", { name: "Export" }).click();
+    await expect(page.getByRole("menuitem", { name: "CSV" })).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: /Print/ })).toHaveCount(0);
+    await page.keyboard.press("Escape");
   });
 
   test("charts render in dark mode", async ({ page }) => {

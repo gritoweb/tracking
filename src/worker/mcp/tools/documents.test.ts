@@ -56,7 +56,7 @@ describe("prepare_client_document", () => {
       client: "School",
       hours: 8.25,
       entryCount: 2,
-      invoiceNumber: "2026-09",
+      invoiceNumber: "1",
       currency: "BRL",
       hourlyRate: 65,
       rateSource: "workspace default",
@@ -66,7 +66,7 @@ describe("prepare_client_document", () => {
         { description: "Email server", hours: null, amount: 35 },
       ],
       total: 555,
-      url: "https://app.test/clients/cl-A?document=invoice&from=2026-09-01&to=2026-09-30&lang=pt-BR&number=2026-09",
+      url: "https://app.test/clients/cl-A?document=invoice&from=2026-09-01&to=2026-09-30&lang=pt-BR&number=1",
     });
   });
 

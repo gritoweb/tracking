@@ -28,6 +28,7 @@ describe("the report settings", () => {
       logoUrl: null,
       defaultRate: 100,
       currency: "BRL",
+      nextInvoiceNumber: "1",
     });
   });
 
@@ -66,5 +67,27 @@ describe("the report settings", () => {
     expect((await as("u-member").request("/logo", { method: "PUT" })).status).toBe(403);
     await as("u-owner").put("/", { companyName: "Agency" });
     expect(((await (await as("u-owner", "ws-B").get("/")).json()) as { companyName: string }).companyName).toBe("B");
+  });
+});
+
+describe("the invoice number sequence", () => {
+  it("starts at 1 and continues the last number's pattern; an older one in the same pattern is a re-issue", async () => {
+    const { as } = world();
+    const record = async (number: string) => {
+      const res = await as("u-owner").post("/invoice-number", { number });
+      return res.status === 200 ? ((await res.json()) as { nextInvoiceNumber: string }).nextInvoiceNumber : res.status;
+    };
+    expect(await record("2")).toBe("3");
+    expect(await record("10")).toBe("11");
+    expect(await record("5")).toBe("11");
+    expect(await record("2026-09")).toBe("2026-10");
+    expect(await record("2026-010")).toBe("2026-011");
+    expect(await record("2")).toBe("3");
+    expect(await record("INV-7")).toBe(400);
+  });
+
+  it("is moved only by an owner or admin", async () => {
+    const { as } = world();
+    expect((await as("u-member").post("/invoice-number", { number: "3" })).status).toBe(403);
   });
 });

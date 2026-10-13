@@ -27,6 +27,8 @@ import { ClientForm } from "@/components/forms/ClientForm";
 import { useAllClients, useDeleteClient, useUpdateClient } from "@/hooks/useProjects";
 import { useWorkspaceRole } from "@/hooks/useWorkspaceRole";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { ClientDocumentButton } from "@/components/client-documents/ClientDocumentButton";
 import { cn } from "@/lib/utils";
 import type { Client, ClientStats } from "@shared/schemas";
 
@@ -172,6 +174,7 @@ export function ClientList() {
           <span className="w-20 shrink-0 text-right">Tracked</span>
           <span className="w-20 shrink-0 text-right">Billable</span>
           <span className="w-24 shrink-0 text-right">Amount</span>
+          {canManage && <span className="w-17 shrink-0" aria-hidden />}
           <span className="w-8 shrink-0" aria-hidden />
           <span className="w-8 shrink-0" aria-hidden />
         </div>
@@ -231,21 +234,38 @@ export function ClientList() {
                 the row that didn't answer. aria-hidden and not focusable, so it
                 adds a live target without adding a tab stop for an action the
                 name button already exposes to the keyboard. */}
-            <span
-              aria-hidden
-              onClick={() => navigate(`/clients/${client.id}`)}
-              className="hidden shrink-0 cursor-pointer text-muted-foreground md:block"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </span>
+            {canManage && (
+              <div className="flex shrink-0 items-center gap-1">
+                <ClientDocumentButton kind="invoice" clientId={client.id} />
+                <ClientDocumentButton kind="hours" clientId={client.id} />
+              </div>
+            )}
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span
+                  aria-hidden
+                  onClick={() => navigate(`/clients/${client.id}`)}
+                  className="hidden shrink-0 cursor-pointer text-muted-foreground md:block"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>Open client</TooltipContent>
+            </Tooltip>
 
             {canManage && (
             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon-sm" aria-label="Client actions">
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon-sm" aria-label="Client actions">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                </TooltipTrigger>
+                <TooltipContent>Client actions</TooltipContent>
+              </Tooltip>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={() => setEditClient(client)}>
                   <Edit2 className="mr-2 h-3.5 w-3.5" />

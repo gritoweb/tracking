@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-10-13 (14) — `refactor`, local only (not pushed to master, not deployed)
+### Changed
+- **Invoices and hours reports are two documents, each with its own dialog and icon** (with a tooltip): on Reports ("Invoices", "Hours reports"), on the client's page and on each row of the client list ("Invoice", "Hours report"). The "Client document" button and its Document switch are gone. The list's open chevron and row menu got tooltips too.
+- **The invoice number is a workspace-wide sequence**, filled in and still editable: it starts at 1 and continues the pattern of the last one generated (`10` → `11`, `2026-09` → `2026-10`, padding kept). Re-issuing an older number in the same pattern doesn't move it back; a new pattern takes over. Digits and hyphens only, enforced by the field, the route and the MCP tool. New column `report_settings.last_invoice_number` (migration `0060`, local only) and `POST /api/report-settings/invoice-number`, called after each invoice is generated. `prepare_client_document` offers the same next number.
+- **The generator's From/To are dd/mm/yyyy** (the shared `DatePicker`, which now takes an `id`, a `label` and a `displayFormat`, and opens on the selected month) instead of the browser's native date field.
+- **"Fixed services" are "Recurring services"** on screen.
+- **A client's billable amount** (client page and list) is billable hours × the client's rate, else the workspace default, in the documents' currency — it read $0.00 because it used project rates, which are unset (commit `1c4bf2b`).
+### Removed
+- The hours report's Total row at the end of the table: the same total is in the card at the top.
+- **Printing the Reports page**: its menu item, `window.print()`, `css/global/print.css` and every `print:` class. CSV and Excel export are back on (`LEGACY_EXPORTS_ENABLED` removed); the CSV "Hide amounts" e2e runs again.
+### Verified
+- `tsc -b` (0), `pnpm lint` (0), `vitest run` 1272/1272 (new: the sequence — 2→3, 10→11, 5 keeps 11, 2026-09→2026-10, 2026-010→2026-011, 2→3, "INV-7" refused; member refused; client billable amount at the client rate / workspace default). Playwright `client-documents`, `reports`, `report-per-person`: 12/12. Billable amount checked on the client page in Chrome (September: R$2,199.17 = 33h50 × 65).
+
 ## 2026-10-13 (13) — `refactor`, local only (not pushed to master, not deployed)
 ### Fixed
 - **Invoice number and hourly rate sit side by side** in the generator (from the client page and from Reports), on the same two-column row as From / To; they were stacked, which broke the dialog's grid. The rate hint runs under the row.

@@ -1,7 +1,9 @@
 import { useState } from "react";
-import { endOfMonth, format, startOfMonth, subMonths } from "date-fns";
+import { useQueryClient } from "@tanstack/react-query";
+import { endOfMonth, format, parseISO, startOfMonth, subMonths } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Spinner } from "@/components/ui/spinner";
 import {
@@ -24,6 +26,7 @@ import { SettingsHint } from "@/components/settings/SettingsHint";
 import { useUIStore } from "@/stores/uiStore";
 import {
   DOCUMENT_TEXT,
+  INVOICE_NUMBER,
   invoiceLines,
   type ClientDocumentKind,
   type DocumentLocale,
@@ -35,10 +38,6 @@ import {
 } from "@/lib/clientDocuments";
 import { brandPalette } from "./brand";
 
-const KIND_OPTIONS = [
-  { value: "invoice" as const, label: "Invoice" },
-  { value: "hours" as const, label: "Hours report" },
-];
 const LOCALE_OPTIONS = [
   { value: "pt-BR" as const, label: "Português" },
   { value: "en" as const, label: "English" },
@@ -61,11 +60,13 @@ function download(blob: Blob, filename: string) {
 /** Generates a client's invoice or hours report as a PDF; `clientId` fixes the client (opened from its page). */
 export function ClientDocumentDialog({
   open,
+  kind,
   onOpenChange,
   clientId: fixedClientId,
   preset,
 }: {
   open: boolean;
+  kind: ClientDocumentKind;
   onOpenChange: (open: boolean) => void;
   clientId?: string;
   preset?: DocumentPreset | null;
@@ -73,14 +74,16 @@ export function ClientDocumentDialog({
   const { data: clients = [] } = useClients();
   const updateClient = useUpdateClient();
   const { data: settings } = useReportSettings();
+  const queryClient = useQueryClient();
   const roundMode = useUIStore((s) => s.roundMode);
   const roundMinutes = useUIStore((s) => s.roundMinutes);
 
   const [clientId, setClientId] = useState(fixedClientId ?? "");
-  const [kind, setKind] = useState<ClientDocumentKind>(preset?.kind ?? "invoice");
   const [locale, setLocale] = useState<DocumentLocale>(preset?.locale ?? "pt-BR");
   const [{ from, to }, setRange] = useState(() => (preset ? { from: preset.from, to: preset.to } : lastMonth()));
-  const [number, setNumber] = useState(() => preset?.number ?? (preset?.from ?? lastMonth().from).slice(0, 7));
+  // Untouched: the link's number, else the workspace's next one.
+  const [typedNumber, setNumber] = useState(preset?.number);
+  const number = typedNumber ?? settings?.nextInvoiceNumber ?? "";
   // Untouched (undefined): the client's rate, else the workspace default. Typed: saved on the client when generating.
   const [rateOverride, setRateOverride] = useState<number | null | undefined>(preset?.rate);
   const [busy, setBusy] = useState(false);
@@ -90,13 +93,7 @@ export function ClientDocumentDialog({
   const rate = rateOverride === undefined ? savedRate : rateOverride;
   const validRate = kind === "hours" || (rate !== null && rate >= 0);
   const validRange = from !== "" && to !== "" && from <= to;
-  const canGenerate = Boolean(client && settings && validRange && validRate && !busy);
-
-  const changeFrom = (value: string) => {
-    setRange((r) => ({ ...r, from: value }));
-    // The suggested number is the period's year-month.
-    if (value) setNumber(value.slice(0, 7));
-  };
+  const canGenerate = Boolean(client && settings && validRange && validRate && (kind === "hours" || INVOICE_NUMBER.test(number)) && !busy);
 
   const generate = async () => {
     if (!client || !settings) return;
@@ -135,6 +132,7 @@ export function ClientDocumentDialog({
           currency: settings.currency,
         });
         download(blob, t.invoiceFile(client.name, number));
+        queryClient.setQueryData(["report-settings"], await api.reportSettings.recordInvoiceNumber(number));
       } else {
         // A period inside one month is named by the month; any other by its two dates.
         const oneMonth = from.slice(0, 7) === to.slice(0, 7);
@@ -160,8 +158,10 @@ export function ClientDocumentDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Client document</DialogTitle>
-          <DialogDescription>A PDF to send to the client, with your report branding.</DialogDescription>
+          <DialogTitle>{kind === "invoice" ? "Invoice" : "Hours report"}</DialogTitle>
+          <DialogDescription>
+            {kind === "invoice" ? "What the client is billed for the period" : "The hours worked for the client in the period"}, as a PDF with your report branding.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
@@ -187,19 +187,16 @@ export function ClientDocumentDialog({
             </Field>
           )}
 
-          <div className="flex flex-wrap gap-3">
-            <SegmentedControl label="Document" options={KIND_OPTIONS} value={kind} onChange={setKind} />
-            <SegmentedControl label="Language" options={LOCALE_OPTIONS} value={locale} onChange={setLocale} />
-          </div>
+          <SegmentedControl label="Language" options={LOCALE_OPTIONS} value={locale} onChange={setLocale} />
 
           <div className="flex gap-3">
             <Field className="flex-1">
               <FieldLabel htmlFor="doc-from">From</FieldLabel>
-              <Input id="doc-from" type="date" value={from} max={to} onChange={(e) => changeFrom(e.target.value)} />
+              <DatePicker id="doc-from" label="From" displayFormat="dd/MM/yyyy" value={parseISO(from)} onSelect={(d) => setRange((r) => ({ ...r, from: format(d, "yyyy-MM-dd") }))} />
             </Field>
             <Field className="flex-1">
               <FieldLabel htmlFor="doc-to">To</FieldLabel>
-              <Input id="doc-to" type="date" value={to} min={from} onChange={(e) => setRange((r) => ({ ...r, to: e.target.value }))} />
+              <DatePicker id="doc-to" label="To" displayFormat="dd/MM/yyyy" value={parseISO(to)} onSelect={(d) => setRange((r) => ({ ...r, to: format(d, "yyyy-MM-dd") }))} />
             </Field>
           </div>
 
@@ -209,7 +206,15 @@ export function ClientDocumentDialog({
               <div className="flex gap-3">
                 <Field className="flex-1">
                   <FieldLabel htmlFor="doc-number">Invoice number</FieldLabel>
-                  <Input id="doc-number" value={number} onChange={(e) => setNumber(e.target.value)} />
+                  <Input
+                    id="doc-number"
+                    inputMode="numeric"
+                    placeholder="12 or 2026-09"
+                    value={number}
+                    aria-invalid={!INVOICE_NUMBER.test(number)}
+                    // Digits and hyphens only; the next invoice continues this one's pattern.
+                    onChange={(e) => setNumber(e.target.value.replace(/[^\d-]/g, ""))}
+                  />
                 </Field>
                 {client && settings && savedRate !== null && (
                   <Field className="flex-1">

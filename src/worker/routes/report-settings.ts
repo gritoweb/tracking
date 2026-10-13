@@ -1,13 +1,16 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
+import { z } from "zod";
 import {
   UpdateReportSettingsSchema,
   type ReportSettings,
 } from "@shared/schemas";
 import { REPORT_DEFAULT_COLORS } from "@shared/colors";
+import { INVOICE_NUMBER, movesInvoiceSequence, nextInvoiceNumber } from "@shared/client-documents";
 import { isManager, MANAGER_ONLY_ERROR } from "../lib/permissions";
 
 const MAX_LOGO_BYTES = 1024 * 1024;
+export const InvoiceNumberSchema = z.string().trim().regex(INVOICE_NUMBER, "Digits and hyphens only, e.g. 12 or 2026-09");
 // The one default not taken from the workspace itself: an invoice always needs some rate.
 export const DEFAULT_HOURLY_RATE = 100;
 
@@ -27,6 +30,7 @@ interface ReportSettingsRow {
   logo_r2_key: string | null;
   logo_content_type: string | null;
   currency: string | null;
+  last_invoice_number: string | null;
   updated_at: string;
 }
 
@@ -55,6 +59,7 @@ async function load(db: D1Database, workspaceId: string): Promise<ReportSettings
     logoUrl: row?.logo_r2_key ? `/api/report-settings/logo?v=${encodeURIComponent(row.updated_at)}` : null,
     defaultRate: ws?.default_rate ?? DEFAULT_HOURLY_RATE,
     currency: row?.currency ?? ws?.owner_currency ?? "USD",
+    nextInvoiceNumber: nextInvoiceNumber(row?.last_invoice_number ?? null),
   };
 }
 
@@ -93,6 +98,21 @@ export const reportSettingsRouter = new Hono<{
       writes.push(c.env.DB.prepare(`UPDATE workspaces SET default_rate = ? WHERE id = ?`).bind(data.defaultRate, workspaceId));
     }
     if (writes.length) await c.env.DB.batch(writes);
+    return c.json(await load(c.env.DB, workspaceId), 200);
+  })
+  // Generating an invoice moves the sequence on (see movesInvoiceSequence); re-issuing an older number does not.
+  .post("/invoice-number", zValidator("json", z.object({ number: InvoiceNumberSchema })), async (c) => {
+    if (!(await isManager(c.env.DB, c.get("workspaceId"), c.get("userId")))) return c.json({ error: MANAGER_ONLY_ERROR }, 403);
+    const workspaceId = c.get("workspaceId");
+    const { number } = c.req.valid("json");
+    const row = await c.env.DB.prepare(`SELECT last_invoice_number FROM report_settings WHERE workspace_id = ?`)
+      .bind(workspaceId).first<{ last_invoice_number: string | null }>();
+    if (!row?.last_invoice_number || movesInvoiceSequence(number, row.last_invoice_number)) {
+      await c.env.DB.prepare(
+        `INSERT INTO report_settings (workspace_id, last_invoice_number) VALUES (?, ?)
+         ON CONFLICT(workspace_id) DO UPDATE SET last_invoice_number = excluded.last_invoice_number`
+      ).bind(workspaceId, number).run();
+    }
     return c.json(await load(c.env.DB, workspaceId), 200);
   })
   .put("/logo", async (c) => {

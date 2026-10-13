@@ -411,6 +411,7 @@ export const api = {
       return (await res.json()) as ReportSettings;
     },
     deleteLogo: () => json(reportSettingsClient.logo.$delete()),
+    recordInvoiceNumber: (number: string) => json(reportSettingsClient["invoice-number"].$post({ json: { number } })),
   },
 
   // ─── Tags ─────────────────────────────────────────────────────────────────
