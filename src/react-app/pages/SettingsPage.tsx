@@ -18,13 +18,14 @@ import { McpConnectorCard } from "@/components/settings/McpConnectorCard";
 import { AssistantMemoryCard } from "@/components/settings/AssistantMemoryCard";
 import { RecurringEntriesCard } from "@/components/settings/RecurringEntriesCard";
 import { TeamCard } from "@/components/settings/TeamCard";
+import { ReportBrandingCard } from "@/components/settings/ReportBrandingCard";
 import { AccountCard } from "@/components/settings/AccountCard";
 import { SessionsCard } from "@/components/settings/SessionsCard";
 import { ConnectedAccountsCard } from "@/components/settings/ConnectedAccountsCard";
 import { PasskeysCard } from "@/components/settings/PasskeysCard";
 import { DangerZoneCard } from "@/components/settings/DangerZoneCard";
 
-const TABS = ["general", "tracking", "workspace", "account"] as const;
+const TABS = ["general", "tracking", "reports", "workspace", "account"] as const;
 type Tab = (typeof TABS)[number];
 
 // ── Settings page ────────────────────────────────────────────────────────────
@@ -113,6 +114,7 @@ export function SettingsPage() {
         <TabsList>
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="tracking">Tracking</TabsTrigger>
+          <TabsTrigger value="reports">Reports</TabsTrigger>
           <TabsTrigger value="workspace">Workspace</TabsTrigger>
           <TabsTrigger value="account">Account</TabsTrigger>
         </TabsList>
@@ -141,6 +143,10 @@ export function SettingsPage() {
           <DigestCard />
           <RecurringEntriesCard />
           <AssistantMemoryCard />
+        </TabsContent>
+
+        <TabsContent value="reports" className="mt-4 space-y-4">
+          <ReportBrandingCard />
         </TabsContent>
 
         <TabsContent value="workspace" className="mt-4 space-y-4">

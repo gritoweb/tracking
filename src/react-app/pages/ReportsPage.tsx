@@ -5,6 +5,7 @@ import {
   type ExportFormat,
 } from "@/components/reports/ReportHeader";
 import { AiSummaryDialog } from "@/components/reports/AiSummaryDialog";
+import { ClientDocumentButton } from "@/components/client-documents/ClientDocumentButton";
 import { SummaryCards, SummaryMetricsMenu } from "@/components/reports/SummaryCards";
 import { RoundingControl } from "@/components/reports/RoundingControl";
 import { SavedReportsMenu } from "@/components/reports/SavedReportsMenu";
@@ -160,6 +161,7 @@ export function ReportsPage() {
         onExport={handleExport}
         actions={
           <>
+            {canManage && <ClientDocumentButton />}
             <SavedReportsMenu current={currentConfig} onLoad={loadConfig} />
             <AiSummaryDialog since={range.since} until={range.until} />
           </>

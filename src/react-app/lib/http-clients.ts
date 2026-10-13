@@ -6,6 +6,7 @@ import type { meRouter } from "../../worker/routes/me";
 import type { timeEntriesRouter } from "../../worker/routes/time-entries";
 import type { projectsRouter } from "../../worker/routes/projects";
 import type { clientsRouter } from "../../worker/routes/clients";
+import type { reportSettingsRouter } from "../../worker/routes/report-settings";
 import type { tagsRouter } from "../../worker/routes/tags";
 import type { tasksRouter } from "../../worker/routes/tasks";
 import type { attachmentsRouter } from "../../worker/routes/attachments";
@@ -44,6 +45,10 @@ export const projectsClient = hc<PickResponseByStatusCode<typeof projectsRouter,
 );
 export const clientsClient = hc<PickResponseByStatusCode<typeof clientsRouter, 200 | 201>>(
   "/clients",
+  { fetch: honoFetch }
+);
+export const reportSettingsClient = hc<PickResponseByStatusCode<typeof reportSettingsRouter, 200>>(
+  "/report-settings",
   { fetch: honoFetch }
 );
 export const tagsClient = hc<PickResponseByStatusCode<typeof tagsRouter, 200 | 201>>("/tags", {

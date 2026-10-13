@@ -224,3 +224,10 @@ A task comment's `body` is one of two things: legacy text, where a tagged person
 - `POST /api/tasks/bulk` — `archive | unarchive | delete` over up to 100 ids, all or nothing: `canDeleteTask` for every id (403 lists the refused), 404 for an id outside the workspace, archive/unarchive refuse a subtask and carry the parent's subtasks. `DELETE /api/tasks/:id` shares `deleteTaskTrees`.
 - `POST /api/tasks/bulk-update` — each item runs through the task's own `PUT /:id` on an inner Hono app, so there is no second write path. Its notifications go through a `NotificationBatch` (the inner Request is the WeakMap key), sent once per person and kind at the end.
 - Frontend: `ui/selection-bar.tsx` (primitive) + `tasks/board/TaskSelectionBar.tsx` (the board's actions); selection rules are pure functions in `lib/taskUtils.ts` (`toggleCardSelection`, `toggleColumnSelection`).
+
+## Client documents (invoice, hours report)
+
+- **Rates**: an invoice bills `clients.rate`, else `workspaces.default_rate` (migration 0057); `projects.rate` is not read, and no existing report or total changes. Fixed services are `client_services` (`/api/clients/:id/services`, writes manager-only); only `billable` ones are invoiced.
+- **Branding**: `report_settings` (migration 0058), one row per workspace, defaults in `REPORT_DEFAULT_COLORS` (`src/shared/colors.ts`). `/api/report-settings` (read: any member; write: owner/admin). The logo is a PNG/JPEG (sniffed, ≤ 1 MB) at R2 `<workspaceId>/report-logo` in `ATTACHMENTS`, served by `GET /api/report-settings/logo?v=<updated_at>`.
+- **Rendering** is in the browser with `@react-pdf/renderer`, loaded only when a document is generated (`components/client-documents/generate.tsx`, its own chunk). Entries come from the existing `GET /api/reports/detailed` with `clientIds`, so scoping and rounding are the report's own. Money and hours math is pure (`lib/clientDocuments.ts`, tested); fixed texts per language live in `DOCUMENT_TEXT` there.
+- The Reports page's CSV/Excel/print export is switched off by `LEGACY_EXPORTS_ENABLED` in `ReportHeader.tsx`, not deleted.

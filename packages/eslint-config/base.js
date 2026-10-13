@@ -82,6 +82,8 @@ const COLOR_EXEMPT_FILES = [
 	"src/react-app/lib/colorUtils.ts",
 	// Email clients do not support oklch(), and Chrome's setBadgeBackgroundColor takes a literal.
 	"src/worker/emails/**",
+	// The PDF renderer draws with literal colours; it has no CSS tokens to read.
+	"src/react-app/components/client-documents/**",
 	"extension/background/**",
 	"e2e/**",
 	"scripts/**",

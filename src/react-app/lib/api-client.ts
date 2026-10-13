@@ -5,6 +5,7 @@ import {
   timeEntriesClient,
   projectsClient,
   clientsClient,
+  reportSettingsClient,
   tagsClient,
   tasksClient,
   attachmentsClient,
@@ -52,6 +53,8 @@ import type {
   UpdateClientRest,
   CreateClientService,
   UpdateClientService,
+  ReportSettings,
+  UpdateReportSettings,
   CreateFavorite,
   CreateRecurringEntry,
   UpdateRecurringEntry,
@@ -395,6 +398,20 @@ export const api = {
       json(clientsClient[":id"].services[":serviceId"].$put({ param: { id, serviceId }, json: body })),
     deleteService: (id: string, serviceId: string) =>
       json(clientsClient[":id"].services[":serviceId"].$delete({ param: { id, serviceId } })),
+  },
+
+  // ─── Report settings (client PDF branding) ────────────────────────────────
+  reportSettings: {
+    get: () => json(reportSettingsClient.index.$get()),
+    update: (body: UpdateReportSettings) => json(reportSettingsClient.index.$put({ json: body })),
+    // Own call, not hc: a FormData body needs appFetch's raw Response, not JSON args.
+    uploadLogo: async (file: File): Promise<ReportSettings> => {
+      const body = new FormData();
+      body.append("file", file);
+      const res = await appFetch("/report-settings/logo", { method: "PUT", body });
+      return (await res.json()) as ReportSettings;
+    },
+    deleteLogo: () => json(reportSettingsClient.logo.$delete()),
   },
 
   // ─── Tags ─────────────────────────────────────────────────────────────────

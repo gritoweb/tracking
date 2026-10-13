@@ -256,14 +256,17 @@ The Reports page has three tabs:
 Everything respects the **date range picker** and filters. Other tools on this page:
 
 - **Rounding** — round durations off / nearest / up / down to a chosen number of minutes. This preference is saved to your account.
-- **Export** — CSV, Excel (.xlsx), or print/PDF via the browser's print dialog.
-- **Hide amounts** — a switch in the toolbar for a report that goes to a client: it takes money out of the summary tiles, the breakdown, the detailed table, the CSV/Excel export and the printout, and a saved report remembers it.
+- **Client document** (owners and admins) — generates a client's **Invoice** or **Worked-hours report** as a PDF, in Portuguese or English. The period opens on last month (1st to last day) and can be changed; the invoice number opens as the period's `YYYY-MM` and is editable too. The invoice bills the period's hours (with your rounding) × the client's hourly rate — or the workspace default when the client has none — on one "Serviços Técnicos / Technical Services" line, then lists the client's billable fixed services. The same button is on the client's page. Logo, colours and the default rate are in **Settings → Reports**.
+- **Hide amounts** — a switch in the toolbar: it takes money out of the summary tiles, the breakdown and the detailed table, and a saved report remembers it.
+- The old CSV/Excel/print export of this page is turned off; client documents are the PDF output now.
 - **Whose hours** — a member's Reports cover only their own time, whatever filters are sent (the same goes for their Timer, project and client totals, task totals, AI summary, briefing and MCP key). Owners and admins see the whole workspace here and can narrow it with the **Person** filter under Filters.
 - **Saved reports** — save the current configuration (range, filters, grouping, rounding) under a name and reload it in one click.
 - **AI summary** — draft a client-ready narrative summary of the selected period in a chosen style, from your real entries. Edit before you send it anywhere.
 - A full **all-entries CSV export** lives under Settings → Data export.
 
-Amounts come from each project's billing rate; the display currency is set under Settings → Preferences.
+**Fixed services and a client's rate.** On a client's page, owners and admins add fixed services (name, description, amount) and switch each one billable or not; only billable ones go on the invoice. The client's **Edit** dialog takes its own hourly rate; blank means the workspace default from Settings → Reports. These apply to invoices only.
+
+Amounts on this page come from each project's billing rate; the display currency is set under Settings → Preferences.
 
 ## Productivity tools
 
@@ -346,6 +349,7 @@ Under **Settings → Account / Security / Danger zone**:
 | Appearance | Theme (light/dark/system), auto-assign colors + AI recolor | Theme: device · colors: account |
 | Keyboard shortcuts | Reference card | — |
 | Data export | All-entries CSV | — |
+| Reports → Client documents | Logo, company name and e-mail, default hourly rate, primary/accent/text colours of the client PDFs (owners/admins edit) | Workspace |
 | Preferences | 12/24h time, currency, week start, show weekends | Account |
 | Productivity | Notifications, idle detection, reminders, nudge alerts, pomodoro | Device |
 | Email digests | Morning briefing, weekly summary, send hour, send one now | Account |

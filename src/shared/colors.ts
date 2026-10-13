@@ -82,3 +82,6 @@ export function nextUnusedColor(used: Iterable<string>): string {
 export function randomColor(): string {
   return DISTINCT_COLORS[Math.floor(Math.random() * DISTINCT_COLORS.length)];
 }
+
+// Client PDF defaults: the GritoWeb identity, measured from its invoice. A workspace with no branding saved gets these.
+export const REPORT_DEFAULT_COLORS = { primary: "#0d4a8c", accent: "#f5a94a", text: "#1f2433" } as const;

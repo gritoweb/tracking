@@ -19,6 +19,9 @@ interface DateRange {
 
 export type ExportFormat = "csv" | "excel" | "print";
 
+// Retired for the client PDFs (ClientDocumentDialog); kept switchable rather than deleted.
+const LEGACY_EXPORTS_ENABLED = false;
+
 interface ReportHeaderProps {
   onExport?: (format: ExportFormat) => void;
   /** Extra actions rendered inline with the export control (e.g. AI summary). */
@@ -132,7 +135,7 @@ export function ReportHeader({ onExport, actions }: ReportHeaderProps) {
       <h1 className="text-xl font-semibold">Reports</h1>
 
       <div className="flex items-center gap-2 print:hidden">
-        {onExport && (
+        {LEGACY_EXPORTS_ENABLED && onExport && (
           <DropdownMenu>
             <Tooltip>
               <TooltipTrigger asChild>

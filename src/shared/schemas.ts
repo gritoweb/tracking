@@ -117,6 +117,29 @@ export const CreateClientServiceSchema = z.object({
 
 export const UpdateClientServiceSchema = CreateClientServiceSchema.partial();
 
+// ─── Report settings (client PDFs) ───────────────────────────────────────────
+
+const HexColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/, "Must be a 6-digit hex colour");
+
+export const ReportSettingsSchema = z.object({
+  companyName: z.string(),
+  companyEmail: z.string().nullable(),
+  colors: z.object({ primary: z.string(), accent: z.string(), text: z.string() }),
+  // Changes whenever the logo does, so a cached image is never shown after a replace.
+  logoUrl: z.string().nullable(),
+  // The workspace default hourly rate; a client's own rate overrides it on an invoice.
+  defaultRate: z.number().nullable(),
+});
+
+export const UpdateReportSettingsSchema = z
+  .object({
+    companyName: z.string().trim().max(255).nullable(),
+    companyEmail: z.string().trim().email().max(255).nullable(),
+    colors: z.object({ primary: HexColorSchema, accent: HexColorSchema, text: HexColorSchema }),
+    defaultRate: z.number().min(0).max(1_000_000).nullable(),
+  })
+  .partial();
+
 // ─── Project ─────────────────────────────────────────────────────────────────
 
 export const ProjectSchema = z.object({
@@ -1308,6 +1331,8 @@ export type CreateClient = z.infer<typeof CreateClientSchema>;
 export type UpdateClient = z.infer<typeof UpdateClientSchema>;
 export type UpdateClientRest = z.infer<typeof UpdateClientRestSchema>;
 export type ClientService = z.infer<typeof ClientServiceSchema>;
+export type ReportSettings = z.infer<typeof ReportSettingsSchema>;
+export type UpdateReportSettings = z.infer<typeof UpdateReportSettingsSchema>;
 export type CreateClientService = z.infer<typeof CreateClientServiceSchema>;
 export type UpdateClientService = z.infer<typeof UpdateClientServiceSchema>;
 export type ClientStats = z.infer<typeof ClientStatsSchema>;

@@ -11,6 +11,7 @@ import { lastOwnerRaceGuard } from "./middleware/last-owner-guard";
 import { timeEntriesRouter } from "./routes/time-entries";
 import { projectsRouter } from "./routes/projects";
 import { clientsRouter } from "./routes/clients";
+import { reportSettingsRouter } from "./routes/report-settings";
 import { tagsRouter } from "./routes/tags";
 import { tasksRouter } from "./routes/tasks";
 import { attachmentsRouter } from "./routes/attachments";
@@ -133,6 +134,7 @@ const app = new Hono<{ Bindings: Env }>()
   .route("/api/drafts", draftsRouter)
   .route("/api/reports", reportsRouter)
   .route("/api/saved-reports", savedReportsRouter)
+  .route("/api/report-settings", reportSettingsRouter)
   .route("/api/planner", plannerRouter)
   .route("/api/settings", settingsRouter)
   .route("/api/integrations", integrationsRouter)
