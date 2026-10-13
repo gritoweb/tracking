@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-13 (8) — `refactor`, local only (not pushed to master, not deployed)
+### Changed
+- **A client's fixed services sit below its projects, inside a card**, instead of above them as loose bordered rows on the page background. Built only from shadcn/ui: the existing `Card` (title, description, `CardAction` for Add service) and the official `Item` (`ItemGroup`, `ItemMedia`, `ItemTitle`, `ItemDescription`, `ItemActions`, `ItemSeparator`), added with `shadcn add item`. The generated file was adjusted only where the project's lint requires (motion tokens `duration-fast ease-out-quart`, the `focus-ring` utility) and to import `cn` from `@/lib/utils`: the CLI resolved that alias to an npm package named `cn` and added it as a dependency, which was reverted.
+### Verified
+- Playwright against local `pnpm dev`, dark and light: services render below the projects inside the card, the non-billable one with its badge and switch off; at 390px the actions wrap under the row and the page has no horizontal overflow. `tsc -b` (0), `pnpm lint` (0), `vitest run` (all green).
+
 ## 2026-10-13 (7) — `refactor`, local only (not pushed to master, not deployed)
 ### Fixed
 - **A project's task checkbox sat below the task name** (Projects and the client page, `TaskList`). Two causes stacked: the row centred its items while the name carries a second line under it (the estimate, invisible until hover), and the name was an inline `text-xs` span inside a block on the base 24px line, which pushed it 5px down. The row now aligns to the top, the name is a block on its own 16px line, and the checkbox is centred on that line.

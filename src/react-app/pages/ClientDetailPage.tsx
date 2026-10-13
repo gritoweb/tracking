@@ -216,8 +216,6 @@ export function ClientDetailPage() {
         )}
       </div>
 
-      <ClientServicesSection clientId={client.id} canManage={canManage} />
-
       {/* Projects */}
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-sm font-semibold text-muted-foreground">
@@ -298,6 +296,8 @@ export function ClientDetailPage() {
           />
         )}
       </div>
+
+      <ClientServicesSection clientId={client.id} canManage={canManage} />
 
       {showEdit && (
         <ClientForm client={client} open onClose={() => setShowEdit(false)} />

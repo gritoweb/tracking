@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Edit2, Plus, Trash2 } from "lucide-react";
+import { Fragment, useState } from "react";
+import { Edit2, Plus, Receipt, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,7 +13,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { SettingsListItem } from "@/components/settings/SettingsListItem";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemSeparator, ItemTitle } from "@/components/ui/item";
+import { EmptyState } from "@/components/ui/empty-state";
 import { MoneyInput } from "@/components/forms/MoneyInput";
 import { useClientServices, useSaveClientService } from "@/hooks/useProjects";
 import { useReportSettings } from "@/hooks/useReportSettings";
@@ -32,56 +35,60 @@ export function ClientServicesSection({ clientId, canManage }: { clientId: strin
   const [removing, setRemoving] = useState<ClientService | null>(null);
 
   return (
-    <div className="mb-6 space-y-2">
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold">Fixed services</h2>
+    <Card className="mt-8">
+      <CardHeader>
+        <CardTitle>Fixed services</CardTitle>
+        <CardDescription>Recurring charges for this client. The billable ones go on its invoice.</CardDescription>
         {canManage && (
-          <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setEditing("new")}>
-            <Plus className="h-3.5 w-3.5" />
-            Add service
-          </Button>
+          <CardAction>
+            <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setEditing("new")}>
+              <Plus className="h-3.5 w-3.5" />
+              Add service
+            </Button>
+          </CardAction>
         )}
-      </div>
-
-      {services.length === 0 ? (
-        <p className="text-xs text-muted-foreground">
-          No fixed services. Hosting, email and other recurring charges added here go on the invoice when billable.
-        </p>
-      ) : (
-        <div className="space-y-1.5">
-          {services.map((s) => (
-            <SettingsListItem
-              key={s.id}
-              title={
-                <>
-                  <span className="font-medium">{s.name}</span>
-                  <span className="tabular-nums text-muted-foreground">{formatMoney(s.amount, currency)}</span>
-                  {!s.billable && <span className="text-xs text-muted-foreground">Not billable</span>}
-                </>
-              }
-              subtitle={s.description || undefined}
-            >
-              {canManage && (
-                <div className="flex shrink-0 items-center gap-1">
-                  <Switch
-                    checked={s.billable}
-                    aria-label={`Bill ${s.name} on the invoice`}
-                    onCheckedChange={(billable) =>
-                      save.mutate({ kind: "update", serviceId: s.id, data: { billable } })
-                    }
-                  />
-                  <Button variant="ghost" size="icon-sm" aria-label="Edit service" title="Edit service" onClick={() => setEditing(s)}>
-                    <Edit2 className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button variant="ghost" size="icon-sm" aria-label="Remove service" title="Remove service" onClick={() => setRemoving(s)}>
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              )}
-            </SettingsListItem>
-          ))}
-        </div>
-      )}
+      </CardHeader>
+      <CardContent>
+        {services.length === 0 ? (
+          <EmptyState icon={Receipt} title="No fixed services" description="Hosting, email and other recurring charges go here." />
+        ) : (
+          <ItemGroup>
+            {services.map((s, i) => (
+              <Fragment key={s.id}>
+                {i > 0 && <ItemSeparator />}
+                <Item size="sm">
+                  <ItemMedia variant="icon">
+                    <Receipt />
+                  </ItemMedia>
+                  <ItemContent>
+                    <ItemTitle>
+                      {s.name}
+                      {!s.billable && <Badge variant="outline">Not billable</Badge>}
+                    </ItemTitle>
+                    <ItemDescription>{[formatMoney(s.amount, currency), s.description].filter(Boolean).join(" · ")}</ItemDescription>
+                  </ItemContent>
+                  {canManage && (
+                    <ItemActions>
+                      <Switch
+                        checked={s.billable}
+                        aria-label={`Bill ${s.name} on the invoice`}
+                        title="Billable"
+                        onCheckedChange={(billable) => save.mutate({ kind: "update", serviceId: s.id, data: { billable } })}
+                      />
+                      <Button variant="ghost" size="icon-sm" aria-label="Edit service" title="Edit service" onClick={() => setEditing(s)}>
+                        <Edit2 />
+                      </Button>
+                      <Button variant="ghost" size="icon-sm" aria-label="Remove service" title="Remove service" onClick={() => setRemoving(s)}>
+                        <Trash2 />
+                      </Button>
+                    </ItemActions>
+                  )}
+                </Item>
+              </Fragment>
+            ))}
+          </ItemGroup>
+        )}
+      </CardContent>
 
       {editing && (
         <ServiceDialog
@@ -111,7 +118,7 @@ export function ClientServicesSection({ clientId, canManage }: { clientId: strin
           setRemoving(null);
         }}
       />
-    </div>
+    </Card>
   );
 }
 
