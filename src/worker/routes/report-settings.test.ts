@@ -10,6 +10,7 @@ function world() {
   raw.exec(`
     INSERT INTO workspaces (id, name) VALUES ('ws-A', 'Agency A'), ('ws-B', 'B');
     ${["u-owner", "u-member"].map((id) => `INSERT INTO "user" (id, name, email, createdAt, updatedAt) VALUES ('${id}', '${id}', '${id}@x.test', '${now}', '${now}');`).join("\n")}
+    UPDATE "user" SET currency = 'BRL' WHERE id = 'u-owner';
     INSERT INTO "member" (id, organizationId, userId, role, createdAt) VALUES
       ('m-owner', 'ws-A', 'u-owner', 'owner', '${now}'), ('m-member', 'ws-A', 'u-member', 'member', '${now}');
   `);
@@ -18,14 +19,15 @@ function world() {
 }
 
 describe("the report settings", () => {
-  it("fall back to the workspace name and the default colours", async () => {
+  it("fall back to the workspace's name and its owner's e-mail and currency", async () => {
     const { as } = world();
     expect(await (await as("u-member").get("/")).json()).toEqual({
       companyName: "Agency A",
-      companyEmail: null,
+      companyEmail: "u-owner@x.test",
       colors: REPORT_DEFAULT_COLORS,
       logoUrl: null,
-      defaultRate: null,
+      defaultRate: 100,
+      currency: "BRL",
     });
   });
 
@@ -36,6 +38,7 @@ describe("the report settings", () => {
       companyEmail: "billing@agency.test",
       colors: { primary: "#112233", accent: "#AABBCC", text: "#000000" },
       defaultRate: 65,
+      currency: "USD",
     });
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({
@@ -43,10 +46,12 @@ describe("the report settings", () => {
       companyEmail: "billing@agency.test",
       colors: { primary: "#112233", accent: "#aabbcc", text: "#000000" },
       defaultRate: 65,
+      currency: "USD",
     });
     // A partial save keeps what it didn't name.
     const again = await (await as("u-owner").put("/", { defaultRate: null })).json();
-    expect(again).toMatchObject({ companyName: "Agency", defaultRate: null });
+    // Clearing the rate falls back to the default rather than leaving the invoice without one.
+    expect(again).toMatchObject({ companyName: "Agency", currency: "USD", defaultRate: 100 });
   });
 
   it("refuses a colour that isn't a hex value", async () => {

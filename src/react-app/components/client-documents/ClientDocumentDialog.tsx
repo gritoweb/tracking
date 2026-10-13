@@ -18,11 +18,10 @@ import { useClients } from "@/hooks/useProjects";
 import { useReportSettings } from "@/hooks/useReportSettings";
 import { api } from "@/lib/api-client";
 import { toastApiError } from "@/lib/toastApiError";
+import { formatMoney } from "@/lib/money";
 import { useUIStore } from "@/stores/uiStore";
 import {
   DOCUMENT_TEXT,
-  defaultInvoiceNumber,
-  effectiveRate,
   formatDay,
   formatMonth,
   invoiceLines,
@@ -43,18 +42,6 @@ const LOCALE_OPTIONS = [
 function lastMonth() {
   const m = subMonths(new Date(), 1);
   return { from: format(startOfMonth(m), "yyyy-MM-dd"), to: format(endOfMonth(m), "yyyy-MM-dd") };
-}
-
-async function asDataUrl(url: string): Promise<string> {
-  const res = await fetch(url, { credentials: "include" });
-  if (!res.ok) throw new Error("Could not load the logo");
-  const blob = await res.blob();
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(blob);
-  });
 }
 
 function download(blob: Blob, filename: string) {
@@ -78,7 +65,6 @@ export function ClientDocumentDialog({
 }) {
   const { data: clients = [] } = useClients();
   const { data: settings } = useReportSettings();
-  const currency = useUIStore((s) => s.currency);
   const roundMode = useUIStore((s) => s.roundMode);
   const roundMinutes = useUIStore((s) => s.roundMinutes);
 
@@ -86,18 +72,17 @@ export function ClientDocumentDialog({
   const [kind, setKind] = useState<ClientDocumentKind>("invoice");
   const [locale, setLocale] = useState<DocumentLocale>("pt-BR");
   const [{ from, to }, setRange] = useState(lastMonth);
-  const [number, setNumber] = useState(() => defaultInvoiceNumber(lastMonth().from));
+  const [number, setNumber] = useState(() => lastMonth().from.slice(0, 7));
   const [busy, setBusy] = useState(false);
 
   const client = clients.find((c) => c.id === (fixedClientId ?? clientId));
-  const rate = client && settings ? effectiveRate(client.rate, settings.defaultRate) : null;
-  const missingRate = kind === "invoice" && client && settings && rate === null;
   const validRange = from !== "" && to !== "" && from <= to;
-  const canGenerate = Boolean(client && settings && validRange && !missingRate && !busy);
+  const canGenerate = Boolean(client && settings && validRange && !busy);
 
   const changeFrom = (value: string) => {
     setRange((r) => ({ ...r, from: value }));
-    if (value) setNumber(defaultInvoiceNumber(value));
+    // The suggested number is the period's year-month.
+    if (value) setNumber(value.slice(0, 7));
   };
 
   const generate = async () => {
@@ -105,7 +90,7 @@ export function ClientDocumentDialog({
     setBusy(true);
     try {
       const rounded = roundMode !== "off" && roundMinutes > 0;
-      const [entries, services, logo, render] = await Promise.all([
+      const [entries, services, render] = await Promise.all([
         api.reports.detailed({
           since: new Date(`${from}T00:00:00`).toISOString(),
           until: new Date(`${to}T23:59:59.999`).toISOString(),
@@ -114,10 +99,11 @@ export function ClientDocumentDialog({
           roundMinutes: rounded ? String(roundMinutes) : undefined,
         }),
         kind === "invoice" ? api.clients.services(client.id) : Promise.resolve([]),
-        settings.logoUrl ? asDataUrl(settings.logoUrl) : Promise.resolve(null),
         import("./generate"),
       ]);
       const t = DOCUMENT_TEXT[locale];
+      // The renderer fetches the logo itself; same origin, so the session cookie goes with it.
+      const logo = settings.logoUrl && new URL(settings.logoUrl, window.location.origin).href;
       const common = { locale, palette: brandPalette(settings.colors), logo, companyName: settings.companyName };
 
       if (kind === "invoice") {
@@ -128,20 +114,22 @@ export function ClientDocumentDialog({
           clientName: client.name,
           number,
           issueDate: formatDay(new Date().toISOString(), locale),
-          lines: invoiceLines(totalSeconds, rate ?? 0, services, locale),
-          currency,
+          lines: invoiceLines(totalSeconds, client.rate ?? settings.defaultRate, services, locale),
+          currency: settings.currency,
         });
         download(blob, t.invoiceFile(client.name, number));
       } else {
-        const month = formatMonth(from, locale);
+        // A period inside one month is named by the month; any other by its two dates.
+        const oneMonth = from.slice(0, 7) === to.slice(0, 7);
+        const periodLabel = `${formatDay(`${from}T12:00:00`, locale)} – ${formatDay(`${to}T12:00:00`, locale)}`;
         const blob = await render.renderHoursReport({
           ...common,
           clientName: client.name,
-          periodLabel: `${formatDay(`${from}T12:00:00`, locale)} – ${formatDay(`${to}T12:00:00`, locale)}`,
-          monthLabel: month,
+          periodLabel,
+          sectionTitle: oneMonth ? t.entriesOf(formatMonth(from, locale)) : t.entries,
           entries,
         });
-        download(blob, t.hoursFile(client.name, month));
+        download(blob, t.hoursFile(client.name, oneMonth ? formatMonth(from, locale) : `${from} - ${to}`));
       }
       onOpenChange(false);
     } catch (error) {
@@ -196,13 +184,13 @@ export function ClientDocumentDialog({
             <div className="space-y-1.5">
               <Label htmlFor="doc-number">Invoice number</Label>
               <Input id="doc-number" value={number} onChange={(e) => setNumber(e.target.value)} className="w-40" />
+              {client && settings && (
+                <p className="text-xs text-muted-foreground">
+                  Billed at {formatMoney(client.rate ?? settings.defaultRate, settings.currency)}/h
+                  {client.rate === null ? " (workspace default)" : " (client rate)"}
+                </p>
+              )}
             </div>
-          )}
-
-          {missingRate && (
-            <p className="text-sm text-destructive">
-              This client has no hourly rate and there is no default rate. Set one on the client or in Settings → Reports.
-            </p>
           )}
         </div>
 

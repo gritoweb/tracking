@@ -25,7 +25,7 @@ import { ConnectedAccountsCard } from "@/components/settings/ConnectedAccountsCa
 import { PasskeysCard } from "@/components/settings/PasskeysCard";
 import { DangerZoneCard } from "@/components/settings/DangerZoneCard";
 
-const TABS = ["general", "tracking", "reports", "workspace", "account"] as const;
+const TABS = ["general", "tracking", "workspace", "reports", "account"] as const;
 type Tab = (typeof TABS)[number];
 
 // ── Settings page ────────────────────────────────────────────────────────────
@@ -114,8 +114,8 @@ export function SettingsPage() {
         <TabsList>
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="tracking">Tracking</TabsTrigger>
-          <TabsTrigger value="reports">Reports</TabsTrigger>
           <TabsTrigger value="workspace">Workspace</TabsTrigger>
+          <TabsTrigger value="reports">Reports</TabsTrigger>
           <TabsTrigger value="account">Account</TabsTrigger>
         </TabsList>
 

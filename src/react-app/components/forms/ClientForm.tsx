@@ -1,4 +1,4 @@
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Field, FieldLabel, FieldMessage } from "@/components/forms/Field";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,9 @@ import {
 } from "@/components/ui/dialog";
 import { useCreateClient, useUpdateClient } from "@/hooks/useProjects";
 import { useWorkspaceRole } from "@/hooks/useWorkspaceRole";
+import { useReportSettings } from "@/hooks/useReportSettings";
+import { currencyLocale, formatMoneyInput } from "@/lib/money";
+import { MoneyInput } from "./MoneyInput";
 import { clientFormSchema, type ClientFormValues } from "./ClientForm.schema";
 import type { Client } from "@shared/schemas";
 
@@ -29,6 +32,7 @@ export function ClientForm({ client, open, onClose }: ClientFormProps) {
   // The rate is an owner/admin edit (the server refuses a member), so it lives on the edit form only.
   const { canManage } = useWorkspaceRole();
   const showRate = Boolean(client) && canManage;
+  const { data: reportSettings } = useReportSettings();
 
   const form = useForm<ClientFormValues>({
     resolver: zodResolver(clientFormSchema),
@@ -38,7 +42,7 @@ export function ClientForm({ client, open, onClose }: ClientFormProps) {
       phone: client?.phone ?? "",
       address: client?.address ?? "",
       notes: client?.notes ?? "",
-      rate: client?.rate?.toString() ?? "",
+      rate: client?.rate ?? null,
     },
   });
 
@@ -52,7 +56,7 @@ export function ClientForm({ client, open, onClose }: ClientFormProps) {
     };
 
     if (client) {
-      const rate = showRate ? { rate: values.rate === "" ? null : Number(values.rate) } : {};
+      const rate = showRate ? { rate: values.rate } : {};
       updateClient.mutate({ id: client.id, data: { ...data, ...rate } }, { onSuccess: onClose });
     } else {
       createClient.mutate(data, { onSuccess: onClose });
@@ -103,17 +107,24 @@ export function ClientForm({ client, open, onClose }: ClientFormProps) {
             <FieldMessage name="notes" />
           </Field>
 
-          {showRate && (
+          {showRate && reportSettings && (
             <Field>
               <FieldLabel htmlFor="client-rate">Hourly rate</FieldLabel>
-              <Input
-                id="client-rate"
-                type="number"
-                min={0}
-                step={0.01}
-                {...form.register("rate")}
-                placeholder="Workspace default"
+              <Controller
+                control={form.control}
+                name="rate"
+                render={({ field }) => (
+                  <MoneyInput
+                    id="client-rate"
+                    className="w-40"
+                    currency={reportSettings.currency}
+                    value={field.value}
+                    onValueChange={field.onChange}
+                    placeholder={formatMoneyInput(reportSettings.defaultRate, currencyLocale(reportSettings.currency))}
+                  />
+                )}
               />
+              <p className="text-xs text-muted-foreground">Blank uses the workspace default from Settings → Reports.</p>
               <FieldMessage name="rate" />
             </Field>
           )}

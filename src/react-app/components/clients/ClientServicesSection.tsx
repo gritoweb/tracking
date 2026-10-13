@@ -14,8 +14,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { SettingsListItem } from "@/components/settings/SettingsListItem";
+import { MoneyInput } from "@/components/forms/MoneyInput";
 import { useClientServices, useSaveClientService } from "@/hooks/useProjects";
-import { formatCurrency } from "@/lib/currency";
+import { useReportSettings } from "@/hooks/useReportSettings";
+import { formatMoney } from "@/lib/money";
 import { useUIStore } from "@/stores/uiStore";
 import type { ClientService } from "@shared/schemas";
 
@@ -23,7 +25,9 @@ import type { ClientService } from "@shared/schemas";
 export function ClientServicesSection({ clientId, canManage }: { clientId: string; canManage: boolean }) {
   const { data: services = [] } = useClientServices(clientId);
   const save = useSaveClientService(clientId);
-  const currency = useUIStore((s) => s.currency);
+  // Services are billed on the invoice, so they read in the documents' currency.
+  const displayCurrency = useUIStore((s) => s.currency);
+  const currency = useReportSettings().data?.currency ?? displayCurrency;
   const [editing, setEditing] = useState<ClientService | "new" | null>(null);
   const [removing, setRemoving] = useState<ClientService | null>(null);
 
@@ -51,7 +55,7 @@ export function ClientServicesSection({ clientId, canManage }: { clientId: strin
               title={
                 <>
                   <span className="font-medium">{s.name}</span>
-                  <span className="tabular-nums text-muted-foreground">{formatCurrency(s.amount, currency)}</span>
+                  <span className="tabular-nums text-muted-foreground">{formatMoney(s.amount, currency)}</span>
                   {!s.billable && <span className="text-xs text-muted-foreground">Not billable</span>}
                 </>
               }
@@ -82,6 +86,7 @@ export function ClientServicesSection({ clientId, canManage }: { clientId: strin
       {editing && (
         <ServiceDialog
           service={editing === "new" ? undefined : editing}
+          currency={currency}
           pending={save.isPending}
           onClose={() => setEditing(null)}
           onSave={(data) =>
@@ -119,21 +124,22 @@ interface ServiceDraft {
 
 function ServiceDialog({
   service,
+  currency,
   pending,
   onClose,
   onSave,
 }: {
   service?: ClientService;
+  currency: string;
   pending: boolean;
   onClose: () => void;
   onSave: (data: ServiceDraft) => void;
 }) {
   const [name, setName] = useState(service?.name ?? "");
   const [description, setDescription] = useState(service?.description ?? "");
-  const [amount, setAmount] = useState(service?.amount.toString() ?? "");
+  const [amount, setAmount] = useState<number | null>(service?.amount ?? null);
   const [billable, setBillable] = useState(service?.billable ?? true);
-  const amountValue = Number(amount);
-  const valid = name.trim() !== "" && amount !== "" && amountValue >= 0;
+  const valid = name.trim() !== "" && amount !== null && amount >= 0;
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
@@ -146,7 +152,7 @@ function ServiceDialog({
           noValidate
           onSubmit={(e) => {
             e.preventDefault();
-            if (valid) onSave({ name: name.trim(), description: description.trim() || null, amount: amountValue, billable });
+            if (valid) onSave({ name: name.trim(), description: description.trim() || null, amount, billable });
           }}
         >
           <div className="space-y-1.5">
@@ -160,15 +166,7 @@ function ServiceDialog({
           <div className="flex items-end gap-4">
             <div className="space-y-1.5">
               <Label htmlFor="service-amount">Amount</Label>
-              <Input
-                id="service-amount"
-                type="number"
-                min={0}
-                step={0.01}
-                className="w-32"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-              />
+              <MoneyInput id="service-amount" className="w-40" currency={currency} value={amount} onValueChange={setAmount} />
             </div>
             <div className="flex items-center gap-2 pb-2">
               <Switch id="service-billable" checked={billable} onCheckedChange={setBillable} />

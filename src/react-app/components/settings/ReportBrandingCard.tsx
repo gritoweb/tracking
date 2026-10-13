@@ -5,11 +5,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { MoneyInput } from "@/components/forms/MoneyInput";
 import { SettingsCardHeader } from "./SettingsCardHeader";
 import { SettingsRow } from "./SettingsRow";
 import { SettingsHint } from "./SettingsHint";
 import { useReportSettings, useUpdateReportSettings } from "@/hooks/useReportSettings";
 import { useWorkspaceRole } from "@/hooks/useWorkspaceRole";
+import { CURRENCIES } from "@/lib/currency";
 import type { ReportSettings } from "@shared/schemas";
 import { REPORT_DEFAULT_COLORS } from "@shared/colors";
 
@@ -20,42 +23,86 @@ const COLOR_FIELDS = [
   { key: "text", label: "Text", description: "Body text; muted text and lines are derived from it" },
 ] as const;
 
-/** Logo, colours and the default hourly rate of the client PDFs (invoice, hours report). */
+/** Logo, colours, currency and the default hourly rate of the client PDFs (invoice, hours report). */
 export function ReportBrandingCard() {
   const { data: settings } = useReportSettings();
+  const { canManage } = useWorkspaceRole();
+  if (!settings) {
+    return (
+      <Card>
+        <SettingsCardHeader icon={FileText} title="Client documents" />
+        <CardContent>
+          <Skeleton className="h-60 w-full" />
+        </CardContent>
+      </Card>
+    );
+  }
+  // The form remounts only when its own saved values change, so replacing the logo never drops unsaved edits.
+  const { logoUrl, ...fields } = settings;
   return (
     <Card>
       <SettingsCardHeader icon={FileText} title="Client documents" />
-      <CardContent>
-        {settings ? <BrandingForm key={JSON.stringify(settings)} settings={settings} /> : <Skeleton className="h-60 w-full" />}
+      <CardContent className="space-y-5">
+        {!canManage && <SettingsHint>Only workspace owners and admins can change these.</SettingsHint>}
+        <LogoRow logoUrl={logoUrl} canManage={canManage} />
+        <Separator />
+        <FieldsForm key={JSON.stringify(fields)} settings={settings} canManage={canManage} />
       </CardContent>
     </Card>
   );
 }
 
-function BrandingForm({ settings }: { settings: ReportSettings }) {
-  const { canManage } = useWorkspaceRole();
+function LogoRow({ logoUrl, canManage }: { logoUrl: string | null; canManage: boolean }) {
   const save = useUpdateReportSettings();
   const fileInput = useRef<HTMLInputElement>(null);
+  const disabled = !canManage || save.isPending;
+  return (
+    <SettingsRow label="Logo" description="PNG or JPEG, up to 1 MB. Shown at the top of every document.">
+      <div className="flex items-center gap-2">
+        {logoUrl && <img src={logoUrl} alt="Report logo" className="h-10 max-w-32 rounded-md bg-muted object-contain p-1" />}
+        <input
+          ref={fileInput}
+          type="file"
+          accept="image/png,image/jpeg"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) save.mutate({ kind: "logo", file });
+            e.target.value = "";
+          }}
+        />
+        <Button type="button" variant="outline" size="sm" className="gap-1.5" disabled={disabled} onClick={() => fileInput.current?.click()}>
+          <ImageUp className="h-3.5 w-3.5" />
+          {logoUrl ? "Replace" : "Upload"}
+        </Button>
+        {logoUrl && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Remove logo"
+            title="Remove logo"
+            disabled={disabled}
+            onClick={() => save.mutate({ kind: "removeLogo" })}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        )}
+      </div>
+    </SettingsRow>
+  );
+}
+
+function FieldsForm({ settings, canManage }: { settings: ReportSettings; canManage: boolean }) {
+  const save = useUpdateReportSettings();
   const [companyName, setCompanyName] = useState(settings.companyName);
-  const [companyEmail, setCompanyEmail] = useState(settings.companyEmail ?? "");
-  const [defaultRate, setDefaultRate] = useState(settings.defaultRate?.toString() ?? "");
+  const [companyEmail, setCompanyEmail] = useState(settings.companyEmail);
+  const [currency, setCurrency] = useState(settings.currency);
+  const [defaultRate, setDefaultRate] = useState<number | null>(settings.defaultRate);
   const [colors, setColors] = useState<ReportSettings["colors"]>(settings.colors);
 
   const colorsValid = Object.values(colors).every((c) => HEX.test(c));
-  const rateValid = defaultRate === "" || Number(defaultRate) >= 0;
-  const disabled = !canManage || save.isPending;
-
-  const submit = () =>
-    save.mutate({
-      kind: "fields",
-      data: {
-        companyName: companyName.trim() || null,
-        companyEmail: companyEmail.trim() || null,
-        defaultRate: defaultRate === "" ? null : Number(defaultRate),
-        colors,
-      },
-    });
+  const rateValid = defaultRate === null || defaultRate >= 0;
 
   return (
     <form
@@ -63,67 +110,47 @@ function BrandingForm({ settings }: { settings: ReportSettings }) {
       noValidate
       onSubmit={(e) => {
         e.preventDefault();
-        if (colorsValid && rateValid) submit();
+        if (!colorsValid || !rateValid) return;
+        save.mutate({
+          kind: "fields",
+          data: {
+            companyName: companyName.trim() || null,
+            companyEmail: companyEmail.trim() || null,
+            currency,
+            defaultRate,
+            colors,
+          },
+        });
       }}
     >
-      {!canManage && <SettingsHint>Only workspace owners and admins can change these.</SettingsHint>}
-
-      <SettingsRow label="Logo" description="PNG or JPEG, up to 1 MB. Shown at the top of every document.">
-        <div className="flex items-center gap-2">
-          {settings.logoUrl && (
-            <img src={settings.logoUrl} alt="Report logo" className="h-10 max-w-32 rounded-md bg-muted object-contain p-1" />
-          )}
-          <input
-            ref={fileInput}
-            type="file"
-            accept="image/png,image/jpeg"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) save.mutate({ kind: "logo", file });
-              e.target.value = "";
-            }}
-          />
-          <Button type="button" variant="outline" size="sm" className="gap-1.5" disabled={disabled} onClick={() => fileInput.current?.click()}>
-            <ImageUp className="h-3.5 w-3.5" />
-            {settings.logoUrl ? "Replace" : "Upload"}
-          </Button>
-          {settings.logoUrl && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Remove logo"
-              title="Remove logo"
-              disabled={disabled}
-              onClick={() => save.mutate({ kind: "removeLogo" })}
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </Button>
-          )}
-        </div>
-      </SettingsRow>
-
-      <Separator />
-
       <SettingsRow htmlFor="report-company" label="Company name" description="Used when there is no logo, and in the footer">
         <Input id="report-company" className="sm:w-64" value={companyName} disabled={!canManage} onChange={(e) => setCompanyName(e.target.value)} />
       </SettingsRow>
       <SettingsRow htmlFor="report-email" label="Contact email" description="Under the logo on the invoice">
         <Input id="report-email" type="email" className="sm:w-64" value={companyEmail} disabled={!canManage} onChange={(e) => setCompanyEmail(e.target.value)} />
       </SettingsRow>
+      <SettingsRow htmlFor="report-currency" label="Currency" description="What invoices bill in, whatever each person's display currency">
+        <Select value={currency} onValueChange={setCurrency} disabled={!canManage}>
+          <SelectTrigger id="report-currency" className="sm:w-64">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {CURRENCIES.map((c) => (
+              <SelectItem key={c.code} value={c.code}>{c.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </SettingsRow>
       <SettingsRow htmlFor="report-rate" label="Default hourly rate" description="For every client without a rate of its own">
-        <Input
+        <MoneyInput
+          // A new currency re-reads the amount in that currency's format.
+          key={currency}
           id="report-rate"
-          type="number"
-          min={0}
-          step={0.01}
-          className="sm:w-32"
-          placeholder="0.00"
+          className="sm:w-40"
+          currency={currency}
           value={defaultRate}
           disabled={!canManage}
-          aria-invalid={!rateValid}
-          onChange={(e) => setDefaultRate(e.target.value)}
+          onValueChange={setDefaultRate}
         />
       </SettingsRow>
 
@@ -163,7 +190,7 @@ function BrandingForm({ settings }: { settings: ReportSettings }) {
 
       {canManage && (
         <div className="flex justify-end">
-          <Button type="submit" disabled={disabled || !colorsValid || !rateValid}>Save</Button>
+          <Button type="submit" disabled={save.isPending || !colorsValid || !rateValid}>Save</Button>
         </div>
       )}
     </form>

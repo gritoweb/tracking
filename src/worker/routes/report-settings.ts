@@ -5,9 +5,11 @@ import {
   type ReportSettings,
 } from "@shared/schemas";
 import { REPORT_DEFAULT_COLORS } from "@shared/colors";
-import { canManageWorkspace, getMemberRole, MANAGER_ONLY_ERROR } from "../lib/permissions";
+import { isManager, MANAGER_ONLY_ERROR } from "../lib/permissions";
 
 const MAX_LOGO_BYTES = 1024 * 1024;
+// The one default not taken from the workspace itself: an invoice always needs some rate.
+const DEFAULT_HOURLY_RATE = 100;
 
 // Sniffed from the bytes; the PDF renderer embeds only PNG and JPEG (lib/image.ts is not imported: it pulls in the photon wasm).
 function logoContentType(b: Uint8Array): string | null {
@@ -24,30 +26,36 @@ interface ReportSettingsRow {
   color_text: string | null;
   logo_r2_key: string | null;
   logo_content_type: string | null;
+  currency: string | null;
   updated_at: string;
 }
 
 async function load(db: D1Database, workspaceId: string): Promise<ReportSettings> {
+  // Unsaved fields come from the workspace: its name, and its first owner's e-mail and display currency.
   const [row, ws] = await Promise.all([
     db.prepare(`SELECT * FROM report_settings WHERE workspace_id = ?`).bind(workspaceId).first<ReportSettingsRow>(),
-    db.prepare(`SELECT name, default_rate FROM workspaces WHERE id = ?`).bind(workspaceId)
-      .first<{ name: string; default_rate: number | null }>(),
+    db.prepare(
+      `SELECT w.name, w.default_rate, u.email AS owner_email, u.currency AS owner_currency
+       FROM workspaces w
+       LEFT JOIN "member" m ON m.organizationId = w.id AND m.role = 'owner'
+       LEFT JOIN "user" u ON u.id = m.userId
+       WHERE w.id = ?
+       ORDER BY m.createdAt ASC LIMIT 1`
+    ).bind(workspaceId)
+      .first<{ name: string; default_rate: number | null; owner_email: string | null; owner_currency: string | null }>(),
   ]);
   return {
     companyName: row?.company_name || ws?.name || "",
-    companyEmail: row?.company_email ?? null,
+    companyEmail: row?.company_email || ws?.owner_email || "",
     colors: {
       primary: row?.color_primary ?? REPORT_DEFAULT_COLORS.primary,
       accent: row?.color_accent ?? REPORT_DEFAULT_COLORS.accent,
       text: row?.color_text ?? REPORT_DEFAULT_COLORS.text,
     },
     logoUrl: row?.logo_r2_key ? `/api/report-settings/logo?v=${encodeURIComponent(row.updated_at)}` : null,
-    defaultRate: ws?.default_rate ?? null,
+    defaultRate: ws?.default_rate ?? DEFAULT_HOURLY_RATE,
+    currency: row?.currency ?? ws?.owner_currency ?? "USD",
   };
-}
-
-async function isManager(c: { env: Env; get: (k: "workspaceId" | "userId") => string }) {
-  return canManageWorkspace(await getMemberRole(c.env.DB, c.get("workspaceId"), c.get("userId")));
 }
 
 // Every member reads the branding (it renders their PDFs); only owners/admins change it.
@@ -57,7 +65,7 @@ export const reportSettingsRouter = new Hono<{
 }>()
   .get("/", async (c) => c.json(await load(c.env.DB, c.get("workspaceId")), 200))
   .put("/", zValidator("json", UpdateReportSettingsSchema), async (c) => {
-    if (!(await isManager(c))) return c.json({ error: MANAGER_ONLY_ERROR }, 403);
+    if (!(await isManager(c.env.DB, c.get("workspaceId"), c.get("userId")))) return c.json({ error: MANAGER_ONLY_ERROR }, 403);
     const workspaceId = c.get("workspaceId");
     const data = c.req.valid("json");
 
@@ -65,6 +73,7 @@ export const reportSettingsRouter = new Hono<{
     const values: unknown[] = [];
     if (data.companyName !== undefined) { fields.push("company_name"); values.push(data.companyName || null); }
     if (data.companyEmail !== undefined) { fields.push("company_email"); values.push(data.companyEmail || null); }
+    if (data.currency !== undefined) { fields.push("currency"); values.push(data.currency); }
     if (data.colors) {
       fields.push("color_primary", "color_accent", "color_text");
       values.push(data.colors.primary.toLowerCase(), data.colors.accent.toLowerCase(), data.colors.text.toLowerCase());
@@ -87,7 +96,7 @@ export const reportSettingsRouter = new Hono<{
     return c.json(await load(c.env.DB, workspaceId), 200);
   })
   .put("/logo", async (c) => {
-    if (!(await isManager(c))) return c.json({ error: MANAGER_ONLY_ERROR }, 403);
+    if (!(await isManager(c.env.DB, c.get("workspaceId"), c.get("userId")))) return c.json({ error: MANAGER_ONLY_ERROR }, 403);
     const workspaceId = c.get("workspaceId");
     // Refuse on the declared size first: parseBody() would buffer the whole upload before any check could run.
     if (Number(c.req.header("content-length")) > MAX_LOGO_BYTES + 16 * 1024) {
@@ -113,7 +122,7 @@ export const reportSettingsRouter = new Hono<{
     return c.json(await load(c.env.DB, workspaceId), 200);
   })
   .delete("/logo", async (c) => {
-    if (!(await isManager(c))) return c.json({ error: MANAGER_ONLY_ERROR }, 403);
+    if (!(await isManager(c.env.DB, c.get("workspaceId"), c.get("userId")))) return c.json({ error: MANAGER_ONLY_ERROR }, 403);
     const workspaceId = c.get("workspaceId");
     const row = await c.env.DB.prepare(`SELECT logo_r2_key FROM report_settings WHERE workspace_id = ?`)
       .bind(workspaceId).first<{ logo_r2_key: string | null }>();

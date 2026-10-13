@@ -17,7 +17,7 @@ export interface HoursReportProps {
   companyName: string;
   clientName: string;
   periodLabel: string;
-  monthLabel: string;
+  sectionTitle: string;
   entries: ReportDetailedEntry[];
 }
 
@@ -66,7 +66,7 @@ export function HoursReportDocument(p: HoursReportProps) {
           </View>
         </View>
 
-        <Text style={s.section}>{t.entriesOf(p.monthLabel)}</Text>
+        <Text style={s.section}>{p.sectionTitle}</Text>
         {/* Inside one wrapping View, the fixed header repeats on every page the table reaches. */}
         <View>
         {header}

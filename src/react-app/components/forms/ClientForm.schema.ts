@@ -13,7 +13,8 @@ export const clientFormSchema = z.object({
   address: blankable(CreateClientSchema.shape.address.unwrap().unwrap()),
   notes: blankable(CreateClientSchema.shape.notes.unwrap().unwrap()),
   // Blank = use the workspace default rate.
-  rate: z.string().refine((v) => v === "" || Number(v) >= 0, "Must be zero or more"),
+  // MoneyInput hands over NaN while the text isn't a number.
+  rate: z.number().nullable().refine((v) => v === null || v >= 0, "Enter an amount of zero or more"),
 });
 
 export type ClientFormValues = z.infer<typeof clientFormSchema>;

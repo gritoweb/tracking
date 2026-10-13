@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-10-13 (4) — `refactor`, local only (not pushed to master, not deployed)
+### Changed
+- **Client-document defaults come from the workspace, not from code**: company name = the workspace's name, contact e-mail = its first owner's e-mail, currency = that owner's display currency, default hourly rate = 100, until saved in Settings → Reports. Nothing about any one company is hard-coded, so the feature works for any workspace. A cleared default rate falls back to 100, so an invoice always has a rate (the "no rate" block in the dialog is gone).
+- **Documents bill in their own currency** (new Currency field in Settings → Reports, migration `0059_report_currency.sql`), separate from each person's display currency; fixed services and the client rate read in it too.
+- **Amount fields accept a comma or a dot** (`MoneyInput`, `lib/money.ts`): `65,5`, `65.5`, `1.234,50` and `1,234.50` all read right, the field shows the currency symbol and re-formats the amount in the currency's own format on leaving it, and anything that isn't a number can't be saved. Used for the default rate, a client's rate and a fixed service's amount.
+- The dialog says what an invoice will bill at ("Billed at R$ 65,00/h (workspace default)").
+- Settings tab order is General, Tracking, Workspace, Reports, Account.
+### Fixed
+- Uploading or removing the logo discarded unsaved edits in the same card (the whole form remounted on any settings change); the logo is now its own row and the form remounts only when its own saved values change.
+- A period spanning two months was titled with the first month only ("Lançamentos de setembro"); it now reads "Lançamentos" with the two dates, and the file is named by the dates.
+### Removed (simplification review)
+- A local `isManager` duplicating `lib/permissions.ts`'s, the one-line `effectiveRate`/`defaultInvoiceNumber` wrappers, the `lazy()` around the 5 KB dialog (the renderer chunk is still loaded on demand), and the hand-rolled logo-to-data-URL fetch (the renderer loads the same-origin URL itself).
+### Verified
+- `money.test.ts` (17 cases: comma/dot/thousands per locale, blank, junk, symbols, currency formatting), `report-settings.test.ts` (defaults from the workspace name and the owner's e-mail and currency, rate falls back to 100). `tsc -b` (0), `pnpm lint` (0), `vitest run` 1257/1257, `pnpm check` (0). Playwright walkthrough against local `pnpm dev`, 0 console errors: defaults show the owner's e-mail and 100.00; switching to BRL re-reads it as 100,00; `65,5` → 65,50, `65.75` → 65,75, `1.234,5` → 1.234,50; uploading the logo kept the unsaved name and rate; `abc` disables Save; services typed as `65` and `35,00` show as R$ 65,00 / R$ 35,00; the client rate placeholder shows the default; invoice and hours report generated and compared side by side with the two model PDFs (same structure, totals 8,12 h × 65 = 527,58 + 65 + 35 = 627,58); at 390 px the page has no horizontal overflow.
+
 ## 2026-10-13 (3) — `refactor`, local only (not pushed to master, not deployed)
 ### Fixed
 - Generating a client PDF with a logo logged `Buffer is not defined` in the browser console. Cause: `@react-pdf/layout` 5.2.0 (`fetchImage`) calls `Buffer.isBuffer` unguarded after the image has loaded; `Buffer` only exists in Node, and 5.2.0 is the latest release. `patches/@react-pdf__layout@5.2.0.patch` guards it with `typeof Buffer !== "undefined"` (same mechanism as the `agents` patch). pnpm refuses to install if the version changes, so an upgrade has to revisit it.

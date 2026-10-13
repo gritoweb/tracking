@@ -123,12 +123,14 @@ const HexColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/, "Must be a 6-digit 
 
 export const ReportSettingsSchema = z.object({
   companyName: z.string(),
-  companyEmail: z.string().nullable(),
+  companyEmail: z.string(),
   colors: z.object({ primary: z.string(), accent: z.string(), text: z.string() }),
   // Changes whenever the logo does, so a cached image is never shown after a replace.
   logoUrl: z.string().nullable(),
   // The workspace default hourly rate; a client's own rate overrides it on an invoice.
-  defaultRate: z.number().nullable(),
+  defaultRate: z.number(),
+  // What the documents bill in, separate from each person's display currency.
+  currency: z.string(),
 });
 
 export const UpdateReportSettingsSchema = z
@@ -137,6 +139,7 @@ export const UpdateReportSettingsSchema = z
     companyEmail: z.string().trim().email().max(255).nullable(),
     colors: z.object({ primary: HexColorSchema, accent: HexColorSchema, text: HexColorSchema }),
     defaultRate: z.number().min(0).max(1_000_000).nullable(),
+    currency: z.string().regex(/^[A-Z]{3}$/, "Must be a 3-letter currency code"),
   })
   .partial();
 

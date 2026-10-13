@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  defaultInvoiceNumber,
-  effectiveRate,
   formatClock,
   hoursSummary,
   invoiceLines,
@@ -9,13 +7,6 @@ import {
 } from "./clientDocuments";
 
 describe("the invoice", () => {
-  it("bills at the client's rate, else the workspace default, else not at all", () => {
-    expect(effectiveRate(80, 65)).toBe(80);
-    expect(effectiveRate(null, 65)).toBe(65);
-    expect(effectiveRate(0, 65)).toBe(0);
-    expect(effectiveRate(null, null)).toBeNull();
-  });
-
   it("charges the exact hours and lists only billable services", () => {
     const lines = invoiceLines(
       32 * 3600 + 10 * 60,
@@ -39,10 +30,6 @@ describe("the invoice", () => {
     expect(invoiceLines(0, 65, [{ name: "Hosting", amount: 50, billable: true }], "en")).toEqual([
       { description: "Hosting", hours: null, amount: 50 },
     ]);
-  });
-
-  it("suggests the period's year-month as the number", () => {
-    expect(defaultInvoiceNumber("2026-09-01")).toBe("2026-09");
   });
 });
 

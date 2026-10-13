@@ -54,11 +54,6 @@ export const DOCUMENT_TEXT = {
   },
 } as const;
 
-/** The client's own rate wins; blank falls back to the workspace default; neither means it can't be invoiced. */
-export function effectiveRate(clientRate: number | null, defaultRate: number | null): number | null {
-  return clientRate ?? defaultRate;
-}
-
 export interface InvoiceLine {
   description: string;
   hours: number | null;
@@ -96,11 +91,6 @@ export function hoursSummary(entries: Pick<ReportDetailedEntry, "start" | "durat
   const totalSeconds = entries.reduce((sum, e) => sum + e.duration, 0);
   const days = new Set(entries.map((e) => format(parseISO(e.start), "yyyy-MM-dd"))).size;
   return { totalSeconds, entryCount: entries.length, dailyAverageHours: days ? totalSeconds / 3600 / days : 0 };
-}
-
-/** "2026-09" from the period's first local day: the invoice number suggested in the dialog. */
-export function defaultInvoiceNumber(sinceDay: string): string {
-  return sinceDay.slice(0, 7);
 }
 
 export function formatMoney(amount: number, currency: string, locale: DocumentLocale): string {
