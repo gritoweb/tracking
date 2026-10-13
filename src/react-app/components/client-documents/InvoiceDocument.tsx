@@ -34,11 +34,11 @@ export function InvoiceDocument(p: InvoiceProps) {
     <Document title={`${t.invoice} ${p.clientName} ${p.number}`} author={p.companyName}>
       <Page size="A4" style={s.page}>
         <View style={s.header}>
-          <View>
+          <View style={s.headerLeft}>
             {p.logo ? <Image src={p.logo} style={s.logo} /> : <Text style={s.companyName}>{p.companyName}</Text>}
             {p.companyEmail && <Text style={s.email}>{p.companyEmail}</Text>}
           </View>
-          <View style={s.right}>
+          <View style={[s.right, s.headerRight]}>
             <Text style={s.kicker}>{t.invoice.toUpperCase()}</Text>
             <Text style={s.number}>#{p.number}</Text>
           </View>
@@ -46,7 +46,7 @@ export function InvoiceDocument(p: InvoiceProps) {
         <View style={s.stripe} />
 
         <View style={s.parties}>
-          <View>
+          <View style={s.billedTo}>
             <Text style={s.label}>{t.billedTo.toUpperCase()}</Text>
             <Text style={s.strong}>{p.clientName}</Text>
           </View>
@@ -86,12 +86,15 @@ function styles(c: BrandPalette) {
   return StyleSheet.create({
     page: { fontFamily: "Helvetica", fontSize: 11, color: c.text, paddingBottom: 40 },
     header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", padding: GUTTER, paddingBottom: 18 },
-    logo: { height: 40, objectFit: "contain", objectPositionX: 0, marginBottom: 4 },
+    // Any logo, number or name length has to stay on the page: each side gets a share and wraps inside it.
+    headerLeft: { flexShrink: 1, maxWidth: "45%", paddingRight: 16 },
+    headerRight: { flexShrink: 1, maxWidth: "55%" },
+    logo: { height: 40, maxWidth: 220, objectFit: "contain", objectPositionX: 0, marginBottom: 4 },
     companyName: { fontFamily: "Helvetica-Bold", fontSize: 16, color: c.primary, marginBottom: 4 },
     email: { fontSize: 9.5, color: c.muted },
     right: { alignItems: "flex-end" },
     kicker: { fontFamily: "Helvetica-Bold", fontSize: 8, letterSpacing: 2.5, color: c.primary, marginBottom: 6 },
-    number: { fontFamily: "Helvetica-Bold", fontSize: 26, color: c.primary },
+    number: { fontFamily: "Helvetica-Bold", fontSize: 26, color: c.primary, textAlign: "right" },
     stripe: { height: 3, backgroundColor: c.accent },
     parties: {
       flexDirection: "row",
@@ -101,6 +104,7 @@ function styles(c: BrandPalette) {
       borderBottomWidth: 1,
       borderBottomColor: c.hairline,
     },
+    billedTo: { flex: 1, paddingRight: 24 },
     label: { fontSize: 7.5, letterSpacing: 1.5, color: c.muted, marginBottom: 8 },
     strong: { fontFamily: "Helvetica-Bold", fontSize: 12 },
     body: { paddingHorizontal: GUTTER, paddingTop: 18 },
@@ -109,14 +113,15 @@ function styles(c: BrandPalette) {
     th: { fontFamily: "Helvetica-Bold", fontSize: 7.5, letterSpacing: 1.5, color: c.accentInk },
     cell: { fontSize: 11 },
     colDesc: { flex: 1 },
-    colQty: { width: 110, textAlign: "center" },
-    colAmount: { width: 110, textAlign: "right" },
+    colQty: { width: 90, textAlign: "center" },
+    colAmount: { width: 130, textAlign: "right" },
     totalBox: {
       flexDirection: "row",
       justifyContent: "space-between",
       alignItems: "center",
       alignSelf: "flex-end",
-      width: 215,
+      // Grows with the amount instead of a fixed width, so a large total never spills out of the box.
+      minWidth: 240,
       marginTop: 28,
       paddingVertical: 16,
       paddingHorizontal: 20,
@@ -124,8 +129,8 @@ function styles(c: BrandPalette) {
       borderColor: c.primary,
       borderRadius: 6,
     },
-    totalLabel: { fontFamily: "Helvetica-Bold", fontSize: 10, letterSpacing: 3, color: c.primary },
-    totalValue: { fontFamily: "Helvetica-Bold", fontSize: 18, color: c.primary },
+    totalLabel: { fontFamily: "Helvetica-Bold", fontSize: 11, letterSpacing: 3, color: c.primary, marginRight: 28 },
+    totalValue: { fontFamily: "Helvetica-Bold", fontSize: 24, color: c.primary },
     thanks: { fontFamily: "Helvetica-Oblique", fontSize: 9.5, color: c.muted, marginTop: 40 },
   });
 }

@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-10-13 (13) — `refactor`, local only (not pushed to master, not deployed)
+### Fixed
+- **Invoice number and hourly rate sit side by side** in the generator (from the client page and from Reports), on the same two-column row as From / To; they were stacked, which broke the dialog's grid. The rate hint runs under the row.
+- **The invoice's TOTAL reads as the largest figure again.** The earlier "already the reference's size" was a mis-measurement: the box border was counted as text. Side by side with the reference, the rows here are larger, so the total looked small next to them. The amount is now 24pt (was 18) with an 11pt label, and the box grows with the amount (min 240pt) instead of a fixed width.
+- **The PDFs can't spill off the page whatever the data**: the invoice header gives the logo/e-mail and the number a bounded share each and wraps inside it, a logo is capped at 220pt wide (160pt on the hours report), the client name wraps in its column, the amount column is 130pt, and a company name without a logo is bounded on the hours report.
+### Verified
+- New `documents.render.test.tsx` renders both PDFs with extreme data (a nine-figure total, 20 long service names, 120-character client and company names, a 40-character invoice number, 300 hours entries of 999:59:00 with long descriptions) and reads them back with `pdfjs-dist`: every text run stays within the A4 width, the total is one unbroken run clear of its label, and the hours report spans more than 10 pages. Against the previous layout (fixed 215pt box, unbounded header) it fails: the long invoice number ends at 599pt and a large total at 604pt, past the 595pt page. `tsc -b` (0), `pnpm lint` (0), `vitest run` 1269/1269, Playwright `client-documents` 3/3; the screenshot run checked the two fields share one row (same top, x 522 / 726).
+
 ## 2026-10-13 (12) — `refactor`, local only (not pushed to master, not deployed)
 ### Removed (repo-wide simplification audit)
 - `components/reports/ProjectBreakdown.tsx` (132 lines), unused since the design-system pass (`401416b`).

@@ -204,32 +204,37 @@ export function ClientDocumentDialog({
           </div>
 
           {kind === "invoice" && (
-            <Field>
-              <FieldLabel htmlFor="doc-number">Invoice number</FieldLabel>
-              <Input id="doc-number" value={number} onChange={(e) => setNumber(e.target.value)} className="w-40" />
-            </Field>
-          )}
-
-          {kind === "invoice" && client && settings && savedRate !== null && (
-            <Field>
-              <FieldLabel htmlFor="doc-rate">Hourly rate</FieldLabel>
-              <MoneyInput
-                // Another client brings its own rate back into the field.
-                key={client.id}
-                id="doc-rate"
-                className="w-40"
-                currency={settings.currency}
-                value={rate}
-                onValueChange={setRateOverride}
-              />
-              <SettingsHint>
-                {rateOverride !== undefined && rateOverride !== savedRate
-                  ? `Saved as this client's rate when you generate (now ${formatMoney(savedRate, settings.currency)}).`
-                  : client.rate === null
-                    ? "The workspace default (Settings → Reports)."
-                    : "This client's rate (Edit on the client page)."}
-              </SettingsHint>
-            </Field>
+            // Same two-column row as From / To above.
+            <div className="space-y-1.5">
+              <div className="flex gap-3">
+                <Field className="flex-1">
+                  <FieldLabel htmlFor="doc-number">Invoice number</FieldLabel>
+                  <Input id="doc-number" value={number} onChange={(e) => setNumber(e.target.value)} />
+                </Field>
+                {client && settings && savedRate !== null && (
+                  <Field className="flex-1">
+                    <FieldLabel htmlFor="doc-rate">Hourly rate</FieldLabel>
+                    <MoneyInput
+                      // Another client brings its own rate back into the field.
+                      key={client.id}
+                      id="doc-rate"
+                      currency={settings.currency}
+                      value={rate}
+                      onValueChange={setRateOverride}
+                    />
+                  </Field>
+                )}
+              </div>
+              {client && settings && savedRate !== null && (
+                <SettingsHint>
+                  {rateOverride !== undefined && rateOverride !== savedRate
+                    ? `Saved as this client's rate when you generate (now ${formatMoney(savedRate, settings.currency)}).`
+                    : client.rate === null
+                      ? "The workspace default (Settings → Reports)."
+                      : "This client's rate (Edit on the client page)."}
+                </SettingsHint>
+              )}
+            </div>
           )}
         </div>
 
