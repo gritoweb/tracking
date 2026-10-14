@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-14
+### Fixed
+- **Client PDFs failed in production**: the document CSP (`public/_headers`) blocked three things react-pdf needs — compiling WebAssembly (`script-src` gains `'wasm-unsafe-eval'`, which allows wasm only, not `eval`), loading yoga's wasm from its inlined `data:` URL (`connect-src data:`), and fflate's compression worker made from a `blob:` URL (new `worker-src 'self' blob:`, rather than opening `script-src` to `blob:`). Dev never sends this header, so only production broke. `src/react-app/csp-headers.test.ts` pins all three and that `'unsafe-eval'` stays out.
+### Verified
+- Reproduced in `pnpm preview` (serves `_headers`): the same console errors as production. After the fix, the hours report and the invoice downloaded as valid PDFs in about 3 s each with no console error.
+
 ## 2026-10-13 (15)
 ### Changed
 - **A member can generate a client's hours report** (of their own hours, like the rest of their reports) from Reports, the client list and the client's page; the invoice stays owner/admin-only. `prepare_client_document` is now offered to members too and refuses `kind: "invoice"` for them, so the Assistant follows.
