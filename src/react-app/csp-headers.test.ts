@@ -19,4 +19,8 @@ describe("the document CSP in public/_headers", () => {
     expect(directive("worker-src").split(" ")).toEqual(expect.arrayContaining(["'self'", "blob:"]));
     expect(directive("script-src")).not.toContain("blob:");
   });
+
+  it("lets FullCalendar load its inlined icon font", () => {
+    expect(directive("font-src").split(" ")).toContain("data:");
+  });
 });

@@ -2,6 +2,7 @@
 
 ## 2026-10-14
 ### Fixed
+- **Two console errors on every page**: `font-src` gains `data:` for FullCalendar's inlined icon font (`fcicons`, e.g. the month popover's close icon), and `index.html` adds `mobile-web-app-capable` beside the deprecated Apple tag. The blocked Cloudflare Web Analytics beacon is left as is on purpose.
 - **Client PDFs failed in production**: the document CSP (`public/_headers`) blocked three things react-pdf needs — compiling WebAssembly (`script-src` gains `'wasm-unsafe-eval'`, which allows wasm only, not `eval`), loading yoga's wasm from its inlined `data:` URL (`connect-src data:`), and fflate's compression worker made from a `blob:` URL (new `worker-src 'self' blob:`, rather than opening `script-src` to `blob:`). Dev never sends this header, so only production broke. `src/react-app/csp-headers.test.ts` pins all three and that `'unsafe-eval'` stays out.
 ### Verified
 - Reproduced in `pnpm preview` (serves `_headers`): the same console errors as production. After the fix, the hours report and the invoice downloaded as valid PDFs in about 3 s each with no console error.
