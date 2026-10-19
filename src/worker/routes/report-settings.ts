@@ -6,7 +6,7 @@ import {
   type ReportSettings,
 } from "@shared/schemas";
 import { REPORT_DEFAULT_COLORS } from "@shared/colors";
-import { INVOICE_NUMBER, movesInvoiceSequence, nextInvoiceNumber } from "@shared/client-documents";
+import { INVOICE_NUMBER } from "@shared/client-documents";
 import { isManager, MANAGER_ONLY_ERROR } from "../lib/permissions";
 
 const MAX_LOGO_BYTES = 1024 * 1024;
@@ -59,7 +59,7 @@ async function load(db: D1Database, workspaceId: string): Promise<ReportSettings
     logoUrl: row?.logo_r2_key ? `/api/report-settings/logo?v=${encodeURIComponent(row.updated_at)}` : null,
     defaultRate: ws?.default_rate ?? DEFAULT_HOURLY_RATE,
     currency: row?.currency ?? ws?.owner_currency ?? "USD",
-    nextInvoiceNumber: nextInvoiceNumber(row?.last_invoice_number ?? null),
+    invoiceNumber: row?.last_invoice_number ?? "1",
   };
 }
 
@@ -100,19 +100,14 @@ export const reportSettingsRouter = new Hono<{
     if (writes.length) await c.env.DB.batch(writes);
     return c.json(await load(c.env.DB, workspaceId), 200);
   })
-  // Generating an invoice moves the sequence on (see movesInvoiceSequence); re-issuing an older number does not.
+  // The number an invoice was generated with is the one the next invoice is offered.
   .post("/invoice-number", zValidator("json", z.object({ number: InvoiceNumberSchema })), async (c) => {
     if (!(await isManager(c.env.DB, c.get("workspaceId"), c.get("userId")))) return c.json({ error: MANAGER_ONLY_ERROR }, 403);
     const workspaceId = c.get("workspaceId");
-    const { number } = c.req.valid("json");
-    const row = await c.env.DB.prepare(`SELECT last_invoice_number FROM report_settings WHERE workspace_id = ?`)
-      .bind(workspaceId).first<{ last_invoice_number: string | null }>();
-    if (!row?.last_invoice_number || movesInvoiceSequence(number, row.last_invoice_number)) {
-      await c.env.DB.prepare(
-        `INSERT INTO report_settings (workspace_id, last_invoice_number) VALUES (?, ?)
-         ON CONFLICT(workspace_id) DO UPDATE SET last_invoice_number = excluded.last_invoice_number`
-      ).bind(workspaceId, number).run();
-    }
+    await c.env.DB.prepare(
+      `INSERT INTO report_settings (workspace_id, last_invoice_number) VALUES (?, ?)
+       ON CONFLICT(workspace_id) DO UPDATE SET last_invoice_number = excluded.last_invoice_number`
+    ).bind(workspaceId, c.req.valid("json").number).run();
     return c.json(await load(c.env.DB, workspaceId), 200);
   })
   .put("/logo", async (c) => {

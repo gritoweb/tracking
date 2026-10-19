@@ -28,7 +28,7 @@ describe("the report settings", () => {
       logoUrl: null,
       defaultRate: 100,
       currency: "BRL",
-      nextInvoiceNumber: "1",
+      invoiceNumber: "1",
     });
   });
 
@@ -70,19 +70,18 @@ describe("the report settings", () => {
   });
 });
 
-describe("the invoice number sequence", () => {
-  it("starts at 1 and continues the last number's pattern; an older one in the same pattern is a re-issue", async () => {
+describe("the invoice number", () => {
+  it("starts at 1 and offers the last one generated again, whatever it was", async () => {
     const { as } = world();
     const record = async (number: string) => {
       const res = await as("u-owner").post("/invoice-number", { number });
-      return res.status === 200 ? ((await res.json()) as { nextInvoiceNumber: string }).nextInvoiceNumber : res.status;
+      return res.status === 200 ? ((await res.json()) as { invoiceNumber: string }).invoiceNumber : res.status;
     };
-    expect(await record("2")).toBe("3");
-    expect(await record("10")).toBe("11");
-    expect(await record("5")).toBe("11");
-    expect(await record("2026-09")).toBe("2026-10");
-    expect(await record("2026-010")).toBe("2026-011");
-    expect(await record("2")).toBe("3");
+    expect(((await (await as("u-owner").get("/")).json()) as { invoiceNumber: string }).invoiceNumber).toBe("1");
+    expect(await record("1")).toBe("1");
+    expect(await record("10")).toBe("10");
+    expect(await record("5")).toBe("5");
+    expect(await record("2026-09")).toBe("2026-09");
     expect(await record("INV-7")).toBe(400);
   });
 

@@ -57,7 +57,7 @@ export function registerDocumentReads(d: ToolDeps): void {
         since: DateArg.describe("First day of the period (inclusive), YYYY-MM-DD"),
         until: DateArg.describe("Last day of the period (inclusive), YYYY-MM-DD"),
         language: z.enum(["pt-BR", "en"]).describe("Language of the document"),
-        invoiceNumber: InvoiceNumberSchema.optional().describe("Invoice only: digits and hyphens (12, 2026-09); defaults to the workspace's next number, the one after the last generated, in its pattern"),
+        invoiceNumber: InvoiceNumberSchema.optional().describe("Invoice only: digits and hyphens (12, 2026-09); defaults to the last invoice number generated in the workspace (1 before the first)"),
         hourlyRate: z.number().min(0).max(1_000_000).optional().describe("Invoice only: a new hourly rate the person asked for. It prices this answer and is saved as the client's rate when they generate the PDF from the link. Omit to use the client's rate, else the workspace default"),
         timezoneOffsetMinutes: TimezoneArg,
       },
@@ -89,7 +89,7 @@ export function registerDocumentReads(d: ToolDeps): void {
       if (!entries.ok) return refuse(entries.error);
       if (services && !services.ok) return refuse(services.error);
 
-      const number = invoiceNumber ?? settings.data.nextInvoiceNumber;
+      const number = invoiceNumber ?? settings.data.invoiceNumber;
       const link = new URLSearchParams({ document: kind, from: since, to: until, lang: language });
       if (kind === "invoice") link.set("number", number);
       if (kind === "invoice" && hourlyRate !== undefined) link.set("rate", String(hourlyRate));

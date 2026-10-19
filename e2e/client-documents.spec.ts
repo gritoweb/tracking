@@ -58,9 +58,9 @@ test.describe("client documents", () => {
     expect(hours.name).toMatch(/^Relatorio de horas - Example School - /);
     expect(hours.head).toBe("%PDF-");
 
-    // The next invoice is offered number 2.
+    // The next invoice is offered the same number until someone types another.
     await page.getByRole("button", { name: "Invoice" }).click();
-    await expect(page.getByLabel("Invoice number")).toHaveValue("2");
+    await expect(page.getByLabel("Invoice number")).toHaveValue("1");
     await page.getByRole("button", { name: "Cancel" }).click();
 
     // Generating saved it as the client's rate.

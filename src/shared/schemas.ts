@@ -131,8 +131,8 @@ export const ReportSettingsSchema = z.object({
   defaultRate: z.number(),
   // What the documents bill in, separate from each person's display currency.
   currency: z.string(),
-  // The number after the last invoice generated, in its pattern; "1" before the first.
-  nextInvoiceNumber: z.string(),
+  // The last invoice number generated, offered again until someone types another; "1" before the first.
+  invoiceNumber: z.string(),
 });
 
 export const UpdateReportSettingsSchema = z
