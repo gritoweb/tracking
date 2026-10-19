@@ -21,6 +21,7 @@ import { useWorkspaceRole } from "@/hooks/useWorkspaceRole";
 import { api } from "@/lib/api-client";
 import { toastApiError } from "@/lib/toastApiError";
 import { formatMoney } from "@/lib/money";
+import { CURRENCIES } from "@/lib/currency";
 import { MoneyInput } from "@/components/forms/MoneyInput";
 import { Field, FieldLabel } from "@/components/forms/Field";
 import { SettingsHint } from "@/components/settings/SettingsHint";
@@ -83,18 +84,19 @@ export function ClientDocumentDialog({
   const [clientId, setClientId] = useState(fixedClientId ?? "");
   const [locale, setLocale] = useState<DocumentLocale>(preset?.locale ?? "pt-BR");
   const [{ from, to }, setRange] = useState(() => (preset ? { from: preset.from, to: preset.to } : lastMonth()));
-  // Untouched: the link's number, else the workspace's next one.
+  // Untouched: the link's number, else the last one generated.
   const [typedNumber, setNumber] = useState(preset?.number);
-  const number = typedNumber ?? settings?.nextInvoiceNumber ?? "";
+  const number = typedNumber ?? settings?.invoiceNumber ?? "";
   // Untouched (undefined): the client's rate, else the workspace default. Typed: saved on the client when generating.
   const [rateOverride, setRateOverride] = useState<number | null | undefined>(preset?.rate);
+  // Untouched (undefined): the client's currency, else the workspace's. Picked: this invoice only.
+  const [currencyOverride, setCurrencyOverride] = useState<string>();
   const [busy, setBusy] = useState(false);
 
   const client = clients.find((c) => c.id === (fixedClientId ?? clientId));
   const savedRate = client && settings ? (client.rate ?? settings.defaultRate) : null;
   const rate = rateOverride === undefined ? savedRate : rateOverride;
-  // The client's own currency, like its rate, wins over the workspace's.
-  const currency = client?.currency ?? settings?.currency ?? "";
+  const currency = currencyOverride ?? client?.currency ?? settings?.currency ?? "";
   const validRate = kind === "hours" || (rate !== null && rate >= 0);
   const validRange = from !== "" && to !== "" && from <= to;
   const canGenerate = Boolean(client && settings && validRange && validRate && (kind === "hours" || INVOICE_NUMBER.test(number)) && !busy);
@@ -177,6 +179,7 @@ export function ClientDocumentDialog({
                 onValueChange={(id) => {
                   setClientId(id);
                   setRateOverride(undefined);
+                  setCurrencyOverride(undefined);
                 }}
               >
                 <SelectTrigger id="doc-client" className="w-full">
@@ -210,10 +213,10 @@ export function ClientDocumentDialog({
           </div>
 
           {kind === "invoice" && (
-            // Same two-column row as From / To above.
+            // Same two columns as From / To above.
             <div className="space-y-1.5">
-              <div className="flex gap-3">
-                <Field className="flex-1">
+              <div className="grid grid-cols-2 gap-3">
+                <Field>
                   <FieldLabel htmlFor="doc-number">Invoice number</FieldLabel>
                   <Input
                     id="doc-number"
@@ -221,15 +224,31 @@ export function ClientDocumentDialog({
                     placeholder="12 or 2026-09"
                     value={number}
                     aria-invalid={!INVOICE_NUMBER.test(number)}
-                    // Digits and hyphens only; the next invoice continues this one's pattern.
+                    // Digits and hyphens only.
                     onChange={(e) => setNumber(e.target.value.replace(/[^\d-]/g, ""))}
                   />
                 </Field>
+                {client && settings && (
+                  <Field>
+                    <FieldLabel htmlFor="doc-currency">Currency</FieldLabel>
+                    <Select value={currency} onValueChange={setCurrencyOverride}>
+                      <SelectTrigger id="doc-currency" className="w-full">
+                        {/* The code alone: the full name doesn't fit half a phone-width dialog. */}
+                        <SelectValue>{currency}</SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CURRENCIES.map((c) => (
+                          <SelectItem key={c.code} value={c.code}>{c.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                )}
                 {client && settings && savedRate !== null && (
-                  <Field className="flex-1">
+                  <Field>
                     <FieldLabel htmlFor="doc-rate">Hourly rate</FieldLabel>
                     <MoneyInput
-                      // Another client brings its own rate and currency back into the field.
+                      // Another client or currency re-reads the rate in that currency's format.
                       key={`${client.id}:${currency}`}
                       id="doc-rate"
                       currency={currency}

@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-10-19 (2)
+### Changed
+- **The invoice number no longer adds 1 by itself**: the dialog offers the last number generated in the workspace ("1" before the first), and whatever number an invoice is generated with becomes the one offered next. `report_settings` returns `invoiceNumber` (was `nextInvoiceNumber`); `nextInvoiceNumber`/`movesInvoiceSequence` are gone. `prepare_client_document` defaults to the same number.
+### Added
+- **A Currency select in the invoice dialog**, on the same two-column grid as From/To: it opens on the client's currency (else the workspace's) and a change applies to that invoice only — the client keeps its currency. The closed field shows the code alone so it fits a phone-width dialog.
+### Verified
+- `tsc -b` (0), `pnpm lint` (0), `vitest run` 1312/1312 (route: 1 before the first, then 10, 5, 2026-09 each offered back as generated).
+- Local app: the dialog offered 5 after #5; switching to BRL produced `#5`, `R$ 1.500,00`; reopening offered 5 again in the client's USD, and the client's currency was unchanged. Dialog checked at 1440px and 375px (no overflow).
+
 ## 2026-10-19
 ### Fixed
 - **English PDFs wrote the amount glued to its symbol** (`R$1,500.00`, `$1,500.00`): `formatMoney` in `lib/clientDocuments.ts` now puts a no-break space after the symbol whenever the locale doesn't (`R$ 1,500.00`), the way pt-BR already writes it. A test walks every currency in the picker in both languages.
