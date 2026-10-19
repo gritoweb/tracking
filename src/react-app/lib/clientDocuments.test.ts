@@ -1,9 +1,30 @@
 import { describe, expect, it } from "vitest";
-import { documentPresetFrom, formatClock } from "./clientDocuments";
+import { CURRENCIES } from "./currency";
+import { documentPresetFrom, formatClock, formatDay, formatMoney } from "./clientDocuments";
 
 describe("the hours report's durations", () => {
   it("writes durations past a day as hours", () => {
     expect(formatClock(32 * 3600 + 10 * 60)).toBe("32:10:00");
+  });
+});
+
+describe("the documents' money and dates", () => {
+  it("separates the currency symbol from the amount in every language", () => {
+    expect(formatMoney(1234.5, "BRL", "en")).toBe("R$\u00a01,234.50");
+    expect(formatMoney(1234.5, "USD", "en")).toBe("$\u00a01,234.50");
+    expect(formatMoney(1234.5, "BRL", "pt-BR")).toBe("R$\u00a01.234,50");
+  });
+
+  it.each(CURRENCIES.flatMap((c) => (["en", "pt-BR"] as const).map((locale) => [c.code, locale] as const)))(
+    "puts a space between the symbol and the amount in %s, %s",
+    (code, locale) => {
+      expect(formatMoney(1234.5, code, locale)).toMatch(/^\D*\S\s\d/);
+    }
+  );
+
+  it("writes English dates with hyphens and Portuguese ones with slashes", () => {
+    expect(formatDay("2026-10-19T12:00:00", "en")).toBe("10-19-2026");
+    expect(formatDay("2026-10-19T12:00:00", "pt-BR")).toBe("19/10/2026");
   });
 });
 

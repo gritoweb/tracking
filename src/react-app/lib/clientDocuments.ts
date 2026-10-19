@@ -1,8 +1,12 @@
 import { format, parseISO } from "date-fns";
 import type { ClientDocumentKind, DocumentLocale } from "@shared/client-documents";
 
+/** "R$ 1.234,50" / "R$ 1,234.50": the symbol always stands apart from the amount, as pt-BR already writes it. */
 export function formatMoney(amount: number, currency: string, locale: DocumentLocale): string {
-  return new Intl.NumberFormat(locale, { style: "currency", currency }).format(amount);
+  const parts = new Intl.NumberFormat(locale, { style: "currency", currency }).formatToParts(amount);
+  return parts
+    .map((p, i) => (p.type === "currency" && parts[i + 1] && parts[i + 1].type !== "literal" ? `${p.value}\u00a0` : p.value))
+    .join("");
 }
 
 export function formatHoursDecimal(hours: number, locale: DocumentLocale): string {
@@ -17,8 +21,10 @@ export function formatClock(seconds: number): string {
   return `${h}:${String(m).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 }
 
+/** "19/10/2026" / "10-19-2026": the English documents write dates with hyphens. */
 export function formatDay(iso: string, locale: DocumentLocale): string {
-  return new Intl.DateTimeFormat(locale, { day: "2-digit", month: "2-digit", year: "numeric" }).format(parseISO(iso));
+  const day = new Intl.DateTimeFormat(locale, { day: "2-digit", month: "2-digit", year: "numeric" }).format(parseISO(iso));
+  return locale === "en" ? day.replace(/\//g, "-") : day;
 }
 
 /** "setembro de 2026" / "September 2026". */
