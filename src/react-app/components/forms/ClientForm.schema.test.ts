@@ -10,6 +10,7 @@ describe("clientFormSchema", () => {
       address: "",
       notes: "",
       rate: null,
+      currency: null,
     });
     expect(result.success).toBe(false);
     if (!result.success) {
@@ -26,6 +27,7 @@ describe("clientFormSchema", () => {
       address: "",
       notes: "",
       rate: null,
+      currency: null,
     });
     expect(result.success).toBe(false);
     if (!result.success) {
@@ -41,17 +43,18 @@ describe("clientFormSchema", () => {
       address: "",
       notes: "",
       rate: null,
+      currency: null,
     });
     expect(result.success).toBe(true);
   });
 
   it("rejects a rate that isn't a number", () => {
-    const result = clientFormSchema.safeParse({ name: "Acme", email: "", phone: "", address: "", notes: "", rate: NaN });
+    const result = clientFormSchema.safeParse({ name: "Acme", email: "", phone: "", address: "", notes: "", rate: NaN, currency: null });
     expect(result.success).toBe(false);
   });
 
   it("rejects a negative rate", () => {
-    const result = clientFormSchema.safeParse({ name: "Acme", email: "", phone: "", address: "", notes: "", rate: -1 });
+    const result = clientFormSchema.safeParse({ name: "Acme", email: "", phone: "", address: "", notes: "", rate: -1, currency: null });
     expect(result.success).toBe(false);
   });
 
@@ -63,6 +66,7 @@ describe("clientFormSchema", () => {
       address: "1 Main St",
       notes: "Pays net-30",
       rate: 80,
+      currency: "USD",
     });
     expect(result.success).toBe(true);
     if (result.success) {
@@ -73,6 +77,7 @@ describe("clientFormSchema", () => {
         address: "1 Main St",
         notes: "Pays net-30",
         rate: 80,
+        currency: "USD",
       });
     }
   });

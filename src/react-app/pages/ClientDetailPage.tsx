@@ -59,7 +59,8 @@ export function ClientDetailPage() {
   const { byClient, isLoading: statsLoading } = useClientStats(since, until);
   // Amounts are priced at the invoice rate, so they show in the invoice currency.
   const ownCurrency = useUIStore((s) => s.currency);
-  const currency = useReportSettings().data?.currency ?? ownCurrency;
+  const workspaceCurrency = useReportSettings().data?.currency;
+  const currency = client?.currency ?? workspaceCurrency ?? ownCurrency;
   const stats = id ? byClient.get(id) : undefined;
 
   const toggle = (projectId: string) =>
@@ -305,7 +306,7 @@ export function ClientDetailPage() {
         )}
       </div>
 
-      <ClientServicesSection clientId={client.id} canManage={canManage} />
+      <ClientServicesSection clientId={client.id} clientCurrency={client.currency} canManage={canManage} />
 
       {showEdit && (
         <ClientForm client={client} open onClose={() => setShowEdit(false)} />

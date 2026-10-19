@@ -35,6 +35,22 @@ describe("a client's hourly rate", () => {
   });
 });
 
+describe("a client's invoice currency", () => {
+  it("is set and cleared by an owner, and must be a currency code", async () => {
+    const { as } = world();
+    const set = await as("u-owner", "ws-A").put("/cl-A", { currency: "USD" });
+    expect(((await set.json()) as { currency: string }).currency).toBe("USD");
+    const cleared = await as("u-owner", "ws-A").put("/cl-A", { currency: null });
+    expect(((await cleared.json()) as { currency: string | null }).currency).toBeNull();
+    expect((await as("u-owner", "ws-A").put("/cl-A", { currency: "dollar" })).status).toBe(400);
+  });
+
+  it("is refused to a member", async () => {
+    const { as } = world();
+    expect((await as("u-member", "ws-A").put("/cl-A", { currency: "USD" })).status).toBe(403);
+  });
+});
+
 describe("a client's fixed services", () => {
   it("an owner adds, edits and removes one", async () => {
     const { as, service } = world();

@@ -15,6 +15,8 @@ export const clientFormSchema = z.object({
   // Blank = use the workspace default rate.
   // MoneyInput hands over NaN while the text isn't a number.
   rate: z.number().nullable().refine((v) => v === null || v >= 0, "Enter an amount of zero or more"),
+  // Null = the workspace's invoice currency.
+  currency: z.string().nullable(),
 });
 
 export type ClientFormValues = z.infer<typeof clientFormSchema>;

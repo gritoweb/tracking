@@ -111,7 +111,7 @@ export function registerDocumentReads(d: ToolDeps): void {
       return json({
         ...common,
         invoiceNumber: number,
-        currency: settings.data.currency,
+        currency: client.data.currency ?? settings.data.currency,
         hourlyRate: rate,
         rateSource: hourlyRate !== undefined ? "new rate, saved on the client when generated" : client.data.rate === null ? "workspace default" : "client",
         lines: lines.map((l) => ({ ...l, hours: l.hours === null ? null : hours(l.hours * 3600) })),

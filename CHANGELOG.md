@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-10-19
+### Fixed
+- **English PDFs wrote the amount glued to its symbol** (`R$1,500.00`, `$1,500.00`): `formatMoney` in `lib/clientDocuments.ts` now puts a no-break space after the symbol whenever the locale doesn't (`R$ 1,500.00`), the way pt-BR already writes it. A test walks every currency in the picker in both languages.
+- **English PDFs write dates with hyphens** (`10-19-2026`); Portuguese keeps `19/10/2026`. Covers the issue date, the hours report's period and its rows.
+### Added
+- **A client can bill in its own currency**, overriding the workspace's, like its hourly rate already does: a Currency select beside the rate in the client's Edit dialog ("Workspace default" = Settings → Reports). The invoice, the generator's rate field, the client's billable amount (page and list), its recurring services and `prepare_client_document` all use it. New nullable column `clients.currency` (migration `0061`, additive).
+### Verified
+- `tsc -b` (0), `pnpm lint` (0), `vitest run` all green (new: currency spacing for 19 currencies × en/pt-BR, hyphenated English dates, client currency set/clear/400/403).
+- Local app, a fresh workspace in USD with a client set to BRL at R$ 150: the generated PDFs read `R$ 1,500.00` / `10-19-2026` in English and `R$ 1.500,00` / `19/10/2026` in Portuguese (10 whole hours). The invoice number went 1 → 2 → 3 across three generations, and the dialog offered 4 next; the sequence-not-moving report did not reproduce.
+
 ## 2026-10-14
 ### Fixed
 - **Two console errors on every page**: `font-src` gains `data:` for FullCalendar's inlined icon font (`fcicons`, e.g. the month popover's close icon), and `index.html` adds `mobile-web-app-capable` beside the deprecated Apple tag. The blocked Cloudflare Web Analytics beacon is left as is on purpose.

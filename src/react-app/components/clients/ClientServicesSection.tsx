@@ -27,12 +27,13 @@ import { useUIStore } from "@/stores/uiStore";
 import type { ClientService } from "@shared/schemas";
 
 /** A client's recurring services (hosting, email…); the billable ones are listed on its invoice. */
-export function ClientServicesSection({ clientId, canManage }: { clientId: string; canManage: boolean }) {
+export function ClientServicesSection({ clientId, clientCurrency, canManage }: { clientId: string; clientCurrency: string | null; canManage: boolean }) {
   const { data: services = [] } = useClientServices(clientId);
   const save = useSaveClientService(clientId);
   // Services are billed on the invoice, so they read in the documents' currency.
   const displayCurrency = useUIStore((s) => s.currency);
-  const currency = useReportSettings().data?.currency ?? displayCurrency;
+  const workspaceCurrency = useReportSettings().data?.currency;
+  const currency = clientCurrency ?? workspaceCurrency ?? displayCurrency;
   const [editing, setEditing] = useState<ClientService | "new" | null>(null);
   const [removing, setRemoving] = useState<ClientService | null>(null);
 

@@ -49,6 +49,7 @@ export interface ClientRow {
   phone: string | null;
   address: string | null;
   rate: number | null;
+  currency: string | null;
 }
 
 /** `client_services` (migration 0057). */

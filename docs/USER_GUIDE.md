@@ -264,7 +264,7 @@ Everything respects the **date range picker** and filters. Other tools on this p
 - **AI summary** — draft a client-ready narrative summary of the selected period in a chosen style, from your real entries. Edit before you send it anywhere.
 - A full **all-entries CSV export** lives under Settings → Data export.
 
-**Recurring services and a client's rate.** On a client's page, owners and admins add recurring services (name, description, amount) and switch each one billable or not; only billable ones go on the invoice. The client's **Edit** dialog takes its own hourly rate; blank means the workspace default from Settings → Reports. These apply to invoices only. Amounts can be typed with a comma or a dot (`65,5`, `65.5`, `1.234,50`) and are shown back in the documents' currency format.
+**Recurring services and a client's rate.** On a client's page, owners and admins add recurring services (name, description, amount) and switch each one billable or not; only billable ones go on the invoice. The client's **Edit** dialog takes its own hourly rate and currency; a blank rate or "Workspace default" currency means the one from Settings → Reports. The invoice, the client's billable amount and its services are shown in the client's currency. These apply to invoices only. Amounts can be typed with a comma or a dot (`65,5`, `65.5`, `1.234,50`) and are shown back in the documents' currency format.
 
 Amounts on this page come from each project's billing rate; the display currency is set under Settings → Preferences.
 

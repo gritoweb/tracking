@@ -93,6 +93,8 @@ export function ClientDocumentDialog({
   const client = clients.find((c) => c.id === (fixedClientId ?? clientId));
   const savedRate = client && settings ? (client.rate ?? settings.defaultRate) : null;
   const rate = rateOverride === undefined ? savedRate : rateOverride;
+  // The client's own currency, like its rate, wins over the workspace's.
+  const currency = client?.currency ?? settings?.currency ?? "";
   const validRate = kind === "hours" || (rate !== null && rate >= 0);
   const validRange = from !== "" && to !== "" && from <= to;
   const canGenerate = Boolean(client && settings && validRange && validRate && (kind === "hours" || INVOICE_NUMBER.test(number)) && !busy);
@@ -131,7 +133,7 @@ export function ClientDocumentDialog({
           number,
           issueDate: formatDay(new Date().toISOString(), locale),
           lines: invoiceLines(totalSeconds, rate ?? 0, services, locale),
-          currency: settings.currency,
+          currency,
         });
         download(blob, t.invoiceFile(client.name, number));
         queryClient.setQueryData(["report-settings"], await api.reportSettings.recordInvoiceNumber(number));
@@ -227,10 +229,10 @@ export function ClientDocumentDialog({
                   <Field className="flex-1">
                     <FieldLabel htmlFor="doc-rate">Hourly rate</FieldLabel>
                     <MoneyInput
-                      // Another client brings its own rate back into the field.
-                      key={client.id}
+                      // Another client brings its own rate and currency back into the field.
+                      key={`${client.id}:${currency}`}
                       id="doc-rate"
-                      currency={settings.currency}
+                      currency={currency}
                       value={rate}
                       onValueChange={setRateOverride}
                     />
@@ -240,7 +242,7 @@ export function ClientDocumentDialog({
               {client && settings && savedRate !== null && (
                 <SettingsHint>
                   {rateOverride !== undefined && rateOverride !== savedRate
-                    ? `Saved as this client's rate when you generate (now ${formatMoney(savedRate, settings.currency)}).`
+                    ? `Saved as this client's rate when you generate (now ${formatMoney(savedRate, currency)}).`
                     : client.rate === null
                       ? "The workspace default (Settings → Reports)."
                       : "This client's rate (Edit on the client page)."}

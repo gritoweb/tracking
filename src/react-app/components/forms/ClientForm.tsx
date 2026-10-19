@@ -1,4 +1,4 @@
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Field, FieldLabel, FieldMessage } from "@/components/forms/Field";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,8 @@ import { useReportSettings } from "@/hooks/useReportSettings";
 import { currencyLocale, formatMoneyInput } from "@/lib/money";
 import { MoneyInput } from "./MoneyInput";
 import { SettingsHint } from "@/components/settings/SettingsHint";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { CURRENCIES } from "@/lib/currency";
 import { clientFormSchema, type ClientFormValues } from "./ClientForm.schema";
 import type { Client } from "@shared/schemas";
 
@@ -34,6 +36,8 @@ export function ClientForm({ client, open, onClose }: ClientFormProps) {
   const { canManage } = useWorkspaceRole();
   const showRate = Boolean(client) && canManage;
   const { data: reportSettings } = useReportSettings();
+  // Radix Select has no empty value, so "Workspace default" needs a token of its own.
+  const WORKSPACE_CURRENCY = "workspace";
 
   const form = useForm<ClientFormValues>({
     resolver: zodResolver(clientFormSchema),
@@ -44,8 +48,11 @@ export function ClientForm({ client, open, onClose }: ClientFormProps) {
       address: client?.address ?? "",
       notes: client?.notes ?? "",
       rate: client?.rate ?? null,
+      currency: client?.currency ?? null,
     },
   });
+
+  const currency = useWatch({ control: form.control, name: "currency" }) ?? reportSettings?.currency ?? "";
 
   const onSubmit = form.handleSubmit((values) => {
     const data = {
@@ -57,7 +64,7 @@ export function ClientForm({ client, open, onClose }: ClientFormProps) {
     };
 
     if (client) {
-      const rate = showRate ? { rate: values.rate } : {};
+      const rate = showRate ? { rate: values.rate, currency: values.currency } : {};
       updateClient.mutate({ id: client.id, data: { ...data, ...rate } }, { onSuccess: onClose });
     } else {
       createClient.mutate(data, { onSuccess: onClose });
@@ -109,25 +116,53 @@ export function ClientForm({ client, open, onClose }: ClientFormProps) {
           </Field>
 
           {showRate && reportSettings && (
-            <Field>
-              <FieldLabel htmlFor="client-rate">Hourly rate</FieldLabel>
-              <Controller
-                control={form.control}
-                name="rate"
-                render={({ field }) => (
-                  <MoneyInput
-                    id="client-rate"
-                    className="w-40"
-                    currency={reportSettings.currency}
-                    value={field.value}
-                    onValueChange={field.onChange}
-                    placeholder={formatMoneyInput(reportSettings.defaultRate, currencyLocale(reportSettings.currency))}
+            <div className="space-y-1.5">
+              <div className="flex gap-3">
+                <Field className="flex-1">
+                  <FieldLabel htmlFor="client-rate">Hourly rate</FieldLabel>
+                  <Controller
+                    control={form.control}
+                    name="rate"
+                    render={({ field }) => (
+                      <MoneyInput
+                        // Another currency re-reads the amount in that currency's format.
+                        key={currency}
+                        id="client-rate"
+                        currency={currency}
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        placeholder={formatMoneyInput(reportSettings.defaultRate, currencyLocale(currency))}
+                      />
+                    )}
                   />
-                )}
-              />
-              <SettingsHint>Blank uses the workspace default from Settings → Reports.</SettingsHint>
+                </Field>
+                <Field className="flex-1">
+                  <FieldLabel htmlFor="client-currency">Currency</FieldLabel>
+                  <Controller
+                    control={form.control}
+                    name="currency"
+                    render={({ field }) => (
+                      <Select
+                        value={field.value ?? WORKSPACE_CURRENCY}
+                        onValueChange={(v) => field.onChange(v === WORKSPACE_CURRENCY ? null : v)}
+                      >
+                        <SelectTrigger id="client-currency" className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={WORKSPACE_CURRENCY}>Workspace default ({reportSettings.currency})</SelectItem>
+                          {CURRENCIES.map((c) => (
+                            <SelectItem key={c.code} value={c.code}>{c.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                </Field>
+              </div>
+              <SettingsHint>Blank rate and Workspace default use Settings → Reports.</SettingsHint>
               <FieldMessage name="rate" />
-            </Field>
+            </div>
           )}
 
           <DialogFooter>

@@ -225,7 +225,7 @@ export function ClientList() {
             <ClientFigures
               stats={byClient.get(client.id)}
               loading={statsLoading}
-              currency={currency}
+              currency={client.currency ?? currency}
             />
 
             {/* The invoice is for owners/admins; any member gets the hours report (of their own hours). */}
