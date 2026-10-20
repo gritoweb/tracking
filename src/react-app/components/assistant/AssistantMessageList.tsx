@@ -1,4 +1,4 @@
-import { Sparkles } from "lucide-react";
+import { Paperclip, Sparkles } from "lucide-react";
 import { useAgentChat } from "@cloudflare/ai-chat/react";
 import { Spinner } from "@/components/ui/spinner";
 import { ToolCard } from "./ai-elements/ToolCard";
@@ -7,6 +7,7 @@ import { pendingApprovalIds } from "./ai-elements/pendingApprovals";
 import { endedMidTask } from "./ai-elements/turnState";
 import { AssistantMarkdown } from "./ai-elements/AssistantMarkdown";
 import { MessageActions } from "./ai-elements/MessageActions";
+import { splitAttachedFiles } from "./useStagedFiles";
 
 type ChatMessage = ReturnType<typeof useAgentChat>["messages"][number];
 
@@ -46,9 +47,25 @@ export function AssistantMessageList({
             {m.role === "assistant" && <ApprovalBatchBar ids={pendingApprovalIds(m.parts)} onApprove={onApprove} />}
             {m.parts.map((part, i) => {
               if (part.type === "text") {
-                return m.role === "user" ? (
-                  <span key={i}>{part.text}</span>
-                ) : (
+                if (m.role === "user") {
+                  const { text, files } = splitAttachedFiles(part.text);
+                  return (
+                    <div key={i} className="space-y-1.5">
+                      <span>{text}</span>
+                      {files.length > 0 && (
+                        <ul className="flex flex-wrap gap-1.5" aria-label="Attached files">
+                          {files.map((name, f) => (
+                            <li key={f} className="flex max-w-full items-center gap-1 rounded-full bg-background px-2 py-0.5 text-xs">
+                              <Paperclip className="h-3 w-3 shrink-0 text-muted-foreground" aria-hidden="true" />
+                              <span className="truncate">{name}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  );
+                }
+                return (
                   <AssistantMarkdown key={i} text={part.text} />
                 );
               }

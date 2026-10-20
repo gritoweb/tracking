@@ -1,5 +1,31 @@
 # Changelog
 
+## 2026-10-20
+### Added
+- **Files reach a task from Claude Code (MCP) and from the in-app Assistant.** Before, the MCP took a file only as base64 inside the tool call, which no model can do for an image someone drags in (a 1 MB file is ~1.3 M characters of arguments), and the Assistant's chat box took no files at all.
+  - New MCP tool `request_upload_url`: a signed URL (15 min, HMAC) plus the `curl -T` command.
+  - `create_task`, `update_task` and `add_task_comment` take `uploadIds`: each file is attached and shown (an image inline, any other file as a card) in the same call. A two-step "upload, then paste the Markdown" lost the image with the Assistant's model, which skipped the first step.
+  - `upload_task_attachment` also takes an `uploadId` (base64 stays for tiny files) and returns the `markdown` snippet.
+  - The Assistant's composer takes files by drop, paste or a clip button, stages each one at once (`POST /api/uploads`) and lists their `uploadId`s in the message.
+  - Where files go unless the person says otherwise (`FILE_PLACEMENT`, in the tool docs and `tracking_guide`): a new task gets them in its notes; an existing task gets them in a comment, and in its notes only when the description is asked for.
+  - The attachment itself still goes through `POST /api/tasks/:id/attachments`, the same type sniffing and resizing as the panel.
+### Security
+- Audited before release (SECURITY.md S-31). Three fixes went in:
+  - The upload grant signs with a key derived from the auth secret, so a Better Auth signature can't pass for one.
+  - `uploadId` must be a UUID, so it can't step outside the caller's `staging/<workspace>/<person>/` prefix.
+  - 30 uploads a minute per address across both doors.
+- Staged files are never served and are deleted once attached; leftovers need the R2 lifecycle rule on `staging/` (1 day), applied on deploy.
+### Verified
+- `tsc -b` (0), `pnpm lint` (0), `vitest run` 1326/1326, `pnpm check` (0). New tests:
+  - signed PUT → attach → Markdown;
+  - `uploadIds` on create (notes), update (notes kept) and comment;
+  - refused: a teammate's `uploadId`, a non-UUID id, tampered, expired and raw-secret tokens, empty and over-25 MB PUTs. The raw-secret test fails without the derived key.
+- Local app, MCP over a real key: an 867 KB PNG was sent with `curl -T` and shows inline in the task's description, and a PDF shows as a card in a comment. A tampered link gets 403 and a reused `uploadId` is refused.
+- Local app, the Assistant in the browser:
+  - a picked image → "add to a comment on task X" → comment with the image;
+  - a PDF → "create a task with this spec" → the card in the new task's notes;
+  - an image → "put this on task X" (an existing task, no place named) → a comment, as intended.
+
 ## 2026-10-19 (2)
 ### Changed
 - **The invoice number no longer adds 1 by itself**: the dialog offers the last number generated in the workspace ("1" before the first), and whatever number an invoice is generated with becomes the one offered next. `report_settings` returns `invoiceNumber` (was `nextInvoiceNumber`); `nextInvoiceNumber`/`movesInvoiceSequence` are gone. `prepare_client_document` defaults to the same number.

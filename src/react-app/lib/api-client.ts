@@ -512,6 +512,13 @@ export const api = {
     deleteMemory: (key: string) =>
       assistantClient.memory[":key"].$delete({ param: { key } }).then(() => undefined),
     clearMemory: () => assistantClient.memory.$delete().then(() => undefined),
+    /** Holds a file for the chat until a tool attaches it to a task by its uploadId. */
+    stageFile: async (file: File): Promise<{ uploadId: string; filename: string; size: number }> => {
+      const body = new FormData();
+      body.append("file", file);
+      const res = await appFetch("/uploads", { method: "POST", body });
+      return (await res.json()) as { uploadId: string; filename: string; size: number };
+    },
   },
 
   // ─── API keys (MCP + programmatic access) ─────────────────────────────────

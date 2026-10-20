@@ -243,6 +243,8 @@ Dismissals stick per-device. Turn nudge alerts on/off under Settings → Product
 
 **Chat** — ask the Assistant things in plain language: *"start a timer for the Acme redesign"*, *"how much did I bill this week?"*, *"log 2 hours of code review yesterday afternoon"*, *"track my 10am meeting"*. It can start/stop timers, log and delete entries, track meetings, summarize your time, and look up your projects — anything that **writes or deletes data asks for your approval first** with an in-chat confirm card.
 
+**Files** — drop, paste or pick (the clip button) images and documents in the chat box, then say where they go: *"put this screenshot in the description of the login task"*, *"attach this PDF to a comment on task X"*. Each file uploads as soon as you add it (up to 25 MB); the Assistant attaches it and places it, asking for your approval like any other change. Unless you say where: a task it creates gets the files in its description, and a task that already exists gets them in a comment.
+
 **Memory** — tell the Assistant to remember preferences ("remember that standups are never billable") and it stores them per-workspace, using them in future conversations. Review and delete everything it knows under **Settings → Assistant memory**.
 
 ## Reports & exports

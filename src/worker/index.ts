@@ -15,6 +15,7 @@ import { reportSettingsRouter } from "./routes/report-settings";
 import { tagsRouter } from "./routes/tags";
 import { tasksRouter } from "./routes/tasks";
 import { attachmentsRouter } from "./routes/attachments";
+import { signedUploadRouter, uploadsRouter } from "./routes/uploads";
 import { taskStatusesRouter } from "./routes/task-statuses";
 import { favoritesRouter } from "./routes/favorites";
 import { recurringRouter } from "./routes/recurring";
@@ -108,6 +109,8 @@ const app = new Hono<{ Bindings: Env }>()
     const origin = new URL(c.req.url).origin;
     return createAuth(c.env, origin).handler(c.req.raw);
   })
+  // A signed upload URL is its own credential (an MCP client PUTs a file with curl), so it skips the session.
+  .route("/api/uploads/signed", signedUploadRouter)
   .use("/api/*", workspaceMiddleware)
   .use("/api/ai/*", aiRateLimit)
   // track-event hits Workers AI (project inference); nudge polling is capped well
@@ -128,6 +131,7 @@ const app = new Hono<{ Bindings: Env }>()
   .route("/api/tags", tagsRouter)
   .route("/api/tasks", tasksRouter)
   .route("/api/attachments", attachmentsRouter)
+  .route("/api/uploads", uploadsRouter)
   .route("/api/task-statuses", taskStatusesRouter)
   .route("/api/favorites", favoritesRouter)
   .route("/api/recurring", recurringRouter)

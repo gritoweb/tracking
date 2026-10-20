@@ -2,6 +2,7 @@
 import type { ApiKeyScope } from "../lib/api-keys";
 import { canManageWorkspace, type WorkspaceRole } from "../lib/permissions";
 import type { RegisteredTool, ToolGroup } from "./registry";
+import { FILE_PLACEMENT } from "./tools/tasks";
 import { RICH_TEXT_SYNTAX, RICH_TEXT_UNSUPPORTED } from "@shared/markdown-doc";
 
 const GROUP_ORDER: ToolGroup[] = ["Time and reports", "Tasks", "Projects, clients and tags", "Planning and saved items", "You and the workspace"];
@@ -43,6 +44,7 @@ function examples(role: WorkspaceRole, scope: ApiKeyScope): string {
     `- "Move task X to QA" → \`list_tasks\` with \`search: "X"\` → \`list_task_statuses\` with that task's \`projectId\` (pick the column named QA) → \`move_task\`.`,
     `- "Create a task to review the landing page, with the goal, steps and acceptance criteria" → \`list_projects\` (ask which project if they didn't say) → \`create_task\` with \`name\` and \`description\` in the card shape below → reply with the task's link.`,
     `- "Write the acceptance criteria on task X" → \`get_task\` (keep what the notes already say) → \`update_task\` with \`description\` in Markdown: the card's acceptance-criteria section (\`# ✅ Critério de aceite\` in Portuguese) with \`- [ ]\` items, the rest kept.`,
+    `- "Put this image in task X's description" (a file on disk, e.g. dragged into the chat) → \`request_upload_url\` with its file name → run the returned \`command\` with the file's path → \`update_task\` with \`taskId\` and \`uploadIds: [uploadId]\` (the notes are kept and the image goes at the end; this task exists and they asked for the description). Without that ask, \`add_task_comment\` with \`body\` and \`uploadIds\`. A message from the app's Assistant lists its "Attached files" with their uploadId: pass those straight in \`uploadIds\`.`,
     manager
       ? `- "How many hours did the team do last week?" → \`get_time_summary\` for last Monday–Sunday with \`timezoneOffsetMinutes\` (per project), or \`run_report\` \`grouped\` with \`group: "user"\` for per person.`
       : `- "How many hours did the team do last week?" → you can't see the team's hours: say so, and offer your own week with \`get_time_summary\` (it answers with \`scope: own hours only\`).`,
@@ -66,6 +68,7 @@ ${permissions(role, scope)}
 - Every time entry needs a project, and every project a client. If the person didn't say which, ask — never pick one or create one to get past a refusal.
 - Confirm with the person before deleting or archiving anything.
 - Archived tasks are left out of \`list_tasks\`; pass \`includeArchived: true\` only when the person asks for archived or old tasks, and show only the ones marked \`archived\`.
+- Files (images, documents): ${FILE_PLACEMENT} Pass them as \`uploadIds\`; the file is attached and shown in one call.
 - Answer in the language the person wrote in, and give the \`url\` of what you created or changed as a link.
 
 ## Writing task notes and comments

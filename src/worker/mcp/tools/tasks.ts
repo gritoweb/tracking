@@ -1,7 +1,8 @@
 // Tasks: the plan side — list, edit, statuses, comments and image attachments.
 import { z } from "zod";
 import { RICH_TEXT_SYNTAX, RICH_TEXT_UNSUPPORTED, docJsonToMarkdown, markdownToDocJson } from "@shared/markdown-doc";
-import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENT_LABEL } from "@shared/attachments";
+import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENT_LABEL, isImageContentType } from "@shared/attachments";
+import { UPLOAD_ID, UPLOAD_URL_TTL_MS, readStaged, signUploadGrant, stagingKey } from "../../lib/uploads";
 import type { CreateTask, Task, TaskActivity, TaskAttachment, TaskComment, TaskStatus, UpdateTask } from "@shared/schemas";
 import {
   CreateTaskCommentSchema, CreateTaskSchema, CreateTaskStatusSchema,
@@ -28,7 +29,21 @@ function withRichBody<T extends { body: string }>(data: T): T {
   return { ...data, body: markdownToDocJson(data.body) ?? data.body };
 }
 
-/** Largest image a tool accepts, matching the upload route's own limit. */
+/** The Markdown that shows an attachment in notes or a comment: an image inline, any other file as a card. Brackets in the name would end the link early. */
+function markdownFor(a: TaskAttachment): string {
+  const name = a.filename.replace(/[[\]]/g, "");
+  return isImageContentType(a.contentType) ? `![${name}](${a.url})` : `[${name}](${a.url})`;
+}
+
+/** Where a person's files go when they didn't say: shared with tracking_guide. */
+export const FILE_PLACEMENT =
+  "Where files go unless the person says otherwise: a task being created gets them in its notes (create_task); a task that already exists gets them in a new comment (add_task_comment), and in its notes (update_task) only when the person asks for the description.";
+
+const NO_UPLOAD = "No uploaded file has that uploadId: it expired, was already attached, or its upload never finished. Upload it again.";
+
+const uploadIdsArg = (where: string) =>
+  z.array(z.string().uuid()).max(10).optional()
+    .describe(`Files to show, each an uploadId (from request_upload_url, or the "Attached files" list of a message in the app's Assistant): each is attached to the task and ${where}. No separate upload_task_attachment call needed. ${FILE_PLACEMENT}`);
 
 /** How far back create_task looks for the same task before making another: long enough for a retry or a re-ask. */
 const DUPLICATE_WINDOW_MS = 10 * 60 * 1000;
@@ -266,7 +281,7 @@ export function registerTaskReads(d: ToolDeps): void {
 }
 
 export function registerTaskWrites(d: ToolDeps): void {
-  const { server, env, db, workspaceId, bridge } = d;
+  const { server, env, db, workspaceId, userId, bridge } = d;
   const view = (t: Task) => taskView(t, appUrl(env));
 
   // One implementation per action, shared by the single-item tool and its batch twin.
@@ -287,7 +302,17 @@ export function registerTaskWrites(d: ToolDeps): void {
     );
   };
 
-  const createOne = async (data: Omit<CreateTask, "id">): Promise<BridgeResult<Task & { alreadyExisted?: true }>> => {
+  const createOne = async ({ uploadIds, ...data }: Omit<CreateTask, "id"> & { uploadIds?: string[] }): Promise<BridgeResult<Task & { alreadyExisted?: true }>> => {
+    const created = await createTask(data);
+    if (!created.ok || !uploadIds?.length) return created;
+    // The task needs an id before a file can belong to it, so the notes gain the files in a second write.
+    const shown = await attachAll(created.data.id, uploadIds);
+    if (!shown.ok) return shown;
+    const notes = [docJsonToMarkdown(created.data.description), ...shown.data].filter(Boolean).join("\n\n");
+    const updated = await bridge<Task>("PUT", `/api/tasks/${segment(created.data.id)}`, withRichDescription({ description: notes }));
+    return updated.ok ? { ...updated, data: { ...updated.data, ...(created.data.alreadyExisted ? { alreadyExisted: true as const } : {}) } } : updated;
+  };
+  const createTask = async (data: Omit<CreateTask, "id">): Promise<BridgeResult<Task & { alreadyExisted?: true }>> => {
     // Checked here only for a message a model can act on; the route itself creates, notifies and broadcasts.
     if (!(await findActiveProject(db, workspaceId, data.projectId))) {
       return rejected(`No active project with id ${data.projectId} in this workspace. Call list_projects and ask the person which project this task belongs to.`);
@@ -306,7 +331,18 @@ export function registerTaskWrites(d: ToolDeps): void {
         }
       : {}),
   });
-  const updateOne = async ({ taskId, archived, ...patch }: UpdateTask & { taskId: string; archived?: boolean }) => {
+  const updateOne = async ({ taskId, archived, uploadIds, ...patch }: UpdateTask & { taskId: string; archived?: boolean; uploadIds?: string[] }) => {
+    if (uploadIds?.length) {
+      const shown = await attachAll(taskId, uploadIds);
+      if (!shown.ok) return shown;
+      let notes = patch.description;
+      if (notes === undefined) {
+        const current = await bridge<Task>("GET", `/api/tasks/${segment(taskId)}`);
+        if (!current.ok) return current;
+        notes = docJsonToMarkdown(current.data.description);
+      }
+      patch = { ...patch, description: [notes, ...shown.data].filter(Boolean).join("\n\n") };
+    }
     // Archiving has its own route (author or owner/admin, subtasks follow the parent); the rest is the usual PUT.
     if (archived !== undefined) {
       const done = await bridge("POST", "/api/tasks/bulk", { ids: [taskId], action: archived ? "archive" : "unarchive" });
@@ -319,13 +355,42 @@ export function registerTaskWrites(d: ToolDeps): void {
     bridge<Task>("PATCH", `/api/tasks/${segment(taskId)}/move`, { statusId, ...(completedOn ? { completedOn } : {}) });
   const deleteOne = ({ taskId }: { taskId: string }) => bridge("DELETE", `/api/tasks/${segment(taskId)}`);
 
+  // Every file reaches a task through the panel's own upload route, so the type sniffing and resizing can't diverge.
+  const postFile = (taskId: string, file: File) => {
+    const form = new FormData();
+    form.set("file", file);
+    return bridge<TaskAttachment>("POST", `/api/tasks/${segment(taskId)}/attachments`, form);
+  };
+  const attachStaged = async (taskId: string, uploadId: string, filename?: string): Promise<BridgeResult<TaskAttachment>> => {
+    if (!UPLOAD_ID.test(uploadId)) return rejected(NO_UPLOAD);
+    const key = stagingKey(workspaceId, userId, uploadId);
+    const found = await readStaged(env.ATTACHMENTS, key);
+    if (!found) return rejected(NO_UPLOAD);
+    const result = await postFile(taskId, filename ? new File([found], filename) : found);
+    if (result.ok) await env.ATTACHMENTS.delete(key);
+    return result;
+  };
+  /** Attaches each upload in order, stopping at the first refusal; the Markdown that shows each one. */
+  const attachAll = async (taskId: string, uploadIds: string[]): Promise<BridgeResult<string[]>> => {
+    const shown: string[] = [];
+    for (const uploadId of uploadIds) {
+      const result = await attachStaged(taskId, uploadId);
+      if (!result.ok) return result;
+      shown.push(markdownFor(result.data));
+    }
+    return { ok: true, status: 200, data: shown };
+  };
+
   // No `id`: a model must never pick one; the retry guard is for forms, which mint their own.
   const description = { description: CreateTaskSchema.shape.description.describe(`The task's notes. ${RICH_TEXT_DOC}`) };
-  const createInput = { ...CreateTaskSchema.omit({ id: true }).shape, ...description };
+  const createInput = { ...CreateTaskSchema.omit({ id: true }).shape, ...description, uploadIds: uploadIdsArg("placed at the end of the new task's notes") };
   const archived = {
     archived: z.boolean().optional().describe("true archives the task (off the board and out of lists, nothing deleted; its subtasks follow), false brings it back. Only its author or an owner/admin; a subtask can't be archived on its own."),
   };
-  const updateInput = { taskId: IdArg("task"), ...UpdateTaskSchema.omit({ parentId: true }).shape, ...description, ...archived };
+  const updateInput = {
+    taskId: IdArg("task"), ...UpdateTaskSchema.omit({ parentId: true }).shape, ...description, ...archived,
+    uploadIds: uploadIdsArg("added to the end of the notes (kept as they are when `description` is left out)"),
+  };
   const moveInput = { taskId: IdArg("task"), statusId: IdArg("status"), completedOn: MoveTaskSchema.shape.completedOn };
   const deleteInput = { taskId: IdArg("task") };
 
@@ -392,15 +457,22 @@ export function registerTaskWrites(d: ToolDeps): void {
     {
       title: "Comment on a task",
       description:
-        "Add a comment to a task as the key's owner. To tag a person write @[Name](user:ID) in the body, with the id from list_members: the app shows it as a clickable @Name and notifies them (`mentionedUserIds` still works and notifies without a tag in the text). A comment read back carries the same @[Name](user:ID) form. Pass an `attachmentId` from upload_task_attachment to show an image with it.",
-      inputSchema: { taskId: IdArg("task"), ...CreateTaskCommentSchema.shape, body: commentBody },
+        "Add a comment to a task as the key's owner. To tag a person write @[Name](user:ID) in the body, with the id from list_members: the app shows it as a clickable @Name and notifies them (`mentionedUserIds` still works and notifies without a tag in the text). A comment read back carries the same @[Name](user:ID) form. Files: pass their `uploadIds`.",
+      inputSchema: { taskId: IdArg("task"), ...CreateTaskCommentSchema.shape, body: commentBody, uploadIds: uploadIdsArg("shown under the comment's text") },
       annotations: MUTATES,
     },
-    async ({ taskId, ...body }) =>
-      fromBridge(
-        await bridge<TaskComment>("POST", `/api/tasks/${segment(taskId)}/comments`, withRichBody(body)),
+    async ({ taskId, uploadIds, ...body }) => {
+      let text = body.body;
+      if (uploadIds?.length) {
+        const shown = await attachAll(taskId, uploadIds);
+        if (!shown.ok) return fromBridge(shown);
+        text = [text, ...shown.data].join("\n\n");
+      }
+      return fromBridge(
+        await bridge<TaskComment>("POST", `/api/tasks/${segment(taskId)}/comments`, withRichBody({ ...body, body: text })),
         (c) => commentView(c, appUrl(env))
-      )
+      );
+    }
   );
 
   server.registerTool(
@@ -435,31 +507,52 @@ export function registerTaskWrites(d: ToolDeps): void {
   );
 
   server.registerTool(
+    "request_upload_url",
+    {
+      title: "Get a link to upload a file",
+      description: `For a file on disk (dragged into the chat, a path the person gave): returns a one-time URL, valid ${UPLOAD_URL_TTL_MS / 60_000} minutes, and the curl command that sends the file to it (up to ${MAX_ATTACHMENT_LABEL}). Run the command, then pass the uploadId in uploadIds of add_task_comment or update_task (attaches and shows it in one call), or to upload_task_attachment to attach it alone. Far cheaper than base64 for anything but a tiny file.`,
+      inputSchema: { filename: z.string().min(1).max(255).describe("The file's name, e.g. screenshot.png") },
+      annotations: MUTATES,
+    },
+    async ({ filename }) => {
+      const uploadId = crypto.randomUUID();
+      const expiresAt = Date.now() + UPLOAD_URL_TTL_MS;
+      const token = await signUploadGrant(env.BETTER_AUTH_SECRET, { workspaceId, userId, uploadId, filename, expiresAt });
+      const uploadUrl = new URL(`/api/uploads/signed/${token}`, appUrl(env)).toString();
+      return json({ uploadId, uploadUrl, expiresAt: new Date(expiresAt).toISOString(), command: `curl -sS -T "<path to the file>" "${uploadUrl}"` });
+    }
+  );
+
+  server.registerTool(
     "upload_task_attachment",
     {
       title: "Attach a file to a task",
-      description: `Upload any file (up to ${MAX_ATTACHMENT_LABEL}) to a task, base64-encoded. As in the app, the type is read from the bytes: images are decoded and resized when huge, PDFs and text files open in the app's viewer, and anything else is stored as a download that the app never runs or renders.`,
+      description: `Attach a file (up to ${MAX_ATTACHMENT_LABEL}) to a task, from an uploadId (request_upload_url, or a file the person attached in the app's Assistant) or, for a tiny file only, base64. As in the app, the type is read from the bytes: images are decoded and resized when huge, PDFs and text files open in the app's viewer, and anything else is stored as a download that the app never runs or renders. The result's \`markdown\` shows the file where it is pasted: in the task's notes (update_task) or a comment (add_task_comment).`,
       inputSchema: {
         taskId: IdArg("task"),
-        filename: z.string().min(1).max(255),
-        contentBase64: z.string().min(1).describe("The file's bytes, base64 (no data: prefix)"),
+        uploadId: z.string().uuid().optional().describe("From request_upload_url after its command ran, or from a file attached in the Assistant"),
+        filename: z.string().min(1).max(255).optional().describe("File name shown in the app, e.g. screenshot.png; required with contentBase64"),
+        contentBase64: z.string().min(1).optional().describe("The file's bytes, base64 (no data: prefix); tiny files only, use uploadId otherwise"),
       },
       annotations: MUTATES,
     },
-    async ({ taskId, filename, contentBase64 }) => {
-      let bytes: Uint8Array<ArrayBuffer>;
-      try {
-        bytes = Uint8Array.from(atob(contentBase64.replace(/^data:[^,]*,/, "")), (ch) => ch.charCodeAt(0));
-      } catch {
-        return refuse("contentBase64 is not valid base64.");
+    async ({ taskId, uploadId, filename, contentBase64 }) => {
+      if ((uploadId === undefined) === (contentBase64 === undefined)) return refuse("Pass exactly one of uploadId or contentBase64.");
+      let result: BridgeResult<TaskAttachment>;
+      if (uploadId !== undefined) {
+        result = await attachStaged(taskId, uploadId, filename);
+      } else {
+        if (!filename) return refuse("filename is required with contentBase64.");
+        let bytes: Uint8Array<ArrayBuffer>;
+        try {
+          bytes = Uint8Array.from(atob(contentBase64!.replace(/^data:[^,]*,/, "")), (ch) => ch.charCodeAt(0));
+        } catch {
+          return refuse("contentBase64 is not valid base64.");
+        }
+        if (bytes.byteLength > MAX_ATTACHMENT_BYTES) return refuse(`File is larger than ${MAX_ATTACHMENT_LABEL}.`);
+        result = await postFile(taskId, new File([bytes], filename));
       }
-      if (bytes.byteLength > MAX_ATTACHMENT_BYTES) return refuse(`File is larger than ${MAX_ATTACHMENT_LABEL}.`);
-      const form = new FormData();
-      form.set("file", new File([bytes], filename));
-      return fromBridge(
-        await bridge<TaskAttachment>("POST", `/api/tasks/${segment(taskId)}/attachments`, form),
-        (a) => ({ ...a, url: new URL(a.url, appUrl(env)).toString() })
-      );
+      return fromBridge(result, (a) => ({ ...a, url: new URL(a.url, appUrl(env)).toString(), markdown: markdownFor(a) }));
     }
   );
 

@@ -19,6 +19,7 @@ import { AssistantMessageList } from "./AssistantMessageList";
 import { useContextualSuggestions } from "./useContextualSuggestions";
 import { SuggestionChips } from "./ai-elements/SuggestionChips";
 import { PromptInput } from "./ai-elements/PromptInput";
+import { useStagedFiles, withAttachedFiles } from "./useStagedFiles";
 import {
   Conversation,
   ConversationContent,
@@ -48,6 +49,7 @@ export function AssistantPanel() {
   };
 
   const [input, setInput] = useState("");
+  const staged = useStagedFiles();
 
   // One ChatAgent per workspace; the worker pins the instance to the caller's
   // workspace server-side, so a fixed name here is safe (see worker/index.ts).
@@ -92,7 +94,8 @@ export function AssistantPanel() {
     const text = content.trim();
     if (!text || busy) return;
     setInput("");
-    sendMessage({ text });
+    sendMessage({ text: withAttachedFiles(text, staged.files) });
+    staged.clear();
   };
 
   const approve = (id: string, approved: boolean) => addToolApprovalResponse({ id, approved });
@@ -197,6 +200,9 @@ export function AssistantPanel() {
             onStop={() => stop()}
             busy={busy}
             status={status}
+            files={staged.files}
+            onAddFiles={staged.add}
+            onRemoveFile={staged.remove}
           />
         </div>
       </SheetContent>
