@@ -156,5 +156,8 @@
 		"test:e2e": "playwright test",
 		"seed:demo": "node scripts/seed-feature-demo.mjs"
 	},
-	"type": "module"
+	"type": "module",
+	"engines": {
+		"node": "^22.23.4"
+	}
 }

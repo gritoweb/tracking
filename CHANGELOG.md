@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-10-23
+### Security
+- **Node.js pinned to 22.23.4** (`.nvmrc`, `engines`, CI `node-version-file`). The Oct 21 Node security release fixes CVE-2026-111497 (Brotli decoder out-of-bounds write, possible remote code execution); CI used "22", any 22.x. The worker runs on workerd, so production was never exposed; the pin covers the build and deploy machines.
+  - Verified on Node 22.23.4: `pnpm install --frozen-lockfile`, `pnpm check` (typecheck, build, wrangler dry-run), `pnpm lint` and `vitest run` all pass.
+
 ## 2026-10-20
 ### Added
 - **Files reach a task from Claude Code (MCP) and from the in-app Assistant.** Before, the MCP took a file only as base64 inside the tool call, which no model can do for an image someone drags in (a 1 MB file is ~1.3 M characters of arguments), and the Assistant's chat box took no files at all.
