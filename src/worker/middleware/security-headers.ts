@@ -13,6 +13,7 @@ export async function securityHeaders(c: Context, next: Next) {
 
   c.res.headers.set("X-Content-Type-Options", "nosniff");
   c.res.headers.set("X-Frame-Options", "DENY");
+  c.res.headers.set("X-Robots-Tag", "noindex, nofollow");
   c.res.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   c.res.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
   // A route that sets its own, stricter policy (attachment downloads) keeps it.

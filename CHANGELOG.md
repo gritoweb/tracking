@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-10-26
+### Changed
+- **The app asks search engines not to index it.** Google had started indexing tracking.gritoweb.com.br. `X-Robots-Tag: noindex, nofollow` now goes on every response: `public/_headers` covers the SPA document and static assets, and the `securityHeaders` middleware covers the worker (`/api/*`, `/mcp`). `index.html` also carries `<meta name="robots">`. No `robots.txt` `Disallow` was added, because a crawler that can't fetch a page never sees its noindex.
+  - Verified: `pnpm build` (0), `pnpm lint` (0), the `securityHeaders` route tests pass, and `wrangler dev` on the built bundle returns the header on `/`, `/tasks/x`, `/assets/` and `/api/me`.
+
 ## 2026-10-23
 ### Security
 - **Node.js pinned to 22.23.4** (`.nvmrc`, `engines`, CI `node-version-file`). The Oct 21 Node security release fixes CVE-2026-111497 (Brotli decoder out-of-bounds write, possible remote code execution); CI used "22", any 22.x. The worker runs on workerd, so production was never exposed; the pin covers the build and deploy machines.
