@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-10-29
+### Fixed
+- **Pasted text keeps its blank lines.** Plain text pasted into a comment or a task's notes lost every blank line, so a message copied from a terminal arrived as one block. ProseMirror's default text paste splits on runs of newlines; `clipboardTextParser` in `RichTextEditor` (`pastePlainText.ts`) now makes one paragraph per line and keeps a blank line as an empty paragraph. Pasted HTML (from a web page) is unchanged.
+  - Verified: `pastePlainText.test.ts` (3 tests; the two blank-line tests fail without the parser), `tsc -b` (0), `pnpm lint` (0), `vitest run` 1330/1330, `pnpm build` (0).
+
 ## 2026-10-26
 ### Changed
 - **The app asks search engines not to index it.** Google had started indexing tracking.gritoweb.com.br. `X-Robots-Tag: noindex, nofollow` now goes on every response: `public/_headers` covers the SPA document and static assets, and the `securityHeaders` middleware covers the worker (`/api/*`, `/mcp`). `index.html` also carries `<meta name="robots">`. No `robots.txt` `Disallow` was added, because a crawler that can't fetch a page never sees its noindex.

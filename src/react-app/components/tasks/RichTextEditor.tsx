@@ -13,6 +13,7 @@ import { EditorToolbar } from "./EditorToolbar";
 import { FileAttachmentNode } from "./FileAttachmentNode";
 import { TaskImageNode } from "./TaskImageNode";
 import { pickedFile, insertUploadedFile, UploadPlaceholderExtension, type InlineUpload } from "./editorUpload";
+import { plainTextToSlice } from "./pastePlainText";
 import { attachmentIdFromHref, useOpenAttachment } from "./attachment-viewer/AttachmentViewerContext";
 import { refreshMentionLabels } from "@/lib/mentionLabels";
 import { cn } from "@/lib/utils";
@@ -205,6 +206,7 @@ export function RichTextEditor({
           return false;
         },
       },
+      clipboardTextParser: (text, $context, _plain, view) => plainTextToSlice(text, view.state.schema, $context.marks()),
       handlePaste: (view, event) => {
         const file = pickedFile(event.clipboardData?.items);
         const upload = trackedUploadRef.current;
