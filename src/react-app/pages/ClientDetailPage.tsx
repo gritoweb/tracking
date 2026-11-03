@@ -198,11 +198,14 @@ export function ClientDetailPage() {
               { label: "Projects", value: String(stats?.projectCount ?? 0) },
               { label: "Tracked", value: formatDurationShort(stats?.totalSeconds ?? 0) },
               { label: "Billable", value: formatDurationShort(stats?.billableSeconds ?? 0) },
-              {
-                label: "Billable amount",
-                value: formatCurrency(stats?.billableAmount ?? 0, currency),
-                accent: true,
-              },
+              // A fixed-rate client is billed its fee whatever the hours, so the period doesn't change it.
+              client?.fixedFee != null
+                ? { label: "Fixed rate", value: `${formatCurrency(client.fixedFee, currency)} / month`, accent: true }
+                : {
+                    label: "Billable amount",
+                    value: formatCurrency(stats?.billableAmount ?? 0, currency),
+                    accent: true,
+                  },
             ].map((m) => (
               <div key={m.label} className="min-w-37.5 flex-1 bg-card p-4">
                 <div className="text-xs font-medium text-muted-foreground">{m.label}</div>

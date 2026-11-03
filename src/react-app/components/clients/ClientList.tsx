@@ -44,10 +44,13 @@ function ClientFigures({
   stats,
   loading,
   currency,
+  fixedFee,
 }: {
   stats: ClientStats | undefined;
   loading: boolean;
   currency: string;
+  // A fixed-rate client shows its fee in every period instead of hours × rate.
+  fixedFee: number | null;
 }) {
   if (loading) {
     return (
@@ -80,13 +83,23 @@ function ClientFigures({
     </span>
   );
 
+  const amount =
+    fixedFee !== null ? (
+      <span className="flex shrink-0 items-baseline gap-1.5 md:block md:w-24" title="Fixed rate per month">
+        <span className="text-micro text-muted-foreground md:hidden">Fixed rate</span>
+        <span className="text-sm font-semibold tabular-nums text-success-ink md:block md:text-right">
+          {formatCurrency(fixedFee, currency)}
+        </span>
+      </span>
+    ) : null;
+
   if (!stats) {
     return (
       <div className="order-last flex w-full flex-wrap items-center gap-x-4 gap-y-1 md:order-none md:w-auto md:flex-nowrap md:gap-x-3">
         {cell("Projects", "–", "md:w-16", { muted: true })}
         {cell("Tracked", "–", "md:w-20", { muted: true })}
         {cell("Billable", "–", "md:w-20", { muted: true })}
-        {cell("Amount", "–", "md:w-24", { muted: true })}
+        {amount ?? cell("Amount", "–", "md:w-24", { muted: true })}
       </div>
     );
   }
@@ -96,7 +109,7 @@ function ClientFigures({
       {cell("Projects", String(stats.projectCount), "md:w-16", { muted: true })}
       {cell("Tracked", formatDurationShort(stats.totalSeconds), "md:w-20")}
       {cell("Billable", formatDurationShort(stats.billableSeconds), "md:w-20")}
-      <span className="flex shrink-0 items-baseline gap-1.5 md:block md:w-24">
+      {amount ?? <span className="flex shrink-0 items-baseline gap-1.5 md:block md:w-24">
         <span className="text-micro text-muted-foreground md:hidden">Amount</span>
         {/* The headline figure: the one number a consultant is actually here
             for, so it gets the weight and the semantic colour that means
@@ -111,7 +124,7 @@ function ClientFigures({
         >
           {formatCurrency(stats.billableAmount, currency)}
         </span>
-      </span>
+      </span>}
     </div>
   );
 }
@@ -226,6 +239,7 @@ export function ClientList() {
               stats={byClient.get(client.id)}
               loading={statsLoading}
               currency={client.currency ?? currency}
+              fixedFee={client.fixedFee}
             />
 
             {/* The invoice is for owners/admins; any member gets the hours report (of their own hours). */}

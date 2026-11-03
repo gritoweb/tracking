@@ -1,6 +1,9 @@
 # Changelog
 
 ## 2026-11-03
+### Changed
+- **A fixed-rate client shows its fixed rate on the Clients page and on its own page, in every period.** The "Billable amount" card and the list's Amount column priced every client at billable hours × hourly rate, so a fixed-rate client showed e.g. 5h × $25 = $125 while its invoice bills $1,000. They now show "Fixed rate · $1,000.00 / month" (list: the fee, titled "Fixed rate per month"), also for a period with no hours; hourly clients are unchanged. Both still use the client's current values, so changing a rate or switching type also changes how past periods read; issued invoice PDFs keep the amounts they were generated with. Frontend only, no migration.
+  - Verified: e2e `client-documents.spec.ts` checks the card in This month and All time and the list column, `client-documents` + `clients` e2e 6/6, `tsc -b` (0), `pnpm lint` (0), `vitest run` 1332/1332.
 ### Added
 - **A client can be billed a fixed rate instead of by the hour.** Some clients pay a fixed monthly amount whatever the hours worked. The client's Edit dialog now has an **Hourly rate / Fixed rate** switch; on Fixed rate it takes the amount (required). That client's invoice keeps the "Serviços Técnicos / Technical Services" line with the period's whole hours, but its amount is the fixed rate (also when there are no hours); billable recurring services are still added on top. The invoice dialog hides the hourly rate field for such a client and names the fee. New nullable column `clients.fixed_fee` (migration 0062; NULL = hourly, so no existing client changes). `invoiceLines` is shared, so the MCP's `prepare_client_document` prices the invoice the same way and `update_client` takes `fixedFee`.
 - The client's Edit dialog now shows its validation messages (it had no `FormProvider`, so `FieldMessage` never rendered there).

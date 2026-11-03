@@ -83,6 +83,13 @@ test.describe("client documents", () => {
     await form.getByRole("button", { name: "Save changes" }).click();
     await expect(form).toBeHidden();
     expect((await (await page.request.get(`/api/clients/${client.id}`)).json()).fixedFee).toBe(1000);
+    // The amount follows the fee, not 3h × the default rate, in any period and in the client list.
+    await expect(page.getByText(/R\$\s?1,000\.00 \/ month/)).toBeVisible();
+    await page.getByRole("radio", { name: "All time" }).click();
+    await expect(page.getByText(/R\$\s?1,000\.00 \/ month/)).toBeVisible();
+    await page.goto("/clients");
+    await expect(page.getByTitle("Fixed rate per month")).toHaveText(/R\$\s?1,000\.00/);
+    await page.goto(`/clients/${client.id}`);
 
     await page.getByRole("button", { name: "Invoice" }).click();
     await expect(page.getByLabel("Hourly rate")).toHaveCount(0);
