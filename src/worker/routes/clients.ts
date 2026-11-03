@@ -159,6 +159,7 @@ export const clientsRouter = new Hono<{
     if (data.archived !== undefined) { fields.push("archived = ?"); values.push(data.archived ? 1 : 0); }
     if (data.rate !== undefined) { fields.push("rate = ?"); values.push(data.rate ?? null); }
     if (data.currency !== undefined) { fields.push("currency = ?"); values.push(data.currency ?? null); }
+    if (data.fixedFee !== undefined) { fields.push("fixed_fee = ?"); values.push(data.fixedFee ?? null); }
 
     if (fields.length) {
       await c.env.DB.prepare(

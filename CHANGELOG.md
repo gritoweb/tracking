@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-11-03
+### Added
+- **A client can be billed a fixed rate instead of by the hour.** Some clients pay a fixed monthly amount whatever the hours worked. The client's Edit dialog now has an **Hourly rate / Fixed rate** switch; on Fixed rate it takes the amount (required). That client's invoice keeps the "Serviços Técnicos / Technical Services" line with the period's whole hours, but its amount is the fixed rate (also when there are no hours); billable recurring services are still added on top. The invoice dialog hides the hourly rate field for such a client and names the fee. New nullable column `clients.fixed_fee` (migration 0062; NULL = hourly, so no existing client changes). `invoiceLines` is shared, so the MCP's `prepare_client_document` prices the invoice the same way and `update_client` takes `fixedFee`.
+- The client's Edit dialog now shows its validation messages (it had no `FormProvider`, so `FieldMessage` never rendered there).
+  - Verified: `client-documents.test.ts` (fixed fee with and without hours), `ClientForm.schema.test.ts` (fee required on Fixed rate), e2e `client-documents.spec.ts` drives Edit → Fixed rate → 1000 → Invoice and reads the PDF text (`Serviços Técnicos 3 R$ 1.000,00`, service `R$ 50,00`, total `R$ 1.050,00`); API refuses a negative fee (400) and `null` returns the client to hourly; `tsc -b` (0), `pnpm lint` (0), `vitest run` 1332/1332, e2e client specs 6/6.
+
 ## 2026-10-29
 ### Fixed
 - **Pasted text keeps its blank lines.** Plain text pasted into a comment or a task's notes lost every blank line, so a message copied from a terminal arrived as one block. ProseMirror's default text paste splits on runs of newlines; `clipboardTextParser` in `RichTextEditor` (`pastePlainText.ts`) now makes one paragraph per line and keeps a blank line as an empty paragraph. Pasted HTML (from a web page) is unchanged.

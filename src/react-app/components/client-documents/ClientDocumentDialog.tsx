@@ -94,10 +94,12 @@ export function ClientDocumentDialog({
   const [busy, setBusy] = useState(false);
 
   const client = clients.find((c) => c.id === (fixedClientId ?? clientId));
-  const savedRate = client && settings ? (client.rate ?? settings.defaultRate) : null;
+  // A fixed-fee client is billed its fee for the hours, so there is no rate to show or save.
+  const fixedFee = client?.fixedFee ?? null;
+  const savedRate = client && settings && fixedFee === null ? (client.rate ?? settings.defaultRate) : null;
   const rate = rateOverride === undefined ? savedRate : rateOverride;
   const currency = currencyOverride ?? client?.currency ?? settings?.currency ?? "";
-  const validRate = kind === "hours" || (rate !== null && rate >= 0);
+  const validRate = kind === "hours" || fixedFee !== null || (rate !== null && rate >= 0);
   const validRange = from !== "" && to !== "" && from <= to;
   const canGenerate = Boolean(client && settings && validRange && validRate && (kind === "hours" || INVOICE_NUMBER.test(number)) && !busy);
 
@@ -106,7 +108,7 @@ export function ClientDocumentDialog({
     setBusy(true);
     try {
       // A rate typed here is the client's rate from now on, as if it had been edited on the client.
-      if (kind === "invoice" && rate !== null && rate !== client.rate && rateOverride !== undefined) {
+      if (kind === "invoice" && fixedFee === null && rate !== null && rate !== client.rate && rateOverride !== undefined) {
         await updateClient.mutateAsync({ id: client.id, data: { rate } });
       }
       const rounded = roundMode !== "off" && roundMinutes > 0;
@@ -134,7 +136,7 @@ export function ClientDocumentDialog({
           clientName: client.name,
           number,
           issueDate: formatDay(new Date().toISOString(), locale),
-          lines: invoiceLines(totalSeconds, rate ?? 0, services, locale),
+          lines: invoiceLines(totalSeconds, rate ?? 0, services, locale, fixedFee),
           currency,
         });
         download(blob, t.invoiceFile(client.name, number));
@@ -258,6 +260,9 @@ export function ClientDocumentDialog({
                   </Field>
                 )}
               </div>
+              {fixedFee !== null && (
+                <SettingsHint>{`Fixed fee of ${formatMoney(fixedFee, currency)} for the hours (Edit on the client page).`}</SettingsHint>
+              )}
               {client && settings && savedRate !== null && (
                 <SettingsHint>
                   {rateOverride !== undefined && rateOverride !== savedRate

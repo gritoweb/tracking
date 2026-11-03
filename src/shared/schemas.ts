@@ -69,6 +69,8 @@ export const ClientSchema = z.object({
   rate: z.number().nullable(),
   // The client's own invoice currency; null = the workspace's.
   currency: z.string().nullable(),
+  // A fixed amount billed per invoice for the worked hours; null = billed by the hour.
+  fixedFee: z.number().nullable(),
   archived: z.boolean(),
   createdAt: z.string(),
 });
@@ -95,6 +97,7 @@ export const UpdateClientSchema = CreateClientSchema.partial().extend({
   // The client's own hourly rate on invoices; null = the workspace default. Owners/admins only, like every client edit.
   rate: z.number().min(0).max(1_000_000).nullable().optional(),
   currency: z.string().regex(/^[A-Z]{3}$/, "Must be a 3-letter currency code").nullable().optional(),
+  fixedFee: z.number().min(0).max(1_000_000).nullable().optional(),
 });
 
 // A recurring service billed to a client (hosting, email…); only billable ones reach the invoice.

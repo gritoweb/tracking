@@ -1,4 +1,4 @@
-import { Controller, useForm, useWatch } from "react-hook-form";
+import { Controller, FormProvider, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Field, FieldLabel, FieldMessage } from "@/components/forms/Field";
 import { Button } from "@/components/ui/button";
@@ -17,10 +17,16 @@ import { useReportSettings } from "@/hooks/useReportSettings";
 import { currencyLocale, formatMoneyInput } from "@/lib/money";
 import { MoneyInput } from "./MoneyInput";
 import { SettingsHint } from "@/components/settings/SettingsHint";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CURRENCIES } from "@/lib/currency";
 import { clientFormSchema, type ClientFormValues } from "./ClientForm.schema";
 import type { Client } from "@shared/schemas";
+
+const BILLING_OPTIONS = [
+  { value: "hourly" as const, label: "Hourly rate" },
+  { value: "fixed" as const, label: "Fixed rate" },
+];
 
 interface ClientFormProps {
   client?: Client;
@@ -49,8 +55,11 @@ export function ClientForm({ client, open, onClose }: ClientFormProps) {
       notes: client?.notes ?? "",
       rate: client?.rate ?? null,
       currency: client?.currency ?? null,
+      billing: client?.fixedFee != null ? "fixed" : "hourly",
+      fixedFee: client?.fixedFee ?? null,
     },
   });
+  const billing = useWatch({ control: form.control, name: "billing" });
 
   const currency = useWatch({ control: form.control, name: "currency" }) ?? reportSettings?.currency ?? "";
 
@@ -64,7 +73,9 @@ export function ClientForm({ client, open, onClose }: ClientFormProps) {
     };
 
     if (client) {
-      const rate = showRate ? { rate: values.rate, currency: values.currency } : {};
+      const rate = showRate
+        ? { rate: values.rate, currency: values.currency, fixedFee: values.billing === "fixed" ? values.fixedFee : null }
+        : {};
       updateClient.mutate({ id: client.id, data: { ...data, ...rate } }, { onSuccess: onClose });
     } else {
       createClient.mutate(data, { onSuccess: onClose });
@@ -78,6 +89,8 @@ export function ClientForm({ client, open, onClose }: ClientFormProps) {
           <DialogTitle>{client ? "Edit Client" : "New Client"}</DialogTitle>
         </DialogHeader>
 
+        {/* FieldMessage reads the errors through the form context. */}
+        <FormProvider {...form}>
         <form className="space-y-4 py-2" onSubmit={onSubmit} noValidate>
           <Field>
             <FieldLabel htmlFor="client-name">Name</FieldLabel>
@@ -117,25 +130,56 @@ export function ClientForm({ client, open, onClose }: ClientFormProps) {
 
           {showRate && reportSettings && (
             <div className="space-y-1.5">
-              <div className="flex gap-3">
-                <Field className="flex-1">
-                  <FieldLabel htmlFor="client-rate">Hourly rate</FieldLabel>
-                  <Controller
-                    control={form.control}
-                    name="rate"
-                    render={({ field }) => (
-                      <MoneyInput
-                        // Another currency re-reads the amount in that currency's format.
-                        key={currency}
-                        id="client-rate"
-                        currency={currency}
-                        value={field.value}
-                        onValueChange={field.onChange}
-                        placeholder={formatMoneyInput(reportSettings.defaultRate, currencyLocale(currency))}
-                      />
-                    )}
+              <Controller
+                control={form.control}
+                name="billing"
+                render={({ field }) => (
+                  <SegmentedControl
+                    label="Billing"
+                    options={BILLING_OPTIONS}
+                    value={field.value}
+                    onChange={field.onChange}
                   />
-                </Field>
+                )}
+              />
+              <div className="flex gap-3">
+                {billing === "hourly" ? (
+                  <Field className="flex-1">
+                    <FieldLabel htmlFor="client-rate">Hourly rate</FieldLabel>
+                    <Controller
+                      control={form.control}
+                      name="rate"
+                      render={({ field }) => (
+                        <MoneyInput
+                          // Another currency re-reads the amount in that currency's format.
+                          key={currency}
+                          id="client-rate"
+                          currency={currency}
+                          value={field.value}
+                          onValueChange={field.onChange}
+                          placeholder={formatMoneyInput(reportSettings.defaultRate, currencyLocale(currency))}
+                        />
+                      )}
+                    />
+                  </Field>
+                ) : (
+                  <Field className="flex-1">
+                    <FieldLabel htmlFor="client-fixed-fee">Fixed rate</FieldLabel>
+                    <Controller
+                      control={form.control}
+                      name="fixedFee"
+                      render={({ field }) => (
+                        <MoneyInput
+                          key={currency}
+                          id="client-fixed-fee"
+                          currency={currency}
+                          value={field.value}
+                          onValueChange={field.onChange}
+                        />
+                      )}
+                    />
+                  </Field>
+                )}
                 <Field className="flex-1">
                   <FieldLabel htmlFor="client-currency">Currency</FieldLabel>
                   <Controller
@@ -160,8 +204,13 @@ export function ClientForm({ client, open, onClose }: ClientFormProps) {
                   />
                 </Field>
               </div>
-              <SettingsHint>Blank rate and Workspace default use Settings → Reports.</SettingsHint>
+              <SettingsHint>
+                {billing === "hourly"
+                  ? "Blank rate and Workspace default use Settings → Reports."
+                  : "Each invoice bills this amount for the hours, whatever their number; services are added on top."}
+              </SettingsHint>
               <FieldMessage name="rate" />
+              <FieldMessage name="fixedFee" />
             </div>
           )}
 
@@ -172,6 +221,7 @@ export function ClientForm({ client, open, onClose }: ClientFormProps) {
             </Button>
           </DialogFooter>
         </form>
+        </FormProvider>
       </DialogContent>
     </Dialog>
   );

@@ -1,6 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { endOfMonth, format, startOfMonth, subMonths } from "date-fns";
 import { readFile } from "node:fs/promises";
+import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { signUp } from "./auth";
 
 // A client with 3h of last month's time, one billable and one non-billable recurring service.
@@ -65,6 +66,35 @@ test.describe("client documents", () => {
 
     // Generating saved it as the client's rate.
     expect((await (await page.request.get(`/api/clients/${client.id}`)).json()).rate).toBe(65.5);
+  });
+
+  test("a fixed-rate client is invoiced its fee for the hours, plus its services", async ({ page }) => {
+    const { client } = await seedClient(page);
+    await page.request.post(`/api/clients/${client.id}/services`, { data: { name: "Managed hosting", amount: 50, billable: true } });
+    await page.goto(`/clients/${client.id}`);
+
+    await page.getByRole("button", { name: "Edit", exact: true }).click();
+    const form = page.getByRole("dialog");
+    await form.getByRole("radio", { name: "Fixed rate" }).click();
+    await expect(form.getByLabel("Hourly rate")).toHaveCount(0);
+    await form.getByRole("button", { name: "Save changes" }).click();
+    await expect(form.getByText("Enter the fixed amount")).toBeVisible();
+    await form.getByLabel("Fixed rate").fill("1000");
+    await form.getByRole("button", { name: "Save changes" }).click();
+    await expect(form).toBeHidden();
+    expect((await (await page.request.get(`/api/clients/${client.id}`)).json()).fixedFee).toBe(1000);
+
+    await page.getByRole("button", { name: "Invoice" }).click();
+    await expect(page.getByLabel("Hourly rate")).toHaveCount(0);
+    await expect(page.getByText(/Fixed fee of R\$\s?1\.000,00 for the hours/)).toBeVisible();
+    const pending = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Generate PDF" }).click();
+    const pdf = await getDocument({ data: new Uint8Array(await readFile((await (await pending).path())!)), useSystemFonts: false }).promise;
+    const text = (await (await pdf.getPage(1)).getTextContent()).items.map((i) => ("str" in i ? i.str : "")).join(" ");
+    // 3 hours worked, billed at the fee rather than 3 × the default 100; the service stays on top.
+    expect(text).toMatch(/Serviços Técnicos\s+3\s+R\$\s?1\.000,00/);
+    expect(text).toMatch(/Managed hosting\s+—\s+R\$\s?50,00/);
+    expect(text).toMatch(/R\$\s?1\.050,00/);
   });
 
   test("a prepared link opens the generator filled in, and closing it drops the link", async ({ page }) => {

@@ -17,6 +17,12 @@ export const clientFormSchema = z.object({
   rate: z.number().nullable().refine((v) => v === null || v >= 0, "Enter an amount of zero or more"),
   // Null = the workspace's invoice currency.
   currency: z.string().nullable(),
+  // Fixed: the invoice bills `fixedFee` for the hours instead of hours × rate.
+  billing: z.enum(["hourly", "fixed"]),
+  fixedFee: z.number().nullable(),
+}).refine((v) => v.billing === "hourly" || (v.fixedFee !== null && v.fixedFee >= 0), {
+  message: "Enter the fixed amount",
+  path: ["fixedFee"],
 });
 
 export type ClientFormValues = z.infer<typeof clientFormSchema>;

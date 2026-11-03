@@ -11,6 +11,8 @@ describe("clientFormSchema", () => {
       notes: "",
       rate: null,
       currency: null,
+      billing: "hourly",
+      fixedFee: null,
     });
     expect(result.success).toBe(false);
     if (!result.success) {
@@ -28,6 +30,8 @@ describe("clientFormSchema", () => {
       notes: "",
       rate: null,
       currency: null,
+      billing: "hourly",
+      fixedFee: null,
     });
     expect(result.success).toBe(false);
     if (!result.success) {
@@ -44,17 +48,19 @@ describe("clientFormSchema", () => {
       notes: "",
       rate: null,
       currency: null,
+      billing: "hourly",
+      fixedFee: null,
     });
     expect(result.success).toBe(true);
   });
 
   it("rejects a rate that isn't a number", () => {
-    const result = clientFormSchema.safeParse({ name: "Acme", email: "", phone: "", address: "", notes: "", rate: NaN, currency: null });
+    const result = clientFormSchema.safeParse({ name: "Acme", email: "", phone: "", address: "", notes: "", rate: NaN, currency: null, billing: "hourly", fixedFee: null });
     expect(result.success).toBe(false);
   });
 
   it("rejects a negative rate", () => {
-    const result = clientFormSchema.safeParse({ name: "Acme", email: "", phone: "", address: "", notes: "", rate: -1, currency: null });
+    const result = clientFormSchema.safeParse({ name: "Acme", email: "", phone: "", address: "", notes: "", rate: -1, currency: null, billing: "hourly", fixedFee: null });
     expect(result.success).toBe(false);
   });
 
@@ -67,6 +73,8 @@ describe("clientFormSchema", () => {
       notes: "Pays net-30",
       rate: 80,
       currency: "USD",
+      billing: "hourly",
+      fixedFee: null,
     });
     expect(result.success).toBe(true);
     if (result.success) {
@@ -78,7 +86,17 @@ describe("clientFormSchema", () => {
         notes: "Pays net-30",
         rate: 80,
         currency: "USD",
+        billing: "hourly",
+        fixedFee: null,
       });
     }
+  });
+
+  it("requires the amount when the client is billed a fixed fee", () => {
+    const base = { name: "Acme", email: "", phone: "", address: "", notes: "", rate: null, currency: null, billing: "fixed" as const };
+    const missing = clientFormSchema.safeParse({ ...base, fixedFee: null });
+    expect(missing.success).toBe(false);
+    if (!missing.success) expect(missing.error.issues[0].path).toEqual(["fixedFee"]);
+    expect(clientFormSchema.safeParse({ ...base, fixedFee: 1000 }).success).toBe(true);
   });
 });

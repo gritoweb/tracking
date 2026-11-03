@@ -107,13 +107,15 @@ export function registerDocumentReads(d: ToolDeps): void {
 
       if (kind === "hours") return json({ ...common, dailyAverageHours: hours(summary.dailyAverageHours * 3600) });
       const rate = hourlyRate ?? client.data.rate ?? settings.data.defaultRate;
-      const lines = invoiceLines(summary.totalSeconds, rate, services?.ok ? services.data : [], language);
+      const { fixedFee } = client.data;
+      const lines = invoiceLines(summary.totalSeconds, rate, services?.ok ? services.data : [], language, fixedFee);
       return json({
         ...common,
         invoiceNumber: number,
         currency: client.data.currency ?? settings.data.currency,
-        hourlyRate: rate,
-        rateSource: hourlyRate !== undefined ? "new rate, saved on the client when generated" : client.data.rate === null ? "workspace default" : "client",
+        ...(fixedFee !== null
+          ? { fixedFee, rateSource: "fixed fee: the client is billed this amount for the hours, whatever their number" }
+          : { hourlyRate: rate, rateSource: hourlyRate !== undefined ? "new rate, saved on the client when generated" : client.data.rate === null ? "workspace default" : "client" }),
         lines: lines.map((l) => ({ ...l, hours: l.hours === null ? null : hours(l.hours * 3600) })),
         total: invoiceTotal(lines),
       });

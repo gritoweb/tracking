@@ -29,6 +29,15 @@ describe("the invoice", () => {
       { description: "Hosting", hours: null, amount: 50 },
     ]);
   });
+
+  it("bills a fixed-fee client its fee whatever the hours, keeping the hours and the services", () => {
+    const services = [{ name: "Hosting", amount: 50, billable: true }];
+    expect(invoiceLines(400 * 3600 + 30 * 60, 65, services, "en", 1000)).toEqual([
+      { description: "Technical Services", hours: 400, amount: 1000 },
+      { description: "Hosting", hours: null, amount: 50 },
+    ]);
+    expect(invoiceLines(0, 65, [], "pt-BR", 1000)).toEqual([{ description: "Serviços Técnicos", hours: 0, amount: 1000 }]);
+  });
 });
 
 describe("the hours report", () => {

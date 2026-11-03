@@ -50,6 +50,7 @@ export interface ClientRow {
   address: string | null;
   rate: number | null;
   currency: string | null;
+  fixed_fee: number | null;
 }
 
 /** `client_services` (migration 0057). */

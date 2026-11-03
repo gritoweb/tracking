@@ -12,6 +12,7 @@ export function formatClient(row: ClientRow): Client {
     address: row.address ?? null,
     rate: row.rate ?? null,
     currency: row.currency ?? null,
+    fixedFee: row.fixed_fee ?? null,
     archived: Boolean(row.archived),
     createdAt: row.created_at,
   };
