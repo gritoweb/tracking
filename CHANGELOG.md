@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-11-26 (3)
+### Added
+- **The invoice editor switches the client between hourly and fixed rate.** "Billed to" now carries the same Hourly rate / Fixed rate choice as the client's Edit dialog, with its rate or fee; the hours line re-prices as it changes, and saving writes the choice back to the client (switching to hourly clears the fee). A fixed rate left empty keeps Save disabled with a hint. Only a billing switch brings back an hours line that was removed; a rate edit leaves it removed.
+### Changed
+- One copy of what had been repeated: the document language and billing options and `lastMonthRange` in `lib/clientDocuments.ts`, `companyParty` in `@shared/client-documents` (used by the server's frozen copy and the editor's preview), `dateToLocalDate` (existing, `lib/taskUtils.ts`) instead of local `day()` helpers, and `downloadBlob` in `lib/download.ts` for the PDFs and the CSV/Excel export.
+- e2e `client-documents.spec.ts` follows the new screens (saved invoice, billing switch writing back, delete with confirmation, MCP link opening the editor); `attachment-viewer.spec.ts` uses the shared zoom picker.
+  - Verified: headless Playwright run of the billing switch on the local dev server (11 steps: empty fee disables Save, 1000 re-prices, back to hourly restores 23 h × 80, saved fixed → client fee 1500, a new invoice opens on Fixed, saved hourly → fee cleared, removed hours line stays removed on a rate edit, a billing switch restores it; no page errors) — it caught the rate and fee fields sharing typed text, fixed with distinct keys. e2e `client-documents` + `clients` 7/7, `attachment-viewer` 3/3. `tsc -b` (0), `pnpm lint` (0); `vitest run` 1333/1338 under dev-server load, the 5 failures (untouched files) pass 64/64 alone.
+
 ## 2026-11-26 (2)
 ### Changed
 - **The invoice editor has a "Billed to" block with the client's address.** It was only editable in the client's Edit dialog, so an invoice generated before filling it went out without one. The address typed here is saved on the client before the invoice, so the invoice and every later one use it.

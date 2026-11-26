@@ -20,13 +20,9 @@ import { SettingsHint } from "@/components/settings/SettingsHint";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CURRENCIES } from "@/lib/currency";
+import { BILLING_OPTIONS } from "@/lib/clientDocuments";
 import { clientFormSchema, type ClientFormValues } from "./ClientForm.schema";
 import type { Client } from "@shared/schemas";
-
-const BILLING_OPTIONS = [
-  { value: "hourly" as const, label: "Hourly rate" },
-  { value: "fixed" as const, label: "Fixed rate" },
-];
 
 interface ClientFormProps {
   client?: Client;

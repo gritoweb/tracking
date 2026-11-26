@@ -1,5 +1,5 @@
 // The client documents' texts and money math, shared by the PDFs in the app and the MCP tool that prepares them.
-import type { ClientService, ReportDetailedEntry } from "./schemas";
+import type { ClientService, InvoiceParty, ReportDetailedEntry, ReportSettings } from "./schemas";
 
 export type DocumentLocale = "pt-BR" | "en";
 export type ClientDocumentKind = "invoice" | "hours";
@@ -111,6 +111,11 @@ export function hoursByProject(entries: Pick<ReportDetailedEntry, "projectId" | 
     byId.set(e.projectId, row);
   }
   return [...byId.values()].sort((a, b) => b.seconds - a.seconds);
+}
+
+/** Who an invoice is from, out of the document settings: what the server freezes into it and what the editor previews. */
+export function companyParty(s: Pick<ReportSettings, "companyName" | "companyEmail" | "companyAddress" | "companyPhone">): InvoiceParty {
+  return { name: s.companyName, email: s.companyEmail || null, address: s.companyAddress || null, phone: s.companyPhone || null };
 }
 
 /** An invoice number is digits, optionally in hyphen-separated groups: "7", "2026-09". */

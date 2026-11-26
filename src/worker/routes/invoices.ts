@@ -6,7 +6,7 @@ import {
   type Invoice,
   type InvoiceParty,
 } from "@shared/schemas";
-import { invoiceTotal } from "@shared/client-documents";
+import { companyParty, invoiceTotal } from "@shared/client-documents";
 import { isManager, MANAGER_ONLY_ERROR } from "../lib/permissions";
 import { loadReportSettings } from "./report-settings";
 
@@ -61,12 +61,7 @@ async function currentParties(db: D1Database, workspaceId: string, clientId: str
   if (!client) return null;
   return {
     client: { name: client.name, email: client.email, address: client.address, phone: client.phone },
-    company: {
-      name: settings.companyName,
-      email: settings.companyEmail || null,
-      address: settings.companyAddress || null,
-      phone: settings.companyPhone || null,
-    },
+    company: companyParty(settings),
   };
 }
 

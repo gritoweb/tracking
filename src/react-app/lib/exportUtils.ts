@@ -1,3 +1,4 @@
+import { downloadBlob } from "@/lib/download";
 import { formatSeconds, formatEntryTime, localDayKey } from "./dateUtils";
 import { buildXlsx } from "./xlsx";
 
@@ -72,7 +73,7 @@ export function exportToCSV(
     withoutAmount(EXPORT_HEADERS, options).join(","),
     ...entries.map((e) => withoutAmount(exportRow(e), options).map(csvCell).join(",")),
   ];
-  download(`${filename}.csv`, new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" }));
+  downloadBlob(new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" }), `${filename}.csv`);
 }
 
 // Real .xlsx (OOXML) via the dependency-free writer — opens in Excel/Sheets
@@ -87,19 +88,11 @@ export function exportToExcel(
     ...entries.map((e) => withoutAmount(exportRow(e), options)),
   ];
   const bytes = buildXlsx("Time entries", rows);
-  download(
-    `${filename}.xlsx`,
+  downloadBlob(
     new Blob([bytes as BlobPart], {
       type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    })
+    }),
+    `${filename}.xlsx`
   );
 }
 
-function download(filename: string, blob: Blob): void {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}

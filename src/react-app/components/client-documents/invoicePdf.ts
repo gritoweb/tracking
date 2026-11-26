@@ -38,12 +38,3 @@ export async function renderInvoicePdf(inv: InvoiceContent, settings: ReportSett
 export function invoiceFileName(inv: InvoiceContent): string {
   return DOCUMENT_TEXT[inv.locale].invoiceFile(inv.client.name, inv.number);
 }
-
-export function downloadBlob(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { format, parseISO } from "date-fns";
+import { parseISO } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
 import { SegmentedControl } from "@/components/ui/segmented-control";
@@ -21,12 +21,9 @@ import {
   type ClientDocumentKind,
   type DocumentLocale,
 } from "@shared/client-documents";
-import { lastMonthRange, type DocumentPreset } from "@/lib/clientDocuments";
+import { DOCUMENT_LOCALE_OPTIONS, lastMonthRange, type DocumentPreset } from "@/lib/clientDocuments";
+import { dateToLocalDate } from "@/lib/taskUtils";
 
-const LOCALE_OPTIONS = [
-  { value: "pt-BR" as const, label: "Português" },
-  { value: "en" as const, label: "English" },
-];
 
 
 /** Picks the client, period and language of an invoice or hours report and opens its screen; `clientId` fixes the client. */
@@ -99,16 +96,16 @@ export function ClientDocumentDialog({
             <SettingsHint>This report includes only the hours you logged.</SettingsHint>
           )}
 
-          <SegmentedControl label="Language" options={LOCALE_OPTIONS} value={locale} onChange={setLocale} />
+          <SegmentedControl label="Language" options={DOCUMENT_LOCALE_OPTIONS} value={locale} onChange={setLocale} />
 
           <div className="flex gap-3">
             <Field className="flex-1">
               <FieldLabel htmlFor="doc-from">From</FieldLabel>
-              <DatePicker id="doc-from" label="From" displayFormat="dd/MM/yyyy" value={parseISO(from)} onSelect={(d) => setRange((r) => ({ ...r, from: format(d, "yyyy-MM-dd") }))} />
+              <DatePicker id="doc-from" label="From" displayFormat="dd/MM/yyyy" value={parseISO(from)} onSelect={(d) => setRange((r) => ({ ...r, from: dateToLocalDate(d) }))} />
             </Field>
             <Field className="flex-1">
               <FieldLabel htmlFor="doc-to">To</FieldLabel>
-              <DatePicker id="doc-to" label="To" displayFormat="dd/MM/yyyy" value={parseISO(to)} onSelect={(d) => setRange((r) => ({ ...r, to: format(d, "yyyy-MM-dd") }))} />
+              <DatePicker id="doc-to" label="To" displayFormat="dd/MM/yyyy" value={parseISO(to)} onSelect={(d) => setRange((r) => ({ ...r, to: dateToLocalDate(d) }))} />
             </Field>
           </div>
         </div>

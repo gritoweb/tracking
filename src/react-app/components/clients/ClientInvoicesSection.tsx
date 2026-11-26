@@ -15,7 +15,8 @@ import { useClientInvoices, useDeleteInvoice } from "@/hooks/useInvoices";
 import { useReportSettings } from "@/hooks/useReportSettings";
 import { formatMoney } from "@/lib/money";
 import { toastApiError } from "@/lib/toastApiError";
-import { downloadBlob, invoiceFileName, renderInvoicePdf } from "@/components/client-documents/invoicePdf";
+import { invoiceFileName, renderInvoicePdf } from "@/components/client-documents/invoicePdf";
+import { downloadBlob } from "@/lib/download";
 import type { Invoice, ReportSettings } from "@shared/schemas";
 
 /** "November 2026": the heading of an invoice's issue month. */

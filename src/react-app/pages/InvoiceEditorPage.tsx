@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { addDays, differenceInCalendarDays, format, parseISO } from "date-fns";
+import { addDays, differenceInCalendarDays, parseISO } from "date-fns";
 import { ArrowLeft, FileText, Plus, Trash2 } from "lucide-react";
 import { IconButton } from "@/components/ui/icon-button";
 import { DeleteInvoiceDialog } from "@/components/clients/ClientInvoicesSection";
@@ -26,18 +26,15 @@ import { api } from "@/lib/api-client";
 import { toastApiError } from "@/lib/toastApiError";
 import { formatMoney } from "@/lib/money";
 import { CURRENCIES } from "@/lib/currency";
-import { documentPresetFrom, lastMonthRange } from "@/lib/clientDocuments";
+import { BILLING_OPTIONS, DOCUMENT_LOCALE_OPTIONS, documentPresetFrom, lastMonthRange, type Billing } from "@/lib/clientDocuments";
+import { dateToLocalDate } from "@/lib/taskUtils";
 import { useClientEntriesFetcher } from "@/hooks/useClientEntriesFetcher";
 import { PdfPreview } from "@/components/client-documents/PdfPreview";
 import { useRenderedPdf } from "@/hooks/useRenderedPdf";
-import { downloadBlob, invoiceFileName, renderInvoicePdf, type InvoiceContent } from "@/components/client-documents/invoicePdf";
-import { INVOICE_NUMBER, invoiceLines, invoiceTotal, type DocumentLocale } from "@shared/client-documents";
+import { invoiceFileName, renderInvoicePdf, type InvoiceContent } from "@/components/client-documents/invoicePdf";
+import { downloadBlob } from "@/lib/download";
+import { companyParty, INVOICE_NUMBER, invoiceLines, invoiceTotal, type DocumentLocale } from "@shared/client-documents";
 import type { Client, ClientService, Invoice, ReportSettings } from "@shared/schemas";
-
-const LOCALE_OPTIONS = [
-  { value: "pt-BR" as const, label: "Português" },
-  { value: "en" as const, label: "English" },
-];
 
 type LineKind = "hours" | "recurring" | "one_off";
 
@@ -62,7 +59,6 @@ const GROUPS: { kind: LineKind; title: string; hint: string; add?: string }[] = 
 const newKey = () => crypto.randomUUID();
 // One column set for the header and every item row, so they line up.
 const LINE_GRID = "grid grid-cols-[minmax(0,1fr)_5.5rem_8.5rem_2rem] items-center gap-2";
-const day = (d: Date) => format(d, "yyyy-MM-dd");
 
 /** Seconds tracked for the client in the period, as the PDF has always billed them. */
 function useTrackedSeconds() {
@@ -154,15 +150,17 @@ function Editor({
 }) {
   const save = useSaveInvoice();
   const updateClient = useUpdateClient();
-  const fixedFee = client.fixedFee ?? null;
-  const savedRate = fixedFee === null ? (client.rate ?? settings.defaultRate) : null;
-  const today = day(new Date());
+  // The client's billing, edited here exactly as on its Edit dialog; saving the invoice writes it back to the client.
+  const [billing, setBilling] = useState<Billing>(client.fixedFee != null ? "fixed" : "hourly");
+  const [fee, setFee] = useState<number | null>(client.fixedFee ?? null);
+  const clientRate = client.rate ?? settings.defaultRate;
+  const today = dateToLocalDate(new Date());
 
   const [locale, setLocale] = useState<DocumentLocale>(saved?.locale ?? initial?.locale ?? "pt-BR");
   const [range, setRange] = useState({ from: saved?.periodFrom ?? initial!.from, to: saved?.periodTo ?? initial!.to });
   const [number, setNumber] = useState(saved?.number ?? initial?.number ?? settings.invoiceNumber);
   const [currency, setCurrency] = useState(saved?.currency ?? client.currency ?? settings.currency);
-  const [rate, setRate] = useState<number | null>(initial?.rate ?? savedRate);
+  const [rate, setRate] = useState<number | null>(initial?.rate ?? clientRate);
   const [issueDate, setIssueDate] = useState(saved?.issueDate ?? today);
   // Text, so a cleared field stays empty on screen; empty counts as 0 days.
   const [dueDaysText, setDueDaysText] = useState(String(saved ? differenceInCalendarDays(parseISO(saved.dueDate), parseISO(saved.issueDate)) : settings.invoiceDueDays));
@@ -173,23 +171,26 @@ function Editor({
   const [lines, setLines] = useState<DraftLine[]>(() =>
     saved
       ? saved.lines.map((l, i) => ({ ...l, key: newKey(), kind: l.kind ?? (i === 0 && l.hours !== null ? "hours" : "one_off") }))
-      : invoiceLines(initial!.seconds, rate ?? 0, initial!.services, initial!.locale, fixedFee).map((l, i) => ({
+      : invoiceLines(initial!.seconds, rate ?? 0, initial!.services, initial!.locale, client.fixedFee ?? null).map((l, i) => ({
           ...l,
           key: newKey(),
           // invoiceLines puts the hours line first, whenever there is one; the rest are the client's services.
           kind: i === 0 && l.hours !== null ? "hours" : "recurring",
         }))
   );
+  // The period's tracked time, so switching to fixed billing can bring back an hours line hourly billing left out (0 h).
+  const [seconds, setSeconds] = useState(initial?.seconds ?? Math.round((saved?.lines.find((l) => l.kind === "hours")?.hours ?? 0) * 3600));
   const [busy, setBusy] = useState<false | "save" | "download">(false);
   const [deleting, setDeleting] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  const dueDate = day(addDays(parseISO(issueDate), dueDays));
+  const dueDate = dateToLocalDate(addDays(parseISO(issueDate), dueDays));
   // A row left completely empty is ignored; a cleared amount or quantity counts as nothing (0 / —), never as an error.
   const filled = lines.filter((l) => l.description.trim() !== "" || l.amount !== null || l.hours !== null);
   const lineValid = (l: DraftLine) =>
     l.description.trim() !== "" && !Number.isNaN(l.amount) && (l.amount ?? 0) >= 0 && (l.hours === null || Number.isFinite(l.hours));
-  const valid = INVOICE_NUMBER.test(number) && range.from <= range.to && filled.length > 0 && filled.every(lineValid) && dueDays <= 365 && !Number.isNaN(rate);
+  const valid = INVOICE_NUMBER.test(number) && range.from <= range.to && filled.length > 0 && filled.every(lineValid) && dueDays <= 365 &&
+    (billing === "fixed" ? fee !== null && Number.isFinite(fee) && fee >= 0 : !Number.isNaN(rate));
 
   const content: InvoiceContent = {
     number,
@@ -204,24 +205,43 @@ function Editor({
       .map((l) => ({ description: l.description.trim(), hours: l.hours, amount: l.amount ?? 0, kind: l.kind })),
     // Saving (new or edit) takes the client's and the company's details as they are now, so the preview shows those.
     client: { name: client.name, email: client.email, address: clientAddress.trim() || null, phone: client.phone },
-    company: {
-      name: settings.companyName,
-      email: settings.companyEmail || null,
-      address: settings.companyAddress || null,
-      phone: settings.companyPhone || null,
-    },
+    company: companyParty(settings),
   };
   const preview = useRenderedPdf({ content, settings }, renderPreview);
 
   const setLine = (key: string, patch: Partial<DraftLine>) => setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
 
+  const finite = (n: number | null) => (n !== null && Number.isFinite(n) ? n : 0);
+  const hoursLineFor = (secs: number, b: Billing, r: number | null, f: number | null) =>
+    invoiceLines(secs, finite(r), [], locale, b === "fixed" ? finite(f) : null)[0];
+
+  const withHoursLine = (ls: DraftLine[], line: ReturnType<typeof hoursLineFor>): DraftLine[] => {
+    const rest = ls.filter((l) => l.kind !== "hours");
+    return line ? [{ ...line, key: newKey(), kind: "hours" }, ...rest] : rest;
+  };
+
+  // Re-prices the hours line, keeping its text and hours (a new key remounts its amount); only a billing switch restores a removed one.
+  const reprice = (b: Billing, r: number | null, f: number | null, addIfMissing = false) =>
+    setLines((ls) => {
+      if (!ls.some((l) => l.kind === "hours")) return addIfMissing ? withHoursLine(ls, hoursLineFor(seconds, b, r, f)) : ls;
+      return ls.map((l) =>
+        l.kind === "hours"
+          ? { ...l, key: newKey(), amount: b === "fixed" ? finite(f) : Math.round((l.hours ?? 0) * finite(r) * 100) / 100 }
+          : l
+      );
+    });
+
+  const changeBilling = (b: Billing) => {
+    setBilling(b);
+    reprice(b, rate, fee, true);
+  };
   const changeRate = (next: number | null) => {
     setRate(next);
-    if (Number.isNaN(next)) return;
-    // A new key remounts the row, so its amount field shows the recomputed value.
-    setLines((ls) =>
-      ls.map((l) => (l.kind === "hours" && l.hours !== null ? { ...l, key: newKey(), amount: Math.round(l.hours * (next ?? 0) * 100) / 100 } : l))
-    );
+    if (!Number.isNaN(next)) reprice(billing, next, fee);
+  };
+  const changeFee = (next: number | null) => {
+    setFee(next);
+    if (!Number.isNaN(next)) reprice(billing, rate, next);
   };
 
   // A new period re-reads its hours into the hours line, leaving every other line as it was.
@@ -230,12 +250,9 @@ function Editor({
     if (next.from > next.to) return;
     setRefreshing(true);
     try {
-      const seconds = await trackedSeconds(client.id, next.from, next.to);
-      const [hoursLine] = invoiceLines(seconds, Number.isFinite(rate) ? (rate as number) : 0, [], locale, fixedFee);
-      setLines((ls) => {
-        const rest = ls.filter((l) => l.kind !== "hours");
-        return hoursLine ? [{ ...hoursLine, key: newKey(), kind: "hours" }, ...rest] : rest;
-      });
+      const secs = await trackedSeconds(client.id, next.from, next.to);
+      setSeconds(secs);
+      setLines((ls) => withHoursLine(ls, hoursLineFor(secs, billing, rate, fee)));
     } catch (error) {
       toastApiError(error, "Failed to read the period's hours");
     } finally {
@@ -261,7 +278,12 @@ function Editor({
       // Client changes first (safe to repeat), so the invoice is saved with them; a rate typed here is the client's from now on.
       const clientChange = {
         ...((clientAddress.trim() || null) !== client.address ? { address: clientAddress.trim() || null } : {}),
-        ...(fixedFee === null && rate !== null && Number.isFinite(rate) && rate !== savedRate ? { rate } : {}),
+        ...(billing === "fixed"
+          ? fee !== client.fixedFee ? { fixedFee: fee } : {}
+          : {
+              ...(client.fixedFee != null ? { fixedFee: null } : {}),
+              ...(rate !== null && Number.isFinite(rate) && rate !== clientRate ? { rate } : {}),
+            }),
       };
       if (Object.keys(clientChange).length) await updateClient.mutateAsync({ id: client.id, data: clientChange });
       const invoice = saved
@@ -314,15 +336,15 @@ function Editor({
         <div className="space-y-6">
           <Card>
             <CardContent className="space-y-4">
-              <SegmentedControl label="Language" options={LOCALE_OPTIONS} value={locale} onChange={setLocale} />
+              <SegmentedControl label="Language" options={DOCUMENT_LOCALE_OPTIONS} value={locale} onChange={setLocale} />
               <div className="grid grid-cols-2 gap-3">
                 <Field>
                   <FieldLabel htmlFor="inv-from">Period from</FieldLabel>
-                  <DatePicker id="inv-from" label="From" displayFormat="dd/MM/yyyy" value={parseISO(range.from)} onSelect={(d) => changePeriod({ ...range, from: day(d) })} />
+                  <DatePicker id="inv-from" label="From" displayFormat="dd/MM/yyyy" value={parseISO(range.from)} onSelect={(d) => changePeriod({ ...range, from: dateToLocalDate(d) })} />
                 </Field>
                 <Field>
                   <FieldLabel htmlFor="inv-to">Period to</FieldLabel>
-                  <DatePicker id="inv-to" label="To" displayFormat="dd/MM/yyyy" value={parseISO(range.to)} onSelect={(d) => changePeriod({ ...range, to: day(d) })} />
+                  <DatePicker id="inv-to" label="To" displayFormat="dd/MM/yyyy" value={parseISO(range.to)} onSelect={(d) => changePeriod({ ...range, to: dateToLocalDate(d) })} />
                 </Field>
                 <Field>
                   <FieldLabel htmlFor="inv-number">Invoice number</FieldLabel>
@@ -350,7 +372,7 @@ function Editor({
                 </Field>
                 <Field>
                   <FieldLabel htmlFor="inv-issue">Issue date</FieldLabel>
-                  <DatePicker id="inv-issue" label="Issue date" displayFormat="dd/MM/yyyy" value={parseISO(issueDate)} onSelect={(d) => setIssueDate(day(d))} />
+                  <DatePicker id="inv-issue" label="Issue date" displayFormat="dd/MM/yyyy" value={parseISO(issueDate)} onSelect={(d) => setIssueDate(dateToLocalDate(d))} />
                 </Field>
                 <Field>
                   <FieldLabel htmlFor="inv-due">Due date</FieldLabel>
@@ -373,18 +395,8 @@ function Editor({
                     onChange={(e) => setDueDaysText(e.target.value.replace(/\D/g, "").slice(0, 3))}
                   />
                 </Field>
-                {savedRate !== null && (
-                  <Field>
-                    <FieldLabel htmlFor="inv-rate">Hourly rate</FieldLabel>
-                    <MoneyInput key={currency} id="inv-rate" currency={currency} value={rate} onValueChange={changeRate} />
-                  </Field>
-                )}
               </div>
-              <SettingsHint>
-                {fixedFee !== null
-                  ? `Fixed fee of ${formatMoney(fixedFee, currency)} for the hours (Edit on the client page).`
-                  : "A rate typed here becomes this client's rate. The payment term is remembered for the next invoice."}
-              </SettingsHint>
+              <SettingsHint>The payment term is remembered for the next invoice.</SettingsHint>
             </CardContent>
           </Card>
 
@@ -402,7 +414,33 @@ function Editor({
                   onChange={(e) => setClientAddress(e.target.value)}
                 />
               </Field>
-              <SettingsHint>Saved on the client, so every invoice for it uses this address. Your company's address is in Settings → Reports.</SettingsHint>
+              <SegmentedControl label="Billing" options={BILLING_OPTIONS} value={billing} onChange={changeBilling} />
+              {billing === "hourly" ? (
+                <Field className="w-48">
+                  <FieldLabel htmlFor="inv-rate">Hourly rate</FieldLabel>
+                  <MoneyInput key={`rate-${currency}`} id="inv-rate" currency={currency} value={rate} onValueChange={changeRate} />
+                </Field>
+              ) : (
+                <Field className="w-48">
+                  <FieldLabel htmlFor="inv-fee">Fixed rate</FieldLabel>
+                  <MoneyInput
+                    // Its own key: in the rate's place, a shared one would carry the rate's typed text over.
+                    key={`fee-${currency}`}
+                    id="inv-fee"
+                    currency={currency}
+                    value={fee}
+                    onValueChange={changeFee}
+                    aria-label="Fixed rate"
+                  />
+                </Field>
+              )}
+              {billing === "fixed" && fee === null && <SettingsHint>Enter the fixed rate to save the invoice.</SettingsHint>}
+              <SettingsHint>
+                {billing === "hourly"
+                  ? "The hours line is the period's whole hours × this rate."
+                  : "The hours line bills this amount, whatever the hours; recurring and one-off items are added on top."}{" "}
+                Address and billing are saved on the client, so its page and every invoice for it stay the same. Your company's address is in Settings → Reports.
+              </SettingsHint>
             </CardContent>
           </Card>
 

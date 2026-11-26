@@ -64,8 +64,11 @@ test("a PDF opens in the viewer, renders its pages and zooms, with nothing block
   await expect(viewer.getByText("125%")).toBeVisible();
   await expect.poll(async () => (await viewer.getByLabel("Page 1").boundingBox())!.width).toBeGreaterThan(before * 1.2);
 
-  await viewer.getByRole("button", { name: "Fit to screen" }).click();
-  await expect(viewer.getByText("100%")).toBeVisible();
+  // The shared zoom picker: back to the fitted width, or the whole page in view.
+  await viewer.getByRole("combobox", { name: "Zoom" }).click();
+  await page.getByRole("option", { name: "Fit width" }).click();
+  await expect(viewer.getByRole("combobox", { name: "Zoom" })).toHaveText("Fit width");
+  await expect.poll(async () => (await viewer.getByLabel("Page 1").boundingBox())!.width).toBeLessThan(before * 1.05);
 
   await page.keyboard.press("Escape");
   await expect(viewer).not.toBeVisible();

@@ -1,4 +1,5 @@
 import { endOfMonth, format, parseISO, startOfMonth, subMonths } from "date-fns";
+import { dateToLocalDate } from "@/lib/taskUtils";
 import type { ClientDocumentKind, DocumentLocale } from "@shared/client-documents";
 
 /** "R$ 1.234,50" / "R$ 1,234.50": the symbol always stands apart from the amount, as pt-BR already writes it. */
@@ -64,6 +65,19 @@ export function documentPresetFrom(params: URLSearchParams): DocumentPreset | nu
 /** Last month's first and last local days: the period a client document starts on. */
 export function lastMonthRange() {
   const m = subMonths(new Date(), 1);
-  return { from: format(startOfMonth(m), "yyyy-MM-dd"), to: format(endOfMonth(m), "yyyy-MM-dd") };
+  return { from: dateToLocalDate(startOfMonth(m)), to: dateToLocalDate(endOfMonth(m)) };
 }
+
+/** The two languages a client document is written in, for a picker. */
+export const DOCUMENT_LOCALE_OPTIONS = [
+  { value: "pt-BR" as const, label: "Português" },
+  { value: "en" as const, label: "English" },
+];
+
+/** How a client is billed: by the hour, or a fixed rate per invoice (`clients.fixed_fee`). */
+export type Billing = "hourly" | "fixed";
+export const BILLING_OPTIONS = [
+  { value: "hourly" as const, label: "Hourly rate" },
+  { value: "fixed" as const, label: "Fixed rate" },
+];
 

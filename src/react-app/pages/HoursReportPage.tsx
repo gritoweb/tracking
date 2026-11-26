@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { format, parseISO } from "date-fns";
+import { parseISO } from "date-fns";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -14,21 +14,15 @@ import { SettingsHint } from "@/components/settings/SettingsHint";
 import { PdfPreview } from "@/components/client-documents/PdfPreview";
 import { useRenderedPdf } from "@/hooks/useRenderedPdf";
 import { hoursReportFileName, renderHoursReportPdf } from "@/components/client-documents/hoursReportPdf";
-import { downloadBlob } from "@/components/client-documents/invoicePdf";
+import { downloadBlob } from "@/lib/download";
 import { useClient } from "@/hooks/useProjects";
 import { useReportSettings } from "@/hooks/useReportSettings";
 import { useWorkspaceRole } from "@/hooks/useWorkspaceRole";
 import { useClientEntriesFetcher } from "@/hooks/useClientEntriesFetcher";
-import { documentPresetFrom, formatClock, lastMonthRange, localDay } from "@/lib/clientDocuments";
+import { DOCUMENT_LOCALE_OPTIONS, documentPresetFrom, formatClock, lastMonthRange, localDay } from "@/lib/clientDocuments";
+import { dateToLocalDate } from "@/lib/taskUtils";
 import { toastApiError } from "@/lib/toastApiError";
 import { hoursSummary, type DocumentLocale } from "@shared/client-documents";
-
-const LOCALE_OPTIONS = [
-  { value: "pt-BR" as const, label: "Português" },
-  { value: "en" as const, label: "English" },
-];
-
-const day = (d: Date) => format(d, "yyyy-MM-dd");
 
 /** `/clients/:id/hours-report`: the worked-hours report for a period, beside its live PDF. */
 export function HoursReportPage() {
@@ -95,15 +89,15 @@ export function HoursReportPage() {
       <div className="grid items-start gap-6 lg:grid-cols-2">
         <Card>
           <CardContent className="space-y-4">
-            <SegmentedControl label="Language" options={LOCALE_OPTIONS} value={locale} onChange={setLocale} />
+            <SegmentedControl label="Language" options={DOCUMENT_LOCALE_OPTIONS} value={locale} onChange={setLocale} />
             <div className="grid grid-cols-2 gap-3">
               <Field>
                 <FieldLabel htmlFor="hr-from">From</FieldLabel>
-                <DatePicker id="hr-from" label="From" displayFormat="dd/MM/yyyy" value={parseISO(range.from)} onSelect={(d) => setRange((r) => ({ ...r, from: day(d) }))} />
+                <DatePicker id="hr-from" label="From" displayFormat="dd/MM/yyyy" value={parseISO(range.from)} onSelect={(d) => setRange((r) => ({ ...r, from: dateToLocalDate(d) }))} />
               </Field>
               <Field>
                 <FieldLabel htmlFor="hr-to">To</FieldLabel>
-                <DatePicker id="hr-to" label="To" displayFormat="dd/MM/yyyy" value={parseISO(range.to)} onSelect={(d) => setRange((r) => ({ ...r, to: day(d) }))} />
+                <DatePicker id="hr-to" label="To" displayFormat="dd/MM/yyyy" value={parseISO(range.to)} onSelect={(d) => setRange((r) => ({ ...r, to: dateToLocalDate(d) }))} />
               </Field>
             </div>
             {!validRange && <SettingsHint>The start date is after the end date.</SettingsHint>}
