@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-26 (hotfix)
+### Fixed
+- **The invoice and hours-report preview was blank in production.** The preview hands pdf.js an object URL (`blob:`) of the PDF just generated, and pdf.js reads it with `fetch`; the document CSP in `public/_headers` had no `blob:` in `connect-src`, so production blocked it ("pdf open failed"). The dev server sends no CSP, which is why local testing passed. `connect-src` now includes `blob:` (an object URL is only ever created by the page's own scripts, so nothing outside is opened); `csp-headers.test.ts` locks it in.
+  - Verified: `csp-headers.test.ts` 5/5; `wrangler dev` on the built bundle serves `connect-src 'self' data: blob: …`, and a `fetch` of a `blob:` URL under that CSP succeeds.
+
 ## 2026-11-26
 ### Added
 - **Invoices are saved and become the record of what a client was billed.** Before, an invoice was computed (hours × rate or fixed fee) at generation time and only its number was kept, so a later rate change silently changed what that month "was". New `invoices` table (migration 0063, additive) stores the lines, a server-computed total, the due date and a frozen copy of the client's and the company's details; `/api/invoices` CRUD is owner/admin-only, reads included. The client page lists them by month with view (in-app viewer), download, edit and delete (with confirmation).

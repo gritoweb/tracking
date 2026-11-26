@@ -20,6 +20,10 @@ describe("the document CSP in public/_headers", () => {
     expect(directive("script-src")).not.toContain("blob:");
   });
 
+  it("lets the invoice and hours-report preview (pdf.js) read the PDF generated in the page from its blob: URL", () => {
+    expect(directive("connect-src").split(" ")).toContain("blob:");
+  });
+
   it("lets FullCalendar load its inlined icon font", () => {
     expect(directive("font-src").split(" ")).toContain("data:");
   });
