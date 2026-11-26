@@ -1,4 +1,4 @@
-import { format, parseISO } from "date-fns";
+import { endOfMonth, format, parseISO, startOfMonth, subMonths } from "date-fns";
 import type { ClientDocumentKind, DocumentLocale } from "@shared/client-documents";
 
 /** "R$ 1.234,50" / "R$ 1,234.50": the symbol always stands apart from the amount, as pt-BR already writes it. */
@@ -60,3 +60,10 @@ export function documentPresetFrom(params: URLSearchParams): DocumentPreset | nu
   if (rate !== undefined && !(rate >= 0)) return null;
   return { kind, locale, from, to, number: params.get("number") ?? undefined, rate };
 }
+
+/** Last month's first and last local days: the period a client document starts on. */
+export function lastMonthRange() {
+  const m = subMonths(new Date(), 1);
+  return { from: format(startOfMonth(m), "yyyy-MM-dd"), to: format(endOfMonth(m), "yyyy-MM-dd") };
+}
+

@@ -10,6 +10,8 @@ import { TextStage } from "./TextStage";
 import { HtmlStage } from "./HtmlStage";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { useZoomPan, ZOOM_STEP } from "./useZoomPan";
+import { PdfZoomControl } from "./PdfZoomControl";
+import type { PdfFit } from "./PdfStage";
 
 // pdf.js (~450 KB + a 1.3 MB worker) loads only when someone opens a PDF.
 const PdfStage = lazy(() => import("./PdfStage"));
@@ -27,10 +29,11 @@ function kindOf(attachment: TaskAttachment): Kind {
 
 const ZOOM_RANGE: Record<Kind, [number, number]> = { image: [1, 8], pdf: [0.5, 4], html: [0.5, 2], text: [0.75, 2], other: [1, 1] };
 
-function ViewerBody({ attachment, kind, view, onPdfError, showSource }: {
+function ViewerBody({ attachment, kind, view, fit, onPdfError, showSource }: {
   attachment: TaskAttachment;
   kind: Kind;
   view: ReturnType<typeof useZoomPan>;
+  fit: PdfFit;
   onPdfError: () => void;
   /** HTML only: its source as text instead of the rendered page. */
   showSource: boolean;
@@ -39,7 +42,7 @@ function ViewerBody({ attachment, kind, view, onPdfError, showSource }: {
   if (kind === "pdf") {
     return (
       <Suspense fallback={<div className="flex h-full items-center justify-center"><Spinner /></div>}>
-        <PdfStage url={attachment.url} zoom={view.zoom} onZoomBy={view.zoomBy} onError={onPdfError} />
+        <PdfStage url={attachment.url} zoom={view.zoom} fit={fit} onZoomBy={view.zoomBy} onError={onPdfError} />
       </Suspense>
     );
   }
@@ -74,6 +77,7 @@ function ViewerPane({ attachment, position, onPrevious, onNext, onClose }: Viewe
   const [min, max] = ZOOM_RANGE[kind];
   const view = useZoomPan(min, max);
   const [pdfFailed, setPdfFailed] = useState(false);
+  const [fit, setFit] = useState<PdfFit>("width");
   const [htmlView, setHtmlView] = useState<"preview" | "code">("preview");
   const onPdfError = useCallback(() => setPdfFailed(true), []);
   const zoomable = kind !== "other" && !(kind === "pdf" && pdfFailed);
@@ -122,7 +126,9 @@ function ViewerPane({ attachment, position, onPrevious, onNext, onClose }: Viewe
           />
         )}
 
-        {zoomable && (
+        {zoomable && kind === "pdf" && <PdfZoomControl view={view} fit={fit} onFit={setFit} min={min} max={max} />}
+
+        {zoomable && kind !== "pdf" && (
           <div className="flex items-center">
             <Button
               variant="ghost"
@@ -167,7 +173,7 @@ function ViewerPane({ attachment, position, onPrevious, onNext, onClose }: Viewe
         {kind === "pdf" && pdfFailed ? (
           <p className="p-8 text-center text-sm text-muted-foreground">Couldn't open this PDF. Download it instead.</p>
         ) : (
-          <ViewerBody attachment={attachment} kind={kind} view={view} onPdfError={onPdfError} showSource={htmlView === "code"} />
+          <ViewerBody attachment={attachment} kind={kind} view={view} fit={fit} onPdfError={onPdfError} showSource={htmlView === "code"} />
         )}
       </div>
     </div>

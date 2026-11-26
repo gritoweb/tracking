@@ -1,6 +1,7 @@
 // Supported reporting currencies. Kept intentionally short — extend as needed.
 export const CURRENCIES: { code: string; label: string }[] = [
   { code: "USD", label: "USD — US Dollar" },
+  { code: "BRL", label: "BRL — Brazilian Real" },
   { code: "EUR", label: "EUR — Euro" },
   { code: "GBP", label: "GBP — British Pound" },
   { code: "CAD", label: "CAD — Canadian Dollar" },
@@ -9,7 +10,6 @@ export const CURRENCIES: { code: string; label: string }[] = [
   { code: "CHF", label: "CHF — Swiss Franc" },
   { code: "CNY", label: "CNY — Chinese Yuan" },
   { code: "INR", label: "INR — Indian Rupee" },
-  { code: "BRL", label: "BRL — Brazilian Real" },
   { code: "MXN", label: "MXN — Mexican Peso" },
   { code: "SEK", label: "SEK — Swedish Krona" },
   { code: "NOK", label: "NOK — Norwegian Krone" },

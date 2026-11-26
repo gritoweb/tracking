@@ -3,6 +3,7 @@ import { ImageUp, Trash2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -97,12 +98,17 @@ function FieldsForm({ settings, canManage }: { settings: ReportSettings; canMana
   const save = useUpdateReportSettings();
   const [companyName, setCompanyName] = useState(settings.companyName);
   const [companyEmail, setCompanyEmail] = useState(settings.companyEmail);
+  const [companyAddress, setCompanyAddress] = useState(settings.companyAddress);
+  const [companyPhone, setCompanyPhone] = useState(settings.companyPhone);
+  const [dueDays, setDueDays] = useState(String(settings.invoiceDueDays));
   const [currency, setCurrency] = useState(settings.currency);
   const [defaultRate, setDefaultRate] = useState<number | null>(settings.defaultRate);
   const [colors, setColors] = useState<ReportSettings["colors"]>(settings.colors);
 
   const colorsValid = Object.values(colors).every((c) => HEX.test(c));
   const rateValid = defaultRate === null || defaultRate >= 0;
+  // Empty counts as 0 days (due on the issue date).
+  const dueDaysValid = /^\d{0,3}$/.test(dueDays) && Number(dueDays) <= 365;
 
   return (
     <form
@@ -110,12 +116,15 @@ function FieldsForm({ settings, canManage }: { settings: ReportSettings; canMana
       noValidate
       onSubmit={(e) => {
         e.preventDefault();
-        if (!colorsValid || !rateValid) return;
+        if (!colorsValid || !rateValid || !dueDaysValid) return;
         save.mutate({
           kind: "fields",
           data: {
             companyName: companyName.trim() || null,
             companyEmail: companyEmail.trim() || null,
+            companyAddress: companyAddress.trim() || null,
+            companyPhone: companyPhone.trim() || null,
+            invoiceDueDays: Number(dueDays),
             currency,
             defaultRate,
             colors,
@@ -128,6 +137,24 @@ function FieldsForm({ settings, canManage }: { settings: ReportSettings; canMana
       </SettingsRow>
       <SettingsRow htmlFor="report-email" label="Contact email" description="Under the logo on the invoice">
         <Input id="report-email" type="email" className="sm:w-64" value={companyEmail} disabled={!canManage} onChange={(e) => setCompanyEmail(e.target.value)} />
+      </SettingsRow>
+      <SettingsRow htmlFor="report-address" label="Address" description="Under the logo on the invoice">
+        <Textarea id="report-address" rows={3} className="sm:w-64" value={companyAddress} disabled={!canManage} onChange={(e) => setCompanyAddress(e.target.value)} />
+      </SettingsRow>
+      <SettingsRow htmlFor="report-phone" label="Phone" description="Under the address on the invoice">
+        <Input id="report-phone" type="tel" className="sm:w-64" value={companyPhone} disabled={!canManage} onChange={(e) => setCompanyPhone(e.target.value)} />
+      </SettingsRow>
+      <SettingsRow htmlFor="report-due-days" label="Payment term (days)" description="A new invoice is due this many days after it is issued; changing it on an invoice changes it here too">
+        <Input
+          id="report-due-days"
+          inputMode="numeric"
+          className="w-24"
+          placeholder="0"
+          value={dueDays}
+          disabled={!canManage}
+          aria-invalid={!dueDaysValid}
+          onChange={(e) => setDueDays(e.target.value.replace(/\D/g, ""))}
+        />
       </SettingsRow>
       <SettingsRow htmlFor="report-currency" label="Currency" description="What invoices bill in, whatever each person's display currency">
         <Select value={currency} onValueChange={setCurrency} disabled={!canManage}>
@@ -190,7 +217,7 @@ function FieldsForm({ settings, canManage }: { settings: ReportSettings; canMana
 
       {canManage && (
         <div className="flex justify-end">
-          <Button type="submit" disabled={save.isPending || !colorsValid || !rateValid}>Save</Button>
+          <Button type="submit" disabled={save.isPending || !colorsValid || !rateValid || !dueDaysValid}>Save</Button>
         </div>
       )}
     </form>

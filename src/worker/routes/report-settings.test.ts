@@ -29,6 +29,9 @@ describe("the report settings", () => {
       defaultRate: 100,
       currency: "BRL",
       invoiceNumber: "1",
+      companyAddress: "",
+      companyPhone: "",
+      invoiceDueDays: 15,
     });
   });
 

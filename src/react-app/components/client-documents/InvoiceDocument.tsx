@@ -16,9 +16,14 @@ export interface InvoiceProps {
   logo: string | null;
   companyName: string;
   companyEmail: string | null;
+  companyAddress?: string | null;
+  companyPhone?: string | null;
   clientName: string;
+  clientAddress?: string | null;
   number: string;
   issueDate: string;
+  dueDate?: string | null;
+  notes?: string | null;
   lines: InvoiceLine[];
   currency: string;
 }
@@ -37,6 +42,8 @@ export function InvoiceDocument(p: InvoiceProps) {
           <View style={s.headerLeft}>
             {p.logo ? <Image src={p.logo} style={s.logo} /> : <Text style={s.companyName}>{p.companyName}</Text>}
             {p.companyEmail && <Text style={s.email}>{p.companyEmail}</Text>}
+            {p.companyAddress && <Text style={s.email}>{p.companyAddress}</Text>}
+            {p.companyPhone && <Text style={s.email}>{p.companyPhone}</Text>}
           </View>
           <View style={[s.right, s.headerRight]}>
             <Text style={s.kicker}>{t.invoice.toUpperCase()}</Text>
@@ -49,10 +56,19 @@ export function InvoiceDocument(p: InvoiceProps) {
           <View style={s.billedTo}>
             <Text style={s.label}>{t.billedTo.toUpperCase()}</Text>
             <Text style={s.strong}>{p.clientName}</Text>
+            {p.clientAddress && <Text style={s.address}>{p.clientAddress}</Text>}
           </View>
-          <View style={s.right}>
-            <Text style={s.label}>{t.issueDate.toUpperCase()}</Text>
-            <Text style={s.strong}>{p.issueDate}</Text>
+          <View style={s.dates}>
+            <View style={s.right}>
+              <Text style={s.label}>{t.issueDate.toUpperCase()}</Text>
+              <Text style={s.strong}>{p.issueDate}</Text>
+            </View>
+            {p.dueDate && (
+              <View style={[s.right, s.dueDate]}>
+                <Text style={s.label}>{t.dueDate.toUpperCase()}</Text>
+                <Text style={s.strong}>{p.dueDate}</Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -69,6 +85,13 @@ export function InvoiceDocument(p: InvoiceProps) {
               <Text style={[s.cell, s.colAmount]}>{money(l.amount)}</Text>
             </View>
           ))}
+
+          {p.notes && (
+            <View style={s.notes} wrap={false}>
+              <Text style={s.label}>{t.notes.toUpperCase()}</Text>
+              <Text style={s.cell}>{p.notes}</Text>
+            </View>
+          )}
 
           <View style={s.totalBox} wrap={false}>
             <Text style={s.totalLabel}>{t.total.toUpperCase()}</Text>
@@ -91,7 +114,7 @@ function styles(c: BrandPalette) {
     headerRight: { flexShrink: 1, maxWidth: "55%" },
     logo: { height: 40, maxWidth: 220, objectFit: "contain", objectPositionX: 0, marginBottom: 4 },
     companyName: { fontFamily: "Helvetica-Bold", fontSize: 16, color: c.primary, marginBottom: 4 },
-    email: { fontSize: 9.5, color: c.muted },
+    email: { fontSize: 9.5, color: c.muted, marginTop: 2 },
     right: { alignItems: "flex-end" },
     kicker: { fontFamily: "Helvetica-Bold", fontSize: 8, letterSpacing: 2.5, color: c.primary, marginBottom: 6 },
     number: { fontFamily: "Helvetica-Bold", fontSize: 26, color: c.primary, textAlign: "right" },
@@ -105,6 +128,10 @@ function styles(c: BrandPalette) {
       borderBottomColor: c.hairline,
     },
     billedTo: { flex: 1, paddingRight: 24 },
+    address: { fontSize: 9.5, color: c.muted, marginTop: 4, lineHeight: 1.4 },
+    dates: { flexDirection: "row" },
+    dueDate: { marginLeft: 28 },
+    notes: { marginTop: 22 },
     label: { fontSize: 7.5, letterSpacing: 1.5, color: c.muted, marginBottom: 8 },
     strong: { fontFamily: "Helvetica-Bold", fontSize: 12 },
     body: { paddingHorizontal: GUTTER, paddingTop: 18 },

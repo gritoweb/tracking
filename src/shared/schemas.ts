@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { parseRecurRule } from "./task-recurrence";
+import { INVOICE_NUMBER } from "./client-documents";
 
 // ─── Workspace ───────────────────────────────────────────────────────────────
 
@@ -136,6 +137,10 @@ export const ReportSettingsSchema = z.object({
   currency: z.string(),
   // The last invoice number generated, offered again until someone types another; "1" before the first.
   invoiceNumber: z.string(),
+  companyAddress: z.string(),
+  companyPhone: z.string(),
+  // Days from issue to due date, remembered from the last invoice saved.
+  invoiceDueDays: z.number(),
 });
 
 export const UpdateReportSettingsSchema = z
@@ -145,8 +150,65 @@ export const UpdateReportSettingsSchema = z
     colors: z.object({ primary: HexColorSchema, accent: HexColorSchema, text: HexColorSchema }),
     defaultRate: z.number().min(0).max(1_000_000).nullable(),
     currency: z.string().regex(/^[A-Z]{3}$/, "Must be a 3-letter currency code"),
+    companyAddress: z.string().trim().max(1000).nullable(),
+    companyPhone: z.string().trim().max(50).nullable(),
+    invoiceDueDays: z.number().int().min(0).max(365),
   })
   .partial();
+
+// ─── Invoices (saved, the source of truth for what a client was billed) ──────
+
+const InvoiceDaySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Expected YYYY-MM-DD");
+
+export const InvoiceLineSchema = z.object({
+  description: z.string().trim().min(1).max(500),
+  hours: z.number().min(0).max(100_000).nullable(),
+  amount: z.number().min(0).max(1_000_000),
+  // Which group the editor shows it in: the worked hours, a recurring service, or a one-off charge.
+  kind: z.enum(["hours", "recurring", "one_off"]).optional(),
+});
+
+// Who an invoice is from or to, frozen when it is created so a later edit of the client or the branding doesn't rewrite it.
+export const InvoicePartySchema = z.object({
+  name: z.string(),
+  email: z.string().nullable(),
+  address: z.string().nullable(),
+  phone: z.string().nullable(),
+});
+
+export const InvoiceSchema = z.object({
+  id: z.string(),
+  clientId: z.string(),
+  number: z.string(),
+  issueDate: z.string(),
+  dueDate: z.string(),
+  periodFrom: z.string(),
+  periodTo: z.string(),
+  currency: z.string(),
+  locale: z.enum(["pt-BR", "en"]),
+  lines: z.array(InvoiceLineSchema),
+  total: z.number(),
+  notes: z.string().nullable(),
+  client: InvoicePartySchema,
+  company: InvoicePartySchema,
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+const InvoiceFieldsSchema = z.object({
+  number: z.string().trim().regex(INVOICE_NUMBER, "Digits and hyphens only, e.g. 12 or 2026-09"),
+  issueDate: InvoiceDaySchema,
+  dueDate: InvoiceDaySchema,
+  periodFrom: InvoiceDaySchema,
+  periodTo: InvoiceDaySchema,
+  currency: z.string().regex(/^[A-Z]{3}$/, "Must be a 3-letter currency code"),
+  locale: z.enum(["pt-BR", "en"]),
+  lines: z.array(InvoiceLineSchema).min(1).max(100),
+  notes: z.string().trim().max(2000).nullable().optional(),
+});
+
+export const CreateInvoiceSchema = InvoiceFieldsSchema.extend({ clientId: z.string().min(1) });
+export const UpdateInvoiceSchema = InvoiceFieldsSchema.partial();
 
 // ─── Project ─────────────────────────────────────────────────────────────────
 
@@ -1340,6 +1402,10 @@ export type UpdateClient = z.infer<typeof UpdateClientSchema>;
 export type ClientService = z.infer<typeof ClientServiceSchema>;
 export type ReportSettings = z.infer<typeof ReportSettingsSchema>;
 export type UpdateReportSettings = z.infer<typeof UpdateReportSettingsSchema>;
+export type Invoice = z.infer<typeof InvoiceSchema>;
+export type InvoiceParty = z.infer<typeof InvoicePartySchema>;
+export type CreateInvoice = z.infer<typeof CreateInvoiceSchema>;
+export type UpdateInvoice = z.infer<typeof UpdateInvoiceSchema>;
 export type CreateClientService = z.infer<typeof CreateClientServiceSchema>;
 export type UpdateClientService = z.infer<typeof UpdateClientServiceSchema>;
 export type ClientStats = z.infer<typeof ClientStatsSchema>;

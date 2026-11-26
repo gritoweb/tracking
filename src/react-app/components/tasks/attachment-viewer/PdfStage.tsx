@@ -39,15 +39,21 @@ function PdfPage({ doc, index, size, scale }: { doc: PDFDocumentProxy; index: nu
       const page = await doc.getPage(index + 1);
       const viewport = page.getViewport({ scale: scale * CSS_UNITS });
       const output = Math.min(window.devicePixelRatio || 1, 2);
-      target.width = Math.floor(viewport.width * output);
-      target.height = Math.floor(viewport.height * output);
+      // Drawn off screen and copied in once complete, so a re-render (zoom, a regenerated file) never blanks the page.
+      const buffer = document.createElement("canvas");
+      buffer.width = Math.floor(viewport.width * output);
+      buffer.height = Math.floor(viewport.height * output);
       task = page.render({
-        canvas: target,
+        canvas: buffer,
         viewport,
         transform: output !== 1 ? [output, 0, 0, output, 0, 0] : undefined,
       });
       // A zoom or scroll cancels the render in flight; only a real failure is worth a log line.
-      task.promise.catch((e: unknown) => {
+      task.promise.then(() => {
+        target.width = buffer.width;
+        target.height = buffer.height;
+        target.getContext("2d")?.drawImage(buffer, 0, 0);
+      }).catch((e: unknown) => {
         if ((e as { name?: string } | null)?.name !== "RenderingCancelledException") {
           console.warn("pdf page render failed", { page: index + 1, error: String(e) });
         }
@@ -70,19 +76,23 @@ function PdfPage({ doc, index, size, scale }: { doc: PDFDocumentProxy; index: nu
   );
 }
 
+export type PdfFit = "width" | "page";
+
 interface PdfStageProps {
   url: string;
   zoom: number;
+  /** What zoom 1 fits: the page's width (default) or the whole page, so it reads without scrolling. */
+  fit?: PdfFit;
   onZoomBy: (factor: number) => void;
   onError: () => void;
 }
 
-/** Every page stacked in one scroll, fitted to the width at zoom 1; Ctrl/⌘ + wheel or a trackpad pinch zooms. */
-export default function PdfStage({ url, zoom, onZoomBy, onError }: PdfStageProps) {
+/** Every page stacked in one scroll, fitted to the width (or the whole page) at zoom 1; Ctrl/⌘ + wheel or a trackpad pinch zooms. */
+export default function PdfStage({ url, zoom, fit = "width", onZoomBy, onError }: PdfStageProps) {
   const scroller = useRef<HTMLDivElement>(null);
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null);
   const [sizes, setSizes] = useState<Size[]>([]);
-  const [fitWidth, setFitWidth] = useState(0);
+  const [box, setBox] = useState({ width: 0, height: 0 });
 
   useEffect(() => {
     // Set on cleanup: a load we tore down ourselves (file switched, dev double-mount) rejects, and that isn't a failure.
@@ -117,7 +127,7 @@ export default function PdfStage({ url, zoom, onZoomBy, onError }: PdfStageProps
   useEffect(() => {
     const el = scroller.current;
     if (!el) return;
-    const observer = new ResizeObserver(() => setFitWidth(el.clientWidth - PAGE_GUTTER));
+    const observer = new ResizeObserver(() => setBox({ width: el.clientWidth - PAGE_GUTTER, height: el.clientHeight - PAGE_GUTTER }));
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
@@ -135,7 +145,9 @@ export default function PdfStage({ url, zoom, onZoomBy, onError }: PdfStageProps
   }, [onZoomBy]);
 
   const widest = Math.max(1, ...sizes.map((s) => s.width));
-  const scale = fitWidth > 0 ? (fitWidth / widest) * zoom : 0;
+  const tallest = Math.max(1, ...sizes.map((s) => s.height));
+  const fitted = fit === "page" ? Math.min(box.width / widest, box.height / tallest) : box.width / widest;
+  const scale = box.width > 0 ? fitted * zoom : 0;
 
   // Keep the same spot of the document in view while zooming.
   const lastScale = useRef(scale);

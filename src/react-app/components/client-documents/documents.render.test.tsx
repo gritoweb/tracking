@@ -51,6 +51,11 @@ describe("the invoice PDF", () => {
         clientName={long("School", 20)}
         number="2026-09-ACME-LONG-INVOICE-NUMBER-0000001"
         issueDate="13/10/2026"
+        dueDate="28/10/2026"
+        companyAddress={long("Long Avenue", 8) + "\nSuite 1000\nCity - State"}
+        companyPhone="+55 15 90000-0000"
+        clientAddress={long("Client Street", 8) + "\nBuilding 7"}
+        notes={long("Payment by bank transfer", 10)}
         lines={lines}
         currency="BRL"
       />
@@ -65,6 +70,10 @@ describe("the invoice PDF", () => {
     // Letter-spaced, it reads back as "T O T A L".
     const label = items.find((i) => i.str.replace(/\s/g, "") === "TOTAL" && i.page === amount!.page)!;
     expect(label.right).toBeLessThan(amount!.left);
+    for (const text of ["VENCIMENTO", "28/10/2026", "+55 15 90000-0000", "Building 7", "OBSERVAÇÕES"]) {
+      // Letter-spaced labels read back with spaces between letters.
+      expect(items.some((i) => i.str.replace(/\s/g, "").includes(text.replace(/\s/g, ""))), `"${text}" is missing`).toBe(true);
+    }
   }, 30_000);
 });
 
@@ -106,5 +115,8 @@ describe("the hours report PDF", () => {
     expect(pages).toBeGreaterThan(10);
     expectInsidePage(items);
     expect(items.some((i) => i.str === "999:59:00")).toBe(true);
+    // The per-project block totals the one project across every entry.
+    expect(items.some((i) => i.str === "Hours by project")).toBe(true);
+    expect(items.some((i) => i.str === "299995:00:00")).toBe(true);
   }, 30_000);
 });

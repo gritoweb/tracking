@@ -6,6 +6,7 @@ import {
   projectsClient,
   clientsClient,
   reportSettingsClient,
+  invoicesClient,
   tagsClient,
   tasksClient,
   attachmentsClient,
@@ -55,6 +56,8 @@ import type {
   UpdateClientService,
   ReportSettings,
   UpdateReportSettings,
+  CreateInvoice,
+  UpdateInvoice,
   CreateFavorite,
   CreateRecurringEntry,
   UpdateRecurringEntry,
@@ -412,6 +415,15 @@ export const api = {
     },
     deleteLogo: () => json(reportSettingsClient.logo.$delete()),
     recordInvoiceNumber: (number: string) => json(reportSettingsClient["invoice-number"].$post({ json: { number } })),
+  },
+
+  // ─── Invoices (saved; owners/admins only) ─────────────────────────────────
+  invoices: {
+    list: (clientId: string) => json(invoicesClient.index.$get({ query: { clientId } })),
+    get: (id: string) => json(invoicesClient[":id"].$get({ param: { id } })),
+    create: (body: CreateInvoice) => json(invoicesClient.index.$post({ json: body })),
+    update: (id: string, body: UpdateInvoice) => json(invoicesClient[":id"].$put({ param: { id }, json: body })),
+    delete: (id: string) => json(invoicesClient[":id"].$delete({ param: { id } })),
   },
 
   // ─── Tags ─────────────────────────────────────────────────────────────────

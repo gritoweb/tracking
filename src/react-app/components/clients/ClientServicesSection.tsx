@@ -1,6 +1,7 @@
 import { Fragment, useState } from "react";
 import { Edit2, Plus, Repeat, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/icon-button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
@@ -78,12 +79,12 @@ export function ClientServicesSection({ clientId, clientCurrency, canManage }: {
                         title="Billable"
                         onCheckedChange={(billable) => save.mutate({ kind: "update", serviceId: s.id, data: { billable } })}
                       />
-                      <Button variant="ghost" size="icon-sm" aria-label="Edit service" title="Edit service" onClick={() => setEditing(s)}>
+                      <IconButton label="Edit service" onClick={() => setEditing(s)}>
                         <Edit2 />
-                      </Button>
-                      <Button variant="ghost" size="icon-sm" aria-label="Remove service" title="Remove service" onClick={() => setRemoving(s)}>
+                      </IconButton>
+                      <IconButton label="Remove service" onClick={() => setRemoving(s)}>
                         <Trash2 />
-                      </Button>
+                      </IconButton>
                     </ItemActions>
                   )}
                 </Item>

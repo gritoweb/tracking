@@ -23,6 +23,12 @@ const ClientsPage = lazy(() =>
 const ClientDetailPage = lazy(() =>
   import("@/pages/ClientDetailPage").then((m) => ({ default: m.ClientDetailPage }))
 );
+const InvoiceEditorPage = lazy(() =>
+  import("@/pages/InvoiceEditorPage").then((m) => ({ default: m.InvoiceEditorPage }))
+);
+const HoursReportPage = lazy(() =>
+  import("@/pages/HoursReportPage").then((m) => ({ default: m.HoursReportPage }))
+);
 const ReportsPage = lazy(() =>
   import("@/pages/ReportsPage").then((m) => ({ default: m.ReportsPage }))
 );
@@ -96,6 +102,9 @@ const router = createBrowserRouter([
           { path: "tasks/:id?/:tab?", element: <TasksPage /> },
           { path: "clients", element: <ClientsPage /> },
           { path: "clients/:id", element: <ClientDetailPage /> },
+          { path: "clients/:id/invoices/new", element: <InvoiceEditorPage /> },
+          { path: "clients/:id/hours-report", element: <HoursReportPage /> },
+          { path: "clients/:id/invoices/:invoiceId", element: <InvoiceEditorPage /> },
           { path: "reports", element: <ReportsPage /> },
           { path: "settings", element: <SettingsPage /> },
           { path: "admin", element: <AdminPage /> },

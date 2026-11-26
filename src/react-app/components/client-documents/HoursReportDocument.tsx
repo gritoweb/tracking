@@ -1,6 +1,7 @@
 import { Document, Image, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import {
   DOCUMENT_TEXT,
+  hoursByProject,
   hoursSummary,
   type DocumentLocale,
 } from "@shared/client-documents";
@@ -30,6 +31,7 @@ export function HoursReportDocument(p: HoursReportProps) {
   const t = DOCUMENT_TEXT[p.locale];
   const s = styles(p.palette);
   const summary = hoursSummary(p.entries, localDay);
+  const projects = hoursByProject(p.entries);
   const header = (
     <View style={s.th} fixed>
       <Text style={[s.thText, s.colDesc]}>{t.description.toUpperCase()}</Text>
@@ -68,6 +70,25 @@ export function HoursReportDocument(p: HoursReportProps) {
             </Text>
           </View>
         </View>
+
+        {projects.length > 0 && (
+          <View style={s.projects}>
+            <Text style={s.section}>{t.byProject}</Text>
+            <View style={s.th}>
+              <Text style={[s.thText, s.colDesc]}>{t.project.toUpperCase()}</Text>
+              <Text style={[s.thText, s.colTotal]}>{t.duration.toUpperCase()}</Text>
+            </View>
+            {projects.map((r, i) => (
+              <View key={i} style={s.row} wrap={false}>
+                <View style={[s.colDesc, s.project]}>
+                  <View style={[s.dot, { backgroundColor: r.projectColor ?? p.palette.primary }]} />
+                  <Text style={s.cell}>{r.projectName ?? "—"}</Text>
+                </View>
+                <Text style={[s.cell, s.colTotal]}>{formatClock(r.seconds)}</Text>
+              </View>
+            ))}
+          </View>
+        )}
 
         <Text style={s.section}>{p.sectionTitle}</Text>
         {/* Inside one wrapping View, the fixed header repeats on every page the table reaches. */}
@@ -120,6 +141,8 @@ function styles(c: BrandPalette) {
     colDur: { width: 62 },
     colProject: { width: 120 },
     colDate: { width: 66, textAlign: "right" },
+    colTotal: { width: 80, textAlign: "right" },
+    projects: { marginBottom: 22 },
     project: { flexDirection: "row", alignItems: "center" },
     dot: { width: 5, height: 5, borderRadius: 3, marginRight: 6 },
     footer: {

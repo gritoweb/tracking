@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { Navigate, useParams, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
   Edit2,
@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/collapsible";
 import { ClientForm } from "@/components/forms/ClientForm";
 import { ClientServicesSection } from "@/components/clients/ClientServicesSection";
+import { ClientInvoicesSection } from "@/components/clients/ClientInvoicesSection";
 import { ClientDocumentButton } from "@/components/client-documents/ClientDocumentButton";
 import { documentPresetFrom } from "@/lib/clientDocuments";
 import { ColorDot } from "@/components/ColorDot";
@@ -46,7 +47,7 @@ export function ClientDetailPage() {
   const { data: allProjects = [] } = useAllProjects();
   const [showEdit, setShowEdit] = useState(false);
   // A link from the Assistant or an MCP client opens the document generator filled in.
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const documentPreset = documentPresetFrom(searchParams);
   // Editing a client is for owners/admins; the server refuses a member (D3).
   const { canManage } = useWorkspaceRole();
@@ -101,6 +102,12 @@ export function ClientDetailPage() {
         />
       </div>
     );
+  }
+
+  // A document link (Assistant, MCP) opens that document's screen, filled in the same way.
+  if (documentPreset && (documentPreset.kind === "hours" || canManage)) {
+    const path = documentPreset.kind === "invoice" ? "invoices/new" : "hours-report";
+    return <Navigate to={`/clients/${client.id}/${path}?${searchParams}`} replace />;
   }
 
   const projects = allProjects.filter((p) => p.clientId === client.id);
@@ -164,8 +171,6 @@ export function ClientDetailPage() {
               key={kind}
               kind={kind}
               clientId={client.id}
-              preset={documentPreset}
-              onClose={() => setSearchParams({}, { replace: true })}
             />
           ))}
           {canManage && (
@@ -308,6 +313,8 @@ export function ClientDetailPage() {
           />
         )}
       </div>
+
+      {canManage && <ClientInvoicesSection clientId={client.id} />}
 
       <ClientServicesSection clientId={client.id} clientCurrency={client.currency} canManage={canManage} />
 

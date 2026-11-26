@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hoursSummary, invoiceLines, invoiceTotal } from "./client-documents";
+import { hoursByProject, hoursSummary, invoiceLines, invoiceTotal } from "./client-documents";
 
 describe("the invoice", () => {
   it("bills whole hours, rounded down, and lists only billable services", () => {
@@ -50,4 +50,13 @@ describe("the hours report", () => {
     expect(s).toEqual({ totalSeconds: 9000, entryCount: 3, dailyAverageHours: 1.25 });
   });
 
+  it("totals each project, most hours first, keeping same-named projects apart", () => {
+    const e = (projectId: string | null, projectName: string | null, duration: number) => ({ projectId, projectName, projectColor: null, duration });
+    expect(hoursByProject([e("p1", "Site", 3600), e("p2", "SEO", 7200), e("p1", "Site", 1800), e("p3", "Site", 60), e(null, null, 30)])).toEqual([
+      { projectName: "SEO", projectColor: null, seconds: 7200 },
+      { projectName: "Site", projectColor: null, seconds: 5400 },
+      { projectName: "Site", projectColor: null, seconds: 60 },
+      { projectName: null, projectColor: null, seconds: 30 },
+    ]);
+  });
 });

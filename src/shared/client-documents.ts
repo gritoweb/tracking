@@ -10,6 +10,9 @@ export const DOCUMENT_TEXT = {
     invoice: "Invoice",
     billedTo: "Faturado para",
     issueDate: "Data de emissão",
+    dueDate: "Vencimento",
+    notes: "Observações",
+    byProject: "Horas por projeto",
     description: "Descrição",
     qtyHours: "Qtd / Hrs",
     amount: "Valor",
@@ -33,6 +36,9 @@ export const DOCUMENT_TEXT = {
     invoice: "Invoice",
     billedTo: "Billed to",
     issueDate: "Issue date",
+    dueDate: "Due date",
+    notes: "Notes",
+    byProject: "Hours by project",
     description: "Description",
     qtyHours: "Qty / Hrs",
     amount: "Amount",
@@ -94,6 +100,17 @@ export function hoursSummary(entries: Pick<ReportDetailedEntry, "start" | "durat
   const totalSeconds = entries.reduce((sum, e) => sum + e.duration, 0);
   const days = new Set(entries.map((e) => dayOf(e.start))).size;
   return { totalSeconds, entryCount: entries.length, dailyAverageHours: days ? totalSeconds / 3600 / days : 0 };
+}
+
+/** Time per project, most first; entries without a project share one row. */
+export function hoursByProject(entries: Pick<ReportDetailedEntry, "projectId" | "projectName" | "projectColor" | "duration">[]) {
+  const byId = new Map<string | null, { projectName: string | null; projectColor: string | null; seconds: number }>();
+  for (const e of entries) {
+    const row = byId.get(e.projectId) ?? { projectName: e.projectName, projectColor: e.projectColor, seconds: 0 };
+    row.seconds += e.duration;
+    byId.set(e.projectId, row);
+  }
+  return [...byId.values()].sort((a, b) => b.seconds - a.seconds);
 }
 
 /** An invoice number is digits, optionally in hyphen-separated groups: "7", "2026-09". */

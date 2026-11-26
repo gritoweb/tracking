@@ -13,6 +13,7 @@ const MAX_LOGO_BYTES = 1024 * 1024;
 export const InvoiceNumberSchema = z.string().trim().regex(INVOICE_NUMBER, "Digits and hyphens only, e.g. 12 or 2026-09");
 // The one default not taken from the workspace itself: an invoice always needs some rate.
 export const DEFAULT_HOURLY_RATE = 100;
+export const DEFAULT_INVOICE_DUE_DAYS = 15;
 
 // Sniffed from the bytes; the PDF renderer embeds only PNG and JPEG (lib/image.ts is not imported: it pulls in the photon wasm).
 function logoContentType(b: Uint8Array): string | null {
@@ -31,10 +32,13 @@ interface ReportSettingsRow {
   logo_content_type: string | null;
   currency: string | null;
   last_invoice_number: string | null;
+  company_address: string | null;
+  company_phone: string | null;
+  invoice_due_days: number | null;
   updated_at: string;
 }
 
-async function load(db: D1Database, workspaceId: string): Promise<ReportSettings> {
+export async function loadReportSettings(db: D1Database, workspaceId: string): Promise<ReportSettings> {
   // Unsaved fields come from the workspace: its name, and its first owner's e-mail and display currency.
   const [row, ws] = await Promise.all([
     db.prepare(`SELECT * FROM report_settings WHERE workspace_id = ?`).bind(workspaceId).first<ReportSettingsRow>(),
@@ -60,6 +64,9 @@ async function load(db: D1Database, workspaceId: string): Promise<ReportSettings
     defaultRate: ws?.default_rate ?? DEFAULT_HOURLY_RATE,
     currency: row?.currency ?? ws?.owner_currency ?? "USD",
     invoiceNumber: row?.last_invoice_number ?? "1",
+    companyAddress: row?.company_address ?? "",
+    companyPhone: row?.company_phone ?? "",
+    invoiceDueDays: row?.invoice_due_days ?? DEFAULT_INVOICE_DUE_DAYS,
   };
 }
 
@@ -68,7 +75,7 @@ export const reportSettingsRouter = new Hono<{
   Bindings: Env;
   Variables: { workspaceId: string; userId: string };
 }>()
-  .get("/", async (c) => c.json(await load(c.env.DB, c.get("workspaceId")), 200))
+  .get("/", async (c) => c.json(await loadReportSettings(c.env.DB, c.get("workspaceId")), 200))
   .put("/", zValidator("json", UpdateReportSettingsSchema), async (c) => {
     if (!(await isManager(c.env.DB, c.get("workspaceId"), c.get("userId")))) return c.json({ error: MANAGER_ONLY_ERROR }, 403);
     const workspaceId = c.get("workspaceId");
@@ -79,6 +86,9 @@ export const reportSettingsRouter = new Hono<{
     if (data.companyName !== undefined) { fields.push("company_name"); values.push(data.companyName || null); }
     if (data.companyEmail !== undefined) { fields.push("company_email"); values.push(data.companyEmail || null); }
     if (data.currency !== undefined) { fields.push("currency"); values.push(data.currency); }
+    if (data.companyAddress !== undefined) { fields.push("company_address"); values.push(data.companyAddress || null); }
+    if (data.companyPhone !== undefined) { fields.push("company_phone"); values.push(data.companyPhone || null); }
+    if (data.invoiceDueDays !== undefined) { fields.push("invoice_due_days"); values.push(data.invoiceDueDays); }
     if (data.colors) {
       fields.push("color_primary", "color_accent", "color_text");
       values.push(data.colors.primary.toLowerCase(), data.colors.accent.toLowerCase(), data.colors.text.toLowerCase());
@@ -98,7 +108,7 @@ export const reportSettingsRouter = new Hono<{
       writes.push(c.env.DB.prepare(`UPDATE workspaces SET default_rate = ? WHERE id = ?`).bind(data.defaultRate, workspaceId));
     }
     if (writes.length) await c.env.DB.batch(writes);
-    return c.json(await load(c.env.DB, workspaceId), 200);
+    return c.json(await loadReportSettings(c.env.DB, workspaceId), 200);
   })
   // The number an invoice was generated with is the one the next invoice is offered.
   .post("/invoice-number", zValidator("json", z.object({ number: InvoiceNumberSchema })), async (c) => {
@@ -108,7 +118,7 @@ export const reportSettingsRouter = new Hono<{
       `INSERT INTO report_settings (workspace_id, last_invoice_number) VALUES (?, ?)
        ON CONFLICT(workspace_id) DO UPDATE SET last_invoice_number = excluded.last_invoice_number`
     ).bind(workspaceId, c.req.valid("json").number).run();
-    return c.json(await load(c.env.DB, workspaceId), 200);
+    return c.json(await loadReportSettings(c.env.DB, workspaceId), 200);
   })
   .put("/logo", async (c) => {
     if (!(await isManager(c.env.DB, c.get("workspaceId"), c.get("userId")))) return c.json({ error: MANAGER_ONLY_ERROR }, 403);
@@ -134,7 +144,7 @@ export const reportSettingsRouter = new Hono<{
        ON CONFLICT(workspace_id) DO UPDATE SET logo_r2_key = excluded.logo_r2_key,
          logo_content_type = excluded.logo_content_type, updated_at = excluded.updated_at`
     ).bind(workspaceId, key, contentType, new Date().toISOString()).run();
-    return c.json(await load(c.env.DB, workspaceId), 200);
+    return c.json(await loadReportSettings(c.env.DB, workspaceId), 200);
   })
   .delete("/logo", async (c) => {
     if (!(await isManager(c.env.DB, c.get("workspaceId"), c.get("userId")))) return c.json({ error: MANAGER_ONLY_ERROR }, 403);
@@ -147,7 +157,7 @@ export const reportSettingsRouter = new Hono<{
       ).bind(new Date().toISOString(), workspaceId).run();
       c.executionCtx.waitUntil(c.env.ATTACHMENTS.delete(row.logo_r2_key));
     }
-    return c.json(await load(c.env.DB, workspaceId), 200);
+    return c.json(await loadReportSettings(c.env.DB, workspaceId), 200);
   })
   .get("/logo", async (c) => {
     const row = await c.env.DB.prepare(

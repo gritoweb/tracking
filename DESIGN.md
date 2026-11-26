@@ -326,6 +326,7 @@ Variants live in a sibling `*-variants.ts` module so the component file exports 
 | Primitive | Variants | Use it for | Not for |
 |---|---|---|---|
 | `Button` | `variant` (default, destructive, outline, secondary, ghost, link), `size` (default, sm, lg, icon-xs, icon-sm, icon-lg) | every clickable action | a hand-rolled `<button>` with its own classes |
+| `IconButton` | `Button`'s `variant` / icon `size` (default ghost, icon-sm) | every icon-only action: it always carries the tooltip with its `label`, which is also its accessible name | an icon button with only a native `title` |
 | `ClearButton` | `size` (xs, sm) | the small ✕ that clears a chip or a field | deleting a record (that is `RemoveButton`) |
 | `RemoveButton` | — (`icon` prop) | the hover-revealed trash on a menu row; always visible on touch | a primary delete action |
 | `AssignButton` | `size` | "empty, click to fill" per the Dashed Rule | anything that is not an empty slot |
