@@ -46,9 +46,14 @@ describe("saved invoices", () => {
     expect(inv.company).toMatchObject({ name: "Agency A", address: "9 Side Rd", phone: "555-0100" });
     expect(settings()).toEqual({ last_invoice_number: "7", invoice_due_days: 30 });
 
-    // A later edit of the client doesn't rewrite the invoice already sent.
+    // A later edit of the client doesn't rewrite the invoice already sent…
     raw.exec(`UPDATE clients SET address = 'Elsewhere' WHERE id = 'cl-A'`);
+    raw.exec(`UPDATE report_settings SET company_phone = '555-0199' WHERE workspace_id = 'ws-A'`);
     expect(((await (await as("u-owner").get(`/${inv.id}`)).json()) as Invoice).client.address).toBe("1 Main St");
+    // …until someone saves an edit of it, which takes both parties as they are now.
+    const resaved = (await (await as("u-owner").put(`/${inv.id}`, { notes: "x" })).json()) as Invoice;
+    expect(resaved.client.address).toBe("Elsewhere");
+    expect(resaved.company.phone).toBe("555-0199");
   });
 
   it("an edit of the lines changes the stored total and its payment term becomes the default; delete removes it", async () => {

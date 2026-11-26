@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-11-26 (2)
+### Changed
+- **The invoice editor has a "Billed to" block with the client's address.** It was only editable in the client's Edit dialog, so an invoice generated before filling it went out without one. The address typed here is saved on the client before the invoice, so the invoice and every later one use it.
+- **Saving an invoice, new or edited, takes the client's and the company's details as they are now.** An invoice that is never edited still keeps the details it was saved with; one saved before the company address existed gets it by opening Edit and saving.
+- Client changes (address, rate) are saved before the invoice and anything after it only warns, so a failing recurring-item save can no longer leave Save clickable on an invoice that already exists (a second click duplicated it).
+  - Verified: `invoices.test.ts` (an edit refreshes both parties, an unedited invoice keeps its own), `tsc -b` (0), `pnpm lint` (0); against the local dev server via the API: client address changed, invoice edit saved, the invoice carried the new client address and the company address/phone. Full `vitest run` under dev-server load had 10 timeouts in untouched files, which pass 132/132 re-run alone.
+
 ## 2026-11-26 (hotfix)
 ### Fixed
 - **The invoice and hours-report preview was blank in production.** The preview hands pdf.js an object URL (`blob:`) of the PDF just generated, and pdf.js reads it with `fetch`; the document CSP in `public/_headers` had no `blob:` in `connect-src`, so production blocked it ("pdf open failed"). The dev server sends no CSP, which is why local testing passed. `connect-src` now includes `blob:` (an object URL is only ever created by the page's own scripts, so nothing outside is opened); `csp-headers.test.ts` locks it in.

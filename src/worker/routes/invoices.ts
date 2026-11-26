@@ -50,6 +50,26 @@ function formatInvoice(r: InvoiceRow): Invoice {
   };
 }
 
+/** The client's and the company's details as they are now, frozen into an invoice when it is saved; null when the client isn't in the workspace. */
+async function currentParties(db: D1Database, workspaceId: string, clientId: string): Promise<{ client: InvoiceParty; company: InvoiceParty } | null> {
+  const [client, settings] = await Promise.all([
+    db.prepare(`SELECT name, email, address, phone FROM clients WHERE id = ? AND workspace_id = ?`)
+      .bind(clientId, workspaceId)
+      .first<InvoiceParty>(),
+    loadReportSettings(db, workspaceId),
+  ]);
+  if (!client) return null;
+  return {
+    client: { name: client.name, email: client.email, address: client.address, phone: client.phone },
+    company: {
+      name: settings.companyName,
+      email: settings.companyEmail || null,
+      address: settings.companyAddress || null,
+      phone: settings.companyPhone || null,
+    },
+  };
+}
+
 /** Whole days from issue to due date, kept inside the 0–365 the settings accept. */
 function dueDaysOf(issue: string, due: string): number {
   const days = Math.round((Date.parse(`${due}T00:00:00Z`) - Date.parse(`${issue}T00:00:00Z`)) / 86_400_000);
@@ -85,17 +105,8 @@ export const invoicesRouter = new Hono<{
   .post("/", zValidator("json", CreateInvoiceSchema), async (c) => {
     const workspaceId = c.get("workspaceId");
     const data = c.req.valid("json");
-    const client = await c.env.DB.prepare(`SELECT name, email, address, phone FROM clients WHERE id = ? AND workspace_id = ?`)
-      .bind(data.clientId, workspaceId)
-      .first<{ name: string; email: string | null; address: string | null; phone: string | null }>();
-    if (!client) return c.json({ error: "Not found" }, 404);
-    const settings = await loadReportSettings(c.env.DB, workspaceId);
-    const company: InvoiceParty = {
-      name: settings.companyName,
-      email: settings.companyEmail || null,
-      address: settings.companyAddress || null,
-      phone: settings.companyPhone || null,
-    };
+    const parties = await currentParties(c.env.DB, workspaceId, data.clientId);
+    if (!parties) return c.json({ error: "Not found" }, 404);
     const now = new Date().toISOString();
     const dueDays = dueDaysOf(data.issueDate, data.dueDate);
 
@@ -108,8 +119,8 @@ export const invoicesRouter = new Hono<{
       ).bind(
         id, workspaceId, data.clientId, data.number, data.issueDate, data.dueDate,
         data.periodFrom, data.periodTo, data.currency, data.locale, JSON.stringify(data.lines),
-        invoiceTotal(data.lines), data.notes || null, JSON.stringify(client satisfies InvoiceParty),
-        JSON.stringify(company), now, now
+        invoiceTotal(data.lines), data.notes || null, JSON.stringify(parties.client),
+        JSON.stringify(parties.company), now, now
       ),
       // The number and due-days of the invoice just saved are what the next one is offered.
       c.env.DB.prepare(
@@ -126,7 +137,15 @@ export const invoicesRouter = new Hono<{
     const workspaceId = c.get("workspaceId");
     const id = c.req.param("id");
     const data = c.req.valid("json");
+    const existing = await c.env.DB.prepare(`SELECT client_id FROM invoices WHERE id = ? AND workspace_id = ?`)
+      .bind(id, workspaceId)
+      .first<{ client_id: string }>();
+    if (!existing) return c.json({ error: "Not found" }, 404);
+    // Saving an edit takes the client's and the company's details as they are now; an invoice nobody edits keeps its own.
+    const parties = await currentParties(c.env.DB, workspaceId, existing.client_id);
     const columns: Record<string, unknown> = {
+      client_snapshot: parties && JSON.stringify(parties.client),
+      company_snapshot: parties && JSON.stringify(parties.company),
       number: data.number,
       issue_date: data.issueDate,
       due_date: data.dueDate,

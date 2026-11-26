@@ -168,6 +168,8 @@ function Editor({
   const [dueDaysText, setDueDaysText] = useState(String(saved ? differenceInCalendarDays(parseISO(saved.dueDate), parseISO(saved.issueDate)) : settings.invoiceDueDays));
   const dueDays = Number(dueDaysText || 0);
   const [notes, setNotes] = useState(saved?.notes ?? "");
+  // The client's own address: edited here, it is saved on the client, and saving the invoice takes it from there.
+  const [clientAddress, setClientAddress] = useState(client.address ?? "");
   const [lines, setLines] = useState<DraftLine[]>(() =>
     saved
       ? saved.lines.map((l, i) => ({ ...l, key: newKey(), kind: l.kind ?? (i === 0 && l.hours !== null ? "hours" : "one_off") }))
@@ -200,9 +202,9 @@ function Editor({
     lines: GROUPS.flatMap((g) => filled.filter((l) => l.kind === g.kind))
       .filter(lineValid)
       .map((l) => ({ description: l.description.trim(), hours: l.hours, amount: l.amount ?? 0, kind: l.kind })),
-    // An edit keeps the parties the invoice was sent with; a new one takes today's client and branding.
-    client: saved?.client ?? { name: client.name, email: client.email, address: client.address, phone: client.phone },
-    company: saved?.company ?? {
+    // Saving (new or edit) takes the client's and the company's details as they are now, so the preview shows those.
+    client: { name: client.name, email: client.email, address: clientAddress.trim() || null, phone: client.phone },
+    company: {
       name: settings.companyName,
       email: settings.companyEmail || null,
       address: settings.companyAddress || null,
@@ -256,18 +258,25 @@ function Editor({
         lines: content.lines,
         notes: content.notes,
       };
+      // Client changes first (safe to repeat), so the invoice is saved with them; a rate typed here is the client's from now on.
+      const clientChange = {
+        ...((clientAddress.trim() || null) !== client.address ? { address: clientAddress.trim() || null } : {}),
+        ...(fixedFee === null && rate !== null && Number.isFinite(rate) && rate !== savedRate ? { rate } : {}),
+      };
+      if (Object.keys(clientChange).length) await updateClient.mutateAsync({ id: client.id, data: clientChange });
       const invoice = saved
         ? await save.mutateAsync({ kind: "update", id: saved.id, data: fields })
         : await save.mutateAsync({ kind: "create", data: { ...fields, clientId: client.id } });
-      // A rate typed here is the client's rate from now on, as if it had been edited on the client.
-      if (fixedFee === null && rate !== null && Number.isFinite(rate) && rate !== savedRate) {
-        await updateClient.mutateAsync({ id: client.id, data: { rate } });
+      // From here the invoice is saved: a failure below is reported, never retried by a second Save that would duplicate it.
+      try {
+        // A recurring item added here becomes one of the client's services, billed on every invoice from now on.
+        for (const l of filled.filter((x) => x.isNewService)) {
+          await api.clients.createService(client.id, { name: l.description.trim(), amount: l.amount ?? 0, billable: true });
+        }
+        if (andDownload) downloadBlob(await renderInvoicePdf(invoice, settings), invoiceFileName(invoice));
+      } catch (error) {
+        toastApiError(error, "The invoice was saved, but a recurring item or the PDF download failed");
       }
-      // A recurring item added here becomes one of the client's services, billed on every invoice from now on.
-      for (const l of filled.filter((x) => x.isNewService)) {
-        await api.clients.createService(client.id, { name: l.description.trim(), amount: l.amount ?? 0, billable: true });
-      }
-      if (andDownload) downloadBlob(await renderInvoicePdf(invoice, settings), invoiceFileName(invoice));
       onDone();
     } catch (error) {
       toastApiError(error, "Failed to save the invoice");
@@ -376,6 +385,24 @@ function Editor({
                   ? `Fixed fee of ${formatMoney(fixedFee, currency)} for the hours (Edit on the client page).`
                   : "A rate typed here becomes this client's rate. The payment term is remembered for the next invoice."}
               </SettingsHint>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="space-y-3">
+              <h2 className="text-sm font-semibold">Billed to</h2>
+              <p className="text-sm">{client.name}</p>
+              <Field>
+                <FieldLabel htmlFor="inv-client-address">Client address</FieldLabel>
+                <Textarea
+                  id="inv-client-address"
+                  rows={3}
+                  value={clientAddress}
+                  placeholder="Street, number, city, state, ZIP"
+                  onChange={(e) => setClientAddress(e.target.value)}
+                />
+              </Field>
+              <SettingsHint>Saved on the client, so every invoice for it uses this address. Your company's address is in Settings → Reports.</SettingsHint>
             </CardContent>
           </Card>
 
